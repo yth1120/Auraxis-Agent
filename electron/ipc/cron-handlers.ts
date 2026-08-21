@@ -16,7 +16,7 @@ import { join, dirname } from 'path';
 import { devLog } from './shared';
 import { existsSync } from 'fs';
 import { readSettings } from './settings-store';
-import { scheduler } from './agent-scheduler';
+import { scheduler, createUnattendedPermissionChecker } from './agent-scheduler';
 
 // ─── Types ──────────────────────────────────────────────
 
@@ -331,21 +331,28 @@ async function runCronAgent(job: CronJob): Promise<void> {
     updateJobRun(job.id, { at: Date.now(), status: 'error', error: '缺少项目目录或 API Key，定时任务未执行' });
     return;
   }
+  // 无人值守默认不自动批准：只有显式设置 AURAXIS_UNATTENDED_AUTOAPPROVE=1
+  // 才恢复全自动执行，避免定时任务绕过审批门。
+  const unattendedAuto = process.env.AURAXIS_UNATTENDED_AUTOAPPROVE === '1';
+  const config = {
+    name: `[定时] ${job.name}`,
+    description: job.prompt,
+    type: 'general-purpose',
+    model: settings?.defaultModel || 'deepseek-v4-pro',
+    apiKey,
+    priority: 'normal' as const,
+    autoApprove: unattendedAuto,
+    mode: unattendedAuto ? 'auto' as const : 'ask' as const,
+    sandboxMode: unattendedAuto ? 'full' as const : 'workspace-write' as const,
+    maxIterations: 50,
+    metadata: { cronJobId: job.id },
+  };
   scheduler.startAgent(
-    {
-      name: `[定时] ${job.name}`,
-      description: job.prompt,
-      type: 'general-purpose',
-      model: settings?.defaultModel || 'deepseek-v4-pro',
-      apiKey,
-      priority: 'normal',
-      autoApprove: true,
-      mode: 'auto',
-      maxIterations: 50,
-      metadata: { cronJobId: job.id },
-    },
+    config,
     projectPath,
-    () => Promise.resolve(true),
+    unattendedAuto
+      ? () => Promise.resolve(true)
+      : createUnattendedPermissionChecker(config, projectPath),
   );
 }
 

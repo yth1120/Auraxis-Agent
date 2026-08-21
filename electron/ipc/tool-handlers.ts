@@ -1,4 +1,5 @@
 import { spawn, execSync, spawnSync } from 'child_process';
+import dns from 'dns';
 import { app } from 'electron';
 import { readFile, writeFile, readdir, stat, mkdir, rm } from 'fs/promises';
 import { statSync } from 'fs';
@@ -1063,9 +1064,17 @@ async function runGitCommit(params: { message: string }, ctx: ToolContext): Prom
   const cwd = ctx.projectRoot;
   if (!cwd) return { output: null, error: '缺少项目路径' };
   try {
-    const { execSync } = await import('child_process');
-    execSync('git add -A', { cwd, encoding: 'utf-8', timeout: 10000, windowsHide: true });
-    const hash = execSync(`git commit -m "${message.replace(/"/g, '\\"')}"`, { cwd, encoding: 'utf-8', timeout: 10000, windowsHide: true }).trim();
+    // 使用 spawnSync 传参数数组，避免 commit message 里的
+    // `&`、`;`、`$()`、反引号等被 shell 解释（命令注入）。
+    const add = spawnSync('git', ['add', '-A'], { cwd, encoding: 'utf-8', timeout: 10000, windowsHide: true });
+    if (add.status !== 0) {
+      throw new Error((add.stderr || add.error?.message || 'git add 失败').trim());
+    }
+    const commit = spawnSync('git', ['commit', '-m', message], { cwd, encoding: 'utf-8', timeout: 10000, windowsHide: true });
+    if (commit.status !== 0) {
+      throw new Error((commit.stderr || commit.error?.message || 'git commit 失败').trim());
+    }
+    const hash = (commit.stdout || '').trim();
     // Extract short hash from commit output
     const shortHash = hash.match(/\[[\w-]+ ([a-f0-9]+)\]/)?.[1] || hash.slice(0, 7);
     return { output: { committed: true, hash: shortHash, message } };
@@ -1216,27 +1225,51 @@ async function runGlob(params: { pattern: string; path?: string }, ctx: ToolCont
 const BLOCKED_HOSTS = new Set(['localhost', '127.0.0.1', '0.0.0.0', '::1', '[::1]', '169.254.169.254']);
 const BLOCKED_SUFFIXES = ['.local', '.internal', '.localhost'];
 
+function isPrivateIpv4(ip: string): boolean {
+  const parts = ip.split('.').map(Number);
+  if (parts.length !== 4 || parts.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) return false;
+  if (parts[0] === 0 || parts[0] === 10 || parts[0] === 127) return true;
+  if (parts[0] === 169 && parts[1] === 254) return true;
+  if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
+  if (parts[0] === 192 && parts[1] === 168) return true;
+  return false;
+}
+
+function isPrivateIp(ip: string): boolean {
+  const normalized = ip.toLowerCase().replace(/^\[|\]$/g, '');
+  if (normalized === '::' || normalized === '::1' || normalized === '0.0.0.0') return true;
+  if (normalized.startsWith('::ffff:')) return isPrivateIpv4(normalized.slice(7));
+  if (normalized.includes(':')) {
+    // IPv6 loopback / ULA (fc00::/7) / link-local (fe80::/10)
+    if (normalized.startsWith('fc') || normalized.startsWith('fd')) return true;
+    if (normalized.startsWith('fe8') || normalized.startsWith('fe9')
+      || normalized.startsWith('fea') || normalized.startsWith('feb')) return true;
+    return false;
+  }
+  return isPrivateIpv4(normalized);
+}
+
 function isBlockedUrl(urlStr: string): boolean {
   try {
     const u = new URL(urlStr);
     const hostname = u.hostname.toLowerCase();
     if (BLOCKED_HOSTS.has(hostname)) return true;
-    if (hostname.startsWith('127.') || hostname.startsWith('10.') || hostname.startsWith('192.168.')) return true;
-    if (hostname.startsWith('172.') && parseInt(hostname.split('.')[1]) >= 16 && parseInt(hostname.split('.')[1]) <= 31) return true;
     if (BLOCKED_SUFFIXES.some((s) => hostname.endsWith(s))) return true;
+    if (isPrivateIp(hostname)) return true;
     return false;
   } catch {
     return true;
   }
 }
 
-async function runWebFetch(params: { url: string; prompt?: string }, ctx: ToolContext): Promise<ToolResult> {
+async function runWebFetch(params: { url: string; prompt?: string }, _ctx: ToolContext): Promise<ToolResult> {
   let url = params.url;
   if (!url.startsWith('http://') && !url.startsWith('https://')) {
     url = 'https://' + url;
   }
 
-  if (!ctx.autoApprove && isBlockedUrl(url)) {
+  // 内网/环回地址永远禁止访问——autoApprove 也不能绕过（防 SSRF 重定向/内网探测）。
+  if (isBlockedUrl(url)) {
     const hostname = (() => { try { return new URL(url).hostname; } catch { return url; } })();
     return { output: null, error: `禁止访问内部/本地网络地址 (${hostname})。仅允许访问公网 URL。如需获取本地文件，请使用 Read 工具。` };
   }
@@ -1245,34 +1278,68 @@ async function runWebFetch(params: { url: string; prompt?: string }, ctx: ToolCo
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
 
-    const response = await fetch(url, {
-      signal: controller.signal,
-      headers: { 'User-Agent': 'Auraxis/2.0' },
-    });
-    clearTimeout(timeout);
+    try {
+      // 预解析 DNS，拦截解析到内网/环回地址的域名（缓解 DNS rebinding）。
+      try {
+        const hostname = new URL(url).hostname;
+        const addresses = await dns.promises.lookup(hostname, { all: true });
+        if (addresses.some((a) => isPrivateIp(a.address))) {
+          return { output: null, error: `禁止访问内部/本地网络地址 (${hostname})。` };
+        }
+      } catch {
+        return { output: null, error: `无法解析主机名: ${new URL(url).hostname}` };
+      }
 
-    if (!response.ok) {
-      return { output: null, error: `HTTP ${response.status}: ${response.statusText}` };
+      // 手动跟随重定向，每一跳都重新做内网检查。
+      let current = url;
+      for (let hop = 0; hop < 5; hop++) {
+        const response = await fetch(current, {
+          signal: controller.signal,
+          redirect: 'manual',
+          headers: { 'User-Agent': 'Auraxis/2.0' },
+        });
+
+        if (response.status === 301 || response.status === 302
+          || response.status === 303 || response.status === 307 || response.status === 308) {
+          const location = response.headers.get('location');
+          if (!location) {
+            return { output: null, error: `HTTP ${response.status}: 缺少重定向地址` };
+          }
+          const next = new URL(location, current).toString();
+          if (isBlockedUrl(next)) {
+            return { output: null, error: `禁止跟随重定向到内部/本地网络地址: ${next}` };
+          }
+          current = next;
+          continue;
+        }
+
+        if (!response.ok) {
+          return { output: null, error: `HTTP ${response.status}: ${response.statusText}` };
+        }
+
+        const contentType = response.headers.get('content-type') || '';
+        const text = await response.text();
+
+        // Strip HTML tags for basic text extraction
+        let content = text;
+        if (contentType.includes('text/html') || content.includes('<html')) {
+          content = text
+            .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+            .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+            .replace(/<[^>]+>/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .slice(0, 10000);
+        } else {
+          content = text.slice(0, 10000);
+        }
+
+        return { output: { url: current, content_type: contentType, content } };
+      }
+      return { output: null, error: '重定向次数超过上限（5 次）' };
+    } finally {
+      clearTimeout(timeout);
     }
-
-    const contentType = response.headers.get('content-type') || '';
-    const text = await response.text();
-
-    // Strip HTML tags for basic text extraction
-    let content = text;
-    if (contentType.includes('text/html') || content.includes('<html')) {
-      content = text
-        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-        .replace(/<[^>]+>/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim()
-        .slice(0, 10000);
-    } else {
-      content = text.slice(0, 10000);
-    }
-
-    return { output: { url, content_type: contentType, content } };
   } catch (err: any) {
     return { output: null, error: `请求失败: ${err.message}` };
   }
@@ -1344,6 +1411,9 @@ async function runAgentTool(
         prompt: params.prompt,
         projectRoot: ctx.projectRoot,
         signal: ctx.abortSignal,
+        // fork 子进程不能弹审批窗口：只有父任务本身是 autoApprove 才允许全自动，
+        // 否则继承 ask 语义（headless ask 下非只读工具会被拒绝）。
+        autoApprove: ctx.autoApprove === true,
       });
       if (!res.ok) return { output: null, error: res.error };
       return {
@@ -2460,7 +2530,12 @@ async function runRunWorkflow(
   const defs = await listWorkflows(root);
   const def = defs.find((d) => d.id === name || d.name === name);
   if (!def) return { output: null, error: `工作流不存在: ${name}` };
-  const runId = await startWorkflow(def, root);
+  const runId = await startWorkflow(def, root, {
+    autoApprove: ctx.autoApprove === true,
+    mode: ctx.mode,
+    sandboxMode: ctx.sandboxMode,
+    checkPermission: ctx.checkPermission,
+  });
   return {
     output: {
       runId,
@@ -3420,9 +3495,14 @@ async function runWriteSkill(params: { name?: string; content?: string }, _ctx: 
 }
 
 const DANGEROUS_TOOLS = new Set([
-  'Bash', 'Pwsh', 'Write', 'Edit', 'Delete', 'WebFetch', 'WebSearch',
-  'CronCreate', 'TaskStop', 'EnterWorktree', 'ReviewArtifact', 'GitCommit',
-  'WriteDocument', 'SlackPostMessage', 'NotionCreatePage',
+  'Bash', 'Pwsh', 'RunCode', 'RunWorkflow', 'Agent', 'Ralph',
+  'Write', 'Edit', 'StrReplaceEditor', 'NotebookEdit', 'Delete',
+  'WebFetch', 'WebSearch', 'CronCreate', 'CronDelete',
+  'ScheduleCreate', 'ScheduleDelete', 'TaskStop', 'JobKill',
+  'EnterWorktree', 'ReviewArtifact', 'GitCommit', 'WriteDocument',
+  'SlackPostMessage', 'NotionCreatePage', 'MountPlugin', 'UnmountPlugin',
+  'WriteSkill', 'Pty', 'TerminalOpen', 'TerminalSend', 'TerminalSignal',
+  'TerminalClose', 'SendMessage', 'InterruptAgent', 'CreateGoal', 'UpdateGoal',
 ]);
 const FILE_MODIFY_TOOLS = new Set(['Write', 'Edit', 'NotebookEdit', 'Delete']);
 
@@ -3442,13 +3522,16 @@ export async function executeToolCall(
   input: Record<string, unknown>,
   ctx: ToolContext,
 ): Promise<ToolResult> {
-  // Route MCP-prefixed tools to the MCP bridge
-  if (toolName.startsWith('mcp__')) {
+  const isMcpTool = toolName.startsWith('mcp__');
+  let executor: ToolExecutor | null = null;
+  if (isMcpTool) {
+    // MCP 工具同样要走完整权限/沙箱/工作模式门禁，不能直接放行。
     const { executeMcpTool } = await import('../tool-registry');
-    return executeMcpTool(toolName, input);
+    executor = async (toolInput: Record<string, unknown>) =>
+      executeMcpTool(toolName, toolInput ?? {});
+  } else {
+    executor = toolRegistry[toolName] || await dynamicPluginExecutor(toolName);
   }
-
-  const executor = toolRegistry[toolName] || await dynamicPluginExecutor(toolName);
   if (!executor) {
     return { output: null, error: `未知工具: ${toolName}` };
   }
@@ -3542,7 +3625,7 @@ export async function executeToolCall(
           return { output: null, error: `工具被权限规则拒绝: ${toolName}` };
         }
       }
-    } else if (DANGEROUS_TOOLS.has(toolName) && !ctx.autoApprove) {
+    } else if ((DANGEROUS_TOOLS.has(toolName) || isMcpTool) && !ctx.autoApprove) {
       // Falls through to checkPermission → requestPermission → user dialog.
       if (!ctx.checkPermission) {
         return { output: null, error: '权限检查未初始化，已阻止危险操作。请重新创建 Agent。' };

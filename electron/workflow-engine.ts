@@ -10,6 +10,8 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 import { app } from 'electron';
+import type { ApprovalPolicy } from './types';
+import type { SandboxMode } from './sandbox-policy';
 
 export interface WorkflowStep {
   id: string;
@@ -26,6 +28,14 @@ export interface WorkflowDef {
   steps: WorkflowStep[];
   /** Definition format — json（经典）or markdown 模板。 */
   source?: 'json' | 'markdown';
+}
+
+export interface WorkflowRunOptions {
+  /** 默认 false：工作流步骤走 ask 审批（无窗口/用户拒绝即不执行）。 */
+  autoApprove?: boolean;
+  mode?: ApprovalPolicy;
+  sandboxMode?: SandboxMode;
+  checkPermission?: (toolName: string, input: Record<string, unknown>, toolCallId?: string, agentId?: string) => Promise<boolean>;
 }
 
 export type StepRunStatus = 'pending' | 'running' | 'completed' | 'error';
@@ -212,7 +222,7 @@ export async function listWorkflowRuns(workflowId?: string): Promise<WorkflowRun
 }
 
 /** Start a workflow run. Returns the run id immediately; steps execute async. */
-export async function startWorkflow(def: WorkflowDef, projectRoot: string): Promise<string> {
+export async function startWorkflow(def: WorkflowDef, projectRoot: string, opts: WorkflowRunOptions = {}): Promise<string> {
   topoOrder(def); // validate before starting
   const runId = `wf-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   const state: WorkflowRunState = {
@@ -224,13 +234,13 @@ export async function startWorkflow(def: WorkflowDef, projectRoot: string): Prom
     steps: Object.fromEntries(def.steps.map((s) => [s.id, { status: 'pending' }])),
   };
   await saveRun(state);
-  void executeWorkflow(def, projectRoot, state);
+  void executeWorkflow(def, projectRoot, state, opts);
   return runId;
 }
 
-async function executeWorkflow(def: WorkflowDef, projectRoot: string, state: WorkflowRunState): Promise<void> {
+async function executeWorkflow(def: WorkflowDef, projectRoot: string, state: WorkflowRunState, opts: WorkflowRunOptions): Promise<void> {
   try {
-    const [{ scheduler }, { readSettings }] = await Promise.all([
+    const [{ scheduler, createUnattendedPermissionChecker }, { readSettings }] = await Promise.all([
       import('./ipc/agent-scheduler'),
       import('./ipc/settings-store'),
     ]);
@@ -275,21 +285,28 @@ async function executeWorkflow(def: WorkflowDef, projectRoot: string, state: Wor
         for (const step of ready) {
           state.steps[step.id].status = 'running';
           const prompt = renderTemplate(step.prompt, results);
+          const unattendedAuto = opts.autoApprove === true;
+          const stepConfig = {
+            name: `[工作流] ${step.name}`,
+            description: prompt,
+            type: step.agentType || 'general-purpose',
+            model: settings?.defaultModel || 'deepseek-v4-pro',
+            apiKey,
+            priority: 'normal' as const,
+            autoApprove: unattendedAuto,
+            mode: unattendedAuto ? 'auto' as const : (opts.mode ?? 'ask'),
+            sandboxMode: unattendedAuto ? 'full' as const : (opts.sandboxMode ?? 'workspace-write'),
+            maxIterations: 50,
+            metadata: { workflowRunId: state.runId, stepId: step.id },
+          };
+          const checker = opts.checkPermission
+            ?? (unattendedAuto
+              ? () => Promise.resolve(true)
+              : createUnattendedPermissionChecker(stepConfig, projectRoot));
           const agentId = scheduler.startAgent(
-            {
-              name: `[工作流] ${step.name}`,
-              description: prompt,
-              type: step.agentType || 'general-purpose',
-              model: settings?.defaultModel || 'deepseek-v4-pro',
-              apiKey,
-              priority: 'normal',
-              autoApprove: true,
-              mode: 'auto',
-              maxIterations: 50,
-              metadata: { workflowRunId: state.runId, stepId: step.id },
-            },
+            stepConfig,
             projectRoot,
-            () => Promise.resolve(true),
+            checker,
           );
           state.steps[step.id].agentId = agentId;
         }

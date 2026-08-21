@@ -9,6 +9,7 @@
  */
 
 import { spawn, type ChildProcessWithoutNullStreams } from 'child_process';
+import crypto from 'crypto';
 import { createInterface } from 'readline';
 import net from 'net';
 import path from 'path';
@@ -20,6 +21,8 @@ export interface AuraxisRuntimeOptions {
   mainJs?: string;
   /** Extra env vars for the runtime process. */
   env?: NodeJS.ProcessEnv;
+  /** Optional SDK auth token. Defaults to AURAXIS_SDK_TOKEN or a random one. */
+  token?: string;
   /** How long to wait for the runtime to advertise its port. */
   spawnTimeoutMs?: number;
   /** Per-request timeout. */
@@ -146,14 +149,17 @@ export class AuraxisClient {
   private closed = false;
   private readonly requestTimeoutMs: number;
   private readonly cleanup: (() => void) | undefined;
+  private readonly token?: string;
 
   constructor(
     private readonly transport: RpcTransport,
     requestTimeoutMs = 120_000,
     cleanup?: () => void,
+    token?: string,
   ) {
     this.requestTimeoutMs = requestTimeoutMs;
     this.cleanup = cleanup;
+    this.token = token;
 
     transport.onLine((line) => {
       let msg: { id?: string | number; result?: unknown; error?: RpcError };
@@ -205,11 +211,11 @@ export class AuraxisClient {
   }
 
   async runAgent(params: RunAgentParams): Promise<unknown> {
-    return this.request('agent.run', params);
+    return this.request('agent.run', this.token ? { ...params, token: this.token } : params);
   }
 
   async searchSessions(query: string, limit?: number): Promise<SearchSessionsResult> {
-    return this.request('session.search', { query, limit });
+    return this.request('session.search', this.token ? { query, limit, token: this.token } : { query, limit });
   }
 
   async close(): Promise<void> {
@@ -234,10 +240,14 @@ export async function createAuraxis(options: AuraxisRuntimeOptions = {}): Promis
   const electronPath = options.electronPath || defaultElectronPath();
   const mainJs = options.mainJs || defaultMainJs();
   const spawnTimeoutMs = options.spawnTimeoutMs ?? 30_000;
+  const runtimeEnv = { ...process.env, ...(options.env || {}) };
+  // TCP 服务默认强制鉴权：未配置时客户端生成随机 token 并传给运行时。
+  const sdkToken = options.token || runtimeEnv.AURAXIS_SDK_TOKEN || crypto.randomBytes(24).toString('hex');
+  runtimeEnv.AURAXIS_SDK_TOKEN = sdkToken;
 
   const child = spawn(electronPath, [mainJs, '--sdk'], {
     stdio: ['pipe', 'pipe', 'pipe'],
-    env: { ...process.env, ...(options.env || {}) },
+    env: runtimeEnv,
   });
   if (options.onStderr) {
     child.stderr.on('data', (d: Buffer) => options.onStderr!(d.toString()));
@@ -275,7 +285,7 @@ export async function createAuraxis(options: AuraxisRuntimeOptions = {}): Promis
   const transport = new SocketTransport(socket);
   const client = new AuraxisClient(transport, options.requestTimeoutMs ?? 120_000, () => {
     try { child.kill(); } catch { /* noop */ }
-  });
+  }, sdkToken);
 
   try {
     await client.request('ping', {}, Math.min(2000, options.requestTimeoutMs ?? 2000));

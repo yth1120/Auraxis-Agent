@@ -43,13 +43,17 @@ class SdkError extends Error {
   }
 }
 
-export async function handleSdkRequest(deps: SdkDeps, raw: unknown): Promise<SdkResponse> {
+export async function handleSdkRequest(
+  deps: SdkDeps,
+  raw: unknown,
+  opts: { token?: string } = {},
+): Promise<SdkResponse> {
   const req = raw as SdkRequest;
   if (!req || req.jsonrpc !== '2.0' || req.id === undefined) {
     return { jsonrpc: '2.0', id: null, error: { code: -32600, message: 'Invalid Request' } };
   }
-  // 可选鉴权：配置 AURAXIS_SDK_TOKEN 后，agent.run / session.search 必须携带匹配的 token。
-  const expectedToken = process.env.AURAXIS_SDK_TOKEN;
+  // TCP 服务默认生成随机 token 并强制鉴权；stdio 模式仍可由父进程管控。
+  const expectedToken = opts.token ?? process.env.AURAXIS_SDK_TOKEN;
   const authorize = (params: any): boolean => {
     if (!expectedToken) return true;
     const got = typeof params?.token === 'string' ? params.token : '';
@@ -130,8 +134,10 @@ export function startSdkServer(deps: SdkDeps): () => void {
 export function startSdkTcpServer(
   deps: SdkDeps,
   port = 0,
-): Promise<{ port: number; close: () => void }> {
+): Promise<{ port: number; token: string; close: () => void }> {
   const MAX_LINE_BYTES = 1024 * 1024;
+  // 未显式配置 AURAXIS_SDK_TOKEN 时生成一次性随机 token，并要求客户端携带。
+  const token = process.env.AURAXIS_SDK_TOKEN || crypto.randomBytes(24).toString('hex');
   const server = net.createServer((socket) => {
     socket.setEncoding('utf8');
     let buffer = '';
@@ -152,7 +158,7 @@ export function startSdkTcpServer(
           socket.write(`${JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } })}\n`);
           continue;
         }
-        void handleSdkRequest(deps, req).then((res) => socket.write(`${JSON.stringify(res)}\n`));
+        void handleSdkRequest(deps, req, { token }).then((res) => socket.write(`${JSON.stringify(res)}\n`));
       }
       if (buffer.length > MAX_LINE_BYTES) buffer = '';
     });
@@ -165,6 +171,7 @@ export function startSdkTcpServer(
       const address = server.address() as net.AddressInfo;
       resolve({
         port: address.port,
+        token,
         close: () => server.close(),
       });
     });

@@ -144,7 +144,8 @@ import {
 import { mountDynamicPlugin, unmountDynamicPlugin } from '../dynamic-plugin';
 import { addPluginTools, removePluginTools } from '../../tool-registry';
 import { orchestrateRunSubAgent } from '../agent-orchestration';
-import { execSync } from 'child_process';
+import { spawnSync } from 'child_process';
+import { shouldAutoApprove } from '../permission-handlers';
 
 function ctx(extra: Record<string, unknown> = {}) {
   return {
@@ -249,6 +250,31 @@ describe('RunCode 工具', () => {
     expect(r.output).toMatchObject({ stdout: 'ok', exitCode: 2 });
     expect(r.error).toContain('超时');
   });
+
+  it('ask 模式下 RunCode 必须先过审批门，不能直接执行', async () => {
+    vi.mocked(shouldAutoApprove).mockReturnValueOnce(false);
+    const checkPermission = vi.fn(async () => false);
+    const r = await executeToolCall(
+      'RunCode',
+      { language: 'javascript', code: '1+1' },
+      ctx({ autoApprove: false, mode: 'ask', checkPermission }),
+    );
+    expect(r.error).toContain('用户拒绝了该工具调用权限');
+    expect(checkPermission).toHaveBeenCalledWith('RunCode', expect.anything(), undefined);
+    expect(vi.mocked(runCode)).not.toHaveBeenCalled();
+  });
+
+  it('ask 模式下 MCP 工具必须先过审批门', async () => {
+    vi.mocked(shouldAutoApprove).mockReturnValueOnce(false);
+    const checkPermission = vi.fn(async () => false);
+    const r = await executeToolCall(
+      'mcp__some_tool',
+      { arg: 1 },
+      ctx({ autoApprove: false, mode: 'ask', checkPermission }),
+    );
+    expect(r.error).toContain('用户拒绝了该工具调用权限');
+    expect(checkPermission).toHaveBeenCalledWith('mcp__some_tool', expect.anything(), undefined);
+  });
 });
 
 describe('ListAgents / Goal 工具', () => {
@@ -319,14 +345,20 @@ describe('运行时插件挂载 / GitCommit / Ralph', () => {
     expect((await executeToolCall('GitCommit', {}, ctx())).error).toBe('缺少 commit message');
     expect((await executeToolCall('GitCommit', { message: 'm' }, ctx({ projectRoot: '' }))).error).toBe('缺少项目路径');
 
-    vi.mocked(execSync).mockImplementationOnce(() => '').mockReturnValueOnce('[main abc1234] msg');
+    vi.mocked(spawnSync)
+      .mockReturnValueOnce({ status: 0, stdout: '', stderr: '' } as any)
+      .mockReturnValueOnce({ status: 0, stdout: '[main abc1234] msg', stderr: '' } as any);
     const ok = await executeToolCall('GitCommit', { message: 'msg' }, ctx());
     expect(ok.output as any).toMatchObject({ committed: true, hash: 'abc1234' });
 
-    vi.mocked(execSync).mockImplementationOnce(() => { throw Object.assign(new Error('x'), { stderr: 'nothing to commit' }); });
+    vi.mocked(spawnSync)
+      .mockReturnValueOnce({ status: 0, stdout: '', stderr: '' } as any)
+      .mockReturnValueOnce({ status: 1, stdout: '', stderr: 'nothing to commit' } as any);
     expect(((await executeToolCall('GitCommit', { message: 'm' }, ctx())).output as any)).toMatchObject({ committed: false });
 
-    vi.mocked(execSync).mockImplementationOnce(() => { throw Object.assign(new Error('x'), { stderr: 'fatal' }); });
+    vi.mocked(spawnSync)
+      .mockReturnValueOnce({ status: 0, stdout: '', stderr: '' } as any)
+      .mockReturnValueOnce({ status: 1, stdout: '', stderr: 'fatal' } as any);
     expect((await executeToolCall('GitCommit', { message: 'm' }, ctx())).error).toContain('Git commit 失败');
   });
 

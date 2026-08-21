@@ -151,7 +151,7 @@ export function getScheduleCount(): number {
 
 /** Fire a due follow-up as an unattended Agent task (mirrors runCronAgent). */
 export async function runScheduledEntry(entry: ScheduleEntry): Promise<void> {
-  const { scheduler } = await import('./ipc/agent-scheduler');
+  const { scheduler, createUnattendedPermissionChecker } = await import('./ipc/agent-scheduler');
   const { readSettings } = await import('./ipc/settings-store');
   const settings = (await readSettings().catch(() => null)) as {
     deepseekApiKey?: string;
@@ -164,20 +164,26 @@ export async function runScheduledEntry(entry: ScheduleEntry): Promise<void> {
     entry.lastError = '缺少项目目录或 API Key，跟进任务未执行';
     return;
   }
+  // 跟进任务同样默认走 ask 审批；显式环境变量才允许全自动。
+  const unattendedAuto = process.env.AURAXIS_UNATTENDED_AUTOAPPROVE === '1';
+  const config = {
+    name: `[跟进] ${entry.prompt.slice(0, 40)}`,
+    description: entry.prompt,
+    type: 'general-purpose',
+    model: settings?.defaultModel || 'deepseek-v4-pro',
+    apiKey,
+    priority: 'normal' as const,
+    autoApprove: unattendedAuto,
+    mode: unattendedAuto ? 'auto' as const : 'ask' as const,
+    sandboxMode: unattendedAuto ? 'full' as const : 'workspace-write' as const,
+    maxIterations: 50,
+    metadata: { scheduleId: entry.id },
+  };
   scheduler.startAgent(
-    {
-      name: `[跟进] ${entry.prompt.slice(0, 40)}`,
-      description: entry.prompt,
-      type: 'general-purpose',
-      model: settings?.defaultModel || 'deepseek-v4-pro',
-      apiKey,
-      priority: 'normal',
-      autoApprove: true,
-      mode: 'auto',
-      maxIterations: 50,
-      metadata: { scheduleId: entry.id },
-    },
+    config,
     projectPath,
-    () => Promise.resolve(true),
+    unattendedAuto
+      ? () => Promise.resolve(true)
+      : createUnattendedPermissionChecker(config, projectPath),
   );
 }

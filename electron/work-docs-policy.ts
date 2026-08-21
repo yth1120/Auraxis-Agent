@@ -93,6 +93,11 @@ export function workDocsOnlyVerdict(
 ): WorkDocsVerdict {
   if (surface !== 'work') return { allowed: true };
 
+  // MCP 工具的文件语义对 Work 模式不可见，无法保证“只改文档”，一律拒绝。
+  if (toolName.startsWith('mcp__')) {
+    return { allowed: false, reason: 'Work 模式不允许调用 MCP 工具（无法验证其文件操作边界）' };
+  }
+
   if (WORK_MUTATION_TOOLS.has(toolName)) {
     const candidates: string[] = [];
     if (typeof input.file_path === 'string' && input.file_path.trim()) {

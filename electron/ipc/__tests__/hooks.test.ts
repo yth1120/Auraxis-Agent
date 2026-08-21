@@ -11,10 +11,12 @@ beforeEach(async () => {
   root = await fs.mkdtemp(path.join(os.tmpdir(), 'auraxis-hooks-'));
   projectRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'auraxis-hooks-proj-'));
   process.env.AURAXIS_HOOKS_DIR = root;
+  process.env.AURAXIS_TRUST_PROJECT_HOOKS = '1';
 });
 
 afterEach(async () => {
   delete process.env.AURAXIS_HOOKS_DIR;
+  delete process.env.AURAXIS_TRUST_PROJECT_HOOKS;
   await fs.rm(root, { recursive: true, force: true });
   await fs.rm(projectRoot, { recursive: true, force: true });
 });
@@ -59,6 +61,42 @@ describe('hooks', () => {
     const hooks = await getHooks(projectRoot);
     expect(hooks.Stop?.[0].command).toContain('project-stop');
     expect(hooks.SessionStart).toBeDefined();
+  });
+
+  it('project hooks are ignored unless explicitly trusted', async () => {
+    delete process.env.AURAXIS_TRUST_PROJECT_HOOKS;
+    await fs.mkdir(path.join(projectRoot, '.auraxis'), { recursive: true });
+    await fs.writeFile(
+      path.join(projectRoot, '.auraxis', 'hooks.json'),
+      JSON.stringify({ hooks: { Stop: { command: 'echo project-stop' } } }),
+      'utf8',
+    );
+    const hooks = await getHooks(projectRoot);
+    expect(hooks.Stop).toBeUndefined();
+  });
+
+  it('strips secret-like variables from hook environment', async () => {
+    process.env.DEEPSEEK_API_KEY = 'sk-secret';
+    process.env.AURAXIS_SDK_TOKEN = 'sdk-token';
+    process.env.MY_SAFE_VAR = 'visible';
+    const probe = path.join(root, 'env-probe.cjs');
+    await fs.writeFile(
+      probe,
+      `console.log(JSON.stringify({ ds: process.env.DEEPSEEK_API_KEY || '', tok: process.env.AURAXIS_SDK_TOKEN || '', safe: process.env.MY_SAFE_VAR || '' }));\n`,
+      'utf8',
+    );
+    try {
+      const result = await runHook({ command: `node ${JSON.stringify(probe)}` }, {});
+      expect(result.ok).toBe(true);
+      const parsed = JSON.parse(result.output);
+      expect(parsed.ds).toBe('');
+      expect(parsed.tok).toBe('');
+      expect(parsed.safe).toBe('visible');
+    } finally {
+      delete process.env.DEEPSEEK_API_KEY;
+      delete process.env.AURAXIS_SDK_TOKEN;
+      delete process.env.MY_SAFE_VAR;
+    }
   });
 
   it('解析钩子协议响应（stdin JSON + decision envelope）', async () => {

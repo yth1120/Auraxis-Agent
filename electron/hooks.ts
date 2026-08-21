@@ -63,7 +63,12 @@ async function readHooksFile(file: string): Promise<Partial<Record<HookEvent, Ho
 export async function getHooks(projectRoot?: string): Promise<Partial<Record<HookEvent, HookConfig[]>>> {
   const merged: Partial<Record<HookEvent, HookConfig[]>> = {};
   const user = await readHooksFile(userHooksFile());
-  const project = projectRoot ? await readHooksFile(path.join(projectRoot, '.auraxis', 'hooks.json')) : null;
+  // 项目目录内的 hooks 默认不执行：打开不受信任仓库可能自动执行任意命令。
+  // 只有显式设置 AURAXIS_TRUST_PROJECT_HOOKS=1 才加载项目层 hooks。
+  const trustProjectHooks = process.env.AURAXIS_TRUST_PROJECT_HOOKS === '1';
+  const project = projectRoot && trustProjectHooks
+    ? await readHooksFile(path.join(projectRoot, '.auraxis', 'hooks.json'))
+    : null;
   for (const layer of [user, project]) {
     if (!layer) continue;
     for (const [event, hooks] of Object.entries(layer)) {
@@ -73,12 +78,26 @@ export async function getHooks(projectRoot?: string): Promise<Partial<Record<Hoo
   return merged;
 }
 
+const HOOK_SECRET_RE = /(KEY|TOKEN|SECRET|PASSWORD|PASSWD|AUTH|CREDENTIAL)/i;
+
+/** Hook 进程继承的环境：剥离 API Key / Token 等敏感变量，只留通用环境。 */
+function hookEnv(payload: Record<string, unknown>): Record<string, string> {
+  const env: Record<string, string> = {};
+  for (const [k, v] of Object.entries(process.env)) {
+    if (typeof v !== 'string') continue;
+    if (HOOK_SECRET_RE.test(k)) continue;
+    env[k] = v;
+  }
+  env.HOOK_PAYLOAD = JSON.stringify(payload);
+  return env;
+}
+
 export function runHook(config: HookConfig, payload: Record<string, unknown>, cwd?: string): Promise<HookRunResult> {
   return getShellExecutor().run({
     command: config.command,
     shell: true,
     cwd: cwd || process.cwd(),
-    env: { ...process.env, HOOK_PAYLOAD: JSON.stringify(payload) },
+    env: hookEnv(payload),
     stdin: JSON.stringify(payload),
     timeoutMs: config.timeout ?? 10_000,
   }).then((result) => {

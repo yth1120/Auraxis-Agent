@@ -11,6 +11,7 @@ import json
 import os
 import queue
 import re
+import secrets
 import socket
 import subprocess
 import threading
@@ -60,9 +61,10 @@ class _Request:
 class AuraxisClient:
     """JSON-RPC client over one TCP connection."""
 
-    def __init__(self, sock: socket.socket, request_timeout: float = 120.0) -> None:
+    def __init__(self, sock: socket.socket, request_timeout: float = 120.0, token: Optional[str] = None) -> None:
         self._sock = sock
         self._request_timeout = request_timeout
+        self._token = token
         self._lock = threading.Lock()
         self._pending: dict[int, _Request] = {}
         self._next_id = 0
@@ -147,18 +149,21 @@ class AuraxisClient:
         subagent_type: Optional[str] = None,
         project_root: Optional[str] = None,
     ) -> Any:
-        return self.request(
-            "agent.run",
-            {
+        params = {
                 "prompt": prompt,
                 "description": description,
                 "subagentType": subagent_type,
                 "projectRoot": project_root,
-            },
-        )
+            }
+        if self._token:
+            params["token"] = self._token
+        return self.request("agent.run", params)
 
     def search_sessions(self, query: str, limit: Optional[int] = None) -> dict:
-        return self.request("session.search", {"query": query, "limit": limit})
+        params = {"query": query, "limit": limit}
+        if self._token:
+            params["token"] = self._token
+        return self.request("session.search", params)
 
     def close(self) -> None:
         if self._closed:
@@ -208,6 +213,9 @@ def create_client(
     proc_env = dict(os.environ)
     if env:
         proc_env.update(env)
+    # TCP 服务默认强制鉴权：未配置时生成随机 token 并传给运行时。
+    token = (env or {}).get("AURAXIS_SDK_TOKEN") or os.environ.get("AURAXIS_SDK_TOKEN") or secrets.token_hex(24)
+    proc_env["AURAXIS_SDK_TOKEN"] = token
 
     proc = subprocess.Popen(
         [electron, main, "--sdk"],
@@ -250,7 +258,7 @@ def create_client(
         raise AuraxisError("Auraxis runtime 未在超时内输出 SDK 端口")
 
     sock = socket.create_connection(("127.0.0.1", port), timeout=10)
-    client = AuraxisClient(sock, request_timeout)
+    client = AuraxisClient(sock, request_timeout, token)
     try:
         client.request("ping", timeout=min(2.0, request_timeout))
     except Exception as exc:

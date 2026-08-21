@@ -18,6 +18,19 @@ function resolveInsideProject(filePath: string, projectRoot?: string): string | 
   return normalizedPath;
 }
 
+async function requireProjectRoot(projectRoot?: string): Promise<string> {
+  if (projectRoot) return path.resolve(projectRoot);
+  // 不传 projectRoot 时回退到主进程记录的项目根，禁止操作任意路径。
+  try {
+    const { readSettings } = await import('./settings-store');
+    const settings = await readSettings();
+    if (typeof settings?.projectPath === 'string' && settings.projectPath) {
+      return path.resolve(settings.projectPath);
+    }
+  } catch { /* fall through */ }
+  throw new Error('缺少项目路径');
+}
+
 export function registerFileHandlers() {
   ipcMain.handle('file:open', async (_event, projectRoot?: string) => {
     try {
@@ -54,7 +67,8 @@ export function registerFileHandlers() {
 
   ipcMain.handle('file:read', async (_event, filePath: string, projectRoot?: string) => {
     try {
-      const normalizedPath = resolveInsideProject(filePath, projectRoot);
+      const root = await requireProjectRoot(projectRoot);
+      const normalizedPath = resolveInsideProject(filePath, root);
       if (!normalizedPath) return { ok: false, error: '不允许读取项目目录外的文件' };
       const content = await readFile(normalizedPath, 'utf-8');
       return { ok: true, data: content };
@@ -66,9 +80,10 @@ export function registerFileHandlers() {
   ipcMain.handle('file:estimateTokens', async (_event, files: string[], projectRoot?: string) => {
     try {
       if (!Array.isArray(files)) return { ok: false, error: 'files 必须是数组' };
+      const root = await requireProjectRoot(projectRoot);
       const results: { path: string; bytes: number; tokens: number | null; skipped?: 'binary' | 'too-large' }[] = [];
       for (const raw of files.slice(0, 20)) {
-        const filePath = resolveInsideProject(String(raw), projectRoot);
+        const filePath = resolveInsideProject(String(raw), root);
         if (!filePath) continue;
         try {
           const st = await stat(filePath);
@@ -93,7 +108,8 @@ export function registerFileHandlers() {
 
   ipcMain.handle('file:readPreview', async (_event, filePath: string, projectRoot?: string) => {
     try {
-      const normalizedPath = resolveInsideProject(filePath, projectRoot);
+      const root = await requireProjectRoot(projectRoot);
+      const normalizedPath = resolveInsideProject(filePath, root);
       if (!normalizedPath) return { ok: false, error: '不允许读取项目目录外的文件' };
       const ext = path.extname(normalizedPath).toLowerCase();
       if (!PREVIEW_EXTENSIONS.has(ext)) return { ok: false, error: '不支持预览该文件类型' };
@@ -121,13 +137,11 @@ export function registerFileHandlers() {
     try {
       assertString(filePath, 'filePath');
       assertString(content, 'content', true);
+      const root = await requireProjectRoot(projectRoot);
       const normalizedPath = path.resolve(normalizeWinPath(filePath));
 
-      if (projectRoot) {
-        const root = path.resolve(projectRoot);
-        if (!isPathInside(normalizedPath, root)) {
-          return { ok: false, error: '不允许写入项目目录外的文件' };
-        }
+      if (!isPathInside(normalizedPath, root)) {
+        return { ok: false, error: '不允许写入项目目录外的文件' };
       }
 
       if (!isAllowedExtension(normalizedPath)) {
@@ -150,7 +164,7 @@ export function registerFileHandlers() {
         return { ok: true, data: [] };
       }
 
-      const root = path.resolve(projectRoot);
+      const root = await requireProjectRoot(projectRoot);
       const results: { name: string; path: string; isDirectory: boolean; snippet?: string; matchType?: 'name' | 'content' }[] = [];
       const lowerKeyword = keyword.toLowerCase();
       const TEXT_EXT = new Set([
@@ -227,13 +241,11 @@ export function registerFileHandlers() {
 
   ipcMain.handle('file:delete', async (_event, filePath: string, projectRoot?: string) => {
     try {
+      const root = await requireProjectRoot(projectRoot);
       const normalizedPath = path.resolve(normalizeWinPath(filePath));
-      if (projectRoot) {
-        const root = path.resolve(projectRoot);
-        // Reject the project root itself — rm(recursive) would erase everything.
-        if (normalizedPath === root || !isPathInside(normalizedPath, root)) {
-          return { ok: false, error: '不允许删除项目目录外的文件' };
-        }
+      // Reject the project root itself — rm(recursive) would erase everything.
+      if (normalizedPath === root || !isPathInside(normalizedPath, root)) {
+        return { ok: false, error: '不允许删除项目目录外的文件' };
       }
       await rm(normalizedPath, { recursive: true, force: true });
       return { ok: true };
@@ -244,16 +256,14 @@ export function registerFileHandlers() {
 
   ipcMain.handle('file:rename', async (_event, oldPath: string, newPath: string, projectRoot?: string) => {
     try {
+      const root = await requireProjectRoot(projectRoot);
       const normalizedOld = path.resolve(normalizeWinPath(oldPath));
       const normalizedNew = path.resolve(normalizeWinPath(newPath));
-      if (projectRoot) {
-        const root = path.resolve(projectRoot);
-        // Renaming the project root itself would silently move the whole
-        // workspace out from under the app.
-        if (normalizedOld === root || normalizedNew === root
-          || !isPathInside(normalizedOld, root) || !isPathInside(normalizedNew, root)) {
-          return { ok: false, error: '不允许操作项目目录外的文件' };
-        }
+      // Renaming the project root itself would silently move the whole
+      // workspace out from under the app.
+      if (normalizedOld === root || normalizedNew === root
+        || !isPathInside(normalizedOld, root) || !isPathInside(normalizedNew, root)) {
+        return { ok: false, error: '不允许操作项目目录外的文件' };
       }
       await rename(normalizedOld, normalizedNew);
       return { ok: true };
@@ -264,12 +274,10 @@ export function registerFileHandlers() {
 
   ipcMain.handle('file:createFolder', async (_event, dirPath: string, projectRoot?: string) => {
     try {
+      const root = await requireProjectRoot(projectRoot);
       const normalizedPath = path.resolve(normalizeWinPath(dirPath));
-      if (projectRoot) {
-        const root = path.resolve(projectRoot);
-        if (!isPathInside(normalizedPath, root)) {
-          return { ok: false, error: '不允许在项目目录外创建文件夹' };
-        }
+      if (!isPathInside(normalizedPath, root)) {
+        return { ok: false, error: '不允许在项目目录外创建文件夹' };
       }
       await mkdir(normalizedPath, { recursive: true });
       return { ok: true };
@@ -280,12 +288,10 @@ export function registerFileHandlers() {
 
   ipcMain.handle('file:createFile', async (_event, filePath: string, projectRoot?: string) => {
     try {
+      const root = await requireProjectRoot(projectRoot);
       const normalizedPath = path.resolve(normalizeWinPath(filePath));
-      if (projectRoot) {
-        const root = path.resolve(projectRoot);
-        if (!isPathInside(normalizedPath, root)) {
-          return { ok: false, error: '不允许在项目目录外创建文件' };
-        }
+      if (!isPathInside(normalizedPath, root)) {
+        return { ok: false, error: '不允许在项目目录外创建文件' };
       }
       if (!isAllowedExtension(normalizedPath)) {
         return { ok: false, error: `不允许创建该文件类型: ${path.extname(normalizedPath)}` };

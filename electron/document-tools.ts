@@ -3,7 +3,7 @@
  *
  * Supported formats:
  *   .docx — Word (mammoth read, docx writer)
- *   .xlsx — Excel (SheetJS read / write)
+ *   .xlsx — Excel (ExcelJS read / write)
  *   .pptx — PowerPoint (XML text read, PptxGenJS writer)
  *   .pdf  — PDF (pdf-parse read, PDFKit writer with CJK font fallback)
  *
@@ -14,7 +14,7 @@ import { promises as fs } from 'fs';
 import { existsSync } from 'fs';
 import path from 'path';
 import mammoth from 'mammoth';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import {
   Document as DocxDocument,
   Packer as DocxPacker,
@@ -126,16 +126,18 @@ export async function readDocument(filePath: string): Promise<DocumentReadResult
       return { format, fileName, bytes, text: value.trim() };
     }
     case 'xlsx': {
-      const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: false });
-      const sheets: DocumentSheet[] = workbook.SheetNames.map((name) => {
-        const sheet = workbook.Sheets[name];
-        const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
-          header: 1,
-          raw: false,
-          defval: '',
-          blankrows: false,
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(buffer as any);
+      const sheets: DocumentSheet[] = workbook.worksheets.map((ws) => {
+        const rows: unknown[][] = [];
+        ws.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+          const values: unknown[] = [];
+          for (let c = 1; c <= ws.columnCount; c++) {
+            values.push(ws.getCell(rowNumber, c).text);
+          }
+          rows.push(values);
         });
-        return { name, rows };
+        return { name: ws.name, rows };
       });
       const text = sheets
         .map((s) => `## 工作表: ${s.name}\n${s.rows.map((r) => r.join('\t')).join('\n')}`)
@@ -242,8 +244,8 @@ function buildDocx(spec: DocumentWriteSpec): DocxDocument {
   });
 }
 
-function buildXlsx(spec: DocumentWriteSpec): Buffer {
-  const workbook = XLSX.utils.book_new();
+async function buildXlsx(spec: DocumentWriteSpec): Promise<Buffer> {
+  const workbook = new ExcelJS.Workbook();
   const sheets = spec.sheets && spec.sheets.length > 0
     ? spec.sheets
     : [{ name: 'Sheet1', rows: (spec.blocks ?? []).filter((b) => b.type === 'table').map((b) => b.rows ?? []) }]
@@ -252,10 +254,12 @@ function buildXlsx(spec: DocumentWriteSpec): Buffer {
     throw new Error('写入 xlsx 至少需要一个非空 sheets 数组（每张表包含 rows 二维数组）');
   }
   for (const sheet of sheets) {
-    const ws = XLSX.utils.aoa_to_sheet(sheet.rows.map((r) => r.map((v) => (v === null || v === undefined ? '' : v))));
-    XLSX.utils.book_append_sheet(workbook, ws, (sheet.name || 'Sheet').slice(0, 31));
+    const ws = workbook.addWorksheet((sheet.name || 'Sheet').slice(0, 31));
+    for (const row of sheet.rows) {
+      ws.addRow(row.map((v) => (v === null || v === undefined ? '' : v)));
+    }
   }
-  return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
+  return (await workbook.xlsx.writeBuffer()) as any as Buffer;
 }
 
 function buildPptx(spec: DocumentWriteSpec): Promise<Buffer> {
@@ -358,7 +362,7 @@ export async function writeDocument(
       break;
     }
     case 'xlsx':
-      buffer = buildXlsx(spec);
+      buffer = await buildXlsx(spec);
       break;
     case 'pptx':
       buffer = await buildPptx(spec);

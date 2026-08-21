@@ -53,6 +53,9 @@ export function enforceSandbox(args: {
   if (args.sandboxMode === 'full') return { allowed: true };
 
   if (args.sandboxMode === 'read') {
+    if (args.toolName.startsWith('mcp__')) {
+      return { allowed: false, reason: '只读沙箱不允许调用 MCP 工具（无法验证其读写边界）' };
+    }
     if (MUTATION_TOOLS.has(args.toolName)) {
       return { allowed: false, reason: `只读沙箱禁止调用 ${args.toolName}` };
     }

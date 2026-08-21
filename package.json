@@ -39,6 +39,7 @@
     "dagre": "^0.8.5",
     "docx": "^9.7.1",
     "echarts": "^6.1.0",
+    "exceljs": "^4.4.0",
     "highlight.js": "^11.10.0",
     "iconv-lite": "^0.7.2",
     "katex": "^0.16.45",
@@ -58,7 +59,6 @@
     "remark-gfm": "^4.0.0",
     "remark-math": "^6.0.0",
     "ssh2": "^1.17.0",
-    "xlsx": "^0.18.5",
     "zustand": "^4.5.0"
   },
   "devDependencies": {
@@ -84,6 +84,11 @@
     "vite": "^7.3.6",
     "vitest": "^3.2.7",
     "wait-on": "^7.2.0"
+  },
+  "overrides": {
+    "exceljs": {
+      "uuid": "^11.1.1"
+    }
   },
   "optionalDependencies": {
     "better-sqlite3": "^11.10.0"

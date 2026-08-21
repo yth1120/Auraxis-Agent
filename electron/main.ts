@@ -287,7 +287,7 @@ app.whenReady().then(async () => {
     try {
       const { runSubAgent } = await import('./ipc/agent-handlers');
       const { startSdkTcpServer } = await import('./sdk-server');
-      const { port } = await startSdkTcpServer({
+      const { port, token } = await startSdkTcpServer({
         runAgent: async ({ prompt, description, subagentType, projectRoot }) => {
           let root = projectRoot || '';
           if (!root) {
@@ -311,6 +311,7 @@ app.whenReady().then(async () => {
       // Advertise the loopback port so the client can connect (stdin is not
       // readable in Electron's main process on Windows).
       process.stdout.write(`AURAXIS_SDK_PORT=${port}\n`);
+      process.stdout.write(`AURAXIS_SDK_TOKEN=${token}\n`);
     } catch (e: any) {
       process.stderr.write(`[sdk] failed: ${e?.stack || e}\n`);
       app.exit(1);

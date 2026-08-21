@@ -14,6 +14,9 @@ export interface ForkedSubagentOptions {
   projectRoot: string;
   timeoutMs?: number;
   signal?: AbortSignal | null;
+  /** Whether the parent task is already auto-approve. Fork cannot prompt, so
+   *  non-auto parents keep the ask-mode deny-by-default semantics. */
+  autoApprove?: boolean;
 }
 
 export interface ForkedSubagentResult {
@@ -36,9 +39,9 @@ export function runForkedSubagent(opts: ForkedSubagentOptions): Promise<ForkedSu
       opts.prompt,
       '--project',
       opts.projectRoot,
-      '--auto-approve',
       '--json',
     ];
+    if (opts.autoApprove === true) argv.push('--auto-approve');
 
     let child: ReturnType<typeof spawn>;
     try {

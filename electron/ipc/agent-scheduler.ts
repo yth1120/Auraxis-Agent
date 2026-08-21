@@ -139,6 +139,30 @@ export interface AgentInstance {
   pauseSettled?: Promise<void>;
 }
 
+/**
+ * 无人值守任务（cron / 跟进 / 工作流）的权限检查器。
+ * 默认按 ask 走主窗口审批；没有窗口或用户拒绝时自动拒绝，
+ * 避免模型创建的定时任务以全自动、全权限方式在后台执行。
+ */
+export function createUnattendedPermissionChecker(
+  config: Pick<AgentConfig, 'mode' | 'workTier' | 'approvedPlanSteps'>,
+  projectPath: string,
+): (toolName: string, input: Record<string, unknown>, toolCallId?: string, agentId?: string) => Promise<boolean> {
+  return async (toolName, input, toolCallId, agentId) => {
+    const win = BrowserWindow.getAllWindows()[0] || null;
+    if (!win || win.isDestroyed()) return false;
+    const isReviewGate =
+      toolName === 'ReviewArtifact'
+      && input?.action === 'continue_after_failed_review';
+    return requestPermission(toolName, input, win, toolCallId, {
+      mode: isReviewGate || config.workTier === 'full' ? 'ask' : normalizeApprovalPolicy(config.mode ?? 'ask'),
+      approvedPlanSteps: config.approvedPlanSteps,
+      projectRoot: projectPath,
+      agentId,
+    });
+  };
+}
+
 // ─── Singleton ──────────────────────────────────────────
 
 const instances = new Map<string, AgentInstance>();
