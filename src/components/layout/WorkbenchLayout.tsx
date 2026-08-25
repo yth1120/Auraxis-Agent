@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Dropdown, Layout } from 'antd';
-import { ArrowLeft, ArrowRight, Cube, PanelBottom, Bell, Minus, Square, Copy, X } from '@/components/common/icons';
+import { Layout } from 'antd';
 import { Allotment } from 'allotment';
 import clsx from 'clsx';
 import { useAppStore } from '../../stores/useAppStore';
@@ -12,16 +11,12 @@ import { useT } from '../../i18n';
 
 import SiderNav from './SiderNav';
 import TabBar from './TabBar';
-import WorkbenchActionsButton from './WorkbenchActionsButton';
 import TerminalDrawer from './TerminalDrawer';
-import HeaderStatusInfo from './HeaderStatusInfo';
 import { COCKPIT_TABS, PANEL_LABELS } from './WorkbenchLayoutData';
-import GlobalSearchModal from './GlobalSearchModal';
+import { WorkbenchHeader } from './WorkbenchHeader';
 import { buildEditMenuItems, buildFileMenuItems, buildHelpMenuItems, buildViewMenuItems } from './WorkbenchMenus';
 import { useWorkbenchPaneResize, WORKBENCH_MAIN_MIN } from './useWorkbenchPaneResize';
 import { WorkbenchRightPanel, WorkbenchTabContent } from './WorkbenchContent';
-
-const { Header } = Layout;
 
 export default function WorkbenchLayout() {
   const t = useT();
@@ -158,11 +153,6 @@ export default function WorkbenchLayout() {
     setPaneSizes,
   });
 
-  const headerToolActive = (key: 'terminal' | 'notifications') => {
-    if (key === 'notifications') return activeToolView === 'notifications';
-    return activeToolView === 'terminal';
-  };
-
   return (
     <Layout
       className={clsx(
@@ -176,138 +166,26 @@ export default function WorkbenchLayout() {
           需要这条透明热区维持无边框窗口的拖拽能力。 */}
       {aquaGlassOn && <div aria-hidden className="ax-aqua-drag-strip" />}
       {/* ── Top Header Bar ── */}
-      <Header className="ax-header !h-10 !pl-0 !pr-3 shrink-0">
-        <div className="ax-header-group flex-1 min-w-0 gap-2.5">
-          <div className="ax-header-group shrink-0">
-            <button
-              className={clsx('ax-header-action text-sm', !canGoBack() && 'ax-header-action:disabled')}
-              onClick={goBack}
-              disabled={!canGoBack()}
-              title={t('header.back')}
-            >
-              <ArrowLeft weight="bold" />
-            </button>
-            <button
-              className={clsx('ax-header-action text-sm', !canGoForward() && 'ax-header-action:disabled')}
-              onClick={goForward}
-              disabled={!canGoForward()}
-              title={t('header.forward')}
-            >
-              <ArrowRight weight="bold" />
-            </button>
-          </div>
-
-          <div className="ax-header-group shrink-0 !gap-1.5">
-            <Dropdown
-              menu={{ items: fileMenuItems }}
-              trigger={['click']}
-              placement="bottomLeft"
-              overlayClassName="ax-top-menu-popup"
-              transitionName=""
-            >
-              <button className="ax-header-action !w-auto !px-1.5 text-sm">{t('menu.file')}</button>
-            </Dropdown>
-            <Dropdown
-              menu={{ items: editMenuItems }}
-              trigger={['click']}
-              placement="bottomLeft"
-              overlayClassName="ax-top-menu-popup"
-              transitionName=""
-            >
-              <button className="ax-header-action !w-auto !px-1.5 text-sm">{t('menu.edit')}</button>
-            </Dropdown>
-            <Dropdown
-              menu={{ items: viewMenuItems }}
-              trigger={['click']}
-              placement="bottomLeft"
-              overlayClassName="ax-top-menu-popup"
-              transitionName=""
-            >
-              <button className="ax-header-action !w-auto !px-1.5 text-sm">{t('menu.view')}</button>
-            </Dropdown>
-            <Dropdown
-              menu={{ items: helpMenuItems }}
-              trigger={['click']}
-              placement="bottomLeft"
-              overlayClassName="ax-top-menu-popup"
-              transitionName=""
-            >
-              <button className="ax-header-action !w-auto !px-1.5 text-sm">{t('menu.help')}</button>
-            </Dropdown>
-          </div>
-
-          <HeaderStatusInfo />
-
-          <GlobalSearchModal open={globalSearchOpen} onClose={() => setGlobalSearchOpen(false)} />
-
-          {worktreeActive && (
-            <span className="ax-badge" title={t('header.sandbox', { id: worktreeTaskId || 'active' })}>
-              <Cube weight="bold" />
-              Sandbox {worktreeTaskId?.slice(0, 16) || 'Active'}
-            </span>
-          )}
-        </div>
-
-        {/* ── Top-right feature actions — notifications / terminal / workbench ── */}
-        <div className="ax-header-group shrink-0 gap-2">
-          <button
-            className={clsx(
-              'ax-header-action relative text-sm',
-              headerToolActive('notifications') && '!bg-primary-soft !text-primary',
-            )}
-            onClick={() => openToolView('notifications')}
-            title={t('workbench.notifications')}
-          >
-            <Bell weight={headerToolActive('notifications') ? 'fill' : 'regular'} />
-            {unreadNotifications > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-danger text-2xs font-semibold text-white leading-none">
-                {unreadNotifications > 99 ? '99+' : unreadNotifications}
-              </span>
-            )}
-          </button>
-          {sidebarMode !== 'chat' && (
-            <button
-              className={clsx(
-                'ax-header-action text-sm',
-                headerToolActive('terminal') && '!bg-primary-soft !text-primary',
-              )}
-              onClick={() => openToolView('terminal')}
-              title={`${t('workbench.terminal')} (Ctrl+\`)`}
-            >
-              <PanelBottom weight={headerToolActive('terminal') ? 'fill' : 'regular'} />
-            </button>
-          )}
-          {sidebarMode !== 'chat' && <WorkbenchActionsButton />}
-        </div>
-
-        <div className="ax-header-group">
-          {isElectron && (
-            <>
-              <button
-                className="ax-header-action text-sm"
-                onClick={() => window.electronAPI?.minimize()}
-                title={t('header.minimize')}
-              >
-                <Minus size={12} weight="bold" />
-              </button>
-              <button
-                className="ax-header-action text-sm"
-                onClick={() => window.electronAPI?.maximize()}
-                title={isMaximized ? t('header.restore') : t('header.maximize')}
-              >
-                {isMaximized ? <Copy size={12} /> : <Square size={12} />}
-              </button>
-              <button
-                className="ax-header-action text-sm hover:!bg-danger-soft hover:!text-text-secondary"
-                onClick={() => window.electronAPI?.close()}
-                title={t('header.close')}
-              >
-                <X size={12} weight="bold" />
-              </button>
-            </>
-          )}
-        </div>
-      </Header>
+      <WorkbenchHeader
+        fileMenuItems={fileMenuItems}
+        editMenuItems={editMenuItems}
+        viewMenuItems={viewMenuItems}
+        helpMenuItems={helpMenuItems}
+        canGoBack={canGoBack}
+        canGoForward={canGoForward}
+        goBack={goBack}
+        goForward={goForward}
+        unreadNotifications={unreadNotifications}
+        sidebarMode={sidebarMode}
+        worktreeActive={worktreeActive}
+        worktreeTaskId={worktreeTaskId}
+        globalSearchOpen={globalSearchOpen}
+        onCloseGlobalSearch={() => setGlobalSearchOpen(false)}
+        activeToolView={activeToolView}
+        openToolView={openToolView}
+        isElectron={isElectron}
+        isMaximized={isMaximized}
+      />
 
       {/* ── Tab Bar ── Only when multiple workbench tabs are actually open. */}
       {tabs.length > 1 && <TabBar />}
