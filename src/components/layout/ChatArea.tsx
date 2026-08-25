@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import { Modal, message } from 'antd';
+import { message } from 'antd';
 import { NEW_CHAT_ICON, SidebarSimple } from '@/components/common/icons';
 import { useChatStore } from '@/stores/useChatStore';
 import { useAppStore } from '@/stores/useAppStore';
@@ -15,13 +15,11 @@ import HeaderModeSwitcher from './HeaderModeSwitcher';
 
 const AgentConversation = lazy(() => import('../agent/AgentConversation'));
 const WorkItemView = lazy(() => import('../work/WorkItemView'));
-const ScheduledPanel = lazy(() => import('../tools/ScheduledPanel'));
-const NotificationsPanel = lazy(() => import('../tools/NotificationsPanel'));
-const PluginsPanel = lazy(() => import('../tools/PluginsPanel'));
 import QuickActionsPanel from '../inspector/QuickActionsPanel';
 import WorkHomeOverview from '../work/WorkHomeOverview';
 import FirstRunHint from '../chat/FirstRunHint';
 import logoPng from '../../assets/auraxis-logo.png';
+import { ChatReplayModal, ChatToolOverlay } from './ChatAreaOverlays';
 
 function greeting(): string {
   const h = new Date().getHours();
@@ -128,26 +126,6 @@ export default function ChatArea() {
     const r = await window.electronAPI?.chatLog?.read(sessionId);
     setReplayEvents(r?.ok && r.data ? r.data : []);
     setReplayOpen(true);
-  };
-
-  const renderToolView = () => {
-    if (activeToolView === 'none' || activeToolView === 'terminal') return null;
-    return (
-      <>
-        <div
-          className="absolute inset-0 z-30 bg-black/20"
-          onClick={() => setActiveToolView('none')}
-          aria-hidden="true"
-        />
-        <div className="absolute inset-y-0 right-0 z-40 w-[440px] max-w-[85%] flex flex-col bg-[var(--color-bg-elevated)] border-l border-[var(--color-border-dim)] shadow-[var(--shadow-lg)]">
-          <Suspense fallback={null}>
-            {activeToolView === 'notifications' && <NotificationsPanel onClose={() => setActiveToolView('none')} />}
-            {activeToolView === 'scheduled' && <ScheduledPanel onClose={() => setActiveToolView('none')} />}
-            {activeToolView === 'plugins' && <PluginsPanel onClose={() => setActiveToolView('none')} />}
-          </Suspense>
-        </div>
-      </>
-    );
   };
 
   return (
@@ -341,75 +319,8 @@ export default function ChatArea() {
         </div>
       </div>
 
-      <Modal
-        title={tConv('chat.sessionLogTip')}
-        open={replayOpen}
-        onCancel={() => setReplayOpen(false)}
-        transitionName=""
-        maskTransitionName=""
-        footer={
-          <button
-            type="button"
-            className="text-xs text-text-muted px-2 py-1 rounded-md cursor-pointer hover:bg-[var(--color-hover)] hover:text-text-secondary"
-            onClick={() => {
-              const blob = new Blob([replayEvents.map((e) => JSON.stringify(e)).join('\n')], {
-                type: 'application/x-ndjson',
-              });
-              const a = document.createElement('a');
-              a.href = URL.createObjectURL(blob);
-              a.download = `chat-log-${Date.now()}.jsonl`;
-              a.click();
-              URL.revokeObjectURL(a.href);
-            }}
-          >
-            {tConv('chat.exportJsonl')}
-          </button>
-        }
-        width={680}
-      >
-        <div className="max-h-[480px] overflow-y-auto flex flex-col gap-1">
-          {replayEvents.length === 0 ? (
-            <div className="text-xs text-muted">{tConv('chat.noLogs')}</div>
-          ) : (
-            replayEvents.map((e) => {
-              const time = new Date(e.ts).toLocaleTimeString('zh-CN', { hour12: false });
-              let label: React.ReactNode;
-              if (e.type === 'user') {
-                label = (
-                  <span className="text-text-primary">
-                    {tConv('chat.userLabel', { text: String(e.data.text ?? '') })}
-                  </span>
-                );
-              } else if (e.type === 'assistant_chunk') {
-                label = <span className="text-text-secondary">{String(e.data.text ?? '')}</span>;
-              } else if (e.type === 'tool') {
-                label = (
-                  <span className="text-text-secondary">
-                    {String(e.data.action ?? '')} {String(e.data.toolName ?? '')} {String(e.data.error ?? '')}
-                  </span>
-                );
-              } else if (e.type === 'command') {
-                const data = e.data as { name?: string; args?: string };
-                label = (
-                  <span className="text-text-secondary font-mono">
-                    /{String(data.name ?? '')} {String(data.args ?? '').trim()}
-                  </span>
-                );
-              } else {
-                label = <span className="text-text-muted">{String(e.data.text ?? e.type)}</span>;
-              }
-              return (
-                <div key={e.seq} className="flex gap-2 text-xs leading-[1.6] font-mono">
-                  <span className="shrink-0 text-text-faint">#{e.seq}</span>
-                  <span className="shrink-0 text-text-faint">{time}</span>
-                  <span className="min-w-0 flex-1">{label}</span>
-                </div>
-              );
-            })
-          )}
-        </div>
-      </Modal>
-      {renderToolView()}
+      <ChatReplayModal open={replayOpen} onClose={() => setReplayOpen(false)} events={replayEvents} />
+      <ChatToolOverlay activeToolView={activeToolView} onClose={() => setActiveToolView('none')} />
     </div>
   );
 }
