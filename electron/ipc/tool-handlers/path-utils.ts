@@ -31,6 +31,11 @@ const WIN_RESERVED_NAMES = new Set([
   'lpt9',
 ]);
 
+export interface ToolResult {
+  output: unknown;
+  error?: string;
+}
+
 export interface ToolContext {
   projectRoot: string;
   requestId: string;

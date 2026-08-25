@@ -38,7 +38,7 @@ describe('sub-agent recursion depth — wiring is in place', () => {
   });
 
   it('ToolContext carries a depth field', () => {
-    const src = read('tool-handlers.ts');
+    const src = read('tool-handlers/path-utils.ts');
     const ctxMatch = src.match(/export interface ToolContext\s*\{[\s\S]*?\n\}/);
     expect(ctxMatch).toBeTruthy();
     expect(ctxMatch![0]).toContain('depth?: number');
