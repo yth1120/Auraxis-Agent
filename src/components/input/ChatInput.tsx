@@ -11,10 +11,10 @@ import { useSettingsStore } from '../../stores/useSettingsStore';
 import ChatInputComposer from './ChatInputComposer';
 import { useChatInputMentions } from './useChatInputMentions';
 import { executeLeadingCommand, launchAgentTask, recordCommand } from './ChatInputActions';
+import { useChatInputFiles } from './useChatInputFiles';
 import { useT } from '../../i18n';
 import {
   greeting,
-  parsePendingImages,
   type ChatInputProps,
 } from './ChatInputUtils';
 import GhostToast from '../layout/GhostToast';
@@ -649,126 +649,16 @@ export default function ChatInput({ position, heroSubtitleKey }: ChatInputProps)
     });
   }, [smartMoreClose, smartMorePanelRef, setCommandOpen, setDollarOpen, setMentionOpen]);
 
-  // ── Image draft rail: live thumbnails for picked images in the composer ──
-  const pendingImages = useMemo(() => parsePendingImages(inputValue), [inputValue]);
-  const removePendingImage = useCallback(
-    (index: number) => {
-      const target = pendingImages[index];
-      if (!target) return;
-      const next = (inputValue.slice(0, target.start) + inputValue.slice(target.end)).replace(/^\n+/, '');
-      setInputValue(next);
-    },
-    [pendingImages, inputValue, setInputValue],
-  );
-
-  /** 将文件/图片统一转为输入区文本块（选择、拖拽、粘贴共用）。 */
-  const appendFiles = useCallback(
-    async (files: File[]) => {
-      if (files.length === 0) return;
-      const parts: string[] = [];
-      for (const file of files) {
-        const isImage = file.type.startsWith('image/');
-        if (isImage) {
-          if (file.size > 5 * 1024 * 1024) {
-            parts.push(t('composer.imageTooLarge', { name: file.name }));
-            continue;
-          }
-          try {
-            const dataUrl = await new Promise<string>((resolve, reject) => {
-              const reader = new FileReader();
-              reader.onload = () => resolve(reader.result as string);
-              reader.onerror = () => reject(reader.error);
-              reader.readAsDataURL(file);
-            });
-            parts.push(`【图片: ${file.name}】\n${dataUrl}`);
-          } catch {
-            parts.push(t('composer.imageReadFailed', { name: file.name }));
-          }
-        } else {
-          if (file.size > 100 * 1024) {
-            parts.push(t('composer.attachmentTooLarge', { name: file.name }));
-            continue;
-          }
-          try {
-            const text = await file.text();
-            const ext = file.name.includes('.') ? file.name.split('.').pop() : '';
-            parts.push(`【附件: ${file.name}】\n\`\`\`${ext || ''}\n${text}\n\`\`\``);
-          } catch {
-            parts.push(t('composer.attachmentReadFailed', { name: file.name }));
-          }
-        }
-      }
-      if (parts.length > 0) {
-        const { inputValue: iv, setInputValue: sv } = useChatStore.getState();
-        sv(iv + (iv.trim() ? '\n\n' : '') + parts.join('\n\n'));
-      }
-    },
-    [t],
-  );
-
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      void appendFiles(Array.from(e.dataTransfer.files ?? []));
-    },
-    [appendFiles],
-  );
-
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-  }, []);
-
-  const pickFiles = useCallback(
-    (accept: string) => {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.multiple = true;
-      input.accept = accept;
-      input.onchange = () => {
-        void appendFiles(Array.from(input.files || []));
-      };
-      input.click();
-    },
-    [appendFiles],
-  );
-
-  const handleMicClick = useCallback(() => {
-    const SR = speechRecognitionConstructor();
-    if (!SR) {
-      message.info(t('composer.micUnavailable'));
-      return;
-    }
-    try {
-      const rec = new SR();
-      rec.lang = 'zh-CN';
-      rec.interimResults = false;
-      rec.onerror = () => {
-        message.error(t('composer.micPermission'));
-      };
-      rec.onresult = (e) => {
-        const t = e.results[0][0].transcript?.trim();
-        if (t) {
-          const { inputValue: iv, setInputValue: sv } = useChatStore.getState();
-          sv(iv + (iv.trim() ? ' ' : '') + t);
-        }
-      };
-      rec.start();
-      message.success(t('composer.listening'));
-    } catch {
-      message.error(t('composer.micFailed'));
-    }
-  }, [t]);
-
-  /** Pick a project directory and keep every consumer in sync (settings +
-   *  chat store). Shared by the hero chip and the composer toolbar pill. */
-  const pickProjectDirectory = useCallback(async () => {
-    const result = await window.electronAPI?.project.selectDirectory();
-    if (result?.ok && result.data) {
-      useSettingsStore.getState().setProjectPath(result.data);
-      useChatStore.getState().setCurrentProjectPath(result.data);
-      message.success(t('composer.projectDirSet', { path: result.data }));
-    }
-  }, [t]);
+  const {
+    pendingImages,
+    removePendingImage,
+    appendFiles,
+    handleDrop,
+    handleDragOver,
+    pickFiles,
+    handleMicClick,
+    pickProjectDirectory,
+  } = useChatInputFiles({ inputValue, t });
 
   const inputCard = (
     <ChatInputComposer
