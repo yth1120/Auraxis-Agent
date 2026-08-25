@@ -9,10 +9,8 @@ import type { AgentLogEntry } from '@/types/agent';
 import StateDot from '../common/StateDot';
 import AgentViewFilter from '../agent/AgentViewFilter';
 import {
-  OVERSCAN,
   ROW_H,
   TURN_H,
-  entrySearchText,
   fmtDuration,
   fmtTime,
   rowKey,
@@ -21,17 +19,14 @@ import {
   type Turn,
 } from './TimelineUtils';
 import { ToolDetail, TrajectoryToolRow, type TimelineDetailTab } from './TimelineRows';
-
-interface FlatRow {
-  kind: 'turn' | 'tool' | 'plain' | 'empty';
-  key: string;
-  turn: Turn;
-  entry?: AgentLogEntry;
-  /** 1-based ledger index (#N), reset per filtered ledger. */
-  index: number;
-  height: number;
-  offset: number;
-}
+import {
+  buildTimelineRows,
+  buildTurns,
+  filterTurns,
+  flattenRows,
+  maxTimelineDuration,
+  visibleRange,
+} from './TimelineModel';
 
 /** Right-panel trajectory table: per-turn ledger with expandable tool details. */
 export default function TimelinePanel() {
@@ -77,175 +72,36 @@ export default function TimelinePanel() {
     return () => ro.disconnect();
   }, []);
 
-  const turns = useMemo<Turn[]>(() => {
-    const list: Turn[] = [];
-    let cur: Turn | null = null;
-    for (const e of agent?.log ?? []) {
-      if (e.type === 'iteration_start') {
-        cur = { iteration: e.iteration ?? list.length + 1, entries: [] };
-        list.push(cur);
-        continue;
-      }
-      if (e.type === 'iteration_end') {
-        if (cur) cur.end = e;
-        continue;
-      }
-      if (!cur) {
-        cur = { iteration: 1, entries: [] };
-        list.push(cur);
-      }
-      if (e.type === 'tool_start') {
-        cur.entries.push(e);
-        continue;
-      }
-      if (e.type === 'tool_end' || e.type === 'tool_error') {
-        const idx = cur.entries.findIndex((x) => x.type === 'tool_start' && x.toolCallId === e.toolCallId);
-        if (idx >= 0) cur.entries[idx] = e;
-        else cur.entries.push(e);
-        continue;
-      }
-      if (
-        e.type === 'text' ||
-        e.type === 'thinking' ||
-        e.type === 'warning' ||
-        e.type === 'error' ||
-        e.type === 'progress'
-      ) {
-        cur.entries.push(e);
-      }
-    }
-    return list;
-  }, [agent]);
+  const turns = useMemo(() => buildTurns(agent?.log), [agent]);
 
   // Filter once per turn so stream updates don't re-scan the whole ledger.
-  const filteredTurns = useMemo(() => {
-    const out: { turn: Turn; entries: AgentLogEntry[] }[] = [];
-    for (const turn of turns) {
-      const entries = turn.entries
-        .filter((entry) => {
-          if (agentErrorsOnly) {
-            return entry.type === 'tool_error' || entry.type === 'warning' || entry.type === 'error';
-          }
-          if (agentTextOnly) {
-            return entry.type === 'text' || entry.type === 'thinking';
-          }
-          if (agentRunningOnly) {
-            return entry.type === 'tool_start';
-          }
-          if (filter === 'all') return true;
-          if (entry.type === 'tool_start') return filter === 'running';
-          if (entry.type === 'tool_error') return filter === 'failed';
-          if (entry.type === 'tool_end') return filter === 'done';
-          return false;
-        })
-        .filter((entry) => {
-          return !toolFilter || entry.toolName === toolFilter;
-        })
-        .filter((entry) => {
-          const q = searchQuery.trim().toLowerCase();
-          if (!q) return true;
-          return entrySearchText(entry).includes(q);
-        });
-      if ((agentErrorsOnly || agentTextOnly || agentRunningOnly) && entries.length === 0) {
-        continue;
-      }
-      if (entries.length > 0 || !searchQuery.trim()) out.push({ turn, entries });
-    }
-    return out;
-  }, [turns, agentErrorsOnly, agentTextOnly, agentRunningOnly, filter, toolFilter, searchQuery]);
+  const filteredTurns = useMemo(
+    () =>
+      filterTurns(turns, {
+        agentErrorsOnly,
+        agentTextOnly,
+        agentRunningOnly,
+        filter,
+        toolFilter,
+        searchQuery,
+      }),
+    [turns, agentErrorsOnly, agentTextOnly, agentRunningOnly, filter, toolFilter, searchQuery],
+  );
 
-  // Flatten the ledger into fixed-height rows with cumulative offsets, so the
-  // visible slice can be computed from scrollTop alone.
-  const flatRows = useMemo(() => {
-    const rows: FlatRow[] = [];
-    let offset = 0;
-    let idx = 0;
-    for (const { turn, entries } of filteredTurns) {
-      rows.push({ kind: 'turn', key: `turn-${turn.iteration}`, turn, index: 0, height: TURN_H, offset });
-      offset += TURN_H;
-      if (turn.entries.length === 0) {
-        rows.push({ kind: 'empty', key: `empty-${turn.iteration}`, turn, index: ++idx, height: ROW_H, offset });
-        offset += ROW_H;
-        continue;
-      }
-      for (const entry of entries) {
-        const isTool = entry.type === 'tool_start' || entry.type === 'tool_end' || entry.type === 'tool_error';
-        idx += 1;
-        rows.push({
-          kind: isTool ? 'tool' : 'plain',
-          key: rowKey(turn.iteration, entry),
-          turn,
-          entry,
-          index: idx,
-          height: ROW_H,
-          offset,
-        });
-        offset += ROW_H;
-      }
-    }
-    return { rows, total: offset };
-  }, [filteredTurns]);
+  // Flatten the ledger into fixed-height rows with cumulative offsets.
+  const flatRows = useMemo(() => flattenRows(filteredTurns), [filteredTurns]);
 
   // Timeline view: one row per turn, each tool call drawn as a duration-
   // proportional block (running calls get a fixed-width accent block).
-  const timelineRows = useMemo(() => {
-    const rows: { turn: Turn; items: { entry: AgentLogEntry; dur: number }[]; total: number }[] = [];
-    for (const { turn, entries } of filteredTurns) {
-      const items = entries
-        .filter((e) => e.type === 'tool_start' || e.type === 'tool_end' || e.type === 'tool_error')
-        .map((e) => ({ entry: e, dur: e.durationMs ?? 0 }));
-      if (items.length === 0) continue;
-      rows.push({ turn, items, total: items.reduce((sum, item) => sum + item.dur, 0) });
-    }
-    return rows;
-  }, [filteredTurns]);
+  const timelineRows = useMemo(() => buildTimelineRows(filteredTurns), [filteredTurns]);
 
-  const timelineMaxDur = useMemo(() => {
-    let max = 1;
-    for (const row of timelineRows) {
-      for (const item of row.items) if (item.dur > max) max = item.dur;
-    }
-    return max;
-  }, [timelineRows]);
+  const timelineMaxDur = useMemo(() => maxTimelineDuration(timelineRows), [timelineRows]);
 
   // Visible slice with overscan.
-  const range = useMemo(() => {
-    const { rows, total } = flatRows;
-    if (rows.length === 0) return { start: 0, end: 0, topPad: 0, bottomPad: 0 };
-    const viewEnd = scrollTop + viewportH;
-    let lo = 0;
-    let hi = rows.length - 1;
-    let startIdx = 0;
-    while (lo <= hi) {
-      const mid = (lo + hi) >> 1;
-      if (rows[mid].offset <= scrollTop) {
-        startIdx = mid;
-        lo = mid + 1;
-      } else {
-        hi = mid - 1;
-      }
-    }
-    lo = 0;
-    hi = rows.length - 1;
-    let endIdx = rows.length - 1;
-    while (lo <= hi) {
-      const mid = (lo + hi) >> 1;
-      if (rows[mid].offset <= viewEnd) {
-        endIdx = mid;
-        lo = mid + 1;
-      } else {
-        hi = mid - 1;
-      }
-    }
-    const start = Math.max(0, startIdx - OVERSCAN);
-    const end = Math.min(rows.length, endIdx + 1 + OVERSCAN);
-    return {
-      start,
-      end,
-      topPad: rows[start].offset,
-      bottomPad: end < rows.length ? total - rows[end].offset : 0,
-    };
-  }, [scrollTop, viewportH, flatRows]);
+  const range = useMemo(
+    () => visibleRange(flatRows.rows, flatRows.total, scrollTop, viewportH),
+    [scrollTop, viewportH, flatRows],
+  );
 
   // Programmatic jump to a row key (works even when the row isn't rendered).
   const scrollToRow = useCallback(
