@@ -49,15 +49,19 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+    chunkSizeWarningLimit: 1000,
     // Electron 44 ships Chromium 152 — target the real runtime so Vite skips
     // unnecessary legacy-syntax polyfills.
-    target: 'chrome150',
+    target: 'chrome152',
     rollupOptions: {
       input: {
         main: path.resolve(import.meta.dirname, 'index.html'),
       },
       output: {
         manualChunks(id) {
+          if (id.includes('node_modules/@rc-component')) {
+            return 'vendor-rc';
+          }
           if (
             id.includes('node_modules/antd') ||
             id.includes('node_modules/@ant-design') ||
@@ -75,6 +79,24 @@ export default defineConfig({
             id.includes('node_modules/micromark')
           ) {
             return 'vendor-markdown';
+          }
+          if (id.includes('node_modules/echarts') || id.includes('node_modules/zrender')) {
+            return 'vendor-echarts';
+          }
+          if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/')) {
+            return 'vendor-react';
+          }
+          if (id.includes('node_modules/lucide-react')) {
+            return 'vendor-icons';
+          }
+          if (id.includes('node_modules/react-virtuoso')) {
+            return 'vendor-virtuoso';
+          }
+          if (id.includes('node_modules/@xyflow')) {
+            return 'vendor-flow';
+          }
+          if (id.includes('node_modules/allotment')) {
+            return 'vendor-layout';
           }
           if (id.includes('node_modules/katex')) {
             return 'vendor-katex';

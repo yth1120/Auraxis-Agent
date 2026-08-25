@@ -36,7 +36,7 @@ export default function SiderAccountMenu({
         onOpenChange={setOpen}
         trigger={['click']}
         placement="topLeft"
-        overlayClassName="account-popup"
+        classNames={{ root: 'account-popup' }}
         menu={{ items: [] }}
         popupRender={() => (
           <div className="w-[236px] p-1 gap-1 bg-[var(--color-bg-elevated)] rounded-xl shadow-[var(--shadow-md)] flex flex-col opacity-0 translate-y-1 animate-[smartPanelInUp_0.18s_ease_forwards]">

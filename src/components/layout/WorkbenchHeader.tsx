@@ -78,7 +78,7 @@ export function WorkbenchHeader({
             menu={{ items: fileMenuItems }}
             trigger={['click']}
             placement="bottomLeft"
-            overlayClassName="ax-top-menu-popup"
+            classNames={{ root: 'ax-top-menu-popup' }}
             transitionName=""
           >
             <button className="ax-header-action !w-auto !px-1.5 text-sm">{t('menu.file')}</button>
@@ -87,7 +87,7 @@ export function WorkbenchHeader({
             menu={{ items: editMenuItems }}
             trigger={['click']}
             placement="bottomLeft"
-            overlayClassName="ax-top-menu-popup"
+            classNames={{ root: 'ax-top-menu-popup' }}
             transitionName=""
           >
             <button className="ax-header-action !w-auto !px-1.5 text-sm">{t('menu.edit')}</button>
@@ -96,7 +96,7 @@ export function WorkbenchHeader({
             menu={{ items: viewMenuItems }}
             trigger={['click']}
             placement="bottomLeft"
-            overlayClassName="ax-top-menu-popup"
+            classNames={{ root: 'ax-top-menu-popup' }}
             transitionName=""
           >
             <button className="ax-header-action !w-auto !px-1.5 text-sm">{t('menu.view')}</button>
@@ -105,7 +105,7 @@ export function WorkbenchHeader({
             menu={{ items: helpMenuItems }}
             trigger={['click']}
             placement="bottomLeft"
-            overlayClassName="ax-top-menu-popup"
+            classNames={{ root: 'ax-top-menu-popup' }}
             transitionName=""
           >
             <button className="ax-header-action !w-auto !px-1.5 text-sm">{t('menu.help')}</button>
