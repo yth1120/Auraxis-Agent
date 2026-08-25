@@ -1,4 +1,6 @@
 import path from 'path';
+import { stat } from 'fs/promises';
+import { workspaceDrift } from '../../workspace-drift';
 import { isPathInside, normalizeWinPath, SAFE_EXTENSIONS } from '../shared';
 import type { SandboxMode } from '../../sandbox-policy';
 import type { ApprovalPolicy } from '../../types';
@@ -66,6 +68,40 @@ export interface ToolContext {
   surface?: WorkSurface;
 }
 
+const observedFiles = new Map<string, Set<string>>();
+
+export function observationScope(ctx: ToolContext): string {
+  return ctx.sessionId || ctx.agentId || ctx.requestId;
+}
+
+export function markFileObserved(ctx: ToolContext, filePath: string): void {
+  const scope = observationScope(ctx);
+  let set = observedFiles.get(scope);
+  if (!set) {
+    set = new Set();
+    observedFiles.set(scope, set);
+  }
+  set.add(path.resolve(filePath));
+  const driftScope = ctx.projectRoot || scope;
+  void workspaceDrift.observe(driftScope, filePath).catch(() => {});
+  if (observedFiles.size > 500) {
+    const oldest = observedFiles.keys().next().value;
+    if (oldest) observedFiles.delete(oldest);
+  }
+}
+
+export function isFileObserved(ctx: ToolContext, filePath: string): boolean {
+  return observedFiles.get(observationScope(ctx))?.has(path.resolve(filePath)) ?? false;
+}
+
+export async function fileExists(filePath: string): Promise<boolean> {
+  try {
+    await stat(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
 export function hasReservedFileName(filePath: string): boolean {
   const segments = filePath.replace(/\\/g, '/').split('/');
   return segments.some((s) => {
