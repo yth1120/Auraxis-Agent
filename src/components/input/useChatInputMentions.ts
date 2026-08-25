@@ -19,13 +19,13 @@ export function useChatInputMentions({
 }: {
   projectPath: string | null;
   inputValue: string;
-  textareaRef: RefObject<HTMLTextAreaElement>;
+  textareaRef: RefObject<HTMLTextAreaElement | null>;
   isAgentSurface: boolean;
   t: Translate;
 }) {
   const allSessions = useSessionStore((s) => s.sessions);
   const mentionFetchRef = useRef(0);
-  const mentionDebounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const mentionDebounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [mentionOpen, setMentionOpen] = useState(false);
   const [mentionQuery, setMentionQuery] = useState('');
   const [mentionIndex, setMentionIndex] = useState(-1);
@@ -57,9 +57,7 @@ export function useChatInputMentions({
             description: skill.description,
             type: 'general-purpose' as const,
             icon: 'feature' as const,
-            instruction: skill.whenToUse
-              ? `${skill.description}\n\n何时使用：${skill.whenToUse}`
-              : skill.description,
+            instruction: skill.whenToUse ? `${skill.description}\n\n何时使用：${skill.whenToUse}` : skill.description,
           })),
         );
       })
@@ -150,9 +148,7 @@ export function useChatInputMentions({
         if (!query.includes(' ') && !query.includes('\n') && !query.includes('@')) {
           setMentionIndex(atIndex);
           setMentionQuery(query);
-          const filtered = allFilePaths
-            .filter((path) => path.toLowerCase().includes(query.toLowerCase()))
-            .slice(0, 8);
+          const filtered = allFilePaths.filter((path) => path.toLowerCase().includes(query.toLowerCase())).slice(0, 8);
           const sessions = allSessions
             .filter((session) => (session.title || '').toLowerCase().includes(query.toLowerCase()))
             .slice(0, 4)

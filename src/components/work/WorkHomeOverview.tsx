@@ -1,12 +1,13 @@
 import { memo } from 'react';
 import { useT } from '../../i18n';
 import { useAgentStore } from '../../stores/useAgentStore';
+import { useShallow } from 'zustand/react/shallow';
 import { workDeliverables } from './workUtils';
 
 /** Work 首页顶部概览：进行中 / 待审批 / 已完成 / 交付物，替代空白首屏。 */
 export default memo(function WorkHomeOverview() {
   const t = useT();
-  const agents = useAgentStore((s) => s.agents.filter((a) => (a.surface ?? 'work') === 'work'));
+  const agents = useAgentStore(useShallow((s) => s.agents.filter((a) => (a.surface ?? 'work') === 'work')));
   const agentPermissions = useAgentStore((s) => s.agentPermissions);
 
   const active = agents.filter((a) => a.status === 'running' || a.status === 'queued' || a.status === 'paused').length;

@@ -28,7 +28,7 @@ export function TimelineStream({
   viewMode: 'table' | 'timeline';
   selectedKey: string | null;
   agentId: string;
-  scrollRef: RefObject<HTMLDivElement>;
+  scrollRef: RefObject<HTMLDivElement | null>;
   onScroll: () => void;
   onSelectRow: (key: string) => void;
   onFocusAgent: (agentId: string, toolCallId: string) => void;
@@ -70,7 +70,10 @@ export function TimelineStream({
                   <tr
                     key={row.key}
                     style={{ height: TURN_H }}
-                    className={clsx('bg-[var(--color-bg-secondary)] border-b border-border-dim', isCurrent && 'bg-primary-soft/40')}
+                    className={clsx(
+                      'bg-[var(--color-bg-secondary)] border-b border-border-dim',
+                      isCurrent && 'bg-primary-soft/40',
+                    )}
                     data-current-round={isCurrent || undefined}
                   >
                     <td colSpan={4} className="px-3">

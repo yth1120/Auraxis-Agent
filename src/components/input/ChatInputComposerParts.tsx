@@ -61,13 +61,19 @@ export function ChatInputWorkspaceStatus({
         {t('composer.local')}
       </span>
       {sidebarMode === 'work' && (
-        <span className="inline-flex items-center gap-1.5 h-8 px-2.5 text-xs text-text-secondary rounded-full" title={t('work.docsOnlyTip')}>
+        <span
+          className="inline-flex items-center gap-1.5 h-8 px-2.5 text-xs text-text-secondary rounded-full"
+          title={t('work.docsOnlyTip')}
+        >
           <FileTextIcon size={14} className="shrink-0 text-text-muted" />
           {t('work.docsOnly')}
         </span>
       )}
       {gitBranch && (
-        <span className="inline-flex items-center gap-1.5 h-8 px-2.5 text-xs text-text-secondary rounded-full" title={t('composer.branchTip', { branch: gitBranch })}>
+        <span
+          className="inline-flex items-center gap-1.5 h-8 px-2.5 text-xs text-text-secondary rounded-full"
+          title={t('composer.branchTip', { branch: gitBranch })}
+        >
           <GitBranchIcon size={14} className="shrink-0 text-text-muted" />
           <span className="max-w-[160px] overflow-hidden text-ellipsis whitespace-nowrap">{gitBranch}</span>
         </span>
@@ -80,10 +86,10 @@ export interface ChatInputToolbarProps {
   isAgentSurface: boolean;
   sidebarMode: string;
   heroSizing: boolean;
-  moreTriggerRef: RefObject<HTMLButtonElement>;
+  moreTriggerRef: RefObject<HTMLButtonElement | null>;
   smartMoreOpen: boolean;
   smartMorePosition: DropdownPosition | null;
-  smartMorePanelRef: RefObject<HTMLDivElement>;
+  smartMorePanelRef: RefObject<HTMLDivElement | null>;
   smartMoreClose: () => void;
   toggleMoreMenu: (event: React.MouseEvent) => void;
   pickFiles: (accept: string) => void;
@@ -103,7 +109,7 @@ export interface ChatInputToolbarProps {
   isStreaming: boolean;
   currentAgentRunning: boolean;
   handleSend: () => void;
-  modeTriggerRef: RefObject<HTMLButtonElement>;
+  modeTriggerRef: RefObject<HTMLButtonElement | null>;
   modePanelOpen: boolean;
   toggleModePanel: (event: React.MouseEvent) => void;
 }
@@ -173,8 +179,12 @@ export function ChatInputToolbar({
                   smartMoreClose();
                 }}
               >
-                <span className="flex items-center justify-center w-4 h-4 shrink-0 text-text-muted"><Paperclip size={16} /></span>
-                <span className="flex-1 min-w-0 text-sm leading-[20px] text-text-primary">{t('composer.uploadFile')}</span>
+                <span className="flex items-center justify-center w-4 h-4 shrink-0 text-text-muted">
+                  <Paperclip size={16} />
+                </span>
+                <span className="flex-1 min-w-0 text-sm leading-[20px] text-text-primary">
+                  {t('composer.uploadFile')}
+                </span>
               </button>
               <button
                 type="button"
@@ -184,8 +194,12 @@ export function ChatInputToolbar({
                   smartMoreClose();
                 }}
               >
-                <span className="flex items-center justify-center w-4 h-4 shrink-0 text-text-muted"><ImageIcon size={16} /></span>
-                <span className="flex-1 min-w-0 text-sm leading-[20px] text-text-primary">{t('composer.uploadImage')}</span>
+                <span className="flex items-center justify-center w-4 h-4 shrink-0 text-text-muted">
+                  <ImageIcon size={16} />
+                </span>
+                <span className="flex-1 min-w-0 text-sm leading-[20px] text-text-primary">
+                  {t('composer.uploadImage')}
+                </span>
               </button>
             </div>,
             document.body,
@@ -194,7 +208,10 @@ export function ChatInputToolbar({
       {isAgentSurface && (
         <>
           {pendingPlanMode && !(sidebarMode === 'work' && workAutonomyTier === 'plan') && (
-            <span className="inline-flex items-center gap-1 self-center h-8 pl-2.5 pr-1 text-xs leading-5 font-medium text-primary bg-primary-soft rounded-full" title={t('runmode.planTip')}>
+            <span
+              className="inline-flex items-center gap-1 self-center h-8 pl-2.5 pr-1 text-xs leading-5 font-medium text-primary bg-primary-soft rounded-full"
+              title={t('runmode.planTip')}
+            >
               <ListChecks size={14} className="shrink-0" />
               {t('runmode.plan')}
               <button
@@ -208,7 +225,10 @@ export function ChatInputToolbar({
             </span>
           )}
           {pendingToolChoice && (
-            <span className="inline-flex items-center gap-1 self-center h-8 pl-2.5 pr-1 text-xs leading-5 font-medium text-primary bg-primary-soft rounded-full" title={t('runmode.toolChoiceTip')}>
+            <span
+              className="inline-flex items-center gap-1 self-center h-8 pl-2.5 pr-1 text-xs leading-5 font-medium text-primary bg-primary-soft rounded-full"
+              title={t('runmode.toolChoiceTip')}
+            >
               <Wrench size={14} className="shrink-0" />
               {typeof pendingToolChoice === 'string'
                 ? `tool: ${pendingToolChoice}`
@@ -226,7 +246,11 @@ export function ChatInputToolbar({
           {sidebarMode === 'work' ? (
             <WorkTierSelector popDirection={heroSizing ? 'down' : 'up'} />
           ) : (
-            <PermissionSelector preset={permissionPreset} onChangePreset={setPermissionPreset} popDirection={heroSizing ? 'down' : 'up'} />
+            <PermissionSelector
+              preset={permissionPreset}
+              onChangePreset={setPermissionPreset}
+              popDirection={heroSizing ? 'down' : 'up'}
+            />
           )}
         </>
       )}
@@ -236,14 +260,24 @@ export function ChatInputToolbar({
         <ModeTrigger ref={modeTriggerRef} onClick={toggleModePanel} open={modePanelOpen} />
         {sidebarMode === 'chat' && (
           <Tooltip title={isDeepThink ? t('think.switchOn') : t('think.switchOff')} placement="top">
-            <button className={clsx('ax-icon-button', isDeepThink && '!bg-primary-soft !text-primary')} onClick={toggleDeepThink} aria-label={t('think.switch')} aria-pressed={isDeepThink}>
+            <button
+              className={clsx('ax-icon-button', isDeepThink && '!bg-primary-soft !text-primary')}
+              onClick={toggleDeepThink}
+              aria-label={t('think.switch')}
+              aria-pressed={isDeepThink}
+            >
               <Brain size={16} weight={isDeepThink ? 'fill' : 'regular'} />
             </button>
           </Tooltip>
         )}
         {sidebarMode === 'chat' && (
           <Tooltip title={isWebSearch ? t('composer.webSearchOn') : t('composer.webSearch')} placement="top">
-            <button className={clsx('ax-icon-button', isWebSearch && '!bg-primary-soft !text-primary')} onClick={toggleWebSearch} aria-label={t('composer.webSearch')} aria-pressed={isWebSearch}>
+            <button
+              className={clsx('ax-icon-button', isWebSearch && '!bg-primary-soft !text-primary')}
+              onClick={toggleWebSearch}
+              aria-label={t('composer.webSearch')}
+              aria-pressed={isWebSearch}
+            >
               <GlobeHemisphereWest size={16} weight={isWebSearch ? 'fill' : 'regular'} />
             </button>
           </Tooltip>
@@ -260,14 +294,40 @@ export function ChatInputToolbar({
           className={clsx('ax-send-button', (isStreaming || currentAgentRunning) && 'send-btn-stop')}
           onClick={handleSend}
           disabled={!hasInput && !isStreaming && !currentAgentRunning}
-          title={currentAgentRunning ? (hasInput ? t('composer.queueSend') : t('composer.stopTask')) : isStreaming ? (hasInput ? t('composer.sendAfterStop') : t('composer.stopGenerate')) : isAgentSurface ? t('composer.startTask') : t('composer.send')}
-          aria-label={currentAgentRunning ? (hasInput ? t('composer.queueSend') : t('composer.stopTask')) : isStreaming ? (hasInput ? t('composer.sendAfterStop') : t('composer.stopGenerate')) : isAgentSurface ? t('composer.startTask') : t('composer.send')}
+          title={
+            currentAgentRunning
+              ? hasInput
+                ? t('composer.queueSend')
+                : t('composer.stopTask')
+              : isStreaming
+                ? hasInput
+                  ? t('composer.sendAfterStop')
+                  : t('composer.stopGenerate')
+                : isAgentSurface
+                  ? t('composer.startTask')
+                  : t('composer.send')
+          }
+          aria-label={
+            currentAgentRunning
+              ? hasInput
+                ? t('composer.queueSend')
+                : t('composer.stopTask')
+              : isStreaming
+                ? hasInput
+                  ? t('composer.sendAfterStop')
+                  : t('composer.stopGenerate')
+                : isAgentSurface
+                  ? t('composer.startTask')
+                  : t('composer.send')
+          }
         >
           {isStreaming || currentAgentRunning ? (
             hasInput ? (
               <ArrowUp size={16} weight="bold" />
             ) : (
-              <span className="inline-flex items-center justify-center w-5 h-5"><span className="inline-block w-[10px] h-[10px] bg-current rounded-md" /></span>
+              <span className="inline-flex items-center justify-center w-5 h-5">
+                <span className="inline-block w-[10px] h-[10px] bg-current rounded-md" />
+              </span>
             )
           ) : isAgentSurface ? (
             <Play size={16} weight="fill" />

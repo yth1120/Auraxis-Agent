@@ -3,6 +3,7 @@ import { Button, Modal, Space } from 'antd';
 import clsx from 'clsx';
 import { useT, keybindingDescKey } from '../../i18n';
 import { useKeybindingsStore } from '../../stores/useKeybindingsStore';
+import { useShallow } from 'zustand/react/shallow';
 import { KEY_BINDINGS, formatBinding, isCtrlOrCmd, type KeyBinding } from '../../constants/keybindings';
 import { SettingsPaneHeader } from './SettingsPanes';
 
@@ -11,7 +12,7 @@ export function SettingsKeybindingsPane() {
   const overrides = useKeybindingsStore((s) => s.overrides);
   const setOverride = useKeybindingsStore((s) => s.setOverride);
   const clearOverrides = useKeybindingsStore((s) => s.clearOverrides);
-  const active = useKeybindingsStore((s) => s.getActive());
+  const active = useKeybindingsStore(useShallow((s) => s.getActive()));
   const [recordingIndex, setRecordingIndex] = useState<number | null>(null);
 
   useEffect(() => {

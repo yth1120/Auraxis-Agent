@@ -12,7 +12,7 @@ import type { Plugin } from 'vite';
  * Electron 桌面端优先走 IPC（coverage:get），从开发目录实时读取。
  */
 function coverageSummaryPlugin(): Plugin {
-  const summaryFile = () => path.resolve(__dirname, 'coverage', 'coverage-summary.json');
+  const summaryFile = () => path.resolve(import.meta.dirname, 'coverage', 'coverage-summary.json');
   return {
     name: 'auraxis-coverage-summary',
     configureServer(server) {
@@ -31,7 +31,7 @@ function coverageSummaryPlugin(): Plugin {
     closeBundle() {
       const src = summaryFile();
       if (!fs.existsSync(src)) return;
-      const destDir = path.resolve(__dirname, 'dist', 'coverage');
+      const destDir = path.resolve(import.meta.dirname, 'dist', 'coverage');
       fs.mkdirSync(destDir, { recursive: true });
       fs.copyFileSync(src, path.join(destDir, 'coverage-summary.json'));
     },
@@ -43,18 +43,18 @@ export default defineConfig({
   base: './',
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, 'src'),
+      '@': path.resolve(import.meta.dirname, 'src'),
     },
   },
   build: {
     outDir: 'dist',
     emptyOutDir: true,
-    // Electron 43 ships Chromium 150 — target the real runtime so Vite skips
+    // Electron 44 ships Chromium 152 — target the real runtime so Vite skips
     // unnecessary legacy-syntax polyfills.
     target: 'chrome150',
     rollupOptions: {
       input: {
-        main: path.resolve(__dirname, 'index.html'),
+        main: path.resolve(import.meta.dirname, 'index.html'),
       },
       output: {
         manualChunks(id) {

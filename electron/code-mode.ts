@@ -303,7 +303,7 @@ export async function runCodeProgram(
     });
 
     worker.on('error', (err) => {
-      stderr = `Worker 错误: ${err.message}`;
+      stderr = `Worker 错误: ${err instanceof Error ? err.message : String(err)}`;
       exitCode = 1;
       finish({});
     });

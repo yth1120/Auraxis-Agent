@@ -168,7 +168,9 @@ export async function runInlineWorkflow(
       }
     });
 
-    worker.on('error', (err) => settle({ ok: false, error: `工作流 worker 错误: ${err.message}` }));
+    worker.on('error', (err) =>
+      settle({ ok: false, error: `工作流 worker 错误: ${err instanceof Error ? err.message : String(err)}` }),
+    );
     worker.on('exit', (code) => {
       if (!finished && code !== 0) settle({ ok: false, error: `工作流 worker 异常退出（code=${code}）` });
     });

@@ -11,6 +11,7 @@ import { useSettingsStore } from '../../stores/useSettingsStore';
 import SkillsDirectory from '../skills/SkillsDirectory';
 import { useAuthStore } from '../../stores/useAuthStore';
 import clsx from 'clsx';
+import { useShallow } from 'zustand/react/shallow';
 import logoPng from '../../assets/auraxis-logo.png';
 import { useT } from '../../i18n';
 import { SessionRow, SIDEBAR_TOP_NAV } from './SiderNavRows';
@@ -62,7 +63,7 @@ export default function SiderNav({ collapsed }: SiderNavProps) {
   const sessionOrder = useProjectStore((s) => s.sessionOrder);
 
   // Code-mode parallel-agent task list
-  const agents = useAgentStore((s) => s.agents.filter((a) => (a.surface ?? 'code') !== 'work'));
+  const agents = useAgentStore(useShallow((s) => s.agents.filter((a) => (a.surface ?? 'code') !== 'work')));
   const currentAgentId = useAgentStore((s) => s.currentAgentId);
   const setCurrentAgent = useAgentStore((s) => s.setCurrentAgent);
   const agentPermissions = useAgentStore((s) => s.agentPermissions);

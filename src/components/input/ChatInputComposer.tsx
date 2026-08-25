@@ -30,7 +30,7 @@ export interface ChatInputComposerProps {
   gitBranch: string;
   pendingPlan?: PlanData;
   pendingImages: { name: string; dataUrl: string; start: number; end: number }[];
-  textareaRef: RefObject<HTMLTextAreaElement>;
+  textareaRef: RefObject<HTMLTextAreaElement | null>;
   inputValue: string;
   handleInputChange: (event: ChangeEvent<HTMLTextAreaElement>) => void;
   handleKeyDownWithMention: (event: ReactKeyboardEvent<HTMLTextAreaElement>) => void;
@@ -55,10 +55,10 @@ export interface ChatInputComposerProps {
   dollarSelected: number;
   handleDollarSelect: (skill: AgentSkill) => void;
   setDollarSelected: (index: number) => void;
-  moreTriggerRef: RefObject<HTMLButtonElement>;
+  moreTriggerRef: RefObject<HTMLButtonElement | null>;
   smartMoreOpen: boolean;
   smartMorePosition: DropdownPosition | null;
-  smartMorePanelRef: RefObject<HTMLDivElement>;
+  smartMorePanelRef: RefObject<HTMLDivElement | null>;
   smartMoreClose: () => void;
   toggleMoreMenu: (event: React.MouseEvent) => void;
   pickFiles: (accept: string) => void;
@@ -78,10 +78,10 @@ export interface ChatInputComposerProps {
   isStreaming: boolean;
   currentAgentRunning: boolean;
   handleSend: () => void;
-  modeTriggerRef: RefObject<HTMLButtonElement>;
+  modeTriggerRef: RefObject<HTMLButtonElement | null>;
   modePanelOpen: boolean;
   modePanelPos: DropdownPosition | null;
-  modePanelRef: RefObject<HTMLDivElement>;
+  modePanelRef: RefObject<HTMLDivElement | null>;
   closeModePanel: () => void;
 }
 
@@ -196,7 +196,12 @@ export default function ChatInputComposer({
                 ))}
               </div>
             )}
-            <div className={clsx('w-full relative flex border-none bg-transparent outline-none shadow-none pl-4 pr-3 pt-1', heroSizing ? 'min-h-[52px]' : 'min-h-[40px]')}>
+            <div
+              className={clsx(
+                'w-full relative flex border-none bg-transparent outline-none shadow-none pl-4 pr-3 pt-1',
+                heroSizing ? 'min-h-[52px]' : 'min-h-[40px]',
+              )}
+            >
               <textarea
                 ref={textareaRef}
                 value={inputValue}
@@ -213,7 +218,9 @@ export default function ChatInputComposer({
                 onBlur={handleBlur}
                 className={clsx(
                   'ax-composer-textarea',
-                  heroSizing ? 'text-lg leading-[30px] max-h-[240px] px-1' : 'text-lg leading-[30px] max-h-[160px] px-1',
+                  heroSizing
+                    ? 'text-lg leading-[30px] max-h-[240px] px-1'
+                    : 'text-lg leading-[30px] max-h-[160px] px-1',
                 )}
                 placeholder={
                   sidebarMode === 'chat'
@@ -298,21 +305,31 @@ export default function ChatInputComposer({
           />
         )}
       </div>
-      {modePanelOpen && modePanelPos && createPortal(
-        <div
-          ref={modePanelRef}
-          className={clsx('z-[1050] p-1 gap-1 w-[232px] bg-[var(--color-bg-elevated)] rounded-xl flex flex-col', 'shadow-[var(--shadow-md)]', modePanelPos.direction === 'up' ? 'animate-[smartPanelInUp_0.18s_ease_forwards]' : 'animate-[smartPanelInDown_0.18s_ease_forwards]')}
-          style={{
-            position: 'fixed',
-            left: `${modePanelPos.left}px`,
-            width: '232px',
-            ...(modePanelPos.direction === 'up' ? { bottom: `${modePanelPos.bottom}px` } : { top: `${modePanelPos.top}px` }),
-          }}
-        >
-          <ModePanelContent onSelect={closeModePanel} />
-        </div>,
-        document.body,
-      )}
+      {modePanelOpen &&
+        modePanelPos &&
+        createPortal(
+          <div
+            ref={modePanelRef}
+            className={clsx(
+              'z-[1050] p-1 gap-1 w-[232px] bg-[var(--color-bg-elevated)] rounded-xl flex flex-col',
+              'shadow-[var(--shadow-md)]',
+              modePanelPos.direction === 'up'
+                ? 'animate-[smartPanelInUp_0.18s_ease_forwards]'
+                : 'animate-[smartPanelInDown_0.18s_ease_forwards]',
+            )}
+            style={{
+              position: 'fixed',
+              left: `${modePanelPos.left}px`,
+              width: '232px',
+              ...(modePanelPos.direction === 'up'
+                ? { bottom: `${modePanelPos.bottom}px` }
+                : { top: `${modePanelPos.top}px` }),
+            }}
+          >
+            <ModePanelContent onSelect={closeModePanel} />
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

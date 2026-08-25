@@ -1,6 +1,7 @@
 import clsx from 'clsx';
 import { ListChecks, ShieldCheck } from '@/components/common/icons';
 import { useAgentStore } from '../../stores/useAgentStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useT } from '../../i18n';
 import type { AgentInfo } from '../../types/agent';
 import { workProgress } from './workUtils';
@@ -88,7 +89,7 @@ function Group({ title, items, currentAgentId }: { title: string; items: AgentIn
 
 export default function WorkSidebarPanel() {
   const t = useT();
-  const agents = useAgentStore((s) => s.agents.filter((a) => a.surface === 'work'));
+  const agents = useAgentStore(useShallow((s) => s.agents.filter((a) => a.surface === 'work')));
   const currentAgentId = useAgentStore((s) => s.currentAgentId);
 
   const active = agents.filter((a) => a.status === 'running' || a.status === 'queued' || a.status === 'paused');

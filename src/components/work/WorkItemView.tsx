@@ -15,6 +15,7 @@ import {
 } from '@/components/common/icons';
 import clsx from 'clsx';
 import { useAgentStore } from '../../stores/useAgentStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../../stores/useAppStore';
 import { useChatStore } from '../../stores/useChatStore';
 import { useT } from '../../i18n';
@@ -56,7 +57,7 @@ export default function WorkItemView({
   bottomInset: number;
 }) {
   const t = useT();
-  const pendingPerms = useAgentStore((s) => s.agentPermissions[agent.id]) ?? [];
+  const pendingPerms = useAgentStore(useShallow((s) => s.agentPermissions[agent.id] ?? []));
   const stopAgent = useAgentStore((s) => s.stopAgent);
   const pauseAgent = useAgentStore((s) => s.pauseAgent);
   const resumeAgent = useAgentStore((s) => s.resumeAgent);

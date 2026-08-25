@@ -10,8 +10,8 @@ interface GhostToastProps {
 
 export default function GhostToast({ message, visible, duration = 2500, onHide }: GhostToastProps) {
   const [show, setShow] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
-  const hideTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
     if (visible && message) {

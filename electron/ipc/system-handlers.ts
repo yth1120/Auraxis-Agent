@@ -114,8 +114,10 @@ export function registerSystemHandlers() {
       if (!resp.ok) {
         return { ok: false, error: `HTTP ${resp.status}: ${resp.statusText}` };
       }
-      const data = await resp.json();
-      const info = data?.balance_infos?.[0];
+      const data = (await resp.json()) as {
+        balance_infos?: { total_balance?: string; topped_up_balance?: string; currency?: string }[];
+      };
+      const info = data.balance_infos?.[0];
       return {
         ok: true,
         data: {

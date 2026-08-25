@@ -4,6 +4,7 @@ import { ArrowClockwise, CaretDown, Eraser, Plus, Stop, TerminalWindow, X } from
 import clsx from 'clsx';
 import { useTerminalTasksStore } from '@/stores/useTerminalTasksStore';
 import { useAgentStore } from '@/stores/useAgentStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useT } from '@/i18n';
 import { AgentShellSurface, StatusIcon, TerminalSurface, statusLabel } from './TerminalPanelSurfaces';
 
@@ -21,8 +22,10 @@ export default function TerminalPanel({ onClose, paused }: { onClose?: () => voi
   const stopTask = useTerminalTasksStore((s) => s.stopTask);
   const currentAgentId = useAgentStore((s) => s.currentAgentId);
   const currentAgent = useAgentStore((s) => s.agents.find((agent) => agent.id === s.currentAgentId));
-  const agentCandidates = useAgentStore((s) =>
-    s.agents.filter((agent) => agent.status === 'running' || agent.status === 'queued' || agent.status === 'paused'),
+  const agentCandidates = useAgentStore(
+    useShallow((s) =>
+      s.agents.filter((agent) => agent.status === 'running' || agent.status === 'queued' || agent.status === 'paused'),
+    ),
   );
   const prevAgentIdRef = useRef<string | null>(null);
 
@@ -169,8 +172,7 @@ export default function TerminalPanel({ onClose, paused }: { onClose?: () => voi
             {tasksOpen && (
               <div className="max-h-[132px] overflow-y-auto border-t border-[var(--color-border-dim)]/60">
                 {tasks.map((task, index) => {
-                  const elapsed =
-                    task.status === 'running' ? Date.now() - task.startedAt : (task.durationMs ?? 0);
+                  const elapsed = task.status === 'running' ? Date.now() - task.startedAt : (task.durationMs ?? 0);
                   return (
                     <div
                       key={task.id}

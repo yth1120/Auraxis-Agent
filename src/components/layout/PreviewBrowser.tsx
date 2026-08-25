@@ -361,7 +361,7 @@ export default function PreviewBrowser({ tabId }: PreviewBrowserProps) {
             ref={webviewRef as unknown as React.RefObject<HTMLElement>}
             src={url}
             partition="persist:auraxis-preview"
-            allowpopups={true as unknown as string}
+            allowpopups
             useragent="Auraxis/2.0 (Electron Preview)"
             style={frameStyle}
           />
