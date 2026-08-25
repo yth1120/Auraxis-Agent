@@ -1,4 +1,5 @@
 import type { AgentInfo, AgentLogEntry, AgentPriority, AgentStatus } from '../types/agent';
+import type { AgentRuntimeEvent } from '../types/tools';
 
 export function agentIpc() {
   return window.electronAPI?.agent;
@@ -127,4 +128,140 @@ export function toBackendPatch(snapshot: BackendAgentSnapshot): Partial<AgentInf
   const projectPath = snapshot.projectPath || snapshot.projectRoot;
   if (typeof projectPath === 'string' && projectPath) patch.projectRoot = projectPath;
   return patch;
+}
+
+// Convert a raw backend event into a log entry the UI can render.
+// Returns null for events that aren't shown as log entries (text_chunk goes
+// through the RAF buffer instead).
+export function logEntryFromEvent(event: AgentRuntimeEvent): AgentLogEntry | null {
+  switch (event.type) {
+    case 'text_chunk':
+      // Handled by the RAF buffer; never produces a direct log entry here.
+      return null;
+    case 'tool_start':
+      return {
+        type: 'tool_start',
+        timestamp: event.timestamp || Date.now(),
+        toolCallId: event.toolCallId,
+        toolName: event.toolName,
+        input: event.input,
+        streamOutput: '',
+        stepGroupId: event.stepGroupId,
+      };
+    case 'tool_end': {
+      const entry: AgentLogEntry = {
+        type: 'tool_end',
+        timestamp: event.timestamp || Date.now(),
+        toolCallId: event.toolCallId,
+        toolName: event.toolName,
+        output: event.output,
+        durationMs: event.durationMs,
+        stepGroupId: event.stepGroupId,
+        summary: event.summary,
+        streamOutput: event.streamOutput,
+      };
+      if (event.toolName === 'TodoWrite') {
+        const output = isRecord(event.output) ? event.output : {};
+        const todos = normalizeTodos(output.todos);
+        if (todos) entry.todos = todos;
+      }
+      return entry;
+    }
+    case 'tool_aborted':
+      return {
+        type: 'tool_error',
+        timestamp: event.timestamp || Date.now(),
+        toolCallId: event.toolCallId,
+        toolName: event.toolName,
+        error: event.error || '工具已中止',
+        streamOutput: event.streamOutput,
+        stepGroupId: event.stepGroupId,
+      };
+    case 'tool_error':
+      return {
+        type: 'tool_error',
+        timestamp: event.timestamp || Date.now(),
+        toolCallId: event.toolCallId,
+        toolName: event.toolName,
+        error: event.error,
+        streamOutput: event.streamOutput,
+        stepGroupId: event.stepGroupId,
+      };
+    case 'iteration_start':
+      return {
+        type: 'iteration_start',
+        timestamp: Date.now(),
+        iteration: event.iteration,
+        maxIterations: event.maxIterations,
+      };
+    case 'iteration_end':
+      return {
+        type: 'iteration_end',
+        timestamp: Date.now(),
+        iteration: event.iteration,
+        toolsThisIteration: event.toolsThisIteration,
+        llmLatencyMs: event.llmLatencyMs,
+        firstTokenMs: event.firstTokenMs,
+        outputTokens: event.outputTokens,
+      };
+    case 'turn_start':
+      return {
+        type: 'turn_start',
+        timestamp: event.timestamp || Date.now(),
+        turnId: event.turnId,
+      };
+    case 'turn_end':
+      return {
+        type: 'turn_end',
+        timestamp: event.timestamp || Date.now(),
+        turnId: event.turnId,
+        reason: event.reason,
+      };
+    case 'tool_progress':
+      // API retry hints, long-tool liveness pings.
+      return event.progress ? { type: 'progress', timestamp: Date.now(), text: event.progress } : null;
+    case 'deviance_warning':
+      return event.message ? { type: 'warning', timestamp: Date.now(), text: event.message } : null;
+    case 'system_message':
+      return event.level === 'warning' && event.content
+        ? { type: 'warning', timestamp: Date.now(), text: event.content }
+        : null;
+    case 'context_compressed':
+      return {
+        type: 'progress',
+        timestamp: Date.now(),
+        text: '',
+        compaction: {
+          tokensBefore: event.tokensBefore ?? 0,
+          tokensAfter: event.tokensAfter ?? 0,
+          messagesRemoved: event.messagesRemoved,
+          tokensSaved: event.tokensSaved,
+        },
+      };
+    case 'context_injected':
+      if (event.producer === 'external') {
+        return { type: 'user_message', timestamp: Date.now(), text: event.detail || '' };
+      }
+      return {
+        type: 'context',
+        timestamp: Date.now(),
+        disclosure: {
+          source:
+            event.source === 'instructions' || event.source === 'memory' || event.source === 'workspace'
+              ? event.source
+              : 'instructions',
+          producer: event.producer ?? '',
+          detail: event.detail,
+        },
+      };
+    case 'user_message':
+      return { type: 'user_message', timestamp: event.timestamp || Date.now(), text: event.text || '' };
+    case 'error':
+      return { type: 'error', timestamp: Date.now(), error: event.error };
+    case 'plan':
+      // Sub-agents (agent-handlers) emit fully-formed {todos: [...]}.
+      return event.todos ? { type: 'plan', timestamp: Date.now(), todos: event.todos } : null;
+    default:
+      return null;
+  }
 }
