@@ -9,14 +9,14 @@ import { NAV_GROUPS } from './SettingsModalConfig';
 import SchemaPanel from './SchemaPanel';
 import { buildAgentRuntimeFields } from './agentRuntimeSchema';
 import AccountPane from './AccountPane';
+import { SettingsCostPane } from './SettingsCostPane';
+import { SettingsAboutPane } from './SettingsAboutPane';
 import {
-  SettingsCostPane,
   SettingsGeneralPane,
   SettingsAppearancePane,
   SettingsKeybindingsPane,
   SettingsPermissionsPane,
   SettingsPluginsPane,
-  SettingsAboutPane,
 } from './SettingsPanes';
 import {
   SettingsActionsPane,

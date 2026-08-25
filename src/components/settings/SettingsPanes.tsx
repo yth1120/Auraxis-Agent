@@ -7,7 +7,6 @@ import {
   PlusCircle as PlusCircleOutlined,
 } from '@/components/common/icons';
 import clsx from 'clsx';
-import logoPng from '../../assets/auraxis-logo.png';
 import { useSettingsStore } from '../../stores/useSettingsStore';
 import { getDeepSeekModelsUrl } from '../../../electron/api-config';
 import { useAdvancedStore } from '../../stores/useAdvancedStore';
@@ -40,50 +39,6 @@ export function SettingsSectionTitle({ children, hint }: { children: React.React
       <span className="text-sm font-semibold text-text-primary">{children}</span>
       {hint && <span className="text-2xs text-text-faint">{hint}</span>}
     </div>
-  );
-}
-
-export function SettingsCostPane() {
-  const t = useT();
-  const { inputPricePerM, outputPricePerM, setInputPricePerM, setOutputPricePerM } = useSettingsStore();
-  return (
-    <>
-      <SettingsSectionTitle>{t('settings.section.cost')}</SettingsSectionTitle>
-      <section className="mb-2">
-        <SettingItem title={t('settings.cost.input')} description={t('settings.cost.input.desc')}>
-          <Space.Compact block>
-            <InputNumber
-              value={inputPricePerM}
-              onChange={(v) => setInputPricePerM(Number(v) || 0)}
-              min={0}
-              step={0.1}
-              precision={2}
-              style={{ width: '100%' }}
-              placeholder="0"
-            />
-            <span className="inline-flex items-center px-2.5 text-xs text-text-muted bg-[var(--color-bg-inset)] border border-l-0 border-[var(--color-border-dim)]">
-              {t('settings.currencyUnit')}
-            </span>
-          </Space.Compact>
-        </SettingItem>
-        <SettingItem title={t('settings.cost.output')} description={t('settings.cost.output.desc')} noBorder>
-          <Space.Compact block>
-            <InputNumber
-              value={outputPricePerM}
-              onChange={(v) => setOutputPricePerM(Number(v) || 0)}
-              min={0}
-              step={0.1}
-              precision={2}
-              style={{ width: '100%' }}
-              placeholder="0"
-            />
-            <span className="inline-flex items-center px-2.5 text-xs text-text-muted bg-[var(--color-bg-inset)] border border-l-0 border-[var(--color-border-dim)]">
-              {t('settings.currencyUnit')}
-            </span>
-          </Space.Compact>
-        </SettingItem>
-      </section>
-    </>
   );
 }
 
@@ -825,35 +780,5 @@ export function SettingsPluginsPane() {
         </div>
       )}
     </>
-  );
-}
-
-export function SettingsAboutPane() {
-  const t = useT();
-  const [appVersion, setAppVersion] = useState('0.0.0');
-  useEffect(() => {
-    window.electronAPI?.system?.getVersion().then((result) => {
-      if (result.ok && result.data) setAppVersion(result.data);
-    });
-  }, []);
-  return (
-    <div className="text-center py-8">
-      <img src={logoPng} alt="Auraxis" className="w-16 h-16 object-contain mx-auto mb-3" />
-      <h2 className="auraxis-wordmark" style={{ fontSize: 30, margin: '0 0 6px' }}>
-        Auraxis
-      </h2>
-      <p className="text-text-muted text-sm font-mono my-1 mb-6">Version {appVersion}</p>
-      <p className="text-text-secondary text-sm leading-[1.8] mx-auto mb-6 max-w-[400px]">{t('settings.aboutBody')}</p>
-      <div className="flex justify-center flex-wrap gap-2">
-        {['Electron', 'React 18', 'TypeScript', 'Ant Design 5', 'Zustand', 'DeepSeek SDK'].map((tech) => (
-          <span
-            key={tech}
-            className="inline-flex items-center h-6 px-2.5 rounded-full text-2xs font-medium whitespace-nowrap bg-[var(--color-bg-secondary)] border border-[var(--color-border-dim)] text-text-secondary"
-          >
-            {tech}
-          </span>
-        ))}
-      </div>
-    </div>
   );
 }
