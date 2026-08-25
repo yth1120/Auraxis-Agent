@@ -7,7 +7,10 @@ const DANGEROUS_PATTERNS: { pattern: RegExp; label: string }[] = [
   { pattern: /\bnew\s+Function\s*\(/, label: 'new Function() — 可执行任意代码' },
   { pattern: /require\s*\(\s*['"]child_process['"]\s*\)/, label: 'child_process — 可启动系统进程' },
   { pattern: /require\s*\(\s*['"]fs['"]\s*\)/, label: 'fs — 可读写任意文件' },
-  { pattern: /fetch\s*\((?!(['"]https?:\/\/(localhost|127\.0\.0\.1)))/, label: 'fetch() 到非本地地址 — 可发送网络请求' },
+  {
+    pattern: /fetch\s*\((?!(['"]https?:\/\/(localhost|127\.0\.0\.1)))/,
+    label: 'fetch() 到非本地地址 — 可发送网络请求',
+  },
   { pattern: /require\s*\(\s*['"]net['"]\s*\)/, label: 'net — 可创建网络连接' },
   { pattern: /require\s*\(\s*['"]os['"]\s*\)/, label: 'os — 可访问系统信息' },
   { pattern: /require\s*\(\s*['"]path['"]\s*\)/, label: 'path — 可操作文件路径' },
@@ -54,7 +57,10 @@ export function scanForRisks(source: string): string[] {
 
 /** Split a path into segments, dropping '.' / empty; returns null on '..' traversal. */
 function normalizeSegments(p: string): string[] | null {
-  const parts = p.replace(/\\/g, '/').split('/').filter((s) => s !== '' && s !== '.');
+  const parts = p
+    .replace(/\\/g, '/')
+    .split('/')
+    .filter((s) => s !== '' && s !== '.');
   if (parts.some((s) => s === '..')) return null; // reject path traversal
   return parts;
 }

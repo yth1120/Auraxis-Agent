@@ -5,7 +5,7 @@
    existing tokens.css custom properties.
    ================================================================ */
 
-@import "tailwindcss";
+@import 'tailwindcss';
 
 /* 工具行：运行中的行带流光扫过 (keyframes in
    keyframes.css). The row must be position:relative for the overlay. */
@@ -251,7 +251,9 @@
   background: transparent;
   color: var(--color-text-muted);
   cursor: pointer;
-  transition: background-color 80ms ease, color 80ms ease;
+  transition:
+    background-color 80ms ease,
+    color 80ms ease;
 }
 
 .ax-flow-action:hover {
@@ -331,7 +333,9 @@
   font-size: 11px;
   line-height: 16px;
   cursor: pointer;
-  transition: color 80ms ease, background-color 80ms ease;
+  transition:
+    color 80ms ease,
+    background-color 80ms ease;
 }
 
 .ax-session-action:hover {
@@ -354,57 +358,57 @@
 @theme {
   /* Dark Intelligence — brand black actions, aura accent only (see tokens.css). */
   --color-primary: #111216;
-  --color-primary-hover: #292C32;
-  --color-primary-active: #3A3E45;
+  --color-primary-hover: #292c32;
+  --color-primary-active: #3a3e45;
   --color-primary-soft: rgba(30, 35, 42, 0.06);
-  --color-primary-strong: rgba(30, 35, 42, 0.10);
+  --color-primary-strong: rgba(30, 35, 42, 0.1);
   --color-primary-border: rgba(30, 35, 42, 0.17);
-  --color-accent: #6A6884;
-  --color-accent-hover: #5B5975;
-  --color-accent-active: #4D4B66;
-  --color-accent-soft: rgba(106, 104, 132, 0.10);
+  --color-accent: #6a6884;
+  --color-accent-hover: #5b5975;
+  --color-accent-active: #4d4b66;
+  --color-accent-soft: rgba(106, 104, 132, 0.1);
   --color-accent-strong: rgba(106, 104, 132, 0.16);
   --color-accent-border: rgba(106, 104, 132, 0.24);
-  --color-brand-from: #292C32;
-  --color-brand-to: #6A6884;
-  --color-violet: #6A6884;
-  --color-violet-hover: #5B5975;
-  --color-violet-active: #4D4B66;
-  --color-violet-soft: rgba(106, 104, 132, 0.10);
+  --color-brand-from: #292c32;
+  --color-brand-to: #6a6884;
+  --color-violet: #6a6884;
+  --color-violet-hover: #5b5975;
+  --color-violet-active: #4d4b66;
+  --color-violet-soft: rgba(106, 104, 132, 0.1);
   --color-violet-strong: rgba(106, 104, 132, 0.16);
   --color-violet-border: rgba(106, 104, 132, 0.24);
 
-  --color-bg-primary: #FFFFFF;
-  --color-bg-secondary: #F5F6F8;
-  --color-bg-tertiary: #EBEDF0;
-  --color-bg-elevated: #FFFFFF;
+  --color-bg-primary: #ffffff;
+  --color-bg-secondary: #f5f6f8;
+  --color-bg-tertiary: #ebedf0;
+  --color-bg-elevated: #ffffff;
   --color-bg-inset: rgba(30, 35, 42, 0.045);
 
   --color-text-primary: #111216;
-  --color-text-secondary: #2E333A;
-  --color-text-muted: #454B53;
-  --color-text-faint: #61676F;
-  --color-text-on-accent: #FFFFFF;
+  --color-text-secondary: #2e333a;
+  --color-text-muted: #454b53;
+  --color-text-faint: #61676f;
+  --color-text-on-accent: #ffffff;
 
   --color-border-dim: rgba(30, 35, 42, 0.065);
   --color-border-default: rgba(30, 35, 42, 0.085);
   --color-border-strong: rgba(30, 35, 42, 0.13);
 
-  --color-success: #4F7C68;
-  --color-success-soft: rgba(79, 124, 104, 0.10);
-  --color-danger: #A25B60;
-  --color-danger-soft: rgba(162, 91, 96, 0.10);
+  --color-success: #4f7c68;
+  --color-success-soft: rgba(79, 124, 104, 0.1);
+  --color-danger: #a25b60;
+  --color-danger-soft: rgba(162, 91, 96, 0.1);
   --color-danger-border: rgba(162, 91, 96, 0.22);
-  --color-danger-lighter: #B06F74;
-  --color-warning: #B97F3E;
-  --color-warning-soft: rgba(185, 127, 62, 0.10);
+  --color-danger-lighter: #b06f74;
+  --color-warning: #b97f3e;
+  --color-warning-soft: rgba(185, 127, 62, 0.1);
   --color-warning-border: rgba(185, 127, 62, 0.24);
 
-  --color-code-bg: #F6F7F9;
-  --color-surface: #FFFFFF;
-  --color-surface-hover: #EEF0F3;
+  --color-code-bg: #f6f7f9;
+  --color-surface: #ffffff;
+  --color-surface-hover: #eef0f3;
   --color-surface-inset: rgba(30, 35, 42, 0.045);
-  --color-tooltip-bg: #FFFFFF;
+  --color-tooltip-bg: #ffffff;
 
   /* Colors — back-compat aliases */
   --color-bg-primary-alt: var(--color-bg-primary);
@@ -421,38 +425,39 @@
   --color-warning-alt: var(--color-warning);
 
   /* Typography */
-  --font-heading: 'Inter Variable', 'Segoe UI Variable Text', 'Segoe UI',
-    -apple-system, BlinkMacSystemFont, 'HarmonyOS Sans SC', 'MiSans',
-    'PingFang SC', 'Hiragino Sans GB', 'Source Han Sans SC', 'Noto Sans CJK SC',
-    'Microsoft YaHei UI', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
-  --font-body: 'Inter Variable', 'Segoe UI Variable Text', 'Segoe UI',
-    -apple-system, BlinkMacSystemFont, 'HarmonyOS Sans SC', 'MiSans',
-    'PingFang SC', 'Hiragino Sans GB', 'Source Han Sans SC', 'Noto Sans CJK SC',
-    'Microsoft YaHei UI', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
-  --font-mono: 'SF Mono', 'JetBrains Mono', 'Fira Code', 'Cascadia Code',
-    Consolas, 'Liberation Mono', Menlo, Courier, 'PingFang SC', 'Microsoft YaHei';
+  --font-heading:
+    'Inter Variable', 'Segoe UI Variable Text', 'Segoe UI', -apple-system, BlinkMacSystemFont, 'HarmonyOS Sans SC',
+    'MiSans', 'PingFang SC', 'Hiragino Sans GB', 'Source Han Sans SC', 'Noto Sans CJK SC', 'Microsoft YaHei UI',
+    'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
+  --font-body:
+    'Inter Variable', 'Segoe UI Variable Text', 'Segoe UI', -apple-system, BlinkMacSystemFont, 'HarmonyOS Sans SC',
+    'MiSans', 'PingFang SC', 'Hiragino Sans GB', 'Source Han Sans SC', 'Noto Sans CJK SC', 'Microsoft YaHei UI',
+    'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
+  --font-mono:
+    'SF Mono', 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, 'Liberation Mono', Menlo, Courier,
+    'PingFang SC', 'Microsoft YaHei';
 
-  --text-4xs: 0.5625rem;  /* 9px */
+  --text-4xs: 0.5625rem; /* 9px */
   --text-4xs--line-height: 0.875rem;
-  --text-3xs: 0.625rem;   /* 10px */
+  --text-3xs: 0.625rem; /* 10px */
   --text-3xs--line-height: 0.875rem;
-  --text-2xs: 0.6875rem;  /* 11px */
+  --text-2xs: 0.6875rem; /* 11px */
   --text-2xs--line-height: 0.875rem;
-  --text-xs: 0.75rem;     /* 12px */
+  --text-xs: 0.75rem; /* 12px */
   --text-xs--line-height: 1.125rem;
-  --text-sm: 0.8125rem;   /* 13px */
+  --text-sm: 0.8125rem; /* 13px */
   --text-sm--line-height: 1.25rem;
-  --text-base: 0.875rem;  /* 14px */
+  --text-base: 0.875rem; /* 14px */
   --text-base--line-height: 1.375rem;
-  --text-md: 0.9375rem;   /* 15px */
+  --text-md: 0.9375rem; /* 15px */
   --text-md--line-height: 1.5625rem;
-  --text-lg: 1rem;        /* 16px */
+  --text-lg: 1rem; /* 16px */
   --text-lg--line-height: 1.75rem;
-  --text-xl: 1.25rem;     /* 20px */
+  --text-xl: 1.25rem; /* 20px */
   --text-xl--line-height: 1.75rem;
-  --text-2xl: 1.5rem;     /* 24px */
+  --text-2xl: 1.5rem; /* 24px */
   --text-2xl--line-height: 2rem;
-  --text-3xl: 1.5rem;     /* 24px */
+  --text-3xl: 1.5rem; /* 24px */
   --text-3xl--line-height: 2rem;
 
   --font-weight-normal: 400;
@@ -471,33 +476,33 @@
   --tracking-wider: 0.04em;
 
   /* Spacing */
-  --spacing-1: 0.25rem;   /* 4px */
-  --spacing-2: 0.5rem;    /* 8px */
-  --spacing-3: 0.75rem;   /* 12px */
-  --spacing-4: 1rem;      /* 16px */
-  --spacing-5: 1.25rem;   /* 20px */
-  --spacing-6: 1.5rem;    /* 24px */
-  --spacing-8: 2rem;      /* 32px */
-  --spacing-10: 2.5rem;   /* 40px */
-  --spacing-12: 3rem;     /* 48px */
-  --spacing-16: 4rem;     /* 64px */
+  --spacing-1: 0.25rem; /* 4px */
+  --spacing-2: 0.5rem; /* 8px */
+  --spacing-3: 0.75rem; /* 12px */
+  --spacing-4: 1rem; /* 16px */
+  --spacing-5: 1.25rem; /* 20px */
+  --spacing-6: 1.5rem; /* 24px */
+  --spacing-8: 2rem; /* 32px */
+  --spacing-10: 2.5rem; /* 40px */
+  --spacing-12: 3rem; /* 48px */
+  --spacing-16: 4rem; /* 64px */
 
   /* Border radius */
-  --radius-sm: 0.25rem;   /* 4px */
-  --radius-md: 0.375rem;  /* 6px */
-  --radius-lg: 0.5rem;    /* 8px */
-  --radius-xl: 0.75rem;   /* 12px */
-  --radius-card: 0.5rem;  /* 8px */
+  --radius-sm: 0.25rem; /* 4px */
+  --radius-md: 0.375rem; /* 6px */
+  --radius-lg: 0.5rem; /* 8px */
+  --radius-xl: 0.75rem; /* 12px */
+  --radius-card: 0.5rem; /* 8px */
   --radius-full: 9999px;
 
   /* Shadows */
   --shadow-xs: 0 1px 2px rgba(20, 24, 30, 0.05);
   --shadow-sm: 0 1px 2px rgba(20, 24, 30, 0.04), 0 2px 8px rgba(20, 24, 30, 0.06);
   --shadow-md: 0 2px 4px rgba(20, 24, 30, 0.04), 0 6px 16px rgba(20, 24, 30, 0.08);
-  --shadow-lg: 0 4px 8px rgba(20, 24, 30, 0.05), 0 10px 28px rgba(20, 24, 30, 0.10);
+  --shadow-lg: 0 4px 8px rgba(20, 24, 30, 0.05), 0 10px 28px rgba(20, 24, 30, 0.1);
   --shadow-xl: 0 6px 12px rgba(20, 24, 30, 0.06), 0 16px 40px rgba(20, 24, 30, 0.14);
   --shadow-card: 0 1px 2px rgba(20, 24, 30, 0.05);
-  --shadow-card-hover: 0 2px 4px rgba(20, 24, 30, 0.05), 0 8px 20px rgba(20, 24, 30, 0.10);
+  --shadow-card-hover: 0 2px 4px rgba(20, 24, 30, 0.05), 0 8px 20px rgba(20, 24, 30, 0.1);
 
   /* Animation durations */
   --duration-instant: 80ms;
@@ -520,7 +525,9 @@
    We only keep what preflight does NOT cover. */
 
 /* Electron frameless window drag region */
-html, body, #root {
+html,
+body,
+#root {
   height: 100%;
   overflow: hidden;
   color: var(--color-text-primary);
@@ -533,7 +540,9 @@ html, body, #root {
 
 /* Reduced motion preference */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
@@ -542,17 +551,30 @@ html, body, #root {
 }
 
 /* Scrollbar globals */
-::-webkit-scrollbar { width: 5px; height: 5px; }
-::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
 ::-webkit-scrollbar-thumb {
   background: rgba(30, 35, 42, 0.22);
   border-radius: 9999px;
 }
-::-webkit-scrollbar-thumb:hover { background: rgba(30, 35, 42, 0.32); }
-::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(30, 35, 42, 0.32);
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
 
-.dark ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.22); }
-.dark ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.32); }
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.22);
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.32);
+}
 
 /* Selection */
 ::selection {
@@ -591,11 +613,11 @@ html.auraxis-glass .ax-sidebar {
 /* tokens.css is imported AFTER @theme so its values take precedence
    for CSS custom properties. During migration this ensures both
    Tailwind utilities and var() references work identically. */
-@import "./tokens.css";
-@import "./keyframes.css";
-@import "./highlight.css";
-@import "./icons.css";
-@import "./overrides.css";
-@import "./ax-ui.css";
-@import "./glass.css";
-@import "./aqua.css";
+@import './tokens.css';
+@import './keyframes.css';
+@import './highlight.css';
+@import './icons.css';
+@import './overrides.css';
+@import './ax-ui.css';
+@import './glass.css';
+@import './aqua.css';

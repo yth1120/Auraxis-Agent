@@ -84,10 +84,7 @@ class ApprovalFatigueTracker {
    * 对一个即将发生的工具调用给出是否升级人工的建议。
    * risk: high 始终升级；medium/low 依据疲劳曲线。
    */
-  suggest(
-    scope: string,
-    risk: 'low' | 'medium' | 'high',
-  ): { escalate: boolean; reason: string; state: FatigueState } {
+  suggest(scope: string, risk: 'low' | 'medium' | 'high'): { escalate: boolean; reason: string; state: FatigueState } {
     const s = this.state(scope);
     if (risk === 'high') {
       return { escalate: true, reason: '高风险操作始终升级人工审批', state: s };

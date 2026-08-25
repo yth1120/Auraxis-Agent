@@ -25,11 +25,24 @@ function makeAgent(overrides: Partial<AgentInfo> = {}): AgentInfo {
     totalInputTokens: 0,
     totalOutputTokens: 0,
     surface: 'work',
-    plan: { todos: [{ content: '写代码', status: 'completed' }, { content: '写测试', status: 'pending' }] },
+    plan: {
+      todos: [
+        { content: '写代码', status: 'completed' },
+        { content: '写测试', status: 'pending' },
+      ],
+    },
     log: [
       { type: 'iteration_start', timestamp: 1, iteration: 0 },
       { type: 'tool_start', timestamp: 2, toolCallId: 'tc1', toolName: 'Write', input: { file_path: 'C:/proj/a.ts' } },
-      { type: 'tool_end', timestamp: 3, toolCallId: 'tc1', toolName: 'Write', input: { file_path: 'C:/proj/a.ts' }, output: { ok: true }, durationMs: 10 },
+      {
+        type: 'tool_end',
+        timestamp: 3,
+        toolCallId: 'tc1',
+        toolName: 'Write',
+        input: { file_path: 'C:/proj/a.ts' },
+        output: { ok: true },
+        durationMs: 10,
+      },
     ],
     ...overrides,
   };

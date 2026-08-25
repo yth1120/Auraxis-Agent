@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron';
+import { errorText } from '../errors';
 import { secureHandle } from './trust';
 import { resolveTrustedProjectRoot } from './project-access';
 import { loadRules } from '../rules';
@@ -9,8 +9,8 @@ export function registerRulesHandlers() {
     try {
       const root = projectRoot ? await resolveTrustedProjectRoot(projectRoot) : undefined;
       return { ok: true, data: await loadRules(root) };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 }

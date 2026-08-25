@@ -7,6 +7,7 @@
  * exactly like the in-memory Cron runtime. Entries do not survive a restart
  * （会话内投递模型，重启后失效）.
  */
+import { errorText } from './errors';
 import { randomUUID } from 'crypto';
 
 export type ScheduleKind = 'after' | 'at' | 'every';
@@ -54,8 +55,8 @@ function fire(entry: ScheduleEntry): void {
   entry.firedCount += 1;
   try {
     fireHandler?.(entry);
-  } catch (err: any) {
-    entry.lastError = String(err?.message ?? err);
+  } catch (err: unknown) {
+    entry.lastError = String(errorText(err));
   }
 
   if (entry.kind === 'every' && entry.repeatsRemaining > 1) {
@@ -78,8 +79,7 @@ export function createSchedule(params: {
   if (!prompt) return { ok: false, error: 'prompt 不能为空' };
   if (entries.size >= MAX_ENTRIES) return { ok: false, error: `跟进任务数量已达上限（${MAX_ENTRIES}）` };
 
-  const provided = [params.afterSeconds != null, params.at != null, params.everySeconds != null]
-    .filter(Boolean).length;
+  const provided = [params.afterSeconds != null, params.at != null, params.everySeconds != null].filter(Boolean).length;
   if (provided !== 1) {
     return { ok: false, error: 'after_seconds / at / every_seconds 必须且只能提供一个' };
   }
@@ -174,16 +174,14 @@ export async function runScheduledEntry(entry: ScheduleEntry): Promise<void> {
     apiKey,
     priority: 'normal' as const,
     autoApprove: unattendedAuto,
-    mode: unattendedAuto ? 'auto' as const : 'ask' as const,
-    sandboxMode: unattendedAuto ? 'full' as const : 'workspace-write' as const,
+    mode: unattendedAuto ? ('auto' as const) : ('ask' as const),
+    sandboxMode: unattendedAuto ? ('full' as const) : ('workspace-write' as const),
     maxIterations: 50,
     metadata: { scheduleId: entry.id },
   };
   scheduler.startAgent(
     config,
     projectPath,
-    unattendedAuto
-      ? () => Promise.resolve(true)
-      : createUnattendedPermissionChecker(config, projectPath),
+    unattendedAuto ? () => Promise.resolve(true) : createUnattendedPermissionChecker(config, projectPath),
   );
 }

@@ -1,5 +1,39 @@
 # Auraxis Changelog
 
+## v3.1.0 (2026-08-25)
+
+> Engineering release: dependency supply-chain hardening, stricter runtime
+> policy, unified DeepSeek endpoint configuration, and tooling/quality gates.
+
+### Security & Reliability
+
+- Replaced the vulnerable `image-size` transitive dependency with a local
+  type-compatible safe stub (`vendor/image-size-safe`); `npm audit` reports 0
+  vulnerabilities.
+- Centralized CSP/network origins in `electron/network-policy.ts` and removed
+  the production `connect-src https://*` wildcard.
+- Centralized DeepSeek chat, Anthropic, models, balance, and search endpoints
+  in `electron/api-config.ts`; all consumers now share one configuration path.
+- MCP tool calls are now scoped to the requested server ID instead of matching
+  a tool by name across every connected server.
+- Tighter Electron build with Windows, macOS, and Linux E2E gates in CI.
+
+### Quality & Maintainability
+
+- Added ESLint 10, TypeScript ESLint, Prettier, and React Hooks linting;
+  CI now runs `lint`, SDK build/tests, audit, and E2E.
+- Enabled `noUnusedLocals` / `noUnusedParameters` across renderer, Electron,
+  and TypeScript SDK projects; removed 130+ dead imports, variables, and
+  duplicated compatibility shims.
+- Made the IPC `secureHandle` wrapper strongly typed, removed duplicate local
+  wrappers, and fixed React hook ordering/dependency warnings.
+- Restored the missing code-block Apply/Preview actions and added the
+  corresponding i18n labels.
+- Added API endpoint and network-policy regression tests, plus MCP server-ID
+  scoping coverage.
+- Quality gate: 244 test files / 1,784 passing cases (+3 environment skips);
+  coverage 85.18% lines/statements, 78.86% branches, 87.78% functions.
+
 ## v3.0.1 (2026-08-20)
 
 > Patch release: Aqua glass theme, wallpaper support, preset panel redesign, and sidebar fixes.

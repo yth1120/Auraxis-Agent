@@ -39,7 +39,9 @@ describe('DeepSeek 官方离线 tokenizer', () => {
   it('added_tokens（工具调用/思考/FIM 标记）按单 token 计数', () => {
     const base = countTokens('answer');
     const withThink = countTokens('<think>reason</think>answer');
-    const withTool = countTokens('<｜tool▁calls▁begin｜><｜tool▁call▁begin｜>call<｜tool▁call▁end｜><｜tool▁calls▁end｜>');
+    const withTool = countTokens(
+      '<｜tool▁calls▁begin｜><｜tool▁call▁begin｜>call<｜tool▁call▁end｜><｜tool▁calls▁end｜>',
+    );
     expect(withThink - base).toBeGreaterThanOrEqual(2);
     expect(withTool).toBeGreaterThanOrEqual(4);
   });

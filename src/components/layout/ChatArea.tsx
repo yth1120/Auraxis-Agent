@@ -1,9 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { Modal, message } from 'antd';
-import {
-  NEW_CHAT_ICON,
-  SidebarSimple,
-} from '@/components/common/icons';
+import { NEW_CHAT_ICON, SidebarSimple } from '@/components/common/icons';
 import { useChatStore } from '@/stores/useChatStore';
 import { useAppStore } from '@/stores/useAppStore';
 import { useAgentStore } from '@/stores/useAgentStore';
@@ -39,7 +36,9 @@ export default function ChatArea() {
   const accountName = useAuthStore((s) => s.name);
   const messages = useChatStore((s) => s.messages);
   const [replayOpen, setReplayOpen] = useState(false);
-  const [replayEvents, setReplayEvents] = useState<Array<{ seq: number; type: string; ts: number; data: Record<string, unknown> }>>([]);
+  const [replayEvents, setReplayEvents] = useState<
+    Array<{ seq: number; type: string; ts: number; data: Record<string, unknown> }>
+  >([]);
   const [composerHeight, setComposerHeight] = useState(0);
   const [headerHeight, setHeaderHeight] = useState(0);
   const [isMaximized, setIsMaximized] = useState(false);
@@ -95,7 +94,10 @@ export default function ChatArea() {
   useEffect(() => {
     const api = window.electronAPI;
     if (!api?.isMaximized) return;
-    void api.isMaximized().then(setIsMaximized).catch(() => {});
+    void api
+      .isMaximized()
+      .then(setIsMaximized)
+      .catch(() => {});
     return api.onMaximizeChange?.(setIsMaximized);
   }, []);
 
@@ -157,10 +159,8 @@ export default function ChatArea() {
       <div
         ref={headerRef}
         className={
-          'absolute inset-x-0 top-0 z-30 grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 pt-3 '
-          + (showChatDivider
-            ? 'pb-2 border-b border-[var(--color-border-dim)]'
-            : 'pb-1')
+          'absolute inset-x-0 top-0 z-30 grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 pt-3 ' +
+          (showChatDivider ? 'pb-2 border-b border-[var(--color-border-dim)]' : 'pb-1')
         }
         data-divider={showChatDivider ? 'on' : 'off'}
       >
@@ -222,7 +222,10 @@ export default function ChatArea() {
                 onClick={async () => {
                   const text = messages
                     .filter((m) => !m.permissionRequest)
-                    .map((m) => `${m.role === 'user' ? tConv('chat.userLabelShort') : tConv('chat.assistantLabelShort')}:\n${getContentText(m.content)}`)
+                    .map(
+                      (m) =>
+                        `${m.role === 'user' ? tConv('chat.userLabelShort') : tConv('chat.assistantLabelShort')}:\n${getContentText(m.content)}`,
+                    )
                     .join('\n\n---\n\n');
                   try {
                     await navigator.clipboard.writeText(text);
@@ -252,11 +255,7 @@ export default function ChatArea() {
                deliverables job view — a different system from the code log. */
             <div className="flex-1 min-h-0 flex flex-col">
               <Suspense fallback={<div className="flex-1 min-h-0" />}>
-                <WorkItemView
-                  agent={currentAgent}
-                  headerInset={headerHeight}
-                  bottomInset={composerHeight}
-                />
+                <WorkItemView agent={currentAgent} headerInset={headerHeight} bottomInset={composerHeight} />
               </Suspense>
             </div>
           ) : sidebarMode === 'work' ? (
@@ -270,7 +269,7 @@ export default function ChatArea() {
               <ChatInput position="center" heroSubtitleKey="chat.fromWork" />
             </>
           ) : isAgentSurface && currentAgentId ? (
-        /* Agent/Work mode with a selected task: live execution view — completed /
+            /* Agent/Work mode with a selected task: live execution view — completed /
            stopped tasks stay viewable as history. */
             <div className="flex-1 min-h-0 flex flex-col">
               <Suspense fallback={<div className="flex-1 min-h-0" />}>
@@ -291,8 +290,7 @@ export default function ChatArea() {
                     <span className="flex items-center gap-2">
                       <img src={logoPng} alt="Auraxis" className="w-9 h-9 object-contain" />
                       <span className="text-2xl font-medium text-text-primary tracking-[0.01em]">
-                        {greeting()}，
-                        {accountName && <span>{accountName}</span>}
+                        {greeting()}，{accountName && <span>{accountName}</span>}
                       </span>
                     </span>
                     <span className="text-md font-semibold leading-6 text-[var(--color-text-muted)]">
@@ -312,12 +310,16 @@ export default function ChatArea() {
           {/* 首次运行引导：无项目时给出最短上手路径 */}
           {sidebarMode === 'chat' && !hasMessages && !projectPath && (
             <div className="absolute inset-x-0 top-16 z-10 flex justify-center pointer-events-none">
-              <div className="pointer-events-auto"><FirstRunHint /></div>
+              <div className="pointer-events-auto">
+                <FirstRunHint />
+              </div>
             </div>
           )}
 
           {/* Agent-mode empty state: same 品牌光晕 behind the pinned composer. */}
-          {isAgentSurface && sidebarMode !== 'work' && !hasMessages && <div className="ax-hero-glow" aria-hidden="true" />}
+          {isAgentSurface && sidebarMode !== 'work' && !hasMessages && (
+            <div className="ax-hero-glow" aria-hidden="true" />
+          )}
 
           {/* Messages own the whole main area; the composer + context meter
               float above them, so scrolling continues underneath the dock. */}
@@ -350,7 +352,9 @@ export default function ChatArea() {
             type="button"
             className="text-xs text-text-muted px-2 py-1 rounded-md cursor-pointer hover:bg-[var(--color-hover)] hover:text-text-secondary"
             onClick={() => {
-              const blob = new Blob([replayEvents.map((e) => JSON.stringify(e)).join('\n')], { type: 'application/x-ndjson' });
+              const blob = new Blob([replayEvents.map((e) => JSON.stringify(e)).join('\n')], {
+                type: 'application/x-ndjson',
+              });
               const a = document.createElement('a');
               a.href = URL.createObjectURL(blob);
               a.download = `chat-log-${Date.now()}.jsonl`;
@@ -366,37 +370,43 @@ export default function ChatArea() {
         <div className="max-h-[480px] overflow-y-auto flex flex-col gap-1">
           {replayEvents.length === 0 ? (
             <div className="text-xs text-muted">{tConv('chat.noLogs')}</div>
-          ) : replayEvents.map((e) => {
-            const time = new Date(e.ts).toLocaleTimeString('zh-CN', { hour12: false });
-            let label: React.ReactNode;
-            if (e.type === 'user') {
-              label = <span className="text-text-primary">{tConv('chat.userLabel', { text: String(e.data.text ?? '') })}</span>;
-            } else if (e.type === 'assistant_chunk') {
-              label = <span className="text-text-secondary">{String(e.data.text ?? '')}</span>;
-            } else if (e.type === 'tool') {
-              label = (
-                <span className="text-text-secondary">
-                  {String(e.data.action ?? '')} {String(e.data.toolName ?? '')} {String(e.data.error ?? '')}
-                </span>
+          ) : (
+            replayEvents.map((e) => {
+              const time = new Date(e.ts).toLocaleTimeString('zh-CN', { hour12: false });
+              let label: React.ReactNode;
+              if (e.type === 'user') {
+                label = (
+                  <span className="text-text-primary">
+                    {tConv('chat.userLabel', { text: String(e.data.text ?? '') })}
+                  </span>
+                );
+              } else if (e.type === 'assistant_chunk') {
+                label = <span className="text-text-secondary">{String(e.data.text ?? '')}</span>;
+              } else if (e.type === 'tool') {
+                label = (
+                  <span className="text-text-secondary">
+                    {String(e.data.action ?? '')} {String(e.data.toolName ?? '')} {String(e.data.error ?? '')}
+                  </span>
+                );
+              } else if (e.type === 'command') {
+                const data = e.data as { name?: string; args?: string };
+                label = (
+                  <span className="text-text-secondary font-mono">
+                    /{String(data.name ?? '')} {String(data.args ?? '').trim()}
+                  </span>
+                );
+              } else {
+                label = <span className="text-text-muted">{String(e.data.text ?? e.type)}</span>;
+              }
+              return (
+                <div key={e.seq} className="flex gap-2 text-xs leading-[1.6] font-mono">
+                  <span className="shrink-0 text-text-faint">#{e.seq}</span>
+                  <span className="shrink-0 text-text-faint">{time}</span>
+                  <span className="min-w-0 flex-1">{label}</span>
+                </div>
               );
-            } else if (e.type === 'command') {
-              const data = e.data as { name?: string; args?: string };
-              label = (
-                <span className="text-text-secondary font-mono">
-                  /{String(data.name ?? '')} {String(data.args ?? '').trim()}
-                </span>
-              );
-            } else {
-              label = <span className="text-text-muted">{String(e.data.text ?? e.type)}</span>;
-            }
-            return (
-              <div key={e.seq} className="flex gap-2 text-xs leading-[1.6] font-mono">
-                <span className="shrink-0 text-text-faint">#{e.seq}</span>
-                <span className="shrink-0 text-text-faint">{time}</span>
-                <span className="min-w-0 flex-1">{label}</span>
-              </div>
-            );
-          })}
+            })
+          )}
         </div>
       </Modal>
       {renderToolView()}

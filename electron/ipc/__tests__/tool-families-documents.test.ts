@@ -54,14 +54,11 @@ vi.mock('../../connectors', () => ({
   driveList: vi.fn(async () => [{ id: 'F1', name: 'a.txt' }]),
   driveRead: vi.fn(async (fileId: string) => ({ id: fileId, name: 'a.txt', bytes: 3, text: 'abc' })),
   notionSearch: vi.fn(async () => [{ id: 'P1', title: '周报' }]),
-  notionCreatePage: vi.fn(async (parent: string, title: string) => ({ id: 'NP1', url: 'https://notion.so/NP1' })),
+  notionCreatePage: vi.fn(async (_parent: string, _title: string) => ({ id: 'NP1', url: 'https://notion.so/NP1' })),
 }));
 
 import { executeToolCall } from '../tool-handlers';
-import {
-  readDocument,
-  writeDocument,
-} from '../../document-tools';
+import { readDocument, writeDocument } from '../../document-tools';
 import {
   slackListChannels,
   slackPostMessage,
@@ -113,7 +110,10 @@ describe('ReadDocument / WriteDocument', () => {
     );
     expect(r.error).toBeUndefined();
     expect((r.output as any).bytes).toBe(99);
-    expect(writeDocument).toHaveBeenCalledWith(path.join(os.tmpdir(), 'out', 'report.docx'), expect.objectContaining({ title: 'T' }));
+    expect(writeDocument).toHaveBeenCalledWith(
+      path.join(os.tmpdir(), 'out', 'report.docx'),
+      expect.objectContaining({ title: 'T' }),
+    );
   });
 
   it('WriteDocument requires spec', async () => {

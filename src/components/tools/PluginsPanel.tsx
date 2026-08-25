@@ -88,12 +88,11 @@ export default function PluginsPanel({ onClose }: { onClose?: () => void }) {
                     {p.enabled ? t('plugins.enabled') : t('plugins.disabled')}
                   </button>
                 </div>
-                {p.description && (
-                  <div className="mt-1.5 text-xs text-text-muted leading-[1.5]">{p.description}</div>
-                )}
+                {p.description && <div className="mt-1.5 text-xs text-text-muted leading-[1.5]">{p.description}</div>}
                 {active && (
                   <div className="mt-1.5 text-2xs text-text-faint font-mono truncate">
-                    {active.commands?.map((c: any) => `/${c.name}`).join(' · ') || t('plugins.commands', { n: commandCount })}
+                    {active.commands?.map((c: any) => `/${c.name}`).join(' · ') ||
+                      t('plugins.commands', { n: commandCount })}
                   </div>
                 )}
               </li>

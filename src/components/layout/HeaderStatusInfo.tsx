@@ -9,8 +9,8 @@ export default memo(function HeaderStatusInfo() {
   const t = useT();
   const selectedModel = useChatStore((s) => s.selectedModel);
   const sidebarMode = useAppStore((s) => s.sidebarMode);
-  const runningCount = useAgentStore((s) =>
-    s.agents.filter((a) => a.status === 'running' || a.status === 'paused' || a.status === 'queued').length,
+  const runningCount = useAgentStore(
+    (s) => s.agents.filter((a) => a.status === 'running' || a.status === 'paused' || a.status === 'queued').length,
   );
   const openModelPanel = () => {
     // 浏览器/预览等工作台标签没有输入区挂载：先切回主内容面再打开模型面板。

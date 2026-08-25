@@ -1,10 +1,10 @@
+import { errorText } from '../errors';
 import { spawn } from 'child_process';
 import { mkdirSync } from 'fs';
 import path from 'path';
 import os from 'os';
-import { app, ipcMain, BrowserWindow, shell } from 'electron';
-import type { IpcMainInvokeEvent } from 'electron';
-import { assertTrustedIpcSender } from './trust';
+import { app, BrowserWindow, shell } from 'electron';
+import { secureHandle } from './trust';
 import { registerFileHandlers } from './file-handlers';
 import { registerProjectHandlers } from './project-handlers';
 import { registerAiHandlers } from './ai-handlers';
@@ -34,7 +34,12 @@ import { registerAuthHandlers } from './auth-handlers';
 import { registerConnectorHandlers } from './connector-handlers';
 import { registerInstructionsHandlers } from './instructions-handlers';
 import { registerActionHandlers } from './actions-handlers';
-import { registerTerminalHandlers, cleanupTerminalSessions, registerAgentShellHandlers, cleanupAgentShellWatchers } from './terminal-handlers';
+import {
+  registerTerminalHandlers,
+  cleanupTerminalSessions,
+  registerAgentShellHandlers,
+  cleanupAgentShellWatchers,
+} from './terminal-handlers';
 import { registerTerminalTaskHandlers } from './task-monitor';
 import { registerSshHandlers } from './ssh-handlers';
 import { registerRulesHandlers } from './rules-handlers';
@@ -78,19 +83,11 @@ export function isAcrylicWindowReady(): boolean {
 export function broadcastWorktreeStatus(win: BrowserWindow, active: boolean, sandboxPath?: string, taskId?: string) {
   try {
     win.webContents.send('worktree:changed', { active, sandboxPath, taskId });
-  } catch { /* window may be closed */ }
+  } catch {
+    /* window may be closed */
+  }
 }
 
-
-function secureHandle<T extends unknown>(
-  channel: string,
-  handler: (event: Electron.IpcMainInvokeEvent, ...args: any[]) => Promise<T> | T,
-): void {
-  ipcMain.handle(channel, (event, ...args: any[]) => {
-    assertTrustedIpcSender(event);
-    return handler(event, ...args);
-  });
-}
 export function registerIpcHandlers() {
   // Window handlers — resolve the window from the IPC sender, NOT from focus.
   // getFocusedWindow() returns null whenever the window loses focus (e.g. the
@@ -147,8 +144,8 @@ export function registerIpcHandlers() {
         win.setBackgroundColor('#0a0202');
       }
       return { ok: true };
-    } catch (error: any) {
-      return { ok: false, error: error?.message || String(error) };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) || String(error) };
     }
   });
 
@@ -185,18 +182,23 @@ export function registerIpcHandlers() {
   const openWithVSCode = async (target: string, goto: boolean): Promise<{ ok: boolean; error?: string }> => {
     if (!target) return { ok: false, error: '路径为空' };
     const args = goto ? ['--goto', target] : [target];
-    const run = (cmd: string, useArgs?: string[]): Promise<boolean> => new Promise((resolve) => {
-      const child = spawn(cmd, useArgs ?? args, { stdio: 'ignore', windowsHide: true, shell: false });
-      child.on('error', () => resolve(false));
-      child.on('close', (code) => resolve(code === 0));
-    });
+    const run = (cmd: string, useArgs?: string[]): Promise<boolean> =>
+      new Promise((resolve) => {
+        const child = spawn(cmd, useArgs ?? args, { stdio: 'ignore', windowsHide: true, shell: false });
+        child.on('error', () => resolve(false));
+        child.on('close', (code) => resolve(code === 0));
+      });
     if (await run('code')) return { ok: true };
     if (await run('code-insiders')) return { ok: true };
     // Windows: try well-known install paths
     if (process.platform === 'win32') {
-      const home = process.env.USERPROFILE || (process.env.HOMEDRIVE && process.env.HOMEPATH ? process.env.HOMEDRIVE + process.env.HOMEPATH : undefined) || 'C:\\Users\\' + (process.env.USERNAME || '');
+      const home =
+        process.env.USERPROFILE ||
+        (process.env.HOMEDRIVE && process.env.HOMEPATH ? process.env.HOMEDRIVE + process.env.HOMEPATH : undefined) ||
+        'C:\\Users\\' + (process.env.USERNAME || '');
       if (await run(`${home}\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe`)) return { ok: true };
-      if (await run(`${home}\\AppData\\Local\\Programs\\Microsoft VS Code Insiders\\Code - Insiders.exe`)) return { ok: true };
+      if (await run(`${home}\\AppData\\Local\\Programs\\Microsoft VS Code Insiders\\Code - Insiders.exe`))
+        return { ok: true };
       if (await run('C:\\Program Files\\Microsoft VS Code\\Code.exe')) return { ok: true };
     }
     return { ok: false, error: '未找到 VS Code，请确认 code 命令已添加到 PATH' };
@@ -239,8 +241,8 @@ export function registerIpcHandlers() {
         return { ok: true, data: safe[key] };
       }
       return { ok: true, data: safe };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
@@ -253,19 +255,18 @@ export function registerIpcHandlers() {
       settings[key] = value;
       await writeSettings(settings);
       return { ok: true };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
   secureHandle('settings:getApiKey', async (_event, provider: string) => {
     try {
-      const settings = await readSettings();
       const keyField = PROVIDER_KEY_FIELDS[provider];
       if (!keyField) return { ok: false, error: `不支持的 provider: ${provider}` };
       return { ok: true, data: '' };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
@@ -280,8 +281,8 @@ export function registerIpcHandlers() {
       settings[field] = apiKey;
       await writeSettings(settings);
       return { ok: true };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
@@ -289,8 +290,8 @@ export function registerIpcHandlers() {
     try {
       const models = await getAllModels();
       return { ok: true, data: models };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
@@ -320,7 +321,9 @@ export function registerIpcHandlers() {
   registerPlanHandlers();
   registerCronIpc();
   initCronJobs();
-  setScheduleFireHandler((entry) => { void runScheduledEntry(entry); });
+  setScheduleFireHandler((entry) => {
+    void runScheduledEntry(entry);
+  });
   registerStatsHandlers();
   registerSkillHandlers();
   registerGoalHandlers();

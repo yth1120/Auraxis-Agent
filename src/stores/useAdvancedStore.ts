@@ -1,6 +1,13 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { PermissionRequest, PermissionRule, MCPServerConfig, MCPStatus, AgentInfo, AgentLogEntry } from '../types/advanced';
+import type {
+  PermissionRequest,
+  PermissionRule,
+  MCPServerConfig,
+  MCPStatus,
+  AgentInfo,
+  AgentLogEntry,
+} from '../types/advanced';
 import type { PermissionBridgeStatus } from '../services/replBridge';
 
 export interface AdvancedStore {
@@ -32,7 +39,7 @@ export interface AdvancedStore {
 
 export const useAdvancedStore = create<AdvancedStore>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       // ─── Permissions ────────────
       permissionQueue: [],
       permissionRules: [],
@@ -88,23 +95,17 @@ export const useAdvancedStore = create<AdvancedStore>()(
 
       updateMcpStatus: (status) =>
         set((s) => ({
-          mcpStatuses: [
-            ...s.mcpStatuses.filter((st) => st.serverId !== status.serverId),
-            status,
-          ],
+          mcpStatuses: [...s.mcpStatuses.filter((st) => st.serverId !== status.serverId), status],
         })),
 
       // ─── Agents ─────────────────
       runningAgents: [],
 
-      addAgent: (agent) =>
-        set((s) => ({ runningAgents: [...s.runningAgents, agent] })),
+      addAgent: (agent) => set((s) => ({ runningAgents: [...s.runningAgents, agent] })),
 
       updateAgent: (id, updates) =>
         set((s) => ({
-          runningAgents: s.runningAgents.map((a) =>
-            a.id === id ? { ...a, ...updates } : a
-          ),
+          runningAgents: s.runningAgents.map((a) => (a.id === id ? { ...a, ...updates } : a)),
         })),
 
       removeAgent: (id) =>
@@ -136,6 +137,6 @@ export const useAdvancedStore = create<AdvancedStore>()(
         permissionRules: state.permissionRules,
         mcpServers: state.mcpServers,
       }),
-    }
-  )
+    },
+  ),
 );

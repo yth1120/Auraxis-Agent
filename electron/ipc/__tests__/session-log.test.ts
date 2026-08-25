@@ -41,16 +41,30 @@ describe('session-log', () => {
   });
 
   it('maps the full engine event set into the unified vocabulary', () => {
-    expect(mapAgentEventToSessionEvent({ type: 'text_chunk', text: 'x', timestamp: 1 }))
-      .toMatchObject({ type: 'assistant_chunk', data: { text: 'x' } });
-    expect(mapAgentEventToSessionEvent({ type: 'tool_error', toolName: 'Bash', toolCallId: 'c', error: 'boom', timestamp: 2 }))
-      .toMatchObject({ type: 'tool', data: { action: 'error', error: 'boom' } });
-    expect(mapAgentEventToSessionEvent({ type: 'plan_created', plan: { tasks: [] }, timestamp: 3 }))
-      .toMatchObject({ type: 'system', data: { event: 'plan_created' } });
-    expect(mapAgentEventToSessionEvent({ type: 'thinking_chunk', chunk: 'think', isNewBlock: true, timestamp: 4 }))
-      .toMatchObject({ type: 'thinking_chunk', data: { chunk: 'think', isNewBlock: true } });
-    expect(mapAgentEventToSessionEvent({ type: 'done', timestamp: 5 }))
-      .toMatchObject({ type: 'system', data: { event: 'done' } });
+    expect(mapAgentEventToSessionEvent({ type: 'text_chunk', text: 'x', timestamp: 1 })).toMatchObject({
+      type: 'assistant_chunk',
+      data: { text: 'x' },
+    });
+    expect(
+      mapAgentEventToSessionEvent({
+        type: 'tool_error',
+        toolName: 'Bash',
+        toolCallId: 'c',
+        error: 'boom',
+        timestamp: 2,
+      }),
+    ).toMatchObject({ type: 'tool', data: { action: 'error', error: 'boom' } });
+    expect(mapAgentEventToSessionEvent({ type: 'plan_created', plan: { tasks: [] }, timestamp: 3 })).toMatchObject({
+      type: 'system',
+      data: { event: 'plan_created' },
+    });
+    expect(
+      mapAgentEventToSessionEvent({ type: 'thinking_chunk', chunk: 'think', isNewBlock: true, timestamp: 4 }),
+    ).toMatchObject({ type: 'thinking_chunk', data: { chunk: 'think', isNewBlock: true } });
+    expect(mapAgentEventToSessionEvent({ type: 'done', timestamp: 5 })).toMatchObject({
+      type: 'system',
+      data: { event: 'done' },
+    });
   });
 
   it('projects an agent run into the shared session shape', async () => {

@@ -69,16 +69,16 @@ export const useAppStore = create<AppStore>()(
 
       setGlassLayoutMounted: (v) => set({ glassLayoutMounted: !!v }),
 
-      openToolView: (view) => set((s) => ({
-        activeToolView: s.activeToolView === view ? 'none' : view,
-      })),
+      openToolView: (view) =>
+        set((s) => ({
+          activeToolView: s.activeToolView === view ? 'none' : view,
+        })),
 
       setSettingsInitialKey: (key) => set({ settingsInitialKey: key }),
 
       setGlobalSearchOpen: (open) => set({ globalSearchOpen: open }),
 
-      setTerminalHeight: (h) =>
-        set({ terminalHeight: Math.min(560, Math.max(160, Math.round(h))) }),
+      setTerminalHeight: (h) => set({ terminalHeight: Math.min(560, Math.max(160, Math.round(h))) }),
 
       requestAgentLogFocus: (agentId, toolCallId) =>
         set({ agentLogFocusRequest: { agentId, toolCallId, ts: Date.now() } }),
@@ -135,8 +135,7 @@ export const useAppStore = create<AppStore>()(
 
       incrementFileTreeVersion: () => set((s) => ({ fileTreeVersion: s.fileTreeVersion + 1 })),
 
-      requestOpenFile: (path) =>
-        set({ openFileRequest: { path, requestId: Date.now() } }),
+      requestOpenFile: (path) => set({ openFileRequest: { path, requestId: Date.now() } }),
 
       clearOpenFileRequest: () => set({ openFileRequest: null }),
 
@@ -188,9 +187,7 @@ export const useAppStore = create<AppStore>()(
       closeTab: (tabId: string) => {
         set((s) => {
           const newTabs = s.tabs.filter((t) => t.id !== tabId);
-          const newActive = s.activeTabId === tabId
-            ? newTabs[newTabs.length - 1]?.id ?? null
-            : s.activeTabId;
+          const newActive = s.activeTabId === tabId ? (newTabs[newTabs.length - 1]?.id ?? null) : s.activeTabId;
           const newHistory = s.tabHistory.filter((h) => h !== tabId);
           const newIndex = newActive ? newHistory.lastIndexOf(newActive) : -1;
           return {
@@ -218,7 +215,7 @@ export const useAppStore = create<AppStore>()(
 
       updateTab: (tabId: string, updates) => {
         set((s) => ({
-          tabs: s.tabs.map((t) => t.id === tabId ? { ...t, ...updates } : t),
+          tabs: s.tabs.map((t) => (t.id === tabId ? { ...t, ...updates } : t)),
         }));
       },
 

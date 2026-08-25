@@ -24,9 +24,14 @@ function setApi() {
   };
 }
 
-const msg = (id: string, role: 'user' | 'assistant', content: string, extra: Record<string, unknown> = {}) => ({
-  id, role, content, timestamp: Date.now(), ...extra,
-} as any);
+const msg = (id: string, role: 'user' | 'assistant', content: string, extra: Record<string, unknown> = {}) =>
+  ({
+    id,
+    role,
+    content,
+    timestamp: Date.now(),
+    ...extra,
+  }) as any;
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -61,10 +66,9 @@ describe('saveSession / load / delete', () => {
     const id = useSessionStore.getState().currentSessionId!;
     useSessionStore.getState().newSession('code');
 
-    useSessionStore.getState().saveSession(
-      [msg('u2', 'user', '追加'), msg('a1', 'assistant', '回复')],
-      'm2', 'C:/p2', 'code', id,
-    );
+    useSessionStore
+      .getState()
+      .saveSession([msg('u2', 'user', '追加'), msg('a1', 'assistant', '回复')], 'm2', 'C:/p2', 'code', id);
     const state = useSessionStore.getState();
     const target = state.sessions.find((s) => s.id === id)!;
     expect(target.messages).toHaveLength(2);
@@ -168,13 +172,16 @@ describe('fork / export / syncFromLogs', () => {
     expect(useSessionStore.getState().sessions[0].messages).toHaveLength(4);
     expect(useSessionStore.getState().sessions[0].branchedFrom?.sessionId).toBe(id);
 
-    const toMsgId = useSessionStore.getState().forkSession(id, 'a1');
+    useSessionStore.getState().forkSession(id, 'a1');
     expect(useSessionStore.getState().sessions[0].messages).toHaveLength(2);
     expect(useSessionStore.getState().forkSession('missing', 'x')).toBeNull();
     expect(useSessionStore.getState().forkSession(id, 'nope')).toBeNull();
 
     await vi.waitFor(() => expect(mocks.append).toHaveBeenCalled());
-    expect(mocks.meta).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ branchedFrom: expect.any(Object) }));
+    expect(mocks.meta).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ branchedFrom: expect.any(Object) }),
+    );
   });
 
   it('exportSession json / markdown', () => {
@@ -198,12 +205,19 @@ describe('fork / export / syncFromLogs', () => {
     });
     mocks.project.mockImplementation(async (id: string) => ({
       ok: true,
-      data: id === 'remote'
-        ? {
-            id: 'remote', title: '远端', created: 1, updated: 2, model: 'm', messageCount: 2, mode: 'chat',
-            messages: [msg('u1', 'user', '远端消息')],
-          }
-        : null,
+      data:
+        id === 'remote'
+          ? {
+              id: 'remote',
+              title: '远端',
+              created: 1,
+              updated: 2,
+              model: 'm',
+              messageCount: 2,
+              mode: 'chat',
+              messages: [msg('u1', 'user', '远端消息')],
+            }
+          : null,
     }));
 
     await useSessionStore.getState().syncFromLogs();

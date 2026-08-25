@@ -23,13 +23,21 @@ const agent: AgentInfo = {
   log: [
     { type: 'iteration_start', timestamp: 1, iteration: 0 },
     { type: 'tool_start', timestamp: 2, toolCallId: 'tc1', toolName: 'Bash', input: { command: 'npm test' } },
-    { type: 'tool_end', timestamp: 4, toolCallId: 'tc1', toolName: 'Bash', input: { command: 'npm test' }, output: { stdout: 'PASS', exitCode: 0 }, durationMs: 120 },
+    {
+      type: 'tool_end',
+      timestamp: 4,
+      toolCallId: 'tc1',
+      toolName: 'Bash',
+      input: { command: 'npm test' },
+      output: { stdout: 'PASS', exitCode: 0 },
+      durationMs: 120,
+    },
   ],
 };
 
 describe('WorkExecutionFlow — 执行流按钮组', () => {
   it('renders turn cards and toggles collapse', () => {
-    const { container, getByText } = render(<WorkExecutionFlow agent={agent} />);
+    const { container } = render(<WorkExecutionFlow agent={agent} />);
     expect(container.textContent).toContain('第 1 轮');
     expect(container.textContent).toContain('Bash');
     const turnBtn = container.querySelector('[aria-expanded]') as HTMLButtonElement;
@@ -40,9 +48,7 @@ describe('WorkExecutionFlow — 执行流按钮组', () => {
 
   it('expands a tool row to reveal its output', () => {
     const { container, getByText } = render(<WorkExecutionFlow agent={agent} />);
-    const toolBtn = [...container.querySelectorAll('button')].find(
-      (b) => b.textContent?.includes('Bash'),
-    )!;
+    const toolBtn = [...container.querySelectorAll('button')].find((b) => b.textContent?.includes('Bash'))!;
     fireEvent.click(toolBtn);
     expect(getByText('PASS')).toBeTruthy();
   });

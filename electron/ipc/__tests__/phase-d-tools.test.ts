@@ -151,7 +151,6 @@ describe('ReviewArtifact — Command Resolution Logic', () => {
   it('typecheck falls back to npx tsc --noEmit when no scripts configured', () => {
     // Simulating the fallback logic from runReviewArtifact
     const scripts: Record<string, string> = {};
-    const checkType = 'typecheck';
 
     const hasTypecheckScript = scripts['typecheck'] || scripts['type-check'] || scripts['tsc'] || scripts['check'];
     const fallback = hasTypecheckScript

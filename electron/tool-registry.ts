@@ -8,6 +8,7 @@
  * toolRegistry.getAllTools() instead of referencing TOOL_DEFINITIONS directly.
  */
 
+import { errorText } from './errors';
 import { TOOL_DEFINITIONS } from './tool-defs';
 import type { ToolDef } from './tool-defs';
 import { getAllMcpTools, callMcpTool } from './ipc/mcp-handlers';
@@ -16,12 +17,10 @@ const MCP_PREFIX = 'mcp__';
 const MAX_TOTAL_TOOLS = 96;
 
 let cachedMcpTools: ToolDef[] | null = null;
-let mcpCacheVersion = 0;
 
 /** Invalidate MCP tool cache — called when MCP servers connect/disconnect. */
 export function invalidateMcpToolCache(): void {
   cachedMcpTools = null;
-  mcpCacheVersion++;
 }
 
 function getMcpToolDefs(): ToolDef[] {
@@ -80,8 +79,8 @@ export async function executeMcpTool(
   try {
     const result = await callMcpTool(tool.serverName, toolName, input);
     return { output: result };
-  } catch (err: any) {
-    return { output: null, error: `MCP 工具执行失败: ${err.message}` };
+  } catch (err: unknown) {
+    return { output: null, error: `MCP 工具执行失败: ${errorText(err)}` };
   }
 }
 
@@ -97,7 +96,7 @@ export function getAllTools(): ToolDef[] {
   if (all.length > MAX_TOTAL_TOOLS) {
     console.warn(
       `[ToolRegistry] Tool count ${all.length} exceeds limit ${MAX_TOTAL_TOOLS}. ` +
-      `Truncating to ${MAX_TOTAL_TOOLS}. Consider reducing MCP servers or disabling unused plugins.`,
+        `Truncating to ${MAX_TOTAL_TOOLS}. Consider reducing MCP servers or disabling unused plugins.`,
     );
     return all.slice(0, MAX_TOTAL_TOOLS);
   }

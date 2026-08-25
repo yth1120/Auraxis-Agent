@@ -1,3 +1,4 @@
+import { errorText } from '../errors';
 /**
  * agent-orchestration.ts — shared model-facing orchestration API.
  *
@@ -38,8 +39,8 @@ export async function orchestrateRunSubAgent(
       surface: caller.surface,
     });
     return r.error ? { ok: false, error: r.error } : { ok: true, output: r.output };
-  } catch (err: any) {
-    return { ok: false, error: `子代理启动失败: ${err.message}` };
+  } catch (err: unknown) {
+    return { ok: false, error: `子代理启动失败: ${errorText(err)}` };
   }
 }
 
@@ -64,8 +65,8 @@ export async function orchestrateStartBackgroundSubAgent(
       surface: caller.surface,
     });
     return r.error ? { ok: false, error: r.error } : { ok: true, output: r.output };
-  } catch (err: any) {
-    return { ok: false, error: `后台子代理启动失败: ${err.message}` };
+  } catch (err: unknown) {
+    return { ok: false, error: `后台子代理启动失败: ${errorText(err)}` };
   }
 }
 
@@ -111,9 +112,7 @@ export async function orchestrateSendMessage(
 }
 
 /** Interrupt a scheduler task or sub-agent. */
-export async function orchestrateInterruptAgent(
-  agentId: string,
-): Promise<{ ok: boolean; error?: string }> {
+export async function orchestrateInterruptAgent(agentId: string): Promise<{ ok: boolean; error?: string }> {
   const { scheduler } = await import('./agent-scheduler');
   const { interruptSubAgent } = await import('./agent-handlers');
   const viaScheduler = scheduler.stopAgent(agentId);

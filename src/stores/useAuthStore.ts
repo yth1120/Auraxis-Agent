@@ -1,3 +1,4 @@
+import { errorText } from '../../electron/errors';
 import { create } from 'zustand';
 import type { AuthChangePasswordParams, AuthLoginParams, AuthPhase, AuthSetupParams } from '../types/electron-api';
 
@@ -66,8 +67,8 @@ export const useAuthStore = create<AuthStore>((set) => ({
         });
       }
       return res ?? { ok: false, error: '认证服务不可用' };
-    } catch (error: any) {
-      return { ok: false, error: error?.message ?? String(error) };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   },
 
@@ -75,11 +76,16 @@ export const useAuthStore = create<AuthStore>((set) => ({
     try {
       const res = await window.electronAPI?.auth?.login(params);
       if (res?.ok) {
-        set({ phase: 'unlocked', email: params.email.trim().toLowerCase(), rememberMe: !!params.rememberMe, notice: '' });
+        set({
+          phase: 'unlocked',
+          email: params.email.trim().toLowerCase(),
+          rememberMe: !!params.rememberMe,
+          notice: '',
+        });
       }
       return res ?? { ok: false, error: '认证服务不可用' };
-    } catch (error: any) {
-      return { ok: false, error: error?.message ?? String(error) };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   },
 
@@ -96,8 +102,8 @@ export const useAuthStore = create<AuthStore>((set) => ({
   changePassword: async (params) => {
     try {
       return (await window.electronAPI?.auth?.changePassword(params)) ?? { ok: false, error: '认证服务不可用' };
-    } catch (error: any) {
-      return { ok: false, error: error?.message ?? String(error) };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   },
 
@@ -106,8 +112,8 @@ export const useAuthStore = create<AuthStore>((set) => ({
       const res = (await window.electronAPI?.auth?.setAvatar(avatar)) ?? { ok: false, error: '认证服务不可用' };
       if (res.ok) set({ avatar });
       return res;
-    } catch (error: any) {
-      return { ok: false, error: error?.message ?? String(error) };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   },
 
@@ -116,8 +122,8 @@ export const useAuthStore = create<AuthStore>((set) => ({
       const res = (await window.electronAPI?.auth?.changeName(name)) ?? { ok: false, error: '认证服务不可用' };
       if (res.ok) set({ name: name.trim() });
       return res;
-    } catch (error: any) {
-      return { ok: false, error: error?.message ?? String(error) };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   },
 }));

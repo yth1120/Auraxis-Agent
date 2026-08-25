@@ -35,13 +35,18 @@ export default function SchemaPanel({ title, description, fields }: SchemaPanelP
 
   useEffect(() => {
     let disposed = false;
+    const liveTimers = timers.current;
     window.electronAPI?.settings
       ?.get()
-      .then((r) => { if (!disposed && r?.ok && r.data) setValues(r.data as Record<string, unknown>); })
-      .catch(() => { /* keep defaults in browser/dev preview */ });
+      .then((r) => {
+        if (!disposed && r?.ok && r.data) setValues(r.data as Record<string, unknown>);
+      })
+      .catch(() => {
+        /* keep defaults in browser/dev preview */
+      });
     return () => {
       disposed = true;
-      Object.values(timers.current).forEach(clearTimeout);
+      Object.values(liveTimers).forEach(clearTimeout);
     };
   }, []);
 

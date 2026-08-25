@@ -4,14 +4,18 @@ vi.mock('../agent-loop', () => ({
   llmClientInvoke: vi.fn(async () => null),
   matchesPlanTask: vi.fn(() => false),
   Planner: { getSummary: vi.fn((plan: any) => (plan ? '计划摘要' : '无计划')) },
-  estimateTokens: vi.fn((msgs: any[]) =>
-    msgs.reduce((sum, m) => sum + String(m.content ?? '').length / 4 + 2, 0),
-  ),
+  estimateTokens: vi.fn((msgs: any[]) => msgs.reduce((sum, m) => sum + String(m.content ?? '').length / 4 + 2, 0)),
 }));
 
 import {
-  buildAtomicGroups, findSafeBoundaries, countCompleteRounds, findTruncationIndex,
-  generateSummary, buildSummaryInjection, snipCompact, compactHistory,
+  buildAtomicGroups,
+  findSafeBoundaries,
+  countCompleteRounds,
+  findTruncationIndex,
+  generateSummary,
+  buildSummaryInjection,
+  snipCompact,
+  compactHistory,
   SNIP_COMPACT_TOKEN_BUDGET,
 } from '../context-manager';
 import { llmClientInvoke, matchesPlanTask } from '../agent-loop';
@@ -61,14 +65,7 @@ describe('原子分组与边界', () => {
   });
 
   it('findSafeBoundaries 跳过未解析工具组', () => {
-    const msgs = [
-      user('u1'),
-      toolCall('c1'),
-      toolResult('c1'),
-      user('u2'),
-      toolCall('c2'),
-      user('u3'),
-    ];
+    const msgs = [user('u1'), toolCall('c1'), toolResult('c1'), user('u2'), toolCall('c2'), user('u3')];
     expect(findSafeBoundaries(msgs)).toEqual([1, 3, 4, 6]);
     expect(findSafeBoundaries([])).toEqual([]);
   });
@@ -87,14 +84,7 @@ describe('原子分组与边界', () => {
   });
 
   it('findTruncationIndex 保留尾部完整轮', () => {
-    const msgs = [
-      user('u1'),
-      assistant('a1'),
-      user('u2'),
-      toolCall('c1'),
-      toolResult('c1'),
-      assistant('a2'),
-    ];
+    const msgs = [user('u1'), assistant('a1'), user('u2'), toolCall('c1'), toolResult('c1'), assistant('a2')];
     expect(findTruncationIndex(msgs, 0)).toBe(msgs.length);
     expect(findTruncationIndex(msgs, 1)).toBe(5);
     expect(findTruncationIndex(msgs, 99)).toBe(0);
@@ -166,11 +156,7 @@ describe('snipCompact 与 compactHistory', () => {
 
   it('snipCompact 关键 Read 结果被救回', () => {
     vi.mocked(matchesPlanTask).mockImplementation((filePath: string) => filePath === 'critical.ts');
-    const msgs = [
-      user('SYSTEM'),
-      toolCall('c1', 'Read', { file_path: 'critical.ts' }),
-      toolResult('c1', '关键内容'),
-    ];
+    const msgs = [user('SYSTEM'), toolCall('c1', 'Read', { file_path: 'critical.ts' }), toolResult('c1', '关键内容')];
     for (let i = 0; i < 12; i++) {
       msgs.push(user(`m${i}` + 'x'.repeat(40)));
       msgs.push(assistant(`a${i}` + 'y'.repeat(40)));
@@ -187,7 +173,9 @@ describe('snipCompact 与 compactHistory', () => {
     expect(r.summaryInjected).toBe(true);
     expect(r.messagesRemoved).toBeGreaterThan(0);
     expect(r.tokensSaved).toBeGreaterThan(0);
-    const injection = r.messages.find((m) => typeof m.content === 'string' && m.content.startsWith('[System Notification]'));
+    const injection = r.messages.find(
+      (m) => typeof m.content === 'string' && m.content.startsWith('[System Notification]'),
+    );
     expect(injection).toBeDefined();
     expect(r.messages[0]).toBe(msgs[0]);
   });
@@ -205,7 +193,9 @@ describe('snipCompact 与 compactHistory', () => {
     const msgs = manyMessages();
     msgs.splice(3, 0, { role: 'user', content: '[System Notification]: 旧摘要' });
     const r = await compactHistory({ messages: msgs, maxTokens: 1, plan: null, llmConfig });
-    const injections = r.messages.filter((m) => typeof m.content === 'string' && m.content.startsWith('[System Notification]'));
+    const injections = r.messages.filter(
+      (m) => typeof m.content === 'string' && m.content.startsWith('[System Notification]'),
+    );
     expect(injections).toHaveLength(1);
     expect(String(injections[0].content)).toContain('足够长');
   });

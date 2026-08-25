@@ -20,22 +20,32 @@ interface PreviewBrowserProps {
 
 type Viewport = 'desktop' | 'tablet' | 'mobile';
 const VIEWPORT_SIZES: Record<Viewport, { w: number; h: number } | null> = {
-  desktop: null,                  // null = stretch to fill
-  tablet:  { w: 768, h: 1024 },
-  mobile:  { w: 375, h: 667 },
+  desktop: null, // null = stretch to fill
+  tablet: { w: 768, h: 1024 },
+  mobile: { w: 375, h: 667 },
 };
 
 const HOME_URL = 'http://localhost:3000';
-interface HistoryEntry { url: string; title: string; ts: number }
+interface HistoryEntry {
+  url: string;
+  title: string;
+  ts: number;
+}
 const HISTORY_KEY = 'auraxis-browser-history';
 function loadHistory(): HistoryEntry[] {
   try {
     const raw = localStorage.getItem(HISTORY_KEY);
-    return raw ? JSON.parse(raw) as HistoryEntry[] : [];
-  } catch { return []; }
+    return raw ? (JSON.parse(raw) as HistoryEntry[]) : [];
+  } catch {
+    return [];
+  }
 }
 function saveHistory(list: HistoryEntry[]) {
-  try { localStorage.setItem(HISTORY_KEY, JSON.stringify(list.slice(0, 100))); } catch { /* ignore */ }
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(list.slice(0, 100)));
+  } catch {
+    /* ignore */
+  }
 }
 function recordHistory(list: HistoryEntry[], url: string, title: string): HistoryEntry[] {
   const next = [{ url, title: title || url, ts: Date.now() }, ...list.filter((h) => h.url !== url)].slice(0, 100);
@@ -82,7 +92,9 @@ export default function PreviewBrowser({ tabId }: PreviewBrowserProps) {
     try {
       setCanBack(wv.canGoBack());
       setCanForward(wv.canGoForward());
-    } catch { /* webview not yet attached */ }
+    } catch {
+      /* webview not yet attached */
+    }
   }, []);
 
   // Wire up webview events (Electron only).
@@ -91,25 +103,34 @@ export default function PreviewBrowser({ tabId }: PreviewBrowserProps) {
     const wv = webviewRef.current;
     if (!wv) return;
 
-    const onStart   = () => { setLoading(true); setConsoleErrors(0); };
-    const onStop    = () => { setLoading(false); refreshNavState(); };
-    const onNav     = (e: Electron.DidNavigateEvent) => {
+    const onStart = () => {
+      setLoading(true);
+      setConsoleErrors(0);
+    };
+    const onStop = () => {
+      setLoading(false);
+      refreshNavState();
+    };
+    const onNav = (e: Electron.DidNavigateEvent) => {
       urlRef.current = e.url;
-      setUrl(e.url); setInput(e.url); refreshNavState();
+      setUrl(e.url);
+      setInput(e.url);
+      refreshNavState();
       setHistory((h) => recordHistory(h, e.url, title));
     };
-    const onNavSub  = (e: Electron.DidNavigateInPageEvent) => {
+    const onNavSub = (e: Electron.DidNavigateInPageEvent) => {
       if (e.isMainFrame) {
         urlRef.current = e.url;
-        setUrl(e.url); setInput(e.url);
+        setUrl(e.url);
+        setInput(e.url);
         setHistory((h) => recordHistory(h, e.url, title));
       }
     };
-    const onTitle   = (e: Electron.PageTitleUpdatedEvent) => {
+    const onTitle = (e: Electron.PageTitleUpdatedEvent) => {
       setTitle(e.title);
       if (urlRef.current) setHistory((h) => recordHistory(h, urlRef.current, e.title));
     };
-    const onFail    = (e: Electron.DidFailLoadEvent) => {
+    const onFail = (e: Electron.DidFailLoadEvent) => {
       if (e.errorCode === -3) return; // user-initiated abort
       console.warn('[PreviewBrowser] load failed:', e.errorCode, e.errorDescription);
       setLoading(false);
@@ -136,7 +157,7 @@ export default function PreviewBrowser({ tabId }: PreviewBrowserProps) {
       wv.removeEventListener('did-fail-load', onFail);
       wv.removeEventListener('console-message', onConsole);
     };
-  }, [refreshNavState]);
+  }, [refreshNavState, title]);
 
   // Iframe load events (browser fallback only).
   useEffect(() => {
@@ -151,7 +172,7 @@ export default function PreviewBrowser({ tabId }: PreviewBrowserProps) {
       f.removeEventListener('load', onLoad);
       f.removeEventListener('error', onError);
     };
-  }, [url, isElectronEnv]);
+  }, [url]);
 
   const [warning, setWarning] = useState<string | null>(null);
 
@@ -176,13 +197,13 @@ export default function PreviewBrowser({ tabId }: PreviewBrowserProps) {
 
   const hasContent = useMemo(() => !!url, [url]);
 
-  const reload  = () => {
+  const reload = () => {
     setLoading(true);
     if (isElectronEnv) webviewRef.current?.reload();
     else iframeRef.current?.contentWindow?.location.reload();
   };
-  const goHome  = () => navigate(HOME_URL);
-  const back    = () => webviewRef.current?.goBack();
+  const goHome = () => navigate(HOME_URL);
+  const back = () => webviewRef.current?.goBack();
   const forward = () => webviewRef.current?.goForward();
   const toggleDevTools = () => {
     const wv = webviewRef.current;
@@ -209,16 +230,33 @@ export default function PreviewBrowser({ tabId }: PreviewBrowserProps) {
     <div className="flex flex-col h-full w-full bg-[var(--color-bg-primary)] overflow-hidden">
       <div className="flex items-center px-3 py-2 gap-2 bg-secondary border-b border-[var(--color-border-dim)] shrink-0">
         <Space size={2}>
-    <Tooltip title={t('pb.back')}>
-            <Button type="text" size="small" icon={<ArrowLeftOutlined />} disabled={!isElectronEnv || !canBack} onClick={back} />
+          <Tooltip title={t('pb.back')}>
+            <Button
+              type="text"
+              size="small"
+              icon={<ArrowLeftOutlined />}
+              disabled={!isElectronEnv || !canBack}
+              onClick={back}
+            />
           </Tooltip>
-    <Tooltip title={t('pb.forward')}>
-            <Button type="text" size="small" icon={<ArrowRightOutlined />} disabled={!isElectronEnv || !canForward} onClick={forward} />
+          <Tooltip title={t('pb.forward')}>
+            <Button
+              type="text"
+              size="small"
+              icon={<ArrowRightOutlined />}
+              disabled={!isElectronEnv || !canForward}
+              onClick={forward}
+            />
           </Tooltip>
-    <Tooltip title={t('pb.reload')}>
-            <Button type="text" size="small" icon={<ReloadOutlined className={loading ? 'ax-spin' : undefined} />} onClick={reload} />
+          <Tooltip title={t('pb.reload')}>
+            <Button
+              type="text"
+              size="small"
+              icon={<ReloadOutlined className={loading ? 'ax-spin' : undefined} />}
+              onClick={reload}
+            />
           </Tooltip>
-    <Tooltip title={t('pb.home')}>
+          <Tooltip title={t('pb.home')}>
             <Button type="text" size="small" icon={<HomeOutlined />} onClick={goHome} />
           </Tooltip>
         </Space>
@@ -231,13 +269,13 @@ export default function PreviewBrowser({ tabId }: PreviewBrowserProps) {
             onPressEnter={() => navigate(input)}
             onFocus={() => setHistoryOpen(true)}
             onBlur={() => setTimeout(() => setHistoryOpen(false), 150)}
-      placeholder={t('pb.urlPlaceholder')}
+            placeholder={t('pb.urlPlaceholder')}
             style={{ width: '100%' }}
           />
           {suggestions.length > 0 && (
             <div className="absolute top-[calc(100%+4px)] left-0 right-0 z-20 bg-elevated rounded-lg border border-dim shadow-md overflow-hidden">
               <div className="flex items-center justify-between px-2 py-1 border-b border-[var(--color-border-dim)]">
-    <span className="text-2xs text-muted">{t('pb.history')}</span>
+                <span className="text-2xs text-muted">{t('pb.history')}</span>
                 <button
                   type="button"
                   className="text-2xs text-muted hover:text-secondary cursor-pointer"
@@ -245,10 +283,10 @@ export default function PreviewBrowser({ tabId }: PreviewBrowserProps) {
                     e.preventDefault();
                     setHistory([]);
                     saveHistory([]);
-      message.info(t('pb.historyCleared'));
+                    message.info(t('pb.historyCleared'));
                   }}
                 >
-      {t('pb.clear')}
+                  {t('pb.clear')}
                 </button>
               </div>
               {suggestions.map((h) => (
@@ -273,17 +311,32 @@ export default function PreviewBrowser({ tabId }: PreviewBrowserProps) {
         </div>
 
         <Space size={2} style={{ marginLeft: 8 }}>
-    <Tooltip title={t('pb.desktop')}>
-            <Button type={viewport === 'desktop' ? 'primary' : 'text'} size="small" icon={<DesktopOutlined />} onClick={() => setViewport('desktop')} />
+          <Tooltip title={t('pb.desktop')}>
+            <Button
+              type={viewport === 'desktop' ? 'primary' : 'text'}
+              size="small"
+              icon={<DesktopOutlined />}
+              onClick={() => setViewport('desktop')}
+            />
           </Tooltip>
-    <Tooltip title={t('pb.tablet')}>
-            <Button type={viewport === 'tablet' ? 'primary' : 'text'} size="small" icon={<TabletOutlined />} onClick={() => setViewport('tablet')} />
+          <Tooltip title={t('pb.tablet')}>
+            <Button
+              type={viewport === 'tablet' ? 'primary' : 'text'}
+              size="small"
+              icon={<TabletOutlined />}
+              onClick={() => setViewport('tablet')}
+            />
           </Tooltip>
-    <Tooltip title={t('pb.phone')}>
-            <Button type={viewport === 'mobile' ? 'primary' : 'text'} size="small" icon={<MobileOutlined />} onClick={() => setViewport('mobile')} />
+          <Tooltip title={t('pb.phone')}>
+            <Button
+              type={viewport === 'mobile' ? 'primary' : 'text'}
+              size="small"
+              icon={<MobileOutlined />}
+              onClick={() => setViewport('mobile')}
+            />
           </Tooltip>
           {isElectronEnv && (
-    <Tooltip title={t('pb.consoleErrors', { n: consoleErrors })}>
+            <Tooltip title={t('pb.consoleErrors', { n: consoleErrors })}>
               <Badge count={consoleErrors} size="small" offset={[-2, 4]}>
                 <Button type="text" size="small" icon={<BugOutlined />} onClick={toggleDevTools} />
               </Badge>
@@ -296,7 +349,9 @@ export default function PreviewBrowser({ tabId }: PreviewBrowserProps) {
         {!hasContent ? (
           <div className="w-full flex items-center justify-center p-8">
             <div className="flex flex-col items-center justify-center gap-1.5 text-center">
-              <span className="text-faint [&_svg]:w-5 [&_svg]:h-5"><Tray size={20} /></span>
+              <span className="text-faint [&_svg]:w-5 [&_svg]:h-5">
+                <Tray size={20} />
+              </span>
               <div className="text-xs text-muted">{warning ?? t('pb.startHint')}</div>
               {!warning && <div className="text-xs text-faint">{t('pb.examples')}</div>}
             </div>
@@ -321,7 +376,11 @@ export default function PreviewBrowser({ tabId }: PreviewBrowserProps) {
         )}
       </div>
 
-      {title && <div className="flex items-center px-3 py-1 text-xs text-faint bg-secondary border-t border-[var(--color-border-dim)] whitespace-nowrap overflow-hidden text-ellipsis shrink-0">{title} · {url}</div>}
+      {title && (
+        <div className="flex items-center px-3 py-1 text-xs text-faint bg-secondary border-t border-[var(--color-border-dim)] whitespace-nowrap overflow-hidden text-ellipsis shrink-0">
+          {title} · {url}
+        </div>
+      )}
     </div>
   );
 }

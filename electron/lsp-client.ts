@@ -8,6 +8,7 @@
  * to typescript-language-server; callers fall back to regex/tsc when the
  * server is unavailable.
  */
+import { errorText } from './errors';
 import { spawn, type ChildProcessWithoutNullStreams } from 'child_process';
 import { safeProcessEnv } from './safe-env';
 import path from 'path';
@@ -55,7 +56,9 @@ function parseServerCommand(envValue: string | undefined): string[] | null {
   try {
     const arr = JSON.parse(envValue);
     if (Array.isArray(arr) && arr.every((x) => typeof x === 'string')) return arr;
-  } catch { /* not JSON — treat as a command string */ }
+  } catch {
+    /* not JSON — treat as a command string */
+  }
   return envValue.split(/\s+/).filter(Boolean);
 }
 
@@ -78,7 +81,9 @@ function createMessageReader(onMessage: (msg: any) => void): (chunk: Buffer) => 
       buf = buf.slice(headerEnd + 4 + len);
       try {
         onMessage(JSON.parse(body));
-      } catch { /* malformed frame — ignore */ }
+      } catch {
+        /* malformed frame — ignore */
+      }
     }
   };
 }
@@ -86,10 +91,10 @@ function createMessageReader(onMessage: (msg: any) => void): (chunk: Buffer) => 
 function normalize(action: LspAction, result: any): LspQueryResult {
   if (action === 'hover') {
     const contents = Array.isArray(result?.contents)
-      ? result.contents.map((c: any) => (typeof c === 'string' ? c : c?.value ?? '')).join('\n')
+      ? result.contents.map((c: any) => (typeof c === 'string' ? c : (c?.value ?? ''))).join('\n')
       : typeof result?.contents === 'string'
         ? result.contents
-        : result?.contents?.value ?? '';
+        : (result?.contents?.value ?? '');
     return { ok: true, hover: { contents, range: result?.range } };
   }
   const raw = Array.isArray(result) ? result : result ? [result] : [];
@@ -113,9 +118,8 @@ function languageId(filePath: string): string {
 
 export function queryLsp(input: LspQueryInput): Promise<LspQueryResult> {
   return new Promise((resolve) => {
-    const argv = input.serverCommand
-      ?? parseServerCommand(process.env.AURAXIS_LSP_SERVER)
-      ?? ['typescript-language-server', '--stdio'];
+    const argv = input.serverCommand ??
+      parseServerCommand(process.env.AURAXIS_LSP_SERVER) ?? ['typescript-language-server', '--stdio'];
     let child: ChildProcessWithoutNullStreams;
     try {
       child = spawn(argv[0], argv.slice(1), {
@@ -124,8 +128,8 @@ export function queryLsp(input: LspQueryInput): Promise<LspQueryResult> {
         windowsHide: true,
         env: safeProcessEnv(),
       });
-    } catch (e: any) {
-      resolve({ ok: false, error: e?.message ?? String(e) });
+    } catch (e: unknown) {
+      resolve({ ok: false, error: errorText(e) });
       return;
     }
 
@@ -142,7 +146,9 @@ export function queryLsp(input: LspQueryInput): Promise<LspQueryResult> {
       try {
         const body = JSON.stringify(obj);
         child.stdin.write(`Content-Length: ${Buffer.byteLength(body, 'utf8')}\r\n\r\n${body}`);
-      } catch { /* closed */ }
+      } catch {
+        /* closed */
+      }
     };
 
     const onMessage = (msg: any) => {
@@ -160,13 +166,14 @@ export function queryLsp(input: LspQueryInput): Promise<LspQueryResult> {
             },
           },
         });
-        const method = input.action === 'definition'
-          ? 'textDocument/definition'
-          : input.action === 'references'
-            ? 'textDocument/references'
-            : input.action === 'implementation'
-              ? 'textDocument/implementation'
-              : 'textDocument/hover';
+        const method =
+          input.action === 'definition'
+            ? 'textDocument/definition'
+            : input.action === 'references'
+              ? 'textDocument/references'
+              : input.action === 'implementation'
+                ? 'textDocument/implementation'
+                : 'textDocument/hover';
         const params: any = { textDocument: { uri }, position: input.position };
         if (input.action === 'references') params.context = { includeDeclaration: true };
         send({ jsonrpc: '2.0', id: 2, method, params });
@@ -215,8 +222,16 @@ export function queryLsp(input: LspQueryInput): Promise<LspQueryResult> {
 
     function cleanup() {
       clearTimeout(timer);
-      try { child.stdin.end(); } catch { /* closed */ }
-      try { child.kill(); } catch { /* already gone */ }
+      try {
+        child.stdin.end();
+      } catch {
+        /* closed */
+      }
+      try {
+        child.kill();
+      } catch {
+        /* already gone */
+      }
     }
   });
 }

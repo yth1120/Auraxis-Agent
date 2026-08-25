@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { render, fireEvent } from '@testing-library/react';
 import HeaderModeSwitcher from '../HeaderModeSwitcher';
 import { useAppStore } from '@/stores/useAppStore';

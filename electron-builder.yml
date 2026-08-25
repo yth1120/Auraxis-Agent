@@ -13,8 +13,8 @@ asar: true
 # 无本地 C++ 工具链的环境直接完成打包。
 npmRebuild: false
 asarUnpack:
-  - "node_modules/better-sqlite3/**"
-  - "node_modules/node-pty/**"
+  - 'node_modules/better-sqlite3/**'
+  - 'node_modules/node-pty/**'
 extraResources:
   - from: electron/sandbox-windows.ps1
     to: sandbox/sandbox-windows.ps1

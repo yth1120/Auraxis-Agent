@@ -1,6 +1,13 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useAdvancedStore } from '../useAdvancedStore';
-import type { PermissionRequest, PermissionRule, MCPServerConfig, MCPStatus, AgentInfo, AgentLogEntry } from '../../types/advanced';
+import type {
+  PermissionRequest,
+  PermissionRule,
+  MCPServerConfig,
+  MCPStatus,
+  AgentInfo,
+  AgentLogEntry,
+} from '../../types/advanced';
 
 function mkPermissionReq(requestId: string): PermissionRequest {
   return {
@@ -214,12 +221,8 @@ describe('useAdvancedStore — agent log appending', () => {
 
   it('appendAgentLog 连续 text 类型合并', () => {
     useAdvancedStore.getState().addAgent(mkAgent('agent-1'));
-    useAdvancedStore.getState().appendAgentLog('agent-1', [
-      { type: 'text', text: 'Part1', timestamp: 1000 },
-    ]);
-    useAdvancedStore.getState().appendAgentLog('agent-1', [
-      { type: 'text', text: 'Part2', timestamp: 2000 },
-    ]);
+    useAdvancedStore.getState().appendAgentLog('agent-1', [{ type: 'text', text: 'Part1', timestamp: 1000 }]);
+    useAdvancedStore.getState().appendAgentLog('agent-1', [{ type: 'text', text: 'Part2', timestamp: 2000 }]);
     const agent = useAdvancedStore.getState().runningAgents[0];
     // 连续 text 合并为一条
     expect(agent.log!.length).toBe(1);
@@ -228,12 +231,8 @@ describe('useAdvancedStore — agent log appending', () => {
 
   it('appendAgentLog 非 text 类型单独追加（不合并）', () => {
     useAdvancedStore.getState().addAgent(mkAgent('agent-1'));
-    useAdvancedStore.getState().appendAgentLog('agent-1', [
-      { type: 'tool_start', toolName: 'Read', timestamp: 1000 },
-    ]);
-    useAdvancedStore.getState().appendAgentLog('agent-1', [
-      { type: 'tool_start', toolName: 'Write', timestamp: 2000 },
-    ]);
+    useAdvancedStore.getState().appendAgentLog('agent-1', [{ type: 'tool_start', toolName: 'Read', timestamp: 1000 }]);
+    useAdvancedStore.getState().appendAgentLog('agent-1', [{ type: 'tool_start', toolName: 'Write', timestamp: 2000 }]);
     const agent = useAdvancedStore.getState().runningAgents[0];
     // 非 text 类型各自独立
     expect(agent.log!.length).toBe(2);
@@ -241,15 +240,9 @@ describe('useAdvancedStore — agent log appending', () => {
 
   it('appendAgentLog 混合 text 和非 text 追加', () => {
     useAdvancedStore.getState().addAgent(mkAgent('agent-1'));
-    useAdvancedStore.getState().appendAgentLog('agent-1', [
-      { type: 'text', text: 'Hello', timestamp: 1000 },
-    ]);
-    useAdvancedStore.getState().appendAgentLog('agent-1', [
-      { type: 'tool_start', toolName: 'Read', timestamp: 2000 },
-    ]);
-    useAdvancedStore.getState().appendAgentLog('agent-1', [
-      { type: 'text', text: 'World', timestamp: 3000 },
-    ]);
+    useAdvancedStore.getState().appendAgentLog('agent-1', [{ type: 'text', text: 'Hello', timestamp: 1000 }]);
+    useAdvancedStore.getState().appendAgentLog('agent-1', [{ type: 'tool_start', toolName: 'Read', timestamp: 2000 }]);
+    useAdvancedStore.getState().appendAgentLog('agent-1', [{ type: 'text', text: 'World', timestamp: 3000 }]);
     const agent = useAdvancedStore.getState().runningAgents[0];
     // [text:Hello, tool_call:Read, text:World] — 3 entries (text 被 tool_call 隔开)
     expect(agent.log!.length).toBe(3);

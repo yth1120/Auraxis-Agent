@@ -12,6 +12,9 @@ npm run test             # vitest 全量
 npm run test:coverage    # 全量 + 覆盖率报告（生成 coverage/coverage-summary.json）
 npm run sdk:build        # packages/auraxis-sdk 编译
 npm run sdk:test         # SDK 测试
+npm run lint             # ESLint（含 React Hooks 规则，阻断规则错误）
+npm run format:check     # Prettier 格式校验
+npm run check            # lint + 主进程编译 + 渲染层类型检查 + 全量测试
 ```
 
 - 主进程改动必须重启 Electron 才生效；渲染层改动走 Vite HMR。
@@ -82,7 +85,7 @@ npm run sdk:test         # SDK 测试
 ## 测试与验证
 
 - 新增/改动必须过：`npx tsc --noEmit`（渲染层）、`npm run electron:compile`（主进程）、`npx vitest run`（全量）、`npx vite build`（构建）。
-- 测试覆盖门槛：lines/statements ≥ 80%、branches ≥ 70%、functions ≥ 80%（`vitest.config.ts`，校准后的可守住水平；当前实际 85.04% 行/语句、78.88% 分支、86.17% 函数）；只允许有意上调、不允许跌破当前门槛。
+- 测试覆盖门槛：lines/statements ≥ 80%、branches ≥ 70%、functions ≥ 80%（`vitest.config.ts`，校准后的可守住水平；当前实际 85.18% 行/语句、78.86% 分支、87.78% 函数）；只允许有意上调、不允许跌破当前门槛。
 - 覆盖率报告：`npm run test:coverage` 同时输出 `coverage/coverage-summary.json`（gitignore，开发期产物），设置面板「测试覆盖率」页经 `coverage:get` IPC 实时读取该文件；README / AGENTS / docs 中的用例数与覆盖率数字以最近一次全量覆盖率为准，更新后必须同步。
 - 覆盖率统计范围：`electron/ipc/`、`src/stores/`、`src/core/`（不含 `src/components/` 与主进程入口）；UI 由组件级测试覆盖，桌面端到端链路由 `npm run test:smoke` 覆盖。
 - 端到端：`npm run test:e2e`（Playwright 启动真实 Electron，覆盖启动/模式切换/发消息/快捷卡片/设置主题等 15 条链路）；改动渲染层或主进程启动链路后必须重跑。

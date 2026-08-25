@@ -19,7 +19,11 @@ function cleanup() {
 }
 
 describe('WorkspaceDriftTracker', () => {
-  beforeEach(() => { cleanup(); setup(); workspaceDrift.clear(); });
+  beforeEach(() => {
+    cleanup();
+    setup();
+    workspaceDrift.clear();
+  });
   afterEach(() => cleanup());
 
   it('登记基线后检测到内容变化', async () => {
@@ -52,12 +56,14 @@ describe('WorkspaceDriftTracker', () => {
   });
 
   it('漂移摘要包含文件与重检指令', async () => {
-    const fake: DriftedFile[] = [{
-      filePath: path.resolve(fileA),
-      reason: 'content',
-      observedAt: 1,
-      detectedAt: 2,
-    }];
+    const fake: DriftedFile[] = [
+      {
+        filePath: path.resolve(fileA),
+        reason: 'content',
+        observedAt: 1,
+        detectedAt: 2,
+      },
+    ];
     const summary = driftSummary(fake);
     expect(summary).toContain('工作区变更');
     expect(summary).toContain('定向测试');

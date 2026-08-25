@@ -11,20 +11,24 @@ vi.mock('electron', () => ({
 
 // 在模块加载前写入旧数组格式，模拟旧版本 JSON 记忆库
 h.userData = mkdtempSync(path.join(os.tmpdir(), 'auraxis-legacy-'));
-writeFileSync(path.join(h.userData, 'auraxis-memory.json'), JSON.stringify([
-  {
-    id: 'm-legacy',
-    project_path: 'C:/legacy',
-    type: 'decision',
-    title: '旧决策',
-    content: '项目统一使用 React Router v6',
-    tags: '["react"]',
-    timestamp: 1,
-    session_id: null,
-    importance: 4,
-    is_active: 1,
-  },
-]), 'utf-8');
+writeFileSync(
+  path.join(h.userData, 'auraxis-memory.json'),
+  JSON.stringify([
+    {
+      id: 'm-legacy',
+      project_path: 'C:/legacy',
+      type: 'decision',
+      title: '旧决策',
+      content: '项目统一使用 React Router v6',
+      tags: '["react"]',
+      timestamp: 1,
+      session_id: null,
+      importance: 4,
+      is_active: 1,
+    },
+  ]),
+  'utf-8',
+);
 
 import { getBeliefsByScope, getBeliefById, setBackendModeForTest } from '../memory-db';
 

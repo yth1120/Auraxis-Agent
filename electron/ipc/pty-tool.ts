@@ -5,6 +5,7 @@
  * calls: interactive programs, environment, and stdin/stdout streams. Each
  * session is owner-scoped (agent task or chat) and cleaned up on close.
  */
+import { errorText } from '../errors';
 import { spawn, type ChildProcessWithoutNullStreams } from 'child_process';
 import { EventEmitter } from 'events';
 import { safeProcessEnv } from '../safe-env';
@@ -33,7 +34,11 @@ function defaultShell(): string {
 /** node-pty when available; pipe-based child process otherwise. */
 export const defaultPtyFactory: PtyFactory = (opts) => {
   let PTY: any = null;
-  try { PTY = require('node-pty'); } catch { PTY = null; }
+  try {
+    PTY = require('node-pty');
+  } catch {
+    PTY = null;
+  }
   if (PTY) {
     const pty = PTY.spawn(opts.command, [], {
       name: 'xterm-256color',
@@ -44,15 +49,33 @@ export const defaultPtyFactory: PtyFactory = (opts) => {
     });
     const dataListeners = new Set<(d: string) => void>();
     const exitListeners = new Set<() => void>();
-    pty.onData((d: string) => { for (const l of dataListeners) l(d); });
-    pty.onExit(() => { for (const l of exitListeners) l(); });
+    pty.onData((d: string) => {
+      for (const l of dataListeners) l(d);
+    });
+    pty.onExit(() => {
+      for (const l of exitListeners) l();
+    });
     return {
       write: (d) => pty.write(d),
-      kill: () => { try { pty.kill(); } catch { /* gone */ } },
-      onData: (cb) => { dataListeners.add(cb); },
-      onExit: (cb) => { exitListeners.add(cb); },
-      offData: (cb) => { dataListeners.delete(cb); },
-      offExit: (cb) => { exitListeners.delete(cb); },
+      kill: () => {
+        try {
+          pty.kill();
+        } catch {
+          /* gone */
+        }
+      },
+      onData: (cb) => {
+        dataListeners.add(cb);
+      },
+      onExit: (cb) => {
+        exitListeners.add(cb);
+      },
+      offData: (cb) => {
+        dataListeners.delete(cb);
+      },
+      offExit: (cb) => {
+        exitListeners.delete(cb);
+      },
     };
   }
 
@@ -67,8 +90,20 @@ export const defaultPtyFactory: PtyFactory = (opts) => {
   child.stderr?.on('data', (d: Buffer) => emitter.emit('data', d.toString()));
   child.on('exit', () => emitter.emit('exit'));
   return {
-    write: (d) => { try { child.stdin?.write(d); } catch { /* closed */ } },
-    kill: () => { try { child.kill(); } catch { /* gone */ } },
+    write: (d) => {
+      try {
+        child.stdin?.write(d);
+      } catch {
+        /* closed */
+      }
+    },
+    kill: () => {
+      try {
+        child.kill();
+      } catch {
+        /* gone */
+      }
+    },
     onData: (cb) => emitter.on('data', cb),
     onExit: (cb) => emitter.on('exit', cb),
     offData: (cb) => emitter.off('data', cb),
@@ -94,12 +129,7 @@ export class PtyRegistry {
 
   constructor(private factory: PtyFactory = defaultPtyFactory) {}
 
-  create(opts: {
-    owner: string;
-    id?: string;
-    command?: string;
-    cwd?: string;
-  }): { id: string; command: string } {
+  create(opts: { owner: string; id?: string; command?: string; cwd?: string }): { id: string; command: string } {
     const command = opts.command?.trim() || defaultShell();
     const backend = this.factory({ command, cwd: opts.cwd });
     if (!backend) throw new Error('PTY 不可用（无法启动终端进程）');
@@ -114,7 +144,9 @@ export class PtyRegistry {
       lastRead: 0,
       exited: false,
     };
-    backend.onData((d) => { session.buffer += d; });
+    backend.onData((d) => {
+      session.buffer += d;
+    });
     backend.onExit(() => {
       session.exited = true;
       this.sessions.delete(id);
@@ -137,12 +169,7 @@ export class PtyRegistry {
   }
 
   /** Subscribe to live output + exit for a read-only UI mirror. */
-  subscribe(
-    id: string,
-    owner: string,
-    onData: (data: string) => void,
-    onExit?: () => void,
-  ): (() => void) | null {
+  subscribe(id: string, owner: string, onData: (data: string) => void, onExit?: () => void): (() => void) | null {
     const s = this.get(id, owner);
     if (!s) return null;
     s.backend.onData(onData);
@@ -223,8 +250,8 @@ export async function runPtyTool(
           cwd: typeof input.cwd === 'string' ? input.cwd : undefined,
         });
         return { output: { session_id: created.id, command: created.command } };
-      } catch (e: any) {
-        return { output: null, error: e?.message || '创建 PTY 失败' };
+      } catch (e: unknown) {
+        return { output: null, error: errorText(e) || '创建 PTY 失败' };
       }
     }
     case 'write': {

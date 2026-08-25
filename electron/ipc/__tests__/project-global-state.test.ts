@@ -12,20 +12,21 @@ vi.mock('electron', () => ({
   app: { getPath: vi.fn(() => '/fallback-userdata') },
 }));
 
-import {
-  readProjectGlobalState,
-  writeProjectGlobalState,
-  registerProjectHandlers,
-} from '../project-handlers';
+import { readProjectGlobalState, writeProjectGlobalState, registerProjectHandlers } from '../project-handlers';
 import { EMPTY_PROJECT_GLOBAL_STATE } from '../../contracts/project';
 
 const sample = {
-  projects: [{
-    id: 'p1', name: 'demo', path: 'C:/x',
-    roots: ['C:/x', 'C:/shared'],
-    writableRoots: ['C:/x'],
-    createdAt: 1, updatedAt: 2,
-  }],
+  projects: [
+    {
+      id: 'p1',
+      name: 'demo',
+      path: 'C:/x',
+      roots: ['C:/x', 'C:/shared'],
+      writableRoots: ['C:/x'],
+      createdAt: 1,
+      updatedAt: 2,
+    },
+  ],
   currentProjectId: 'p1',
   view: { groupBy: 'workspace', orderBy: 'manual' },
   workspaceOrder: ['p1'],

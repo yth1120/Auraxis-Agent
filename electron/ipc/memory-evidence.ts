@@ -110,7 +110,15 @@ export function captureEvidenceFromSession(source: EvidenceSessionSource): Evide
     const role = roleOf(m.role);
     const text = (m.content ?? '').trim();
     if (!role || !text) continue;
-    pushEvidence(projectPath, sessionId, role, text, m.ts ?? Date.now(), { source: 'session', eventType: role }, result);
+    pushEvidence(
+      projectPath,
+      sessionId,
+      role,
+      text,
+      m.ts ?? Date.now(),
+      { source: 'session', eventType: role },
+      result,
+    );
   }
 
   for (const t of toolResults) {
@@ -159,8 +167,15 @@ export function captureEvidenceFromEvents(
     if (e.type === 'user') {
       const text = eventText(e).trim();
       if (text) {
-        pushEvidence(scope, sessionId, 'user', text, e.ts ?? e.timestamp ?? Date.now(),
-          { source: 'session', eventType: 'user', realtime: true }, result);
+        pushEvidence(
+          scope,
+          sessionId,
+          'user',
+          text,
+          e.ts ?? e.timestamp ?? Date.now(),
+          { source: 'session', eventType: 'user', realtime: true },
+          result,
+        );
       }
       continue;
     }
@@ -171,15 +186,27 @@ export function captureEvidenceFromEvents(
       const summaryRaw = data.summary ?? e.summary;
       const outputRaw = data.output ?? e.output;
       const errorRaw = data.error ?? e.error;
-      const summary = typeof summaryRaw === 'string'
-        ? summaryRaw
-        : outputRaw !== undefined && outputRaw !== null
-          ? (typeof outputRaw === 'string' ? outputRaw : JSON.stringify(outputRaw).slice(0, 400))
-          : typeof errorRaw === 'string' ? `错误: ${errorRaw}` : '';
+      const summary =
+        typeof summaryRaw === 'string'
+          ? summaryRaw
+          : outputRaw !== undefined && outputRaw !== null
+            ? typeof outputRaw === 'string'
+              ? outputRaw
+              : JSON.stringify(outputRaw).slice(0, 400)
+            : typeof errorRaw === 'string'
+              ? `错误: ${errorRaw}`
+              : '';
       const content = `${toolName}: ${summary}`.trim();
       if (content) {
-        pushEvidence(scope, sessionId, 'tool', content, e.ts ?? e.timestamp ?? Date.now(),
-          { source: 'tool', toolName, success: action === 'end', realtime: true }, result);
+        pushEvidence(
+          scope,
+          sessionId,
+          'tool',
+          content,
+          e.ts ?? e.timestamp ?? Date.now(),
+          { source: 'tool', toolName, success: action === 'end', realtime: true },
+          result,
+        );
       }
     }
   }

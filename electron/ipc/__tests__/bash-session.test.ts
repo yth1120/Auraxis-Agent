@@ -35,11 +35,10 @@ describe('runBashPersistent', () => {
     pty.read.mockResolvedValueOnce({ output: 'hello\n__AURAXIS_EXIT_0__\n' } as any);
     const r = await runBashPersistent('echo hello', 'C:/proj', ctx({ onProgress }));
 
-    expect(pty.create).toHaveBeenCalledWith(
-      expect.objectContaining({ owner: 'req-1', cwd: 'C:/proj' }),
-    );
+    expect(pty.create).toHaveBeenCalledWith(expect.objectContaining({ owner: 'req-1', cwd: 'C:/proj' }));
     expect(pty.write).toHaveBeenCalledWith(
-      'bash-req-1', 'req-1',
+      'bash-req-1',
+      'req-1',
       expect.stringContaining("{ eval 'echo hello'; } 2>&1; echo -e"),
       true,
     );
@@ -74,7 +73,9 @@ describe('runBashPersistent', () => {
   });
 
   it('异常时回退 one-shot 并尝试关闭', async () => {
-    pty.list.mockImplementationOnce(() => { throw new Error('boom'); });
+    pty.list.mockImplementationOnce(() => {
+      throw new Error('boom');
+    });
     expect(await runBashPersistent('ls', 'C:/', ctx())).toBeNull();
     expect(pty.close).toHaveBeenCalled();
   });

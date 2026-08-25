@@ -2,7 +2,13 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { promises as fs } from 'fs';
 import os from 'os';
 import path from 'path';
-import { saveAgentSnapshot, loadAgentSnapshots, removeAgentSnapshot, pruneSnapshots, type AgentSnapshotRecord } from '../../agent-snapshot';
+import {
+  saveAgentSnapshot,
+  loadAgentSnapshots,
+  removeAgentSnapshot,
+  pruneSnapshots,
+  type AgentSnapshotRecord,
+} from '../../agent-snapshot';
 
 let root: string;
 
@@ -37,7 +43,13 @@ function record(id: string, startTime: number, status: AgentSnapshotRecord['stat
 describe('agent-snapshot', () => {
   it('round-trips save and load with savedState', async () => {
     const r = record('agent-1', Date.now(), 'paused');
-    r.savedState = { messages: [{ role: 'user', content: 'hi' }], plan: null, iteration: 3, toolCallCount: 5, allText: 'progress' };
+    r.savedState = {
+      messages: [{ role: 'user', content: 'hi' }],
+      plan: null,
+      iteration: 3,
+      toolCallCount: 5,
+      allText: 'progress',
+    };
     await saveAgentSnapshot(r);
 
     const loaded = await loadAgentSnapshots();

@@ -5,7 +5,7 @@ import {
   MinusCircle as MinusCircleOutlined,
   Link as LinkOutlined,
   LinkBreak as DisconnectOutlined,
-} from '@/components/common/icons'
+} from '@/components/common/icons';
 import type { MCPServerConfig, MCPStatus } from '../../types/advanced';
 import { useAdvancedStore } from '../../stores/useAdvancedStore';
 import { useT } from '../../i18n';
@@ -57,7 +57,7 @@ export default function MCPSettings({ servers, statuses, onUpdateServers }: MCPS
     setNewName('');
     setNewCommand('');
     setNewArgs('');
-      message.success(t('mcp.added', { name: server.name }));
+    message.success(t('mcp.added', { name: server.name }));
   };
 
   const handleRemove = async (id: string) => {
@@ -74,7 +74,9 @@ export default function MCPSettings({ servers, statuses, onUpdateServers }: MCPS
           for (const status of statuses.data) updateMcpStatus(status);
         }
       }
-    } catch { /* best-effort — local list is already updated */ }
+    } catch {
+      /* best-effort — local list is already updated */
+    }
   };
 
   const handleConnect = async (id: string) => {
@@ -89,7 +91,7 @@ export default function MCPSettings({ servers, statuses, onUpdateServers }: MCPS
         message.error(t('mcp.connectFailed', { error: String(result.error ?? '') }));
       }
     } catch {
-        message.error(t('mcp.electronOnly'));
+      message.error(t('mcp.electronOnly'));
     }
   };
 
@@ -106,16 +108,15 @@ export default function MCPSettings({ servers, statuses, onUpdateServers }: MCPS
     }
   };
 
-  const getStatus = (id: string): MCPStatus | undefined =>
-    statuses.find((s) => s.serverId === id);
+  const getStatus = (id: string): MCPStatus | undefined => statuses.find((s) => s.serverId === id);
 
   return (
     <div className="p-0">
       <div className="mb-5 pb-4 border-b border-[var(--color-border-dim)]">
-    <div className="font-body text-xs text-muted mb-2 uppercase tracking-[1px]">{t('mcp.addTitle')}</div>
+        <div className="font-body text-xs text-muted mb-2 uppercase tracking-[1px]">{t('mcp.addTitle')}</div>
         <Space.Compact style={{ width: '100%', marginBottom: 8 }}>
           <Input
-      placeholder={t('mcp.namePlaceholder')}
+            placeholder={t('mcp.namePlaceholder')}
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             size="small"
@@ -123,7 +124,7 @@ export default function MCPSettings({ servers, statuses, onUpdateServers }: MCPS
         </Space.Compact>
         <Space.Compact style={{ width: '100%', marginBottom: 8 }}>
           <Input
-      placeholder={t('mcp.cmdPlaceholder')}
+            placeholder={t('mcp.cmdPlaceholder')}
             value={newCommand}
             onChange={(e) => setNewCommand(e.target.value)}
             size="small"
@@ -131,7 +132,7 @@ export default function MCPSettings({ servers, statuses, onUpdateServers }: MCPS
         </Space.Compact>
         <Space.Compact style={{ width: '100%', marginBottom: 8 }}>
           <Input
-      placeholder={t('mcp.argsPlaceholder')}
+            placeholder={t('mcp.argsPlaceholder')}
             value={newArgs}
             onChange={(e) => setNewArgs(e.target.value)}
             size="small"
@@ -145,14 +146,14 @@ export default function MCPSettings({ servers, statuses, onUpdateServers }: MCPS
           block
           className="!border-primary !text-secondary hover:!text-text-primary"
         >
-      {t('mcp.add')}
+          {t('mcp.add')}
         </Button>
       </div>
 
       <div className="p-0">
-    <div className="font-body text-xs text-muted mb-2 uppercase tracking-[1px]">{t('mcp.configured')}</div>
+        <div className="font-body text-xs text-muted mb-2 uppercase tracking-[1px]">{t('mcp.configured')}</div>
         {servers.length === 0 ? (
-    <div className="text-faint font-body text-xs text-center p-5">{t('mcp.empty')}</div>
+          <div className="text-faint font-body text-xs text-center p-5">{t('mcp.empty')}</div>
         ) : (
           <List
             dataSource={servers}
@@ -184,33 +185,25 @@ export default function MCPSettings({ servers, statuses, onUpdateServers }: MCPS
                     ),
                     <Popconfirm
                       key="delete"
-      title={t('mcp.deleteTitle')}
+                      title={t('mcp.deleteTitle')}
                       onConfirm={() => handleRemove(server.id)}
-      okText={t('mcp.delete')}
-      cancelText={t('mcp.cancel')}
+                      okText={t('mcp.delete')}
+                      cancelText={t('mcp.cancel')}
                       okButtonProps={{
                         danger: true,
                         type: 'primary',
                         style: { color: '#fff' },
                       }}
                     >
-                      <Button
-                        type="text"
-                        size="small"
-                        danger
-                        icon={<MinusCircleOutlined />}
-                      />
+                      <Button type="text" size="small" danger icon={<MinusCircleOutlined />} />
                     </Popconfirm>,
                   ]}
                 >
                   <List.Item.Meta
                     title={
                       <span className="font-body text-sm text-text-primary flex items-center gap-2">
-                        <Tag
-                          color={connected ? 'green' : 'default'}
-                          className="!text-xs !leading-none"
-                        >
-    {connected ? t('mcp.connectedState', { n: status?.toolCount || 0 }) : t('mcp.notConnected')}
+                        <Tag color={connected ? 'green' : 'default'} className="!text-xs !leading-none">
+                          {connected ? t('mcp.connectedState', { n: status?.toolCount || 0 }) : t('mcp.notConnected')}
                         </Tag>
                         {server.name}
                       </span>

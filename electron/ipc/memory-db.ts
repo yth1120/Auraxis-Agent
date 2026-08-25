@@ -26,11 +26,11 @@ export interface MemoryRecord {
   type: 'decision' | 'problem' | 'architecture' | 'preference' | 'progress' | 'context';
   title: string;
   content: string;
-  tags: string;          // JSON string array, e.g. '["react","routing"]'
+  tags: string; // JSON string array, e.g. '["react","routing"]'
   timestamp: number;
   session_id: string | null;
-  importance: number;    // 1-5
-  is_active: number;     // 0 = archived/resolved, 1 = active
+  importance: number; // 1-5
+  is_active: number; // 0 = archived/resolved, 1 = active
 }
 
 type MemoryInput = Omit<MemoryRecord, 'importance' | 'is_active'> & {
@@ -61,9 +61,7 @@ export type EvidenceInput = Omit<EvidenceRecord, 'deleted_at'> & {
 
 // ─── Signal（类型化检测） ──────────────────────────────
 
-export type SignalType =
-  | 'date' | 'version' | 'url' | 'entity'
-  | 'decision' | 'correction' | 'approval' | 'rejection';
+export type SignalType = 'date' | 'version' | 'url' | 'entity' | 'decision' | 'correction' | 'approval' | 'rejection';
 
 export interface SignalRecord {
   id: string;
@@ -240,19 +238,27 @@ export function signalId(evidenceId: string, signalType: SignalType, value: stri
 
 export function legacyTypeToKind(type: MemoryRecord['type']): BeliefKind {
   switch (type) {
-    case 'preference': return 'user';
-    case 'problem': return 'feedback';
-    case 'context': return 'reference';
-    default: return 'project';
+    case 'preference':
+      return 'user';
+    case 'problem':
+      return 'feedback';
+    case 'context':
+      return 'reference';
+    default:
+      return 'project';
   }
 }
 
 export function beliefKindToLegacyType(kind: BeliefKind): MemoryRecord['type'] {
   switch (kind) {
-    case 'user': return 'preference';
-    case 'feedback': return 'problem';
-    case 'reference': return 'context';
-    default: return 'decision';
+    case 'user':
+      return 'preference';
+    case 'feedback':
+      return 'problem';
+    case 'reference':
+      return 'context';
+    default:
+      return 'decision';
   }
 }
 
@@ -443,42 +449,62 @@ class SqliteBackend implements MemoryBackend {
   }
 
   addMemory(m: MemoryInput): void {
-    this.db.prepare(`
+    this.db
+      .prepare(
+        `
       INSERT INTO memories (id, project_path, type, title, content, tags, timestamp, session_id, importance, is_active)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(m.id, m.project_path, m.type, m.title, m.content, JSON.stringify(m.tags || []),
-           m.timestamp, m.session_id, m.importance ?? 0, m.is_active ?? 1);
+    `,
+      )
+      .run(
+        m.id,
+        m.project_path,
+        m.type,
+        m.title,
+        m.content,
+        JSON.stringify(m.tags || []),
+        m.timestamp,
+        m.session_id,
+        m.importance ?? 0,
+        m.is_active ?? 1,
+      );
   }
 
   getMemoriesByProject(projectPath: string, limit = 100): MemoryRecord[] {
-    return this.db.prepare(
-      'SELECT * FROM memories WHERE project_path = ? ORDER BY timestamp DESC LIMIT ?'
-    ).all(projectPath, limit).map(this.rowToMemory);
+    return this.db
+      .prepare('SELECT * FROM memories WHERE project_path = ? ORDER BY timestamp DESC LIMIT ?')
+      .all(projectPath, limit)
+      .map(this.rowToMemory);
   }
 
   getMemoriesByType(projectPath: string, type: string): MemoryRecord[] {
-    return this.db.prepare(
-      'SELECT * FROM memories WHERE project_path = ? AND type = ? ORDER BY timestamp DESC'
-    ).all(projectPath, type).map(this.rowToMemory);
+    return this.db
+      .prepare('SELECT * FROM memories WHERE project_path = ? AND type = ? ORDER BY timestamp DESC')
+      .all(projectPath, type)
+      .map(this.rowToMemory);
   }
 
   getMemoriesByTag(projectPath: string, tag: string): MemoryRecord[] {
-    return this.db.prepare(
-      "SELECT * FROM memories WHERE project_path = ? AND tags LIKE ? ORDER BY timestamp DESC"
-    ).all(projectPath, `%${tag}%`).map(this.rowToMemory);
+    return this.db
+      .prepare('SELECT * FROM memories WHERE project_path = ? AND tags LIKE ? ORDER BY timestamp DESC')
+      .all(projectPath, `%${tag}%`)
+      .map(this.rowToMemory);
   }
 
   searchMemories(projectPath: string, query: string): MemoryRecord[] {
-    return this.db.prepare(
-      "SELECT * FROM memories WHERE project_path = ? AND (title LIKE ? OR content LIKE ?) ORDER BY timestamp DESC LIMIT 50"
-    ).all(projectPath, `%${query}%`, `%${query}%`).map(this.rowToMemory);
+    return this.db
+      .prepare(
+        'SELECT * FROM memories WHERE project_path = ? AND (title LIKE ? OR content LIKE ?) ORDER BY timestamp DESC LIMIT 50',
+      )
+      .all(projectPath, `%${query}%`, `%${query}%`)
+      .map(this.rowToMemory);
   }
 
   updateMemory(id: string, updates: Partial<MemoryRecord>): void {
-    const fields = Object.keys(updates).filter(k => k !== 'id');
+    const fields = Object.keys(updates).filter((k) => k !== 'id');
     if (fields.length === 0) return;
-    const sets = fields.map(f => `${f} = ?`);
-    const values = fields.map(f => f === 'tags' ? JSON.stringify(updates[f] || []) : (updates as any)[f]);
+    const sets = fields.map((f) => `${f} = ?`);
+    const values = fields.map((f) => (f === 'tags' ? JSON.stringify(updates[f] || []) : (updates as any)[f]));
     this.db.prepare(`UPDATE memories SET ${sets.join(', ')} WHERE id = ?`).run(...values, id);
   }
 
@@ -487,9 +513,12 @@ class SqliteBackend implements MemoryBackend {
   }
 
   getActiveMemories(projectPath: string): MemoryRecord[] {
-    return this.db.prepare(
-      'SELECT * FROM memories WHERE project_path = ? AND is_active = 1 ORDER BY importance DESC, timestamp DESC'
-    ).all(projectPath).map(this.rowToMemory);
+    return this.db
+      .prepare(
+        'SELECT * FROM memories WHERE project_path = ? AND is_active = 1 ORDER BY importance DESC, timestamp DESC',
+      )
+      .all(projectPath)
+      .map(this.rowToMemory);
   }
 
   deleteMemory(id: string): void {
@@ -497,17 +526,32 @@ class SqliteBackend implements MemoryBackend {
   }
 
   addEvidence(e: EvidenceInput): void {
-    this.db.prepare(`
+    this.db
+      .prepare(
+        `
       INSERT INTO evidence (id, scope, session_id, event_id, role, ts, content_hash, content, metadata, deleted_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(e.id, e.scope, e.session_id, e.event_id, e.role, e.ts, e.content_hash, e.content,
-           e.metadata || '{}', e.deleted_at ?? null);
+    `,
+      )
+      .run(
+        e.id,
+        e.scope,
+        e.session_id,
+        e.event_id,
+        e.role,
+        e.ts,
+        e.content_hash,
+        e.content,
+        e.metadata || '{}',
+        e.deleted_at ?? null,
+      );
   }
 
   listEvidence(scope: string, limit = 200): EvidenceRecord[] {
-    return this.db.prepare(
-      'SELECT * FROM evidence WHERE scope = ? ORDER BY ts DESC LIMIT ?'
-    ).all(scope, limit).map(this.rowToEvidence);
+    return this.db
+      .prepare('SELECT * FROM evidence WHERE scope = ? ORDER BY ts DESC LIMIT ?')
+      .all(scope, limit)
+      .map(this.rowToEvidence);
   }
 
   getEvidenceById(id: string): EvidenceRecord | null {
@@ -516,9 +560,9 @@ class SqliteBackend implements MemoryBackend {
   }
 
   findEvidenceByHash(scope: string, role: EvidenceRole, contentHash: string): EvidenceRecord | null {
-    const row = this.db.prepare(
-      'SELECT * FROM evidence WHERE scope = ? AND role = ? AND content_hash = ? LIMIT 1'
-    ).get(scope, role, contentHash);
+    const row = this.db
+      .prepare('SELECT * FROM evidence WHERE scope = ? AND role = ? AND content_hash = ? LIMIT 1')
+      .get(scope, role, contentHash);
     return row ? this.rowToEvidence(row) : null;
   }
 
@@ -528,22 +572,31 @@ class SqliteBackend implements MemoryBackend {
 
   searchEvidence(scope: string, query: string, limit = 50): EvidenceRecord[] {
     const like = `%${query}%`;
-    return this.db.prepare(
-      'SELECT * FROM evidence WHERE scope = ? AND (content LIKE ? OR content_hash LIKE ?) ORDER BY ts DESC LIMIT ?'
-    ).all(scope, like, like, limit).map(this.rowToEvidence);
+    return this.db
+      .prepare(
+        'SELECT * FROM evidence WHERE scope = ? AND (content LIKE ? OR content_hash LIKE ?) ORDER BY ts DESC LIMIT ?',
+      )
+      .all(scope, like, like, limit)
+      .map(this.rowToEvidence);
   }
 
   addSignal(s: SignalInput): void {
     const id = s.id || signalId(s.evidence_id, s.signal_type, s.value);
-    this.db.prepare(`
+    this.db
+      .prepare(
+        `
       INSERT OR IGNORE INTO signals (id, evidence_id, signal_type, value, confidence, detector)
       VALUES (?, ?, ?, ?, ?, ?)
-    `).run(id, s.evidence_id, s.signal_type, s.value, s.confidence, s.detector);
+    `,
+      )
+      .run(id, s.evidence_id, s.signal_type, s.value, s.confidence, s.detector);
   }
 
   listSignals(evidenceId?: string, limit = 500): SignalRecord[] {
     const rows = evidenceId
-      ? this.db.prepare('SELECT * FROM signals WHERE evidence_id = ? ORDER BY confidence DESC LIMIT ?').all(evidenceId, limit)
+      ? this.db
+          .prepare('SELECT * FROM signals WHERE evidence_id = ? ORDER BY confidence DESC LIMIT ?')
+          .all(evidenceId, limit)
       : this.db.prepare('SELECT * FROM signals ORDER BY evidence_id, confidence DESC LIMIT ?').all(limit);
     return rows as SignalRecord[];
   }
@@ -569,14 +622,28 @@ class SqliteBackend implements MemoryBackend {
       updated_at: b.updated_at ?? now,
       deleted_at: b.deleted_at ?? null,
     };
-    this.db.prepare(`
+    this.db
+      .prepare(
+        `
       INSERT INTO beliefs (id, kind, scope, title, text, summary, status, legacy, importance, is_active, created_at, updated_at, deleted_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      record.id, record.kind, record.scope, record.title, record.text, record.summary,
-      record.status, record.legacy, record.importance, record.is_active,
-      record.created_at, record.updated_at, record.deleted_at,
-    );
+    `,
+      )
+      .run(
+        record.id,
+        record.kind,
+        record.scope,
+        record.title,
+        record.text,
+        record.summary,
+        record.status,
+        record.legacy,
+        record.importance,
+        record.is_active,
+        record.created_at,
+        record.updated_at,
+        record.deleted_at,
+      );
     return record;
   }
 
@@ -596,20 +663,28 @@ class SqliteBackend implements MemoryBackend {
 
   searchBeliefs(scope: string, query: string, limit = 50): BeliefRecord[] {
     const like = `%${query}%`;
-    return this.db.prepare(
-      'SELECT * FROM beliefs WHERE scope = ? AND is_active = 1 AND deleted_at IS NULL AND (title LIKE ? OR text LIKE ?) ORDER BY updated_at DESC LIMIT ?'
-    ).all(scope, like, like, limit).map(this.rowToBelief);
+    return this.db
+      .prepare(
+        'SELECT * FROM beliefs WHERE scope = ? AND is_active = 1 AND deleted_at IS NULL AND (title LIKE ? OR text LIKE ?) ORDER BY updated_at DESC LIMIT ?',
+      )
+      .all(scope, like, like, limit)
+      .map(this.rowToBelief);
   }
 
   updateBeliefStatus(id: string, nextStatus: BeliefStatus, reason?: string, actor = 'system'): boolean {
     const existing = this.getBeliefById(id);
     if (!existing) return false;
-    this.db.prepare('UPDATE beliefs SET status = ?, updated_at = ?, is_active = ? WHERE id = ?')
+    this.db
+      .prepare('UPDATE beliefs SET status = ?, updated_at = ?, is_active = ? WHERE id = ?')
       .run(nextStatus, Date.now(), nextStatus === 'deleted' || nextStatus === 'rejected' ? 0 : existing.is_active, id);
-    this.db.prepare(`
+    this.db
+      .prepare(
+        `
       INSERT INTO belief_revisions (id, belief_id, prev_status, next_status, reason, actor, ts)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(newId('rev'), id, existing.status, nextStatus, reason ?? null, actor, Date.now());
+    `,
+      )
+      .run(newId('rev'), id, existing.status, nextStatus, reason ?? null, actor, Date.now());
     return true;
   }
 
@@ -622,24 +697,35 @@ class SqliteBackend implements MemoryBackend {
   deleteBelief(id: string): void {
     const existing = this.getBeliefById(id);
     if (!existing) return;
-    this.db.prepare('UPDATE beliefs SET is_active = 0, status = ?, deleted_at = ?, updated_at = ? WHERE id = ?')
+    this.db
+      .prepare('UPDATE beliefs SET is_active = 0, status = ?, deleted_at = ?, updated_at = ? WHERE id = ?')
       .run('deleted', Date.now(), Date.now(), id);
-    this.db.prepare(`
+    this.db
+      .prepare(
+        `
       INSERT INTO belief_revisions (id, belief_id, prev_status, next_status, reason, actor, ts)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(newId('rev'), id, existing.status, 'deleted', '用户删除', 'user', Date.now());
+    `,
+      )
+      .run(newId('rev'), id, existing.status, 'deleted', '用户删除', 'user', Date.now());
   }
 
   addBeliefEvidence(link: BeliefEvidenceLink): void {
-    this.db.prepare(`
+    this.db
+      .prepare(
+        `
       INSERT OR IGNORE INTO belief_evidence (belief_id, evidence_id, support_strength)
       VALUES (?, ?, ?)
-    `).run(link.belief_id, link.evidence_id, link.support_strength);
+    `,
+      )
+      .run(link.belief_id, link.evidence_id, link.support_strength);
   }
 
   listBeliefEvidence(beliefId?: string): BeliefEvidenceLink[] {
     const rows = beliefId
-      ? this.db.prepare('SELECT * FROM belief_evidence WHERE belief_id = ? ORDER BY support_strength DESC').all(beliefId)
+      ? this.db
+          .prepare('SELECT * FROM belief_evidence WHERE belief_id = ? ORDER BY support_strength DESC')
+          .all(beliefId)
       : this.db.prepare('SELECT * FROM belief_evidence').all();
     return rows as BeliefEvidenceLink[];
   }
@@ -661,30 +747,42 @@ class SqliteBackend implements MemoryBackend {
       actor: r.actor,
       ts: r.ts,
     };
-    this.db.prepare(`
+    this.db
+      .prepare(
+        `
       INSERT INTO belief_rejections (id, scope, text, evidence_ids, reasons, actor, ts)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(record.id, record.scope, record.text, record.evidence_ids, record.reasons, record.actor, record.ts);
+    `,
+      )
+      .run(record.id, record.scope, record.text, record.evidence_ids, record.reasons, record.actor, record.ts);
   }
 
   listBeliefRejections(scope: string, limit = 200): BeliefRejection[] {
-    return this.db.prepare(
-      'SELECT * FROM belief_rejections WHERE scope = ? ORDER BY ts DESC LIMIT ?'
-    ).all(scope, limit) as BeliefRejection[];
+    return this.db
+      .prepare('SELECT * FROM belief_rejections WHERE scope = ? ORDER BY ts DESC LIMIT ?')
+      .all(scope, limit) as BeliefRejection[];
   }
 
   addReadRun(r: ReadRunRecord): void {
-    this.db.prepare(`
+    this.db
+      .prepare(
+        `
       INSERT INTO read_runs (id, query, query_hash, scope, budget_tokens, latency_ms, ts)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(r.id, r.query, r.query_hash, r.scope, r.budget_tokens, r.latency_ms, r.ts);
+    `,
+      )
+      .run(r.id, r.query, r.query_hash, r.scope, r.budget_tokens, r.latency_ms, r.ts);
   }
 
   addReadResult(r: ReadResultRecord): void {
-    this.db.prepare(`
+    this.db
+      .prepare(
+        `
       INSERT INTO read_results (id, read_run_id, belief_id, evidence_ids, route, rank, score)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(r.id, r.read_run_id, r.belief_id, r.evidence_ids, r.route, r.rank, r.score);
+    `,
+      )
+      .run(r.id, r.read_run_id, r.belief_id, r.evidence_ids, r.route, r.rank, r.score);
   }
 
   getReadRun(id: string): ReadRunRecord | null {
@@ -693,15 +791,16 @@ class SqliteBackend implements MemoryBackend {
   }
 
   listReadResults(runId: string): ReadResultRecord[] {
-    return this.db.prepare(
-      'SELECT * FROM read_results WHERE read_run_id = ? ORDER BY rank ASC'
-    ).all(runId) as ReadResultRecord[];
+    return this.db
+      .prepare('SELECT * FROM read_results WHERE read_run_id = ? ORDER BY rank ASC')
+      .all(runId) as ReadResultRecord[];
   }
 
   listReadRuns(scope: string, limit = 200): ReadRunRecord[] {
-    return this.db.prepare(
-      'SELECT * FROM read_runs WHERE scope = ? ORDER BY ts DESC LIMIT ?'
-    ).all(scope, limit).map(this.rowToReadRun);
+    return this.db
+      .prepare('SELECT * FROM read_runs WHERE scope = ? ORDER BY ts DESC LIMIT ?')
+      .all(scope, limit)
+      .map(this.rowToReadRun);
   }
 
   listEraseAudits(scope?: string, limit = 100): EraseAuditRecord[] {
@@ -713,11 +812,11 @@ class SqliteBackend implements MemoryBackend {
 
   eraseScope(scope: string, opts?: { actor?: string; reason?: string }): number {
     const ev = this.db.prepare('SELECT id FROM evidence WHERE scope = ?').all(scope) as { id: string }[];
-    const evIds = ev.map(e => e.id);
+    const evIds = ev.map((e) => e.id);
     const bel = this.db.prepare('SELECT id FROM beliefs WHERE scope = ?').all(scope) as { id: string }[];
-    const belIds = bel.map(b => b.id);
+    const belIds = bel.map((b) => b.id);
     const runs = this.db.prepare('SELECT id FROM read_runs WHERE scope = ?').all(scope) as { id: string }[];
-    const runIds = runs.map(r => r.id);
+    const runIds = runs.map((r) => r.id);
     for (const id of belIds) {
       this.db.prepare('DELETE FROM belief_revisions WHERE belief_id = ?').run(id);
       this.db.prepare('DELETE FROM belief_evidence WHERE belief_id = ?').run(id);
@@ -738,19 +837,23 @@ class SqliteBackend implements MemoryBackend {
       this.db.prepare(`DELETE FROM read_results WHERE read_run_id IN (${ph})`).run(...runIds);
       this.db.prepare(`DELETE FROM read_runs WHERE id IN (${ph})`).run(...runIds);
     }
-    this.db.prepare(`
+    this.db
+      .prepare(
+        `
       INSERT INTO erase_audits (id, scope, actor, reason, ts, erased_evidence, erased_beliefs, erased_read_runs)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      newId('erase'),
-      scope,
-      opts?.actor ?? 'user',
-      opts?.reason ?? null,
-      Date.now(),
-      evIds.length,
-      belIds.length,
-      runIds.length,
-    );
+    `,
+      )
+      .run(
+        newId('erase'),
+        scope,
+        opts?.actor ?? 'user',
+        opts?.reason ?? null,
+        Date.now(),
+        evIds.length,
+        belIds.length,
+        runIds.length,
+      );
     return evIds.length + belIds.length;
   }
 
@@ -874,22 +977,30 @@ class JsonBackend implements MemoryBackend {
   private save() {
     const dir = path.dirname(this.filePath);
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-    writeFileSync(this.filePath, JSON.stringify({
-      memories: this.data,
-      evidence: this.evidence,
-      signals: this.signals,
-      beliefs: this.beliefs,
-      belief_evidence: this.beliefEvidence,
-      belief_revisions: this.revisions,
-      belief_rejections: this.rejections,
-      read_runs: this.readRuns,
-      read_results: this.readResults,
-      erase_audits: this.eraseAudits,
-    }, null, 2), 'utf-8');
+    writeFileSync(
+      this.filePath,
+      JSON.stringify(
+        {
+          memories: this.data,
+          evidence: this.evidence,
+          signals: this.signals,
+          beliefs: this.beliefs,
+          belief_evidence: this.beliefEvidence,
+          belief_revisions: this.revisions,
+          belief_rejections: this.rejections,
+          read_runs: this.readRuns,
+          read_results: this.readResults,
+          erase_audits: this.eraseAudits,
+        },
+        null,
+        2,
+      ),
+      'utf-8',
+    );
   }
 
   private migrateLegacyMemories() {
-    if (this.data.length === 0 || this.beliefs.some(b => b.legacy === 1)) return;
+    if (this.data.length === 0 || this.beliefs.some((b) => b.legacy === 1)) return;
     const now = Date.now();
     for (const m of this.data) {
       this.beliefs.push({
@@ -923,34 +1034,36 @@ class JsonBackend implements MemoryBackend {
 
   getMemoriesByProject(projectPath: string, limit = 100): MemoryRecord[] {
     return this.data
-      .filter(m => m.project_path === projectPath)
+      .filter((m) => m.project_path === projectPath)
       .sort((a, b) => b.timestamp - a.timestamp)
       .slice(0, limit);
   }
 
   getMemoriesByType(projectPath: string, type: string): MemoryRecord[] {
     return this.data
-      .filter(m => m.project_path === projectPath && m.type === type)
+      .filter((m) => m.project_path === projectPath && m.type === type)
       .sort((a, b) => b.timestamp - a.timestamp);
   }
 
   getMemoriesByTag(projectPath: string, tag: string): MemoryRecord[] {
     return this.data
-      .filter(m => m.project_path === projectPath && m.tags.includes(tag))
+      .filter((m) => m.project_path === projectPath && m.tags.includes(tag))
       .sort((a, b) => b.timestamp - a.timestamp);
   }
 
   searchMemories(projectPath: string, query: string): MemoryRecord[] {
     const q = query.toLowerCase();
     return this.data
-      .filter(m => m.project_path === projectPath &&
-        (m.title.toLowerCase().includes(q) || m.content.toLowerCase().includes(q)))
+      .filter(
+        (m) =>
+          m.project_path === projectPath && (m.title.toLowerCase().includes(q) || m.content.toLowerCase().includes(q)),
+      )
       .sort((a, b) => b.timestamp - a.timestamp)
       .slice(0, 50);
   }
 
   updateMemory(id: string, updates: Partial<MemoryRecord>): void {
-    const idx = this.data.findIndex(m => m.id === id);
+    const idx = this.data.findIndex((m) => m.id === id);
     if (idx < 0) return;
     const updated = { ...this.data[idx], ...updates };
     if (updates.tags && typeof updates.tags !== 'string') {
@@ -966,12 +1079,12 @@ class JsonBackend implements MemoryBackend {
 
   getActiveMemories(projectPath: string): MemoryRecord[] {
     return this.data
-      .filter(m => m.project_path === projectPath && m.is_active === 1)
+      .filter((m) => m.project_path === projectPath && m.is_active === 1)
       .sort((a, b) => b.importance - a.importance || b.timestamp - a.timestamp);
   }
 
   deleteMemory(id: string): void {
-    this.data = this.data.filter(m => m.id !== id);
+    this.data = this.data.filter((m) => m.id !== id);
     this.save();
   }
 
@@ -982,49 +1095,64 @@ class JsonBackend implements MemoryBackend {
 
   listEvidence(scope: string, limit = 200): EvidenceRecord[] {
     return this.evidence
-      .filter(x => x.scope === scope)
+      .filter((x) => x.scope === scope)
       .sort((a, b) => b.ts - a.ts)
       .slice(0, limit);
   }
 
   getEvidenceById(id: string): EvidenceRecord | null {
-    return this.evidence.find(x => x.id === id) ?? null;
+    return this.evidence.find((x) => x.id === id) ?? null;
   }
 
   findEvidenceByHash(scope: string, role: EvidenceRole, contentHash: string): EvidenceRecord | null {
-    return this.evidence.find(x => x.scope === scope && x.role === role && x.content_hash === contentHash) ?? null;
+    return this.evidence.find((x) => x.scope === scope && x.role === role && x.content_hash === contentHash) ?? null;
   }
 
   deleteEvidence(id: string): void {
-    this.evidence = this.evidence.filter(x => x.id !== id);
+    this.evidence = this.evidence.filter((x) => x.id !== id);
     this.save();
   }
 
   searchEvidence(scope: string, query: string, limit = 50): EvidenceRecord[] {
     const q = query.toLowerCase();
     return this.evidence
-      .filter(x => x.scope === scope && x.content.toLowerCase().includes(q))
+      .filter((x) => x.scope === scope && x.content.toLowerCase().includes(q))
       .sort((a, b) => b.ts - a.ts)
       .slice(0, limit);
   }
 
   addSignal(s: SignalInput): void {
     const id = s.id || signalId(s.evidence_id, s.signal_type, s.value);
-    if (this.signals.some(x => x.evidence_id === s.evidence_id && x.signal_type === s.signal_type
-      && x.value === s.value && x.detector === s.detector)) return;
-    this.signals.push({ id, evidence_id: s.evidence_id, signal_type: s.signal_type, value: s.value, confidence: s.confidence, detector: s.detector });
+    if (
+      this.signals.some(
+        (x) =>
+          x.evidence_id === s.evidence_id &&
+          x.signal_type === s.signal_type &&
+          x.value === s.value &&
+          x.detector === s.detector,
+      )
+    )
+      return;
+    this.signals.push({
+      id,
+      evidence_id: s.evidence_id,
+      signal_type: s.signal_type,
+      value: s.value,
+      confidence: s.confidence,
+      detector: s.detector,
+    });
     this.save();
   }
 
   listSignals(evidenceId?: string, limit = 500): SignalRecord[] {
     const rows = evidenceId
-      ? this.signals.filter(x => x.evidence_id === evidenceId).sort((a, b) => b.confidence - a.confidence)
+      ? this.signals.filter((x) => x.evidence_id === evidenceId).sort((a, b) => b.confidence - a.confidence)
       : [...this.signals].sort((a, b) => a.evidence_id.localeCompare(b.evidence_id) || b.confidence - a.confidence);
     return rows.slice(0, limit);
   }
 
   deleteSignalsByEvidence(evidenceId: string): void {
-    this.signals = this.signals.filter(x => x.evidence_id !== evidenceId);
+    this.signals = this.signals.filter((x) => x.evidence_id !== evidenceId);
     this.save();
   }
 
@@ -1051,14 +1179,14 @@ class JsonBackend implements MemoryBackend {
   }
 
   getBeliefById(id: string): BeliefRecord | null {
-    return this.beliefs.find(x => x.id === id) ?? null;
+    return this.beliefs.find((x) => x.id === id) ?? null;
   }
 
   getBeliefsByScope(scope: string, opts?: { activeOnly?: boolean; limit?: number }): BeliefRecord[] {
     const activeOnly = opts?.activeOnly ?? false;
     const limit = Math.max(1, Math.min(1000, opts?.limit ?? 500));
     return this.beliefs
-      .filter(x => x.scope === scope && (!activeOnly || (x.is_active === 1 && x.deleted_at === null)))
+      .filter((x) => x.scope === scope && (!activeOnly || (x.is_active === 1 && x.deleted_at === null)))
       .sort((a, b) => b.updated_at - a.updated_at)
       .slice(0, limit);
   }
@@ -1066,14 +1194,19 @@ class JsonBackend implements MemoryBackend {
   searchBeliefs(scope: string, query: string, limit = 50): BeliefRecord[] {
     const q = query.toLowerCase();
     return this.beliefs
-      .filter(x => x.scope === scope && x.is_active === 1 && x.deleted_at === null &&
-        (x.title.toLowerCase().includes(q) || x.text.toLowerCase().includes(q)))
+      .filter(
+        (x) =>
+          x.scope === scope &&
+          x.is_active === 1 &&
+          x.deleted_at === null &&
+          (x.title.toLowerCase().includes(q) || x.text.toLowerCase().includes(q)),
+      )
       .sort((a, b) => b.updated_at - a.updated_at)
       .slice(0, limit);
   }
 
   updateBeliefStatus(id: string, nextStatus: BeliefStatus, reason?: string, actor = 'system'): boolean {
-    const idx = this.beliefs.findIndex(x => x.id === id);
+    const idx = this.beliefs.findIndex((x) => x.id === id);
     if (idx < 0) return false;
     const existing = this.beliefs[idx];
     this.beliefs[idx] = {
@@ -1096,14 +1229,14 @@ class JsonBackend implements MemoryBackend {
   }
 
   archiveBelief(id: string): void {
-    const idx = this.beliefs.findIndex(x => x.id === id);
+    const idx = this.beliefs.findIndex((x) => x.id === id);
     if (idx < 0) return;
     this.beliefs[idx] = { ...this.beliefs[idx], is_active: 0, updated_at: Date.now() };
     this.save();
   }
 
   deleteBelief(id: string): void {
-    const idx = this.beliefs.findIndex(x => x.id === id);
+    const idx = this.beliefs.findIndex((x) => x.id === id);
     if (idx < 0) return;
     const existing = this.beliefs[idx];
     this.beliefs[idx] = {
@@ -1126,21 +1259,23 @@ class JsonBackend implements MemoryBackend {
   }
 
   addBeliefEvidence(link: BeliefEvidenceLink): void {
-    if (this.beliefEvidence.some(x => x.belief_id === link.belief_id && x.evidence_id === link.evidence_id)) return;
+    if (this.beliefEvidence.some((x) => x.belief_id === link.belief_id && x.evidence_id === link.evidence_id)) return;
     this.beliefEvidence.push(link);
     this.save();
   }
 
   listBeliefEvidence(beliefId?: string): BeliefEvidenceLink[] {
     const rows = beliefId
-      ? this.beliefEvidence.filter(x => x.belief_id === beliefId).sort((a, b) => b.support_strength - a.support_strength)
+      ? this.beliefEvidence
+          .filter((x) => x.belief_id === beliefId)
+          .sort((a, b) => b.support_strength - a.support_strength)
       : [...this.beliefEvidence];
     return rows;
   }
 
   listBeliefRevisions(beliefId?: string): BeliefRevision[] {
     const rows = beliefId
-      ? this.revisions.filter(x => x.belief_id === beliefId).sort((a, b) => a.ts - b.ts)
+      ? this.revisions.filter((x) => x.belief_id === beliefId).sort((a, b) => a.ts - b.ts)
       : [...this.revisions].sort((a, b) => a.ts - b.ts);
     return rows;
   }
@@ -1160,7 +1295,7 @@ class JsonBackend implements MemoryBackend {
 
   listBeliefRejections(scope: string, limit = 200): BeliefRejection[] {
     return this.rejections
-      .filter(x => x.scope === scope)
+      .filter((x) => x.scope === scope)
       .sort((a, b) => b.ts - a.ts)
       .slice(0, limit);
   }
@@ -1176,41 +1311,37 @@ class JsonBackend implements MemoryBackend {
   }
 
   getReadRun(id: string): ReadRunRecord | null {
-    return this.readRuns.find(x => x.id === id) ?? null;
+    return this.readRuns.find((x) => x.id === id) ?? null;
   }
 
   listReadResults(runId: string): ReadResultRecord[] {
-    return this.readResults
-      .filter(x => x.read_run_id === runId)
-      .sort((a, b) => a.rank - b.rank);
+    return this.readResults.filter((x) => x.read_run_id === runId).sort((a, b) => a.rank - b.rank);
   }
 
   listReadRuns(scope: string, limit = 200): ReadRunRecord[] {
     return this.readRuns
-      .filter(x => x.scope === scope)
+      .filter((x) => x.scope === scope)
       .sort((a, b) => b.ts - a.ts)
       .slice(0, limit);
   }
 
   listEraseAudits(scope?: string, limit = 100): EraseAuditRecord[] {
-    const rows = scope
-      ? this.eraseAudits.filter(x => x.scope === scope)
-      : [...this.eraseAudits];
+    const rows = scope ? this.eraseAudits.filter((x) => x.scope === scope) : [...this.eraseAudits];
     return rows.sort((a, b) => b.ts - a.ts).slice(0, limit);
   }
 
   eraseScope(scope: string, opts?: { actor?: string; reason?: string }): number {
-    const evIds = new Set(this.evidence.filter(x => x.scope === scope).map(x => x.id));
-    const belIds = new Set(this.beliefs.filter(x => x.scope === scope).map(x => x.id));
-    const runIds = new Set(this.readRuns.filter(x => x.scope === scope).map(x => x.id));
-    this.signals = this.signals.filter(x => !evIds.has(x.evidence_id));
-    this.beliefEvidence = this.beliefEvidence.filter(x => !evIds.has(x.evidence_id) && !belIds.has(x.belief_id));
-    this.revisions = this.revisions.filter(x => !belIds.has(x.belief_id));
-    this.evidence = this.evidence.filter(x => x.scope !== scope);
-    this.beliefs = this.beliefs.filter(x => x.scope !== scope);
-    this.rejections = this.rejections.filter(x => x.scope !== scope);
-    this.readResults = this.readResults.filter(x => !runIds.has(x.read_run_id));
-    this.readRuns = this.readRuns.filter(x => x.scope !== scope);
+    const evIds = new Set(this.evidence.filter((x) => x.scope === scope).map((x) => x.id));
+    const belIds = new Set(this.beliefs.filter((x) => x.scope === scope).map((x) => x.id));
+    const runIds = new Set(this.readRuns.filter((x) => x.scope === scope).map((x) => x.id));
+    this.signals = this.signals.filter((x) => !evIds.has(x.evidence_id));
+    this.beliefEvidence = this.beliefEvidence.filter((x) => !evIds.has(x.evidence_id) && !belIds.has(x.belief_id));
+    this.revisions = this.revisions.filter((x) => !belIds.has(x.belief_id));
+    this.evidence = this.evidence.filter((x) => x.scope !== scope);
+    this.beliefs = this.beliefs.filter((x) => x.scope !== scope);
+    this.rejections = this.rejections.filter((x) => x.scope !== scope);
+    this.readResults = this.readResults.filter((x) => !runIds.has(x.read_run_id));
+    this.readRuns = this.readRuns.filter((x) => x.scope !== scope);
     this.eraseAudits.push({
       id: newId('erase'),
       scope,
@@ -1251,7 +1382,9 @@ function createBackend() {
   if (sqliteAvailable()) {
     try {
       return new SqliteBackend(sqlitePath);
-    } catch { /* fall through */ }
+    } catch {
+      /* fall through */
+    }
   }
   return new JsonBackend(jsonPath);
 }

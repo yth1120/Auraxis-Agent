@@ -31,7 +31,9 @@ export default function CustomModelsPane() {
     }
   };
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => {
+    void load();
+  }, []);
 
   const save = async (next: CustomModel[]) => {
     const r = await window.electronAPI?.settings.set('customModels', next);
@@ -68,15 +70,30 @@ export default function CustomModelsPane() {
       <div className="grid grid-cols-[1fr_1fr_1.4fr_1fr_1fr_auto] gap-2 items-end">
         <label className="flex flex-col gap-1 text-2xs text-text-muted">
           {t('settings.customModels.id')}
-          <Input value={draft.id} onChange={(e) => setDraft({ ...draft, id: e.target.value })} placeholder="my-provider" className="!h-8" />
+          <Input
+            value={draft.id}
+            onChange={(e) => setDraft({ ...draft, id: e.target.value })}
+            placeholder="my-provider"
+            className="!h-8"
+          />
         </label>
         <label className="flex flex-col gap-1 text-2xs text-text-muted">
           {t('settings.customModels.name')}
-          <Input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="My Provider" className="!h-8" />
+          <Input
+            value={draft.name}
+            onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+            placeholder="My Provider"
+            className="!h-8"
+          />
         </label>
         <label className="flex flex-col gap-1 text-2xs text-text-muted">
           {t('settings.customModels.apiBase')}
-          <Input value={draft.apiBase} onChange={(e) => setDraft({ ...draft, apiBase: e.target.value })} placeholder="https://api.example.com/v1/chat/completions" className="!h-8" />
+          <Input
+            value={draft.apiBase}
+            onChange={(e) => setDraft({ ...draft, apiBase: e.target.value })}
+            placeholder="https://api.example.com/v1/chat/completions"
+            className="!h-8"
+          />
         </label>
         <label className="flex flex-col gap-1 text-2xs text-text-muted">
           {t('settings.customModels.apiKey')}
@@ -89,19 +106,33 @@ export default function CustomModelsPane() {
         </label>
         <label className="flex flex-col gap-1 text-2xs text-text-muted">
           {t('settings.customModels.maxTokens')}
-          <InputNumber value={draft.maxTokens} onChange={(v) => setDraft({ ...draft, maxTokens: v ?? undefined })} className="!w-full !h-8" min={1024} max={384000} step={1024} />
+          <InputNumber
+            value={draft.maxTokens}
+            onChange={(v) => setDraft({ ...draft, maxTokens: v ?? undefined })}
+            className="!w-full !h-8"
+            min={1024}
+            max={384000}
+            step={1024}
+          />
         </label>
-        <Button type="primary" icon={<Plus />} onClick={add}>{t('settings.customModels.add')}</Button>
+        <Button type="primary" icon={<Plus />} onClick={add}>
+          {t('settings.customModels.add')}
+        </Button>
       </div>
 
       <div className="flex flex-col gap-1.5">
         {models.length === 0 && <div className="text-2xs text-text-faint">{t('settings.customModels.empty')}</div>}
         {models.map((m) => (
-          <div key={m.id} className="flex items-center gap-2 px-3 h-9 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border-dim)] text-xs">
+          <div
+            key={m.id}
+            className="flex items-center gap-2 px-3 h-9 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border-dim)] text-xs"
+          >
             <span className="font-mono font-medium text-text-primary truncate max-w-[180px]">{m.id}</span>
             <span className="text-text-secondary truncate max-w-[160px]">{m.name}</span>
             <span className="text-text-faint truncate flex-1">{m.apiBase}</span>
-            <span className="text-2xs text-text-faint">{m.maxTokens ? `${(m.maxTokens / 1024).toFixed(0)}K` : '—'}</span>
+            <span className="text-2xs text-text-faint">
+              {m.maxTokens ? `${(m.maxTokens / 1024).toFixed(0)}K` : '—'}
+            </span>
             <button
               type="button"
               className="border-none bg-transparent p-0 text-text-muted hover:text-danger cursor-pointer"

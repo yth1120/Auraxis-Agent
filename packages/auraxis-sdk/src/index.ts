@@ -8,9 +8,8 @@
  * (`AURAXIS_SDK_PORT=<port>`) and the client connects over TCP.
  */
 
-import { spawn, type ChildProcessWithoutNullStreams } from 'child_process';
+import { spawn } from 'child_process';
 import crypto from 'crypto';
-import { createInterface } from 'readline';
 import net from 'net';
 import path from 'path';
 
@@ -89,41 +88,29 @@ class SocketTransport implements RpcTransport {
         if (line.trim()) for (const cb of [...this.lineCbs]) cb(line);
       }
     });
-    socket.on('error', (err) => { for (const cb of [...this.errorCbs]) cb(err); });
-    socket.on('close', () => { for (const cb of [...this.closeCbs]) cb(); });
+    socket.on('error', (err) => {
+      for (const cb of [...this.errorCbs]) cb(err);
+    });
+    socket.on('close', () => {
+      for (const cb of [...this.closeCbs]) cb();
+    });
   }
 
   write(line: string): void {
     this.socket.write(`${line}\n`);
   }
 
-  onLine(cb: (line: string) => void): void { this.lineCbs.push(cb); }
-  onError(cb: (err: Error) => void): void { this.errorCbs.push(cb); }
-  onClose(cb: () => void): void { this.closeCbs.push(cb); }
-  close(): void { this.socket.end(); }
-}
-
-class StdioTransport implements RpcTransport {
-  private lineCbs: Array<(line: string) => void> = [];
-  private errorCbs: Array<(err: Error) => void> = [];
-  private closeCbs: Array<() => void> = [];
-
-  constructor(private readonly child: ChildProcessWithoutNullStreams) {
-    const rl = createInterface({ input: child.stdout, crlfDelay: Infinity });
-    rl.on('line', (line) => {
-      if (line.trim()) for (const cb of [...this.lineCbs]) cb(line);
-    });
-    child.on('error', (err) => { for (const cb of [...this.errorCbs]) cb(err); });
-    child.on('exit', () => { for (const cb of [...this.closeCbs]) cb(); });
+  onLine(cb: (line: string) => void): void {
+    this.lineCbs.push(cb);
   }
-
-  write(line: string): void { this.child.stdin.write(`${line}\n`); }
-  onLine(cb: (line: string) => void): void { this.lineCbs.push(cb); }
-  onError(cb: (err: Error) => void): void { this.errorCbs.push(cb); }
-  onClose(cb: () => void): void { this.closeCbs.push(cb); }
+  onError(cb: (err: Error) => void): void {
+    this.errorCbs.push(cb);
+  }
+  onClose(cb: () => void): void {
+    this.closeCbs.push(cb);
+  }
   close(): void {
-    try { this.child.stdin.end(); } catch { /* noop */ }
-    try { this.child.kill(); } catch { /* noop */ }
+    this.socket.end();
   }
 }
 
@@ -277,15 +264,28 @@ export async function createAuraxis(options: AuraxisRuntimeOptions = {}): Promis
     child.stdout.on('data', onData);
     child.on('exit', onExit);
   }).catch((err) => {
-    try { child.kill(); } catch { /* noop */ }
+    try {
+      child.kill();
+    } catch {
+      /* noop */
+    }
     throw err;
   });
 
   const socket = net.connect(port, '127.0.0.1');
   const transport = new SocketTransport(socket);
-  const client = new AuraxisClient(transport, options.requestTimeoutMs ?? 120_000, () => {
-    try { child.kill(); } catch { /* noop */ }
-  }, sdkToken);
+  const client = new AuraxisClient(
+    transport,
+    options.requestTimeoutMs ?? 120_000,
+    () => {
+      try {
+        child.kill();
+      } catch {
+        /* noop */
+      }
+    },
+    sdkToken,
+  );
 
   try {
     await client.request('ping', {}, Math.min(2000, options.requestTimeoutMs ?? 2000));

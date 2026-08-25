@@ -21,10 +21,7 @@ export function findPluginCommand(name: string) {
 }
 
 /** Resolve `$技能名` tokens into the skill's instruction before sending. */
-export function resolveSkillRefs(
-  text: string,
-  skills: { key: string; name: string; instruction: string }[],
-): string {
+export function resolveSkillRefs(text: string, skills: { key: string; name: string; instruction: string }[]): string {
   return text.replace(/\$([^\s$]+)/g, (token, name: string) => {
     const skill = skills.find((s) => s.name === name || s.key === name);
     if (!skill) return token;

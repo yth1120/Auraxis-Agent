@@ -25,7 +25,10 @@ describe('loadProjectActions', () => {
   });
 
   it('parses generic actions', async () => {
-    await writeActions([{ name: 'Run', command: 'npm start' }, { name: 'Test', command: 'npm test' }]);
+    await writeActions([
+      { name: 'Run', command: 'npm start' },
+      { name: 'Test', command: 'npm test' },
+    ]);
     const actions = await loadProjectActions(projectRoot);
     expect(actions).toHaveLength(2);
     expect(actions[0].name).toBe('Run');

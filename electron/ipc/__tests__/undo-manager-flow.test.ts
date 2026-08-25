@@ -90,9 +90,7 @@ describe('undoManager — 会话 diff 与文件级回退', () => {
     writeFileSync(p, 'NEW', 'utf-8');
 
     const diffs = await undoManager.getSessionDiffs('sess-d', proj);
-    expect(diffs).toEqual([
-      { path: 'd.ts', oldContent: 'OLD', newContent: 'NEW' },
-    ]);
+    expect(diffs).toEqual([{ path: 'd.ts', oldContent: 'OLD', newContent: 'NEW' }]);
 
     // 文件被删除后只保留 oldContent
     const { rmSync } = await import('fs');

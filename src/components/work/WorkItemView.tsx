@@ -17,16 +17,11 @@ import clsx from 'clsx';
 import { useAgentStore } from '../../stores/useAgentStore';
 import { useAppStore } from '../../stores/useAppStore';
 import { useChatStore } from '../../stores/useChatStore';
-import { t, useT } from '../../i18n';
+import { useT } from '../../i18n';
 import type { AgentInfo } from '../../types/agent';
 import InlinePermissionCard from '../permissions/InlinePermissionCard';
 import { collectQualityRuns } from '../../utils/agentQuality';
-import {
-  workDeliverables,
-  workProgress,
-  workStatusLabelKey,
-  workTodos,
-} from './workUtils';
+import { workDeliverables, workProgress, workStatusLabelKey, workTodos } from './workUtils';
 import WorkExecutionFlow from './WorkExecutionFlow';
 import DeliveryApprovalPanel from './DeliveryApprovalPanel';
 
@@ -72,7 +67,16 @@ export default function WorkItemView({
   const quality = useMemo(() => collectQualityRuns(agent.log ?? []), [agent.log]);
   const failedQuality = quality.filter((q) => !q.passed);
   const hasExecution = (agent.log ?? []).some((e) =>
-    ['iteration_start', 'iteration_end', 'tool_start', 'tool_end', 'tool_error', 'text', 'thinking', 'warning'].includes(e.type),
+    [
+      'iteration_start',
+      'iteration_end',
+      'tool_start',
+      'tool_end',
+      'tool_error',
+      'text',
+      'thinking',
+      'warning',
+    ].includes(e.type),
   );
   const logLen = agent.log?.length ?? 0;
   const isTerminal = agent.status === 'completed' || agent.status === 'error' || agent.status === 'stopped';
@@ -117,7 +121,12 @@ export default function WorkItemView({
           {/* ── Item header ── */}
           <div className="flex flex-col gap-3 p-4 rounded-2xl bg-[var(--color-bg-secondary)] border border-[var(--color-border-dim)]">
             <div className="flex items-start gap-2.5 min-w-0">
-              <span className={clsx('w-2 h-2 rounded-full mt-[7px] shrink-0', STATUS_DOT[agent.status] ?? 'bg-[var(--color-text-faint)]')} />
+              <span
+                className={clsx(
+                  'w-2 h-2 rounded-full mt-[7px] shrink-0',
+                  STATUS_DOT[agent.status] ?? 'bg-[var(--color-text-faint)]',
+                )}
+              />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm font-semibold text-text-primary">
@@ -173,7 +182,10 @@ export default function WorkItemView({
             <div className="flex items-center gap-2.5">
               <div className="flex-1 h-1.5 rounded-full bg-[var(--color-bg-inset)] overflow-hidden">
                 <div
-                  className={clsx('h-full rounded-full transition-[width] duration-500', agent.status === 'error' ? 'bg-danger' : 'bg-primary')}
+                  className={clsx(
+                    'h-full rounded-full transition-[width] duration-500',
+                    agent.status === 'error' ? 'bg-danger' : 'bg-primary',
+                  )}
                   style={{ width: `${pct > 0 ? Math.max(4, pct) : 0}%` }}
                 />
               </div>
@@ -181,7 +193,6 @@ export default function WorkItemView({
                 {total > 0 ? `${done}/${total}` : '—'}
               </span>
             </div>
-
           </div>
 
           {/* ── Pending approvals ── */}
@@ -272,9 +283,7 @@ export default function WorkItemView({
           )}
 
           {/* ── 交付验收收口（review 状态） ── */}
-          {agent.status === 'review' && (
-            <DeliveryApprovalPanel agent={agent} />
-          )}
+          {agent.status === 'review' && <DeliveryApprovalPanel agent={agent} />}
 
           {/* ── Quality gates（只展示失败项，全部通过时不占版面） ── */}
           {failedQuality.length > 0 && (
@@ -290,9 +299,7 @@ export default function WorkItemView({
                     <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-2xs text-text-secondary">
                       {run.checkType}
                     </span>
-                    <span className="shrink-0 text-2xs font-medium text-danger">
-                      {t('work.qualityFailed')}
-                    </span>
+                    <span className="shrink-0 text-2xs font-medium text-danger">{t('work.qualityFailed')}</span>
                   </div>
                 ))}
               </div>

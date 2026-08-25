@@ -2,7 +2,6 @@
  * plugin-state-handlers.ts — shared plugin enabled/disabled state (CLI + UI).
  */
 
-import { ipcMain } from 'electron';
 import { secureHandle } from './trust';
 import { getPluginState, setPluginEnabled } from '../plugin-cli';
 

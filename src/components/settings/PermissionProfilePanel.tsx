@@ -35,9 +35,17 @@ const BUILTIN_FALLBACK: PermissionProfile[] = [
   },
 ];
 
-const FILE_ACCESS_LABEL: Record<string, I18nKey> = { read: 'profile.fileAccess.read', write: 'profile.fileAccess.write', deny: 'profile.fileAccess.deny' };
+const FILE_ACCESS_LABEL: Record<string, I18nKey> = {
+  read: 'profile.fileAccess.read',
+  write: 'profile.fileAccess.write',
+  deny: 'profile.fileAccess.deny',
+};
 const NET_ACCESS_LABEL: Record<string, I18nKey> = { allow: 'profile.netAccess.allow', deny: 'profile.netAccess.deny' };
-const POLICY_LABEL: Record<string, I18nKey> = { ask: 'profile.policy.ask', plan: 'profile.policy.plan', auto: 'profile.policy.auto' };
+const POLICY_LABEL: Record<string, I18nKey> = {
+  ask: 'profile.policy.ask',
+  plan: 'profile.policy.plan',
+  auto: 'profile.policy.auto',
+};
 const BUILTIN_NAME_KEY: Record<string, I18nKey> = {
   standard: 'profile.standard',
   readonly: 'profile.readonly',
@@ -73,68 +81,82 @@ export default function PermissionProfilePanel() {
           setActiveId(nextActive);
           if (nextActive !== data.activeId) {
             window.electronAPI?.permissionProfile
-              ?.save(visible.filter((p) => !p.builtin), nextActive)
+              ?.save(
+                visible.filter((p) => !p.builtin),
+                nextActive,
+              )
               .catch(() => message.error(t('profile.saveFailed')));
           }
         }
       })
-      .catch(() => { /* keep built-in fallback */ });
-  }, []);
-
-  const persist = useCallback((next: PermissionProfile[], nextActive: string) => {
-    setProfiles(next);
-    setActiveId(nextActive);
-    window.electronAPI?.permissionProfile
-      ?.save(next.filter((p) => !p.builtin), nextActive)
-      .catch(() => message.error(t('profile.saveFailed')));
+      .catch(() => {
+        /* keep built-in fallback */
+      });
   }, [t]);
+
+  const persist = useCallback(
+    (next: PermissionProfile[], nextActive: string) => {
+      setProfiles(next);
+      setActiveId(nextActive);
+      window.electronAPI?.permissionProfile
+        ?.save(
+          next.filter((p) => !p.builtin),
+          nextActive,
+        )
+        .catch(() => message.error(t('profile.saveFailed')));
+    },
+    [t],
+  );
 
   const active = profiles.find((p) => p.id === activeId) ?? profiles[0];
 
-  const updateProfile = useCallback((id: string, patch: Partial<PermissionProfile>) => {
-    const next = profiles.map((p) => (p.id === id ? { ...p, ...patch } : p));
-    persist(next, activeId);
-  }, [profiles, activeId, persist]);
+  const updateProfile = useCallback(
+    (id: string, patch: Partial<PermissionProfile>) => {
+      const next = profiles.map((p) => (p.id === id ? { ...p, ...patch } : p));
+      persist(next, activeId);
+    },
+    [profiles, activeId, persist],
+  );
 
   const updateFileScope = (id: string, idx: number, patch: Partial<PermissionProfile['fileScopes'][number]>) => {
-    const next = profiles.map((p) => p.id !== id
-      ? p
-      : { ...p, fileScopes: p.fileScopes.map((s, i) => (i === idx ? { ...s, ...patch } : s)) });
+    const next = profiles.map((p) =>
+      p.id !== id ? p : { ...p, fileScopes: p.fileScopes.map((s, i) => (i === idx ? { ...s, ...patch } : s)) },
+    );
     persist(next, activeId);
   };
 
   const removeFileScope = (id: string, idx: number) => {
-    const next = profiles.map((p) => p.id !== id
-      ? p
-      : { ...p, fileScopes: p.fileScopes.filter((_, i) => i !== idx) });
+    const next = profiles.map((p) =>
+      p.id !== id ? p : { ...p, fileScopes: p.fileScopes.filter((_, i) => i !== idx) },
+    );
     persist(next, activeId);
   };
 
   const addFileScope = (id: string) => {
-    const next = profiles.map((p) => p.id !== id
-      ? p
-      : { ...p, fileScopes: [...p.fileScopes, { pattern: '', access: 'write' as const }] });
+    const next = profiles.map((p) =>
+      p.id !== id ? p : { ...p, fileScopes: [...p.fileScopes, { pattern: '', access: 'write' as const }] },
+    );
     persist(next, activeId);
   };
 
   const updateNetScope = (id: string, idx: number, patch: Partial<PermissionProfile['networkScopes'][number]>) => {
-    const next = profiles.map((p) => p.id !== id
-      ? p
-      : { ...p, networkScopes: p.networkScopes.map((s, i) => (i === idx ? { ...s, ...patch } : s)) });
+    const next = profiles.map((p) =>
+      p.id !== id ? p : { ...p, networkScopes: p.networkScopes.map((s, i) => (i === idx ? { ...s, ...patch } : s)) },
+    );
     persist(next, activeId);
   };
 
   const removeNetScope = (id: string, idx: number) => {
-    const next = profiles.map((p) => p.id !== id
-      ? p
-      : { ...p, networkScopes: p.networkScopes.filter((_, i) => i !== idx) });
+    const next = profiles.map((p) =>
+      p.id !== id ? p : { ...p, networkScopes: p.networkScopes.filter((_, i) => i !== idx) },
+    );
     persist(next, activeId);
   };
 
   const addNetScope = (id: string) => {
-    const next = profiles.map((p) => p.id !== id
-      ? p
-      : { ...p, networkScopes: [...p.networkScopes, { pattern: '', access: 'deny' as const }] });
+    const next = profiles.map((p) =>
+      p.id !== id ? p : { ...p, networkScopes: [...p.networkScopes, { pattern: '', access: 'deny' as const }] },
+    );
     persist(next, activeId);
   };
 
@@ -155,14 +177,20 @@ export default function PermissionProfilePanel() {
     // Only reset the active profile if the deleted one was active — deleting
     // a non-active custom profile must not silently switch the user off it.
     const nextActive = activeId === id ? 'standard' : activeId;
-    persist(profiles.filter((p) => p.id !== id), nextActive);
+    persist(
+      profiles.filter((p) => p.id !== id),
+      nextActive,
+    );
     message.success(t('profile.deleted'));
   };
 
   const scopeChips = (items: { pattern: string; access: string }[], label: Record<string, I18nKey>) => (
     <div className="flex flex-wrap gap-1.5">
       {items.map((s, i) => (
-        <span key={i} className="inline-flex items-center gap-1 h-5 px-2 rounded-full bg-border-dim text-2xs text-text-secondary">
+        <span
+          key={i}
+          className="inline-flex items-center gap-1 h-5 px-2 rounded-full bg-border-dim text-2xs text-text-secondary"
+        >
           <code className="font-mono">{s.pattern || '?'}</code>
           <span className="text-text-muted">{label[s.access] ? t(label[s.access]) : s.access}</span>
         </span>
@@ -180,9 +208,7 @@ export default function PermissionProfilePanel() {
       </div>
       <SettingItem
         title={t('profile.current')}
-        description={active?.builtin
-          ? t(BUILTIN_DESC_KEY[active.id] ?? 'profile.standardDesc')
-          : active?.description}
+        description={active?.builtin ? t(BUILTIN_DESC_KEY[active.id] ?? 'profile.standardDesc') : active?.description}
       >
         <Select
           value={activeId}
@@ -211,7 +237,11 @@ export default function PermissionProfilePanel() {
       ) : active ? (
         <div className="flex flex-col gap-3 pt-1">
           <SettingItem title={t('profile.name')} noBorder>
-            <Input value={active.name} onChange={(e) => updateProfile(active.id, { name: e.target.value })} maxLength={40} />
+            <Input
+              value={active.name}
+              onChange={(e) => updateProfile(active.id, { name: e.target.value })}
+              maxLength={40}
+            />
           </SettingItem>
           <SettingItem title={t('profile.policy')} description={t('profile.policy.desc')} noBorder>
             <Select
@@ -239,7 +269,13 @@ export default function PermissionProfilePanel() {
                   onChange={(v) => updateFileScope(active.id, i, { access: v })}
                   options={fileAccessOptions.map((o) => ({ value: o.value, label: t(o.label as I18nKey) }))}
                 />
-                <Button type="text" size="small" danger icon={<MinusCircleOutlined />} onClick={() => removeFileScope(active.id, i)} />
+                <Button
+                  type="text"
+                  size="small"
+                  danger
+                  icon={<MinusCircleOutlined />}
+                  onClick={() => removeFileScope(active.id, i)}
+                />
               </div>
             ))}
             <Button size="small" icon={<PlusOutlined />} onClick={() => addFileScope(active.id)}>
@@ -263,7 +299,13 @@ export default function PermissionProfilePanel() {
                   onChange={(v) => updateNetScope(active.id, i, { access: v })}
                   options={netAccessOptions.map((o) => ({ value: o.value, label: t(o.label as I18nKey) }))}
                 />
-                <Button type="text" size="small" danger icon={<MinusCircleOutlined />} onClick={() => removeNetScope(active.id, i)} />
+                <Button
+                  type="text"
+                  size="small"
+                  danger
+                  icon={<MinusCircleOutlined />}
+                  onClick={() => removeNetScope(active.id, i)}
+                />
               </div>
             ))}
             <Button size="small" icon={<PlusOutlined />} onClick={() => addNetScope(active.id)}>

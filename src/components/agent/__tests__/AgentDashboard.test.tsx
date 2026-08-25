@@ -2,7 +2,6 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
-import React from 'react';
 
 // ── Mock stores ──
 const mockStopAgent = vi.fn(async () => {});
@@ -88,23 +87,37 @@ describe('AgentDashboard — mini console & tokens', () => {
 
   it('shows token count when tokens are present', async () => {
     mockAgents = [makeAgent({ totalInputTokens: 5000, totalOutputTokens: 3000 })];
-    await act(async () => { render(<AgentDashboard />); });
+    await act(async () => {
+      render(<AgentDashboard />);
+    });
     expect(screen.getByText('8.0k tok')).toBeTruthy();
   });
 
   it('hides token badge when no tokens accumulated', async () => {
     mockAgents = [makeAgent({ totalInputTokens: 0, totalOutputTokens: 0 })];
-    await act(async () => { render(<AgentDashboard />); });
+    await act(async () => {
+      render(<AgentDashboard />);
+    });
     expect(screen.queryByText(/tok$/)).toBeNull();
   });
 
   it('renders tool_start event in console when expanded', async () => {
-    mockAgents = [makeAgent({
-      log: [
-        { type: 'tool_start', timestamp: Date.now(), toolName: 'Bash', toolCallId: 'tc1', input: { command: 'npm test' } },
-      ],
-    })];
-    await act(async () => { render(<AgentDashboard />); });
+    mockAgents = [
+      makeAgent({
+        log: [
+          {
+            type: 'tool_start',
+            timestamp: Date.now(),
+            toolName: 'Bash',
+            toolCallId: 'tc1',
+            input: { command: 'npm test' },
+          },
+        ],
+      }),
+    ];
+    await act(async () => {
+      render(<AgentDashboard />);
+    });
     // The console toggle has accessible name "code" from CodeOutlined
     const consoleBtn = screen.getByRole('button', { name: '展开事件控制台' });
     expect(consoleBtn).toBeTruthy();
@@ -114,12 +127,14 @@ describe('AgentDashboard — mini console & tokens', () => {
   });
 
   it('renders tool_end with duration', async () => {
-    mockAgents = [makeAgent({
-      log: [
-        { type: 'tool_end', timestamp: Date.now(), toolName: 'Read', toolCallId: 'tc2', durationMs: 1500 },
-      ],
-    })];
-    await act(async () => { render(<AgentDashboard />); });
+    mockAgents = [
+      makeAgent({
+        log: [{ type: 'tool_end', timestamp: Date.now(), toolName: 'Read', toolCallId: 'tc2', durationMs: 1500 }],
+      }),
+    ];
+    await act(async () => {
+      render(<AgentDashboard />);
+    });
     const consoleBtn = screen.getByRole('button', { name: '展开事件控制台' });
     fireEvent.click(consoleBtn);
     expect(screen.getByText('Read')).toBeTruthy();
@@ -127,12 +142,22 @@ describe('AgentDashboard — mini console & tokens', () => {
   });
 
   it('renders tool_error with error message', async () => {
-    mockAgents = [makeAgent({
-      log: [
-        { type: 'tool_error', timestamp: Date.now(), toolName: 'Write', toolCallId: 'tc3', error: 'Permission denied' },
-      ],
-    })];
-    await act(async () => { render(<AgentDashboard />); });
+    mockAgents = [
+      makeAgent({
+        log: [
+          {
+            type: 'tool_error',
+            timestamp: Date.now(),
+            toolName: 'Write',
+            toolCallId: 'tc3',
+            error: 'Permission denied',
+          },
+        ],
+      }),
+    ];
+    await act(async () => {
+      render(<AgentDashboard />);
+    });
     const consoleBtn = screen.getByRole('button', { name: '展开事件控制台' });
     fireEvent.click(consoleBtn);
     expect(screen.getByText('Write')).toBeTruthy();
@@ -141,7 +166,9 @@ describe('AgentDashboard — mini console & tokens', () => {
 
   it('formats large token counts with M suffix', async () => {
     mockAgents = [makeAgent({ totalInputTokens: 1_500_000, totalOutputTokens: 500_000 })];
-    await act(async () => { render(<AgentDashboard />); });
+    await act(async () => {
+      render(<AgentDashboard />);
+    });
     expect(screen.getByText('2.0M tok')).toBeTruthy();
   });
 });

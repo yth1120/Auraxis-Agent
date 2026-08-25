@@ -34,9 +34,7 @@ vi.mock('react-virtuoso', () => ({
     return React.createElement(
       'div',
       { 'data-testid': 'virtuoso' },
-      data?.map((item: any, i: number) =>
-        React.createElement('div', { key: i }, itemContent(i, item)),
-      ) ?? null,
+      data?.map((item: any, i: number) => React.createElement('div', { key: i }, itemContent(i, item))) ?? null,
       Footer ? React.createElement(Footer) : null,
     );
   },

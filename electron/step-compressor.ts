@@ -60,7 +60,11 @@ function toolCallsOf(assistant: any): ToolCallInfo[] {
       if (fn?.name) {
         let input: any = {};
         if (typeof fn.arguments === 'string') {
-          try { input = JSON.parse(fn.arguments); } catch { input = {}; }
+          try {
+            input = JSON.parse(fn.arguments);
+          } catch {
+            input = {};
+          }
         } else if (fn.arguments) {
           input = fn.arguments;
         }
@@ -92,7 +96,10 @@ function tailHasError(tail: any[]): boolean {
   });
 }
 
-function planMatchesFile(plan: { tasks: StepCompressorPlanTask[] } | null | undefined, filePath: string | undefined): boolean {
+function planMatchesFile(
+  plan: { tasks: StepCompressorPlanTask[] } | null | undefined,
+  filePath: string | undefined,
+): boolean {
   if (!plan || !filePath) return false;
   const fileName = filePath.toLowerCase();
   return plan.tasks.some((task) => {
@@ -105,10 +112,7 @@ function planMatchesFile(plan: { tasks: StepCompressorPlanTask[] } | null | unde
 }
 
 /** 该步骤是否属于"关键步骤"（必须保留，不允许被压缩掉）。 */
-export function isCriticalStep(
-  step: StepGroup,
-  plan: { tasks: StepCompressorPlanTask[] } | null | undefined,
-): boolean {
+export function isCriticalStep(step: StepGroup, plan: { tasks: StepCompressorPlanTask[] } | null | undefined): boolean {
   const calls = toolCallsOf(step.assistant);
   for (const tc of calls) {
     if (tc.name === 'Replan' || tc.name === 'EnterPlanMode' || tc.name === 'ExitPlanMode') return true;
@@ -122,7 +126,11 @@ export function isCriticalStep(
     const t = toolResultText(m);
     if (!t) continue;
     let parsed: any = null;
-    try { parsed = JSON.parse(t); } catch { continue; }
+    try {
+      parsed = JSON.parse(t);
+    } catch {
+      continue;
+    }
     if (!parsed) continue;
     if (parsed.file_path && planMatchesFile(plan, parsed.file_path)) return true;
     if (parsed.pattern && Array.isArray(parsed.results)) {
@@ -133,7 +141,7 @@ export function isCriticalStep(
 }
 
 /** 确定性启发式：分数越高越值得保留（关键步骤另行判定）。 */
-export function scoreStep(step: StepGroup, plan: { tasks: StepCompressorPlanTask[] } | null | undefined): number {
+export function scoreStep(step: StepGroup, _plan: { tasks: StepCompressorPlanTask[] } | null | undefined): number {
   let score = 0;
   const content = step.assistant?.content;
   if (Array.isArray(content)) {
@@ -243,10 +251,7 @@ export function buildStepSummary(
  * 步骤级压缩主函数：保留系统/前导/最近 K 步/关键步骤，其余整步丢弃并摘要。
  * 返回新消息数组，不改动原数组；被保留的消息保持原对象引用。
  */
-export function compressHistorySteps(
-  messages: any[],
-  opts: StepCompressorOptions = {},
-): any[] {
+export function compressHistorySteps(messages: any[], opts: StepCompressorOptions = {}): any[] {
   const keepRecent = Math.max(1, opts.keepRecentSteps ?? DEFAULT_KEEP_RECENT_STEPS);
   const { system, preamble, orphans, steps } = groupIntoSteps(messages);
   if (steps.length <= keepRecent) return messages;

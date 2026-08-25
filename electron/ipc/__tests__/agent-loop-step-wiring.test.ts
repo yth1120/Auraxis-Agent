@@ -23,7 +23,11 @@ vi.mock('../step-engine', () => ({
 vi.mock('../hooks', () => ({ runHooksFor: vi.fn(async () => []) }));
 vi.mock('electron', () => ({
   app: { getPath: () => '', getName: () => 'auraxis' },
-  BrowserWindow: class { static fromWebContents() { return null; } },
+  BrowserWindow: class {
+    static fromWebContents() {
+      return null;
+    }
+  },
   ipcMain: { handle: vi.fn(), on: vi.fn(), removeHandler: vi.fn() },
   dialog: { showOpenDialog: vi.fn(), showMessageBox: vi.fn() },
   shell: { openExternal: vi.fn() },
@@ -72,9 +76,11 @@ describe('agentLoopRun → step-engine 联动（压缩策略传递）', () => {
   });
 
   it('显式 compressMode 与 stepKeepRecent 透传', async () => {
-    await agentLoopRun(baseConfig({
-      contextConfig: { maxRounds: 20, compressRatio: 0.5, compressMode: 'round', stepKeepRecent: 3 },
-    }));
+    await agentLoopRun(
+      baseConfig({
+        contextConfig: { maxRounds: 20, compressRatio: 0.5, compressMode: 'round', stepKeepRecent: 3 },
+      }),
+    );
     expect(capturedConfigs).toHaveLength(1);
     expect(capturedConfigs[0].compressMode).toBe('snip');
     expect(capturedConfigs[0].stepKeepRecent).toBe(3);

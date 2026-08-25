@@ -36,13 +36,18 @@ function statusLabel(
   elapsedMs: number,
 ): string {
   switch (task.status) {
-    case 'running': return formatDuration(elapsedMs);
-    case 'success': return translate('terminal.status.exitCode0', { duration: formatDuration(task.durationMs) });
-    case 'failed': return task.exitCode != null
-      ? translate('terminal.status.exitCode', { duration: formatDuration(task.durationMs), code: task.exitCode })
-      : formatDuration(task.durationMs);
-    case 'stopped': return translate('terminal.status.stopped');
-    case 'timeout': return translate('terminal.status.timeout');
+    case 'running':
+      return formatDuration(elapsedMs);
+    case 'success':
+      return translate('terminal.status.exitCode0', { duration: formatDuration(task.durationMs) });
+    case 'failed':
+      return task.exitCode != null
+        ? translate('terminal.status.exitCode', { duration: formatDuration(task.durationMs), code: task.exitCode })
+        : formatDuration(task.durationMs);
+    case 'stopped':
+      return translate('terminal.status.stopped');
+    case 'timeout':
+      return translate('terminal.status.timeout');
   }
 }
 
@@ -119,7 +124,11 @@ function TerminalSurface({
     const fit = new FitAddon();
     term.loadAddon(fit);
     term.open(el);
-    try { fit.fit(); } catch { /* size measurement race */ }
+    try {
+      fit.fit();
+    } catch {
+      /* size measurement race */
+    }
 
     const cwd = useSettingsStore.getState().projectPath || undefined;
     void api.create({ id, cwd, cols: term.cols, rows: term.rows });
@@ -130,14 +139,21 @@ function TerminalSurface({
     const unsubExit = api.onExit(id, (info) => {
       term.write(`\r\n\x1b[90m${t('terminal.processExited', { code: info.exitCode })}\x1b[0m\r\n`);
     });
-    const inputDisposable = term.onData((data) => { void api.input(id, data); });
+    const inputDisposable = term.onData((data) => {
+      void api.input(id, data);
+    });
 
     // Ctrl/Cmd+Shift+V → paste from the system clipboard.
     term.attachCustomKeyEventHandler((e) => {
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'v') {
-        void navigator.clipboard.readText().then((text) => {
-          if (text) void api.input(id, text);
-        }).catch(() => { /* clipboard denied */ });
+        void navigator.clipboard
+          .readText()
+          .then((text) => {
+            if (text) void api.input(id, text);
+          })
+          .catch(() => {
+            /* clipboard denied */
+          });
         return false;
       }
       return true;
@@ -161,7 +177,9 @@ function TerminalSurface({
             lastRows = term.rows;
             void api.resize(id, term.cols, term.rows);
           }
-        } catch { /* hidden */ }
+        } catch {
+          /* hidden */
+        }
       });
     };
     requestFitRef.current = requestFit;
@@ -190,7 +208,12 @@ function TerminalSurface({
     };
   }, [onReady, registerClear, registerFocus]);
 
-  return <div ref={containerRef} className="w-full h-full rounded-xl overflow-hidden border border-[var(--color-border-dim)]" />;
+  return (
+    <div
+      ref={containerRef}
+      className="w-full h-full rounded-xl overflow-hidden border border-[var(--color-border-dim)]"
+    />
+  );
 }
 
 /** Read-only mirror of the selected agent's persistent shell session. */
@@ -234,7 +257,11 @@ function AgentShellSurface({ agentId, paused }: { agentId: string; paused?: bool
     const fit = new FitAddon();
     term.loadAddon(fit);
     term.open(el);
-    try { fit.fit(); } catch { /* size measurement race */ }
+    try {
+      fit.fit();
+    } catch {
+      /* size measurement race */
+    }
 
     let disposed = false;
     void api.attach(agentId).then((r) => {
@@ -256,7 +283,11 @@ function AgentShellSurface({ agentId, paused }: { agentId: string; paused?: bool
       if (rafId != null) return;
       rafId = requestAnimationFrame(() => {
         rafId = null;
-        try { fit.fit(); } catch { /* hidden */ }
+        try {
+          fit.fit();
+        } catch {
+          /* hidden */
+        }
       });
     };
     requestFitRef.current = requestFit;
@@ -272,9 +303,18 @@ function AgentShellSurface({ agentId, paused }: { agentId: string; paused?: bool
     term.attachCustomKeyEventHandler((e) => {
       if (!e.ctrlKey) return true;
       const key = e.key.toLowerCase();
-      if (key === 'c') { void api.write(agentId, '\x03'); return false; }
-      if (key === 'z') { void api.write(agentId, '\x1a'); return false; }
-      if (key === 'd') { void api.write(agentId, '\x04'); return false; }
+      if (key === 'c') {
+        void api.write(agentId, '\x03');
+        return false;
+      }
+      if (key === 'z') {
+        void api.write(agentId, '\x1a');
+        return false;
+      }
+      if (key === 'd') {
+        void api.write(agentId, '\x04');
+        return false;
+      }
       return true;
     });
 
@@ -290,7 +330,12 @@ function AgentShellSurface({ agentId, paused }: { agentId: string; paused?: bool
     };
   }, [agentId]);
 
-  return <div ref={containerRef} className="w-full h-full rounded-xl overflow-hidden border border-[var(--color-border-dim)]" />;
+  return (
+    <div
+      ref={containerRef}
+      className="w-full h-full rounded-xl overflow-hidden border border-[var(--color-border-dim)]"
+    />
+  );
 }
 
 export default function TerminalPanel({ onClose, paused }: { onClose?: () => void; paused?: boolean }) {
@@ -376,7 +421,9 @@ export default function TerminalPanel({ onClose, paused }: { onClose?: () => voi
               type="button"
               className={clsx(
                 'flex-1 min-w-[56px] h-5 px-2 rounded-full text-2xs font-medium border-none cursor-pointer transition-colors duration-150',
-                viewMode === 'local' ? 'bg-[var(--color-bg-elevated)] text-text-primary shadow-sm' : 'text-text-muted hover:text-text-secondary',
+                viewMode === 'local'
+                  ? 'bg-[var(--color-bg-elevated)] text-text-primary shadow-sm'
+                  : 'text-text-muted hover:text-text-secondary',
               )}
               onClick={() => setViewMode('local')}
             >
@@ -386,10 +433,16 @@ export default function TerminalPanel({ onClose, paused }: { onClose?: () => voi
               type="button"
               className={clsx(
                 'flex-1 min-w-[56px] h-5 px-2 rounded-full text-2xs font-medium border-none cursor-pointer transition-colors duration-150',
-                viewMode === 'agent' ? 'bg-[var(--color-bg-elevated)] text-text-primary shadow-sm' : 'text-text-muted hover:text-text-secondary',
+                viewMode === 'agent'
+                  ? 'bg-[var(--color-bg-elevated)] text-text-primary shadow-sm'
+                  : 'text-text-muted hover:text-text-secondary',
               )}
               onClick={() => setViewMode('agent')}
-              title={currentAgent ? t('terminal.persistentShellOf', { name: currentAgent.description || currentAgent.name }) : undefined}
+              title={
+                currentAgent
+                  ? t('terminal.persistentShellOf', { name: currentAgent.description || currentAgent.name })
+                  : undefined
+              }
             >
               {t('terminal.agentShell')}
             </button>
@@ -455,9 +508,7 @@ export default function TerminalPanel({ onClose, paused }: { onClose?: () => voi
             {tasksOpen && (
               <div className="max-h-[132px] overflow-y-auto border-t border-[var(--color-border-dim)]/60">
                 {tasks.map((task, i) => {
-                  const elapsed = task.status === 'running'
-                    ? Date.now() - task.startedAt
-                    : task.durationMs ?? 0;
+                  const elapsed = task.status === 'running' ? Date.now() - task.startedAt : (task.durationMs ?? 0);
                   return (
                     <div
                       key={task.id}
@@ -482,7 +533,9 @@ export default function TerminalPanel({ onClose, paused }: { onClose?: () => voi
                           {task.command}
                         </code>
                       </Tooltip>
-                      <span className={`text-2xs shrink-0 font-mono ${task.status === 'failed' ? 'text-danger' : task.status === 'running' ? 'text-[var(--color-success)]' : 'text-text-muted'}`}>
+                      <span
+                        className={`text-2xs shrink-0 font-mono ${task.status === 'failed' ? 'text-danger' : task.status === 'running' ? 'text-[var(--color-success)]' : 'text-text-muted'}`}
+                      >
                         {statusLabel(t, task, elapsed)}
                       </span>
                       {task.status === 'running' && (
@@ -542,7 +595,13 @@ export default function TerminalPanel({ onClose, paused }: { onClose?: () => voi
         ) : (
           <div className="flex-1 min-h-0">
             {window.electronAPI?.terminal ? (
-              <TerminalSurface key={sessionKey} registerClear={registerClear} registerFocus={registerFocus} onReady={onReady} paused={paused} />
+              <TerminalSurface
+                key={sessionKey}
+                registerClear={registerClear}
+                registerFocus={registerFocus}
+                onReady={onReady}
+                paused={paused}
+              />
             ) : (
               <div className="flex items-center justify-center h-full rounded-xl border border-[var(--color-border-dim)] bg-[var(--color-bg-secondary)] text-sm text-text-muted">
                 {t('terminal.desktopOnly')}

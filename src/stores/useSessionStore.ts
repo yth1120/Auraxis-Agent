@@ -3,11 +3,7 @@ import { persist } from 'zustand/middleware';
 import type { Message } from '../types/chat';
 import { getContentText } from '../types/chat';
 import type { ToolName } from '../types/tools';
-import type {
-  ChatLogEvent,
-  ChatSessionMeta,
-  ProjectedChatSession,
-} from '../../electron/chat-log-types';
+import type { ChatLogEvent, ChatSessionMeta, ProjectedChatSession } from '../../electron/chat-log-types';
 
 export interface Session {
   id: string;
@@ -34,7 +30,13 @@ export interface SessionStore {
   /** Mode stamped onto the next session created via newSession (until saveSession). */
   pendingMode: 'chat' | 'work' | 'code';
 
-  saveSession: (messages: Message[], model: string, projectRoot?: string, mode?: 'chat' | 'work' | 'code', targetId?: string) => void;
+  saveSession: (
+    messages: Message[],
+    model: string,
+    projectRoot?: string,
+    mode?: 'chat' | 'work' | 'code',
+    targetId?: string,
+  ) => void;
   loadSession: (id: string) => Session | undefined;
   deleteSession: (id: string) => void;
   renameSession: (id: string, name: string) => void;
@@ -229,7 +231,7 @@ export const useSessionStore = create<SessionStore>()(
         const existing = state.sessions.findIndex((ses) => ses.id === currentId);
         const prev = existing >= 0 ? state.sessions[existing] : undefined;
 
-      const session: Session = {
+        const session: Session = {
           id: currentId || makeSessionId(),
           title,
           created: prev ? prev.created : now,
@@ -238,15 +240,16 @@ export const useSessionStore = create<SessionStore>()(
           messageCount: messages.length,
           messages: messages.filter((m) => !m.isStreaming),
           projectRoot: projectRoot ?? prev?.projectRoot,
-        // mode is immutable once set: keep prev, else the explicit arg, else pendingMode.
-        mode: prev?.mode ?? mode ?? state.pendingMode,
-        archived: prev?.archived,
-      };
+          // mode is immutable once set: keep prev, else the explicit arg, else pendingMode.
+          mode: prev?.mode ?? mode ?? state.pendingMode,
+          archived: prev?.archived,
+        };
 
         set((s) => {
-          const sessionsUpdated = existing >= 0
-            ? s.sessions.map((ses) => (ses.id === currentId ? session : ses))
-            : [session, ...s.sessions].slice(0, 200);
+          const sessionsUpdated =
+            existing >= 0
+              ? s.sessions.map((ses) => (ses.id === currentId ? session : ses))
+              : [session, ...s.sessions].slice(0, 200);
           if (existing >= 0) {
             return targetId
               ? { sessions: sessionsUpdated }
@@ -308,9 +311,7 @@ export const useSessionStore = create<SessionStore>()(
         if (!currentId) return;
         set((s) => ({
           sessions: s.sessions.map((ses) =>
-            ses.id === currentId
-              ? { ...ses, updated: Date.now(), messageCount }
-              : ses,
+            ses.id === currentId ? { ...ses, updated: Date.now(), messageCount } : ses,
           ),
         }));
         pushSessionMeta(currentId, { updated: Date.now(), messageCount });
@@ -319,9 +320,7 @@ export const useSessionStore = create<SessionStore>()(
       renameSession: (id, name) => {
         const next = name.trim();
         set((s) => ({
-          sessions: s.sessions.map((ses) =>
-            ses.id === id ? { ...ses, title: next || ses.title } : ses,
-          ),
+          sessions: s.sessions.map((ses) => (ses.id === id ? { ...ses, title: next || ses.title } : ses)),
         }));
         if (next) pushSessionMeta(id, { title: next });
       },
@@ -331,9 +330,7 @@ export const useSessionStore = create<SessionStore>()(
         if (!target) return;
         const pinned = !target.pinned;
         set((s) => ({
-          sessions: s.sessions.map((ses) =>
-            ses.id === id ? { ...ses, pinned } : ses,
-          ),
+          sessions: s.sessions.map((ses) => (ses.id === id ? { ...ses, pinned } : ses)),
         }));
         pushSessionMeta(id, { pinned });
       },
@@ -343,9 +340,7 @@ export const useSessionStore = create<SessionStore>()(
         if (!target) return;
         const archived = !target.archived;
         set((s) => ({
-          sessions: s.sessions.map((ses) => (
-            ses.id === id ? { ...ses, archived } : ses
-          )),
+          sessions: s.sessions.map((ses) => (ses.id === id ? { ...ses, archived } : ses)),
         }));
         if (archived && get().currentSessionId === id) {
           set({ currentSessionId: null });
@@ -354,11 +349,7 @@ export const useSessionStore = create<SessionStore>()(
 
       moveSessionToProject: (id, projectRoot) => {
         set((s) => ({
-          sessions: s.sessions.map((ses) => (
-            ses.id === id
-              ? { ...ses, projectRoot, updated: Date.now() }
-              : ses
-          )),
+          sessions: s.sessions.map((ses) => (ses.id === id ? { ...ses, projectRoot, updated: Date.now() } : ses)),
         }));
         pushSessionMeta(id, { projectRoot, updated: Date.now() });
       },
@@ -414,16 +405,18 @@ export const useSessionStore = create<SessionStore>()(
         if (api?.append && api?.meta) {
           void api
             .append(newId, sessionToLogEvents(forkedSession))
-            .then(() => api.meta!(newId, {
-              title: forkedSession.title,
-              created: forkedSession.created,
-              updated: forkedSession.updated,
-              model: forkedSession.model,
-              projectRoot: forkedSession.projectRoot,
-              mode: forkedSession.mode,
-              messageCount: forkedSession.messageCount,
-              branchedFrom: forkedSession.branchedFrom,
-            }))
+            .then(() =>
+              api.meta!(newId, {
+                title: forkedSession.title,
+                created: forkedSession.created,
+                updated: forkedSession.updated,
+                model: forkedSession.model,
+                projectRoot: forkedSession.projectRoot,
+                mode: forkedSession.mode,
+                messageCount: forkedSession.messageCount,
+                branchedFrom: forkedSession.branchedFrom,
+              }),
+            )
             .catch(() => {});
         }
 
@@ -516,6 +509,6 @@ export const useSessionStore = create<SessionStore>()(
         currentSessionId: state.currentSessionId,
         pendingMode: state.pendingMode,
       }),
-    }
-  )
+    },
+  ),
 );

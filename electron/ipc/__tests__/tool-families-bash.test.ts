@@ -76,7 +76,14 @@ vi.mock('../settings-store', () => ({ readSettings: vi.fn(async () => ({})) }));
 vi.mock('../ask-handlers', () => ({ askUser: vi.fn(async () => 'answer') }));
 vi.mock('../pty-tool', () => ({
   runPtyTool: vi.fn(async () => ({ output: {} })),
-  ptyRegistry: { list: vi.fn(() => []), create: vi.fn(), write: vi.fn(() => true), read: vi.fn(async () => null), close: vi.fn(), clearOwner: vi.fn() },
+  ptyRegistry: {
+    list: vi.fn(() => []),
+    create: vi.fn(),
+    write: vi.fn(() => true),
+    read: vi.fn(async () => null),
+    close: vi.fn(),
+    clearOwner: vi.fn(),
+  },
 }));
 vi.mock('../dynamic-plugin', () => ({
   mountDynamicPlugin: vi.fn(() => ({ ok: true })),
@@ -93,21 +100,26 @@ vi.mock('../../runtime-inspect', () => ({
   inspectRuntime: vi.fn(async () => ({ tools: [], plugins: [], dynamicPlugins: [], skills: [] })),
 }));
 vi.mock('../goal-store', () => ({
-  getGoal: vi.fn(async () => null), createGoal: vi.fn(async () => null), editGoal: vi.fn(async () => null),
-  pauseGoal: vi.fn(async () => null), resumeGoal: vi.fn(async () => null), completeGoal: vi.fn(async () => null),
+  getGoal: vi.fn(async () => null),
+  createGoal: vi.fn(async () => null),
+  editGoal: vi.fn(async () => null),
+  pauseGoal: vi.fn(async () => null),
+  resumeGoal: vi.fn(async () => null),
+  completeGoal: vi.fn(async () => null),
   blockGoal: vi.fn(async () => null),
 }));
 
 import { executeToolCall, abortTool } from '../tool-handlers';
 import { isSandboxSupported, runSandboxedCommand } from '../../sandbox-runner';
 import { finishBashTask } from '../task-monitor';
-import { execSync } from 'child_process';
 
 function fakeChild() {
   const c: any = new EventEmitter();
   c.stdout = new EventEmitter();
   c.stderr = new EventEmitter();
-  c.kill = vi.fn(() => { c.killed = true; });
+  c.kill = vi.fn(() => {
+    c.killed = true;
+  });
   c.pid = 1234;
   c.exitCode = null;
   c.killed = false;
@@ -148,14 +160,24 @@ describe('Bash — 参数校验', () => {
   it('workspace-write 下拒绝越界 workdir', async () => {
     // 跨平台越界路径：项目根（os.tmpdir()）的父目录之外。
     const outside = path.resolve(os.tmpdir(), '..', `auraxis-outside-${process.pid}`);
-    const r = await executeToolCall('Bash', { command: 'ls', workdir: outside }, ctx({ sandboxMode: 'workspace-write' }));
+    const r = await executeToolCall(
+      'Bash',
+      { command: 'ls', workdir: outside },
+      ctx({ sandboxMode: 'workspace-write' }),
+    );
     expect(r.error).toContain('工作目录超出项目边界');
   });
 
   it('sandbox_permissions 与 justification 配对校验', async () => {
-    expect((await executeToolCall('Bash', { command: 'ls', sandbox_permissions: 'full' }, ctx())).error).toContain('justification');
-    expect((await executeToolCall('Bash', { command: 'ls', justification: 'x' }, ctx())).error).toContain('仅在同时设置');
-    expect((await executeToolCall('Bash', { command: 'ls', sandbox_permissions: 'bogus', justification: 'x' }, ctx())).error).toContain('无效的 sandbox_permissions');
+    expect((await executeToolCall('Bash', { command: 'ls', sandbox_permissions: 'full' }, ctx())).error).toContain(
+      'justification',
+    );
+    expect((await executeToolCall('Bash', { command: 'ls', justification: 'x' }, ctx())).error).toContain(
+      '仅在同时设置',
+    );
+    expect(
+      (await executeToolCall('Bash', { command: 'ls', sandbox_permissions: 'bogus', justification: 'x' }, ctx())).error,
+    ).toContain('无效的 sandbox_permissions');
   });
 });
 
@@ -226,14 +248,21 @@ describe('Bash — 原生沙箱路径', () => {
     });
     const r = await executeToolCall('Bash', { command: 'ls' }, ctx({ sandboxMode: 'workspace-write' }));
     expect(r.output).toMatchObject({ stdout: 'out', stderr: 'err', exitCode: 0 });
-    expect(runSandboxedCommand).toHaveBeenCalledWith(expect.objectContaining({
-      mode: 'workspace-write',
-      argv: expect.arrayContaining([expect.stringContaining('bash'), '-c', 'ls']),
-    }));
+    expect(runSandboxedCommand).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: 'workspace-write',
+        argv: expect.arrayContaining([expect.stringContaining('bash'), '-c', 'ls']),
+      }),
+    );
   });
 
   it('沙箱错误与超时透传', async () => {
-    vi.mocked(runSandboxedCommand).mockResolvedValueOnce({ exitCode: 2, error: 'sandbox boom', timedOut: true, supported: true });
+    vi.mocked(runSandboxedCommand).mockResolvedValueOnce({
+      exitCode: 2,
+      error: 'sandbox boom',
+      timedOut: true,
+      supported: true,
+    });
     const r = await executeToolCall('Bash', { command: 'ls' }, ctx({ sandboxMode: 'read' }));
     expect(r.error).toBe('sandbox boom');
   });

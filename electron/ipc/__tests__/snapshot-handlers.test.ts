@@ -40,7 +40,10 @@ async function seedTouchedFile(relPath: string, content: string): Promise<string
 }
 
 describe('named snapshots', () => {
-  beforeEach(() => { cleanup(); setupTestDir(); });
+  beforeEach(() => {
+    cleanup();
+    setupTestDir();
+  });
   afterEach(() => cleanup());
 
   it('创建快照记录已改动文件的当前内容', async () => {

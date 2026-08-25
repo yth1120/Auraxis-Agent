@@ -42,17 +42,11 @@ export default function PresetPanel({
       )}
     >
       <div className="flex items-baseline justify-between gap-3 px-2.5 pt-2 pb-1">
-        <span className="text-[13px] leading-[18px] font-semibold text-text-primary tracking-[0.01em]">
-          {title}
-        </span>
-        {current && (
-          <span className="min-w-0 truncate text-[11px] leading-[16px] text-text-muted">{current}</span>
-        )}
+        <span className="text-[13px] leading-[18px] font-semibold text-text-primary tracking-[0.01em]">{title}</span>
+        {current && <span className="min-w-0 truncate text-[11px] leading-[16px] text-text-muted">{current}</span>}
       </div>
 
-      {subtitle && (
-        <p className="m-0 px-2.5 pb-1.5 text-[11px] leading-[15px] text-text-faint">{subtitle}</p>
-      )}
+      {subtitle && <p className="m-0 px-2.5 pb-1.5 text-[11px] leading-[15px] text-text-faint">{subtitle}</p>}
 
       <div className="mx-2 h-px bg-[var(--color-border-dim)]" />
 
@@ -99,9 +93,7 @@ export function PresetOptionRow({ active, icon, label, title, onClick }: PresetO
       >
         {icon}
       </span>
-      <span className="flex-1 min-w-0 truncate text-[13px] leading-[18px] font-medium text-text-primary">
-        {label}
-      </span>
+      <span className="flex-1 min-w-0 truncate text-[13px] leading-[18px] font-medium text-text-primary">{label}</span>
       {active && <Check size={14} className="shrink-0 text-primary" />}
     </button>
   );

@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron';
+import { errorText } from '../errors';
 import { secureHandle } from './trust';
 import { resolveTrustedProjectRoot } from './project-access';
 import { loadProjectActions } from '../actions';
@@ -10,8 +10,8 @@ export function registerActionHandlers() {
       if (!projectRoot || typeof projectRoot !== 'string') return { ok: false, error: '项目目录无效' };
       const root = await resolveTrustedProjectRoot(projectRoot);
       return { ok: true, data: await loadProjectActions(root) };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 }

@@ -20,10 +20,7 @@ interface UseSmartDropdownOptions {
   direction?: 'auto' | 'up' | 'down';
 }
 
-export function useSmartDropdown(
-  triggerRef: RefObject<HTMLElement | null>,
-  options: UseSmartDropdownOptions = {},
-) {
+export function useSmartDropdown(triggerRef: RefObject<HTMLElement | null>, options: UseSmartDropdownOptions = {}) {
   const { panelHeight = 180, gap = 10, direction = 'auto' } = options;
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState<DropdownPosition | null>(null);
@@ -45,9 +42,7 @@ export function useSmartDropdown(
 
     setPosition({
       left: rect.left,
-      ...(shouldDropUp
-        ? { bottom: window.innerHeight - rect.top + gap }
-        : { top: rect.bottom + gap }),
+      ...(shouldDropUp ? { bottom: window.innerHeight - rect.top + gap } : { top: rect.bottom + gap }),
       direction: shouldDropUp ? 'up' : 'down',
     });
   }, [triggerRef, panelHeight, gap, direction]);

@@ -1,6 +1,21 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { ApplyCodePayload, ApiMessage } from './contracts/core';
 
+interface UsageEvent {
+  inputTokens: number;
+  outputTokens: number;
+  reasoningTokens?: number;
+  cacheHitTokens?: number;
+  cacheMissTokens?: number;
+}
+
+interface QueryEvent {
+  requestId: string;
+  type: string;
+  error?: string;
+  [key: string]: unknown;
+}
+
 function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 }
@@ -53,14 +68,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
   file: {
     open: (projectRoot?: string) => ipcRenderer.invoke('file:open', projectRoot),
     read: (filePath: string, projectRoot?: string) => ipcRenderer.invoke('file:read', filePath, projectRoot),
-    estimateTokens: (files: string[], projectRoot?: string) => ipcRenderer.invoke('file:estimateTokens', files, projectRoot),
-    readPreview: (filePath: string, projectRoot?: string) => ipcRenderer.invoke('file:readPreview', filePath, projectRoot),
+    estimateTokens: (files: string[], projectRoot?: string) =>
+      ipcRenderer.invoke('file:estimateTokens', files, projectRoot),
+    readPreview: (filePath: string, projectRoot?: string) =>
+      ipcRenderer.invoke('file:readPreview', filePath, projectRoot),
     write: (filePath: string, content: string) => ipcRenderer.invoke('file:write', filePath, content),
     search: (keyword: string, projectRoot: string) => ipcRenderer.invoke('file:search', keyword, projectRoot),
     delete: (filePath: string, projectRoot?: string) => ipcRenderer.invoke('file:delete', filePath, projectRoot),
-    rename: (oldPath: string, newPath: string, projectRoot?: string) => ipcRenderer.invoke('file:rename', oldPath, newPath, projectRoot),
-    createFolder: (dirPath: string, projectRoot?: string) => ipcRenderer.invoke('file:createFolder', dirPath, projectRoot),
-    createFile: (filePath: string, projectRoot?: string) => ipcRenderer.invoke('file:createFile', filePath, projectRoot),
+    rename: (oldPath: string, newPath: string, projectRoot?: string) =>
+      ipcRenderer.invoke('file:rename', oldPath, newPath, projectRoot),
+    createFolder: (dirPath: string, projectRoot?: string) =>
+      ipcRenderer.invoke('file:createFolder', dirPath, projectRoot),
+    createFile: (filePath: string, projectRoot?: string) =>
+      ipcRenderer.invoke('file:createFile', filePath, projectRoot),
   },
 
   // --- Project operations ---
@@ -88,14 +108,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
       callbacks: {
         onChunk: (text: string) => void;
         onThinking?: (text: string) => void;
-        onUsage?: (usage: { inputTokens: number; outputTokens: number; reasoningTokens?: number; cacheHitTokens?: number; cacheMissTokens?: number }) => void;
+        onUsage?: (usage: {
+          inputTokens: number;
+          outputTokens: number;
+          reasoningTokens?: number;
+          cacheHitTokens?: number;
+          cacheMissTokens?: number;
+        }) => void;
         onDone: () => void;
         onError: (error: string) => void;
-      }
+      },
     ) => {
       const requestId = generateId();
 
-      const chunkHandler = (_event: Electron.IpcRendererEvent, data: { requestId: string; type: string; text?: string; usage?: any; error?: string }) => {
+      const chunkHandler = (
+        _event: Electron.IpcRendererEvent,
+        data: { requestId: string; type: string; text?: string; usage?: UsageEvent; error?: string },
+      ) => {
         if (data.requestId !== requestId) return;
         try {
           switch (data.type) {
@@ -106,7 +135,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
               callbacks.onThinking?.(data.text || '');
               break;
             case 'usage':
-              callbacks.onUsage?.(data.usage);
+              if (data.usage) callbacks.onUsage?.(data.usage);
               break;
             case 'done':
               cleanup();
@@ -149,12 +178,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('ai:fim', params),
 
     sendQuery: (
-      request: { sessionId?: string; model: string; messages: ApiMessage[]; memoryContext?: string; isDeepThink: boolean; reasoningEffort?: 'low' | 'high' | 'max'; projectRoot: string; autoApprove?: boolean; mode?: string; apiKey?: string; maxIterations?: number },
-      callbacks: { onEvent: (event: any) => void; onDone: () => void; onError: (error: string) => void }
+      request: {
+        sessionId?: string;
+        model: string;
+        messages: ApiMessage[];
+        memoryContext?: string;
+        isDeepThink: boolean;
+        reasoningEffort?: 'low' | 'high' | 'max';
+        projectRoot: string;
+        autoApprove?: boolean;
+        mode?: string;
+        apiKey?: string;
+        maxIterations?: number;
+      },
+      callbacks: { onEvent: (event: QueryEvent) => void; onDone: () => void; onError: (error: string) => void },
     ) => {
       const requestId = generateId();
 
-      const eventHandler = (_event: Electron.IpcRendererEvent, data: any) => {
+      const eventHandler = (_event: Electron.IpcRendererEvent, data: QueryEvent) => {
         if (data.requestId !== requestId) return;
         if (data.type === 'done') {
           callbacks.onEvent(data);
@@ -197,11 +238,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     retryTool: (requestId: string, toolName: string) => ipcRenderer.invoke('ai:retryTool', requestId, toolName),
 
-    setApiKey: (apiKey: string) =>
-      ipcRenderer.invoke('api:setKey', 'deepseek', apiKey),
+    setApiKey: (apiKey: string) => ipcRenderer.invoke('api:setKey', 'deepseek', apiKey),
 
-    testConnection: (apiKey: string) =>
-      ipcRenderer.invoke('ai:testConnection', { apiKey }),
+    testConnection: (apiKey: string) => ipcRenderer.invoke('ai:testConnection', { apiKey }),
   },
 
   // --- 官方离线 tokenizer ---
@@ -211,7 +250,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // --- Memory ---
   memory: {
-    extract: (ctx: any) => ipcRenderer.invoke('memory:extract', ctx),
+    extract: (ctx: unknown) => ipcRenderer.invoke('memory:extract', ctx),
     getByProject: (projectPath: string) => ipcRenderer.invoke('memory:getByProject', projectPath),
     getByType: (projectPath: string, type: string) => ipcRenderer.invoke('memory:getByType', projectPath, type),
     search: (projectPath: string, query: string) => ipcRenderer.invoke('memory:search', projectPath, query),
@@ -268,12 +307,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // --- Permission ---
   permission: {
     respond: (requestId: string, allowed: boolean) => ipcRenderer.invoke('permission:respond', requestId, allowed),
-    addRule: (rule: any, requestId: string) => ipcRenderer.invoke('permission:addRule', rule, requestId),
+    addRule: (rule: unknown, requestId: string) => ipcRenderer.invoke('permission:addRule', rule, requestId),
     getRules: () => ipcRenderer.invoke('permission:getRules'),
     removeRule: (ruleId: string) => ipcRenderer.invoke('permission:removeRule', ruleId),
     clearRules: () => ipcRenderer.invoke('permission:clearRules'),
-    onRequest: (callback: (request: any) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, request: any) => callback(request);
+    onRequest: (callback: (request: unknown) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, request: unknown) => callback(request);
       ipcRenderer.on('permission:request', handler);
       return () => {
         ipcRenderer.removeListener('permission:request', handler);
@@ -284,19 +323,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // --- Permission profiles ---
   permissionProfile: {
     list: () => ipcRenderer.invoke('permission:listProfiles'),
-    save: (custom: any[], activeId: string) => ipcRenderer.invoke('permission:saveProfiles', { custom, activeId }),
+    save: (custom: unknown[], activeId: string) => ipcRenderer.invoke('permission:saveProfiles', { custom, activeId }),
     listProjectProfiles: () => ipcRenderer.invoke('permission:listProjectProfiles'),
     setProjectProfile: (path: string, profileId: string | null) =>
       ipcRenderer.invoke('permission:setProjectProfile', { path, profileId }),
-    moveProjectProfile: (from: string, to: string) =>
-      ipcRenderer.invoke('permission:moveProjectProfile', { from, to }),
+    moveProjectProfile: (from: string, to: string) => ipcRenderer.invoke('permission:moveProjectProfile', { from, to }),
   },
 
   // --- AskUser (model → human question) ---
   ask: {
     respond: (askId: string, answer: string) => ipcRenderer.invoke('ask:respond', askId, answer),
     onRequest: (callback: (request: { askId: string; question: string; options: string[] }) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, request: any) => callback(request);
+      const handler = (_event: Electron.IpcRendererEvent, request: unknown) =>
+        callback(request as { askId: string; question: string; options: string[] });
       ipcRenderer.on('ask:request', handler);
       return () => {
         ipcRenderer.removeListener('ask:request', handler);
@@ -306,23 +345,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // --- Runtime inspect (bounded self-modification) ---
   runtime: {
-    syncPlugins: (plugins: any[]) => ipcRenderer.invoke('runtime:syncPlugins', plugins),
+    syncPlugins: (plugins: unknown[]) => ipcRenderer.invoke('runtime:syncPlugins', plugins),
   },
 
   // --- MCP ---
   mcp: {
     getServers: () => ipcRenderer.invoke('mcp:getServers'),
-    setServers: (servers: any[]) => ipcRenderer.invoke('mcp:setServers', servers),
+    setServers: (servers: unknown[]) => ipcRenderer.invoke('mcp:setServers', servers),
     connect: (serverId: string) => ipcRenderer.invoke('mcp:connect', serverId),
     disconnect: (serverId: string) => ipcRenderer.invoke('mcp:disconnect', serverId),
     getStatuses: () => ipcRenderer.invoke('mcp:getStatuses'),
     listTools: (serverId: string) => ipcRenderer.invoke('mcp:listTools', serverId),
-    callTool: (serverName: string, toolName: string, args: any) => ipcRenderer.invoke('mcp:callTool', serverName, toolName, args),
+    callTool: (serverName: string, toolName: string, args: unknown) =>
+      ipcRenderer.invoke('mcp:callTool', serverName, toolName, args),
   },
 
   // --- Agent ---
   agent: {
-    start: (config: any, projectPath: string) => ipcRenderer.invoke('agent:start', { config, projectPath }),
+    start: (config: unknown, projectPath: string) => ipcRenderer.invoke('agent:start', { config, projectPath }),
     schedulerStop: (agentId: string) => ipcRenderer.invoke('agent:schedulerStop', agentId),
     pause: (agentId: string) => ipcRenderer.invoke('agent:pause', agentId),
     resume: (agentId: string) => ipcRenderer.invoke('agent:resume', agentId),
@@ -342,16 +382,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
     schedulerRemove: (agentId: string) => ipcRenderer.invoke('agent:schedulerRemove', agentId),
     clear: () => ipcRenderer.invoke('agent:clear'),
     clearAll: () => ipcRenderer.invoke('agent:clearAll'),
-    onUpdated: (callback: (agent: any) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, agent: any) => callback(agent);
+    onUpdated: (callback: (agent: unknown) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, agent: unknown) => callback(agent);
       ipcRenderer.on('agent:updated', handler);
       return () => {
         ipcRenderer.removeListener('agent:updated', handler);
       };
     },
-    onEvent: (agentId: string, callback: (event: any) => void) => {
+    onEvent: (agentId: string, callback: (event: unknown) => void) => {
       const channel = `agent:event:${agentId}`;
-      const handler = (_event: Electron.IpcRendererEvent, data: any) => callback(data);
+      const handler = (_event: Electron.IpcRendererEvent, data: unknown) => callback(data);
       ipcRenderer.on(channel, handler);
       return () => {
         ipcRenderer.removeListener(channel, handler);
@@ -365,9 +405,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // failures instead of them disappearing into stderr.
   app: {
     onError: (callback: (err: { message: string; stack?: string }) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, err: any) => callback(err);
+      const handler = (_event: Electron.IpcRendererEvent, err: unknown) =>
+        callback(err as { message: string; stack?: string });
       ipcRenderer.on('app:error', handler);
-      return () => { ipcRenderer.removeListener('app:error', handler); };
+      return () => {
+        ipcRenderer.removeListener('app:error', handler);
+      };
     },
   },
 
@@ -380,7 +423,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   worktree: {
     getStatus: (sessionKey: string) => ipcRenderer.invoke('worktree:getStatus', sessionKey),
     onChanged: (callback: (data: { active: boolean; sandboxPath?: string; taskId?: string }) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, data: any) => callback(data);
+      const handler = (_event: Electron.IpcRendererEvent, data: unknown) =>
+        callback(data as { active: boolean; sandboxPath?: string; taskId?: string });
       ipcRenderer.on('worktree:changed', handler);
       return () => {
         ipcRenderer.removeListener('worktree:changed', handler);
@@ -398,14 +442,29 @@ contextBridge.exposeInMainWorld('electronAPI', {
   plan: {
     approve: (planId: string, approvedStepIds: string[]) =>
       ipcRenderer.invoke('plan:approve', { planId, approvedStepIds }),
-    reject: (planId: string) =>
-      ipcRenderer.invoke('plan:reject', { planId }),
-    list: (projectRoot?: string) =>
-      ipcRenderer.invoke('plan:list', { projectRoot }),
-    onGenerated: (callback: (data: { planId: string; steps: { id: string; toolName: string; description: string; parameters: Record<string, unknown> }[]; filePath?: string; agentId?: string }) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, data: any) => callback(data);
+    reject: (planId: string) => ipcRenderer.invoke('plan:reject', { planId }),
+    list: (projectRoot?: string) => ipcRenderer.invoke('plan:list', { projectRoot }),
+    onGenerated: (
+      callback: (data: {
+        planId: string;
+        steps: { id: string; toolName: string; description: string; parameters: Record<string, unknown> }[];
+        filePath?: string;
+        agentId?: string;
+      }) => void,
+    ) => {
+      const handler = (_event: Electron.IpcRendererEvent, data: unknown) =>
+        callback(
+          data as {
+            planId: string;
+            steps: { id: string; toolName: string; description: string; parameters: Record<string, unknown> }[];
+            filePath?: string;
+            agentId?: string;
+          },
+        );
       ipcRenderer.on('plan:generated', handler);
-      return () => { ipcRenderer.removeListener('plan:generated', handler); };
+      return () => {
+        ipcRenderer.removeListener('plan:generated', handler);
+      };
     },
   },
 
@@ -413,7 +472,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   undo: {
     getHistory: (sessionId?: string) => ipcRenderer.invoke('undo:getHistory', sessionId),
     getList: () => ipcRenderer.invoke('undo:getList'),
-    getSessionDiffs: (sessionId: string, projectRoot: string) => ipcRenderer.invoke('undo:getSessionDiffs', sessionId, projectRoot),
+    getSessionDiffs: (sessionId: string, projectRoot: string) =>
+      ipcRenderer.invoke('undo:getSessionDiffs', sessionId, projectRoot),
     revertSessionFile: (sessionId: string, relPath: string, projectRoot: string) =>
       ipcRenderer.invoke('undo:revertSessionFile', { sessionId, relPath, projectRoot }),
     execute: (fileId: string, projectRoot: string) => ipcRenderer.invoke('undo:execute', fileId, projectRoot),
@@ -454,7 +514,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // --- Goals ---
   goal: {
     get: (sessionId: string) => ipcRenderer.invoke('goal:get', sessionId),
-    create: (sessionId: string, text: string, maxRounds?: number) => ipcRenderer.invoke('goal:create', sessionId, text, maxRounds),
+    create: (sessionId: string, text: string, maxRounds?: number) =>
+      ipcRenderer.invoke('goal:create', sessionId, text, maxRounds),
     edit: (sessionId: string, text: string) => ipcRenderer.invoke('goal:edit', sessionId, text),
     pause: (sessionId: string) => ipcRenderer.invoke('goal:pause', sessionId),
     resume: (sessionId: string) => ipcRenderer.invoke('goal:resume', sessionId),
@@ -478,7 +539,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // --- Terminal ---
   terminal: {
-    create: (payload: { id: string; cwd?: string; cols?: number; rows?: number }) => ipcRenderer.invoke('terminal:create', payload),
+    create: (payload: { id: string; cwd?: string; cols?: number; rows?: number }) =>
+      ipcRenderer.invoke('terminal:create', payload),
     input: (id: string, data: string) => ipcRenderer.invoke('terminal:input', id, data),
     resize: (id: string, cols: number, rows: number) => ipcRenderer.invoke('terminal:resize', id, cols, rows),
     kill: (id: string) => ipcRenderer.invoke('terminal:kill', id),
@@ -486,19 +548,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
     stopTask: (id: string) => ipcRenderer.invoke('terminal:tasks:stop', id),
     clearTasks: () => ipcRenderer.invoke('terminal:tasks:clear'),
     onData: (id: string, cb: (data: string) => void) => {
-      const listener = (_e: any, payload: { type: string; data?: string }) => {
+      const listener = (_event: Electron.IpcRendererEvent, payload: { type: string; data?: string }) => {
         if (payload?.type === 'data' && typeof payload.data === 'string') cb(payload.data);
       };
       ipcRenderer.on(`terminal:event:${id}`, listener);
       return () => ipcRenderer.removeListener(`terminal:event:${id}`, listener);
     },
     onTasksChanged: (cb: (tasks: unknown[]) => void) => {
-      const listener = (_e: any, tasks: unknown[]) => cb(tasks || []);
+      const listener = (_event: Electron.IpcRendererEvent, tasks: unknown[]) => cb(tasks || []);
       ipcRenderer.on('terminal:tasks:changed', listener);
       return () => ipcRenderer.removeListener('terminal:tasks:changed', listener);
     },
     onExit: (id: string, cb: (info: { exitCode: number; error?: string }) => void) => {
-      const listener = (_e: any, payload: { type: string; data?: { exitCode: number; error?: string } }) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        payload: { type: string; data?: { exitCode: number; error?: string } },
+      ) => {
         if (payload?.type === 'exit' && payload.data) cb(payload.data);
       };
       ipcRenderer.on(`terminal:event:${id}`, listener);

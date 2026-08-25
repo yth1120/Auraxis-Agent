@@ -3,7 +3,8 @@
  * isolated workspaces, priority queue, pause/resume, and concurrency control.
  */
 
-import { BrowserWindow, app, ipcMain } from 'electron';
+import { errorText } from '../errors';
+import { BrowserWindow, app } from 'electron';
 import { secureHandle } from './trust';
 import { resolveTrustedProjectRoot } from './project-access';
 import { existsSync } from 'fs';
@@ -14,7 +15,14 @@ import { requestPermission } from './permission-handlers';
 import { assertObject, assertString } from './shared';
 import { waitForPlanApproval } from './plan-handlers';
 import { getSubAgentStates, getAgentDef } from './agent-handlers';
-import { saveAgentSnapshot, loadAgentSnapshots, removeAgentSnapshot, pruneSnapshots, type AgentSnapshotRecord, type AgentSnapshotStatus } from '../agent-snapshot';
+import {
+  saveAgentSnapshot,
+  loadAgentSnapshots,
+  removeAgentSnapshot,
+  pruneSnapshots,
+  type AgentSnapshotRecord,
+  type AgentSnapshotStatus,
+} from '../agent-snapshot';
 import { ptyRegistry } from './pty-tool';
 import { readSettings } from './settings-store';
 import { appendAgentLog } from '../session-log';
@@ -28,7 +36,9 @@ import type { SandboxMode } from '../sandbox-policy';
 import { appendWorkDocsSystemRule } from '../work-docs-policy';
 
 /** Convert backend TaskPlan to the {todos: [...]} shape AgentDashboard / AgentPanel render. */
-function taskPlanToFrontendPlan(plan: TaskPlan | null | undefined): { todos: { content: string; status: string; activeForm: string }[] } | null {
+function taskPlanToFrontendPlan(
+  plan: TaskPlan | null | undefined,
+): { todos: { content: string; status: string; activeForm: string }[] } | null {
   if (!plan) return null;
   return {
     todos: plan.tasks.map((t) => ({
@@ -110,7 +120,12 @@ export interface AgentInstance {
    *  from log.length (which only counts text chunks). */
   messagesCount: number;
   maxIterations: number;
-  checkPermission?: (toolName: string, input: Record<string, unknown>, toolCallId?: string, agentId?: string) => Promise<boolean>;
+  checkPermission?: (
+    toolName: string,
+    input: Record<string, unknown>,
+    toolCallId?: string,
+    agentId?: string,
+  ) => Promise<boolean>;
   log: Array<{ type: string; timestamp: number; [key: string]: any }>;
   /** Unflushed engine events for the durable agent run log (session-log). */
   logBuffer: Array<Record<string, unknown>>;
@@ -153,9 +168,7 @@ export function createUnattendedPermissionChecker(
   return async (toolName, input, toolCallId, agentId) => {
     const win = BrowserWindow.getAllWindows()[0] || null;
     if (!win || win.isDestroyed()) return false;
-    const isReviewGate =
-      toolName === 'ReviewArtifact'
-      && input?.action === 'continue_after_failed_review';
+    const isReviewGate = toolName === 'ReviewArtifact' && input?.action === 'continue_after_failed_review';
     return requestPermission(toolName, input, win, toolCallId, {
       mode: isReviewGate || config.workTier === 'full' ? 'ask' : normalizeApprovalPolicy(config.mode ?? 'ask'),
       approvedPlanSteps: config.approvedPlanSteps,
@@ -228,7 +241,11 @@ class AgentScheduler {
 
   private notifyTerminal(inst: AgentInstance): void {
     for (const cb of this.terminalListeners) {
-      try { cb(inst); } catch { /* listener errors are contained */ }
+      try {
+        cb(inst);
+      } catch {
+        /* listener errors are contained */
+      }
     }
   }
 
@@ -278,7 +295,12 @@ class AgentScheduler {
     };
     void saveAgentSnapshot(record).catch(() => {});
     void pruneSnapshots().catch(() => {});
-    if (inst.status === 'completed' || inst.status === 'error' || inst.status === 'stopped' || inst.status === 'review') {
+    if (
+      inst.status === 'completed' ||
+      inst.status === 'error' ||
+      inst.status === 'stopped' ||
+      inst.status === 'review'
+    ) {
       const batch = inst.logBuffer?.length ? inst.logBuffer.splice(0) : [];
       if (batch.length > 0) void appendAgentLog(inst.agentId, batch, inst.projectPath).catch(() => {});
     }
@@ -362,9 +384,7 @@ class AgentScheduler {
               // task must still pause for the human on a failed quality gate.
               // Work 全自动档位：高危工具必须真的弹出确认，requestPermission
               // 内部按 ask 模式走，避免 mode='auto' 提前放行。
-              const isReviewGate =
-                toolName === 'ReviewArtifact'
-                && input?.action === 'continue_after_failed_review';
+              const isReviewGate = toolName === 'ReviewArtifact' && input?.action === 'continue_after_failed_review';
               return requestPermission(toolName, input, win, toolCallId, {
                 mode: isReviewGate || config.workTier === 'full' ? 'ask' : normalizeApprovalPolicy(config.mode),
                 approvedPlanSteps: config.approvedPlanSteps,
@@ -384,19 +404,29 @@ class AgentScheduler {
     // tasks wait for a running agent to settle before they ever start.
     this.processQueue();
   }
-  getMaxConcurrent(): number { return maxConcurrent; }
-  getQueueLength(): number { return pendingQueue.length; }
+  getMaxConcurrent(): number {
+    return maxConcurrent;
+  }
+  getQueueLength(): number {
+    return pendingQueue.length;
+  }
 
   /** Spawn a new Agent — queues if at capacity */
   startAgent(
     config: AgentConfig,
     projectPath: string,
-    checkPermission?: (toolName: string, input: Record<string, unknown>, toolCallId?: string, agentId?: string) => Promise<boolean>,
+    checkPermission?: (
+      toolName: string,
+      input: Record<string, unknown>,
+      toolCallId?: string,
+      agentId?: string,
+    ) => Promise<boolean>,
   ): string {
     const agentId = genId();
 
     const instance: AgentInstance = {
-      agentId, config,
+      agentId,
+      config,
       status: 'queued',
       priority: config.priority || 'normal',
       queuePosition: pendingQueue.length,
@@ -405,7 +435,11 @@ class AgentScheduler {
       abortController: new AbortController(),
       observer: {} as AgentObserver,
       checkPermission,
-      toolCallCount: 0, iterations: 0, messagesCount: 0, log: [], logBuffer: [],
+      toolCallCount: 0,
+      iterations: 0,
+      messagesCount: 0,
+      log: [],
+      logBuffer: [],
       maxIterations: config.maxIterations ?? 200,
     };
 
@@ -444,9 +478,10 @@ class AgentScheduler {
     if (!inst.config.systemPrompt) {
       const agentDef = getAgentDef(inst.config.type || 'general-purpose');
       const platform = process.platform === 'win32' ? 'Windows' : process.platform === 'darwin' ? 'macOS' : 'Linux';
-      const shellHint = process.platform === 'win32'
-        ? 'On Windows, the shell is Git Bash — standard Unix commands work natively. Use them freely.'
-        : 'Use standard Unix shell commands.';
+      const shellHint =
+        process.platform === 'win32'
+          ? 'On Windows, the shell is Git Bash — standard Unix commands work natively. Use them freely.'
+          : 'Use standard Unix shell commands.';
       const task = inst.config.description || inst.config.name || '完成用户指定的任务';
       inst.config.systemPrompt = agentDef.getSystemPrompt(task, platform, shellHint, inst.projectPath);
     }
@@ -486,9 +521,9 @@ class AgentScheduler {
         // Work 交付物结构化采集：Write/Edit/NotebookEdit 成功即登记，
         // 验收面板不再只靠日志反推。
         if (
-          i.config.surface === 'work'
-          && event.type === 'tool_end'
-          && (event.toolName === 'Write' || event.toolName === 'Edit' || event.toolName === 'NotebookEdit')
+          i.config.surface === 'work' &&
+          event.type === 'tool_end' &&
+          (event.toolName === 'Write' || event.toolName === 'Edit' || event.toolName === 'NotebookEdit')
         ) {
           const p = event.input?.file_path;
           if (typeof p === 'string' && p.trim()) {
@@ -519,7 +554,7 @@ class AgentScheduler {
       },
     };
 
-    const runtimeSettings = await readSettings().catch(() => null) as Record<string, any> | null;
+    const runtimeSettings = (await readSettings().catch(() => null)) as Record<string, any> | null;
     const model = runtimeSettings?.executeModel || inst.config.model || 'deepseek-v4-pro';
     const planModel = runtimeSettings?.planModel || model;
     const apiBase = await resolveModelApiBase(model);
@@ -529,14 +564,18 @@ class AgentScheduler {
     const presetSpec = isPermissionPreset(runtimeSettings?.permissionPreset)
       ? PERMISSION_PRESETS[runtimeSettings.permissionPreset]
       : undefined;
-    const requestedSandbox = inst.config.sandboxMode === 'read'
-      || inst.config.sandboxMode === 'workspace-write'
-      || inst.config.sandboxMode === 'full'
-      ? inst.config.sandboxMode
-      : undefined;
-    const sandboxMode = requestedSandbox
-      ?? presetSpec?.sandboxMode
-      ?? (runtimeSettings?.sandboxMode === 'read' || runtimeSettings?.sandboxMode === 'workspace-write' || runtimeSettings?.sandboxMode === 'full'
+    const requestedSandbox =
+      inst.config.sandboxMode === 'read' ||
+      inst.config.sandboxMode === 'workspace-write' ||
+      inst.config.sandboxMode === 'full'
+        ? inst.config.sandboxMode
+        : undefined;
+    const sandboxMode =
+      requestedSandbox ??
+      presetSpec?.sandboxMode ??
+      (runtimeSettings?.sandboxMode === 'read' ||
+      runtimeSettings?.sandboxMode === 'workspace-write' ||
+      runtimeSettings?.sandboxMode === 'full'
         ? runtimeSettings.sandboxMode
         : 'workspace-write');
 
@@ -550,14 +589,16 @@ class AgentScheduler {
       // Renderer may not have a key yet (fresh install) — fall back to .env.
       apiKey: inst.config.apiKey || modelApiKey || process.env.DEEPSEEK_API_KEY || '',
       apiBase,
-      systemPrompt: inst.config.systemPrompt, projectRoot: inst.projectPath,
+      systemPrompt: inst.config.systemPrompt,
+      projectRoot: inst.projectPath,
       agentName: inst.config.name,
       tools,
-      signal: inst.abortController.signal, observer: inst.observer,
+      signal: inst.abortController.signal,
+      observer: inst.observer,
       // Bind this task's agentId so per-task permission prompts route to its view.
       checkPermission: checkPermission
         ? (tn: string, inp: Record<string, unknown>, tcid?: string) => checkPermission(tn, inp, tcid, agentId)
-        : (() => Promise.resolve(true)),
+        : () => Promise.resolve(true),
       autoApprove: inst.config.autoApprove ?? presetSpec?.autoApprove ?? false,
       mode: inst.config.mode || presetSpec?.mode || 'ask',
       workTier: inst.config.workTier,
@@ -566,12 +607,17 @@ class AgentScheduler {
       writableRoots: inst.config.writableRoots,
       approvedPlanSteps: inst.config.approvedPlanSteps,
       isDeepThink: inst.config.isDeepThink,
-      reasoningEffort: inst.config.reasoningEffort === 'medium'
-        ? 'high'
-        : inst.config.reasoningEffort as 'low' | 'high' | 'max' | undefined,
+      reasoningEffort:
+        inst.config.reasoningEffort === 'medium'
+          ? 'high'
+          : (inst.config.reasoningEffort as 'low' | 'high' | 'max' | undefined),
       toolChoice: inst.config.toolChoice,
       onPlanGenerated: (plan) =>
-        waitForPlanApproval(plan, win, { projectRoot: inst.projectPath, title: inst.config.name, agentId: inst.agentId }),
+        waitForPlanApproval(plan, win, {
+          projectRoot: inst.projectPath,
+          title: inst.config.name,
+          agentId: inst.agentId,
+        }),
       maxIterations: inst.maxIterations,
       goal: inst.config.goal,
       sandboxMode,
@@ -647,9 +693,11 @@ class AgentScheduler {
     const win = this.getWindow();
     notifyFrontend(win, inst);
     broadcast(win, agentId, {
-      type: 'agent:done', success: true,
+      type: 'agent:done',
+      success: true,
       summary: result.allText.slice(0, 500),
-      toolCallCount: result.toolCallCount, iterations: result.iterations,
+      toolCallCount: result.toolCallCount,
+      iterations: result.iterations,
     });
     if (needsDeliveryGate) {
       broadcast(win, agentId, {
@@ -663,9 +711,11 @@ class AgentScheduler {
     this.persistAgent(inst);
     if (!needsDeliveryGate) this.notifyTerminal(inst);
     // Lazy-import to avoid circular dep in test env
-    import('./conflict-detector').then(({ conflictDetector }) => {
-      conflictDetector.releaseAllForAgent(agentId);
-    }).catch(() => {});
+    import('./conflict-detector')
+      .then(({ conflictDetector }) => {
+        conflictDetector.releaseAllForAgent(agentId);
+      })
+      .catch(() => {});
     ptyRegistry.clearOwner(agentId);
   }
 
@@ -697,9 +747,11 @@ class AgentScheduler {
     this.pruneStale();
     this.persistAgent(inst);
     this.notifyTerminal(inst);
-    import('./conflict-detector').then(({ conflictDetector }) => {
-      conflictDetector.releaseAllForAgent(agentId);
-    }).catch(() => {});
+    import('./conflict-detector')
+      .then(({ conflictDetector }) => {
+        conflictDetector.releaseAllForAgent(agentId);
+      })
+      .catch(() => {});
     ptyRegistry.clearOwner(agentId);
   }
 
@@ -708,15 +760,15 @@ class AgentScheduler {
     if (pendingQueue.length === 0) return;
 
     // Sort by priority descending
-    pendingQueue.sort((a, b) => (PRIORITY_ORDER[b.priority || 'normal'] || 2) - (PRIORITY_ORDER[a.priority || 'normal'] || 2));
+    pendingQueue.sort(
+      (a, b) => (PRIORITY_ORDER[b.priority || 'normal'] || 2) - (PRIORITY_ORDER[a.priority || 'normal'] || 2),
+    );
 
     const runningCount = [...instances.values()].filter((i) => i.status === 'running').length;
     let started = 0;
     for (let qi = 0; qi < pendingQueue.length && runningCount + started < maxConcurrent; qi++) {
       const config = pendingQueue[qi];
-      const entry = [...instances.entries()].find(
-        ([, inst]) => inst.status === 'queued' && inst.config === config,
-      );
+      const entry = [...instances.entries()].find(([, inst]) => inst.status === 'queued' && inst.config === config);
       if (!entry) continue;
       const [id] = entry;
       pendingQueue.splice(qi, 1);
@@ -854,7 +906,11 @@ class AgentScheduler {
    * and the loop resumes from the saved transcript (no re-planning), so the
    * sidebar keeps one task instead of spawning a fresh one.
    */
-  async continueAgent(agentId: string, instruction: string, displayInstruction?: string): Promise<{ ok: boolean; error?: string }> {
+  async continueAgent(
+    agentId: string,
+    instruction: string,
+    displayInstruction?: string,
+  ): Promise<{ ok: boolean; error?: string }> {
     let inst = instances.get(agentId);
     if (!inst) {
       // Completed tasks older than the prune window (1h / 50-cap) were dropped
@@ -865,7 +921,12 @@ class AgentScheduler {
       inst = instances.get(agentId);
       if (!inst) return { ok: false, error: '任务不存在或已被清理，无法续写' };
     }
-    if (inst.status !== 'completed' && inst.status !== 'error' && inst.status !== 'stopped' && inst.status !== 'review') {
+    if (
+      inst.status !== 'completed' &&
+      inst.status !== 'error' &&
+      inst.status !== 'stopped' &&
+      inst.status !== 'review'
+    ) {
       return { ok: false, error: `任务当前状态为 ${inst.status}，无法续写` };
     }
     let history = inst.lastMessages;
@@ -943,13 +1004,29 @@ class AgentScheduler {
     if (!inst) return null;
     return {
       iteration: inst.iterations,
-      toolCallCount: inst.toolCallCount, messagesCount: inst.log.length,
+      toolCallCount: inst.toolCallCount,
+      messagesCount: inst.log.length,
       plan: inst.plan ?? null,
       surface: inst.config.surface,
     };
   }
 
-  getAllAgentStates(): Array<AgentStateSnapshot & { agentId: string; name: string; status: string; priority: string; startTime?: number; endTime?: number; model?: string; maxIterations?: number; error?: string; result?: string; type?: string; description?: string }> {
+  getAllAgentStates(): Array<
+    AgentStateSnapshot & {
+      agentId: string;
+      name: string;
+      status: string;
+      priority: string;
+      startTime?: number;
+      endTime?: number;
+      model?: string;
+      maxIterations?: number;
+      error?: string;
+      result?: string;
+      type?: string;
+      description?: string;
+    }
+  > {
     const result: Array<any> = [];
     for (const [id, inst] of instances) {
       result.push({
@@ -1017,9 +1094,20 @@ class AgentScheduler {
     const queued: any[] = [];
     for (const [id, inst] of instances) {
       if (inst.status === 'running' || inst.status === 'paused') {
-        running.push({ agentId: id, name: inst.config.name, status: inst.status, priority: inst.priority, startTime: inst.startTime });
+        running.push({
+          agentId: id,
+          name: inst.config.name,
+          status: inst.status,
+          priority: inst.priority,
+          startTime: inst.startTime,
+        });
       } else if (inst.status === 'queued') {
-        queued.push({ agentId: id, name: inst.config.name, priority: inst.priority, queuePosition: inst.queuePosition });
+        queued.push({
+          agentId: id,
+          name: inst.config.name,
+          priority: inst.priority,
+          queuePosition: inst.queuePosition,
+        });
       }
     }
     return { running, queued };
@@ -1085,9 +1173,11 @@ class AgentScheduler {
       inst.pauseSettled = undefined;
     }
     ptyRegistry.clearOwner(agentId);
-    import('./conflict-detector').then(({ conflictDetector }) => {
-      conflictDetector.releaseAllForAgent(agentId);
-    }).catch(() => {});
+    import('./conflict-detector')
+      .then(({ conflictDetector }) => {
+        conflictDetector.releaseAllForAgent(agentId);
+      })
+      .catch(() => {});
     instances.delete(agentId);
     void removeAgentSnapshot(agentId).catch(() => {});
     void removeFtsDoc(agentId).catch(() => {});
@@ -1122,7 +1212,7 @@ class AgentScheduler {
     };
 
     for (const [id, inst] of instances) {
-      if (isTerminal(inst.status) && inst.endTime && (now - inst.endTime) > olderThanMs) {
+      if (isTerminal(inst.status) && inst.endTime && now - inst.endTime > olderThanMs) {
         drop(id);
       }
     }
@@ -1153,7 +1243,10 @@ export function registerSchedulerIpc() {
       // folder) would otherwise blow up as an unhandled ENOENT in copyDir.
       const projectPath = await resolveTrustedProjectRoot(params.projectPath);
       if (!projectPath || !existsSync(projectPath)) {
-        return { ok: false, error: `项目目录不存在或未设置: ${params.projectPath || '(空)'}。请先在输入框选择有效的项目目录。` };
+        return {
+          ok: false,
+          error: `项目目录不存在或未设置: ${params.projectPath || '(空)'}。请先在输入框选择有效的项目目录。`,
+        };
       }
       // Backend-enforced mode isolation: chat mode must never create Agent tasks.
       if (params.config.surface === 'chat') {
@@ -1170,11 +1263,10 @@ export function registerSchedulerIpc() {
             // would silently approve the "continue after failed review?"
             // checkpoint. Forcing mode 'ask' for this synthetic request keeps
             // the pause real without changing the task's own policy.
-            const isReviewGate =
-              toolName === 'ReviewArtifact'
-              && input?.action === 'continue_after_failed_review';
+            const isReviewGate = toolName === 'ReviewArtifact' && input?.action === 'continue_after_failed_review';
             return requestPermission(toolName, input, win!, toolCallId, {
-              mode: isReviewGate || params.config.workTier === 'full' ? 'ask' : normalizeApprovalPolicy(params.config.mode),
+              mode:
+                isReviewGate || params.config.workTier === 'full' ? 'ask' : normalizeApprovalPolicy(params.config.mode),
               approvedPlanSteps: params.config.approvedPlanSteps,
               projectRoot: projectPath,
               agentId,
@@ -1182,12 +1274,17 @@ export function registerSchedulerIpc() {
           };
       const agentId = scheduler.startAgent(params.config, projectPath, checkPermission);
       return { ok: true, data: { agentId } };
-    } catch (error: any) { return { ok: false, error: error.message }; }
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
+    }
   });
 
   secureHandle('agent:schedulerStop', async (_e, agentId: string) => {
-    try { return { ok: true, data: { stopped: scheduler.stopAgent(agentId) } }; }
-    catch (error: any) { return { ok: false, error: error.message }; }
+    try {
+      return { ok: true, data: { stopped: scheduler.stopAgent(agentId) } };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
+    }
   });
 
   secureHandle('agent:sendMessage', async (_e, agentId: string, message: string) => {
@@ -1200,22 +1297,30 @@ export function registerSchedulerIpc() {
       const viaSub = sendMessageToSubAgent(agentId, message);
       if (viaSub.ok) return { ok: true, data: { delivered: true, queued: true } };
       return { ok: false, error: viaSub.error };
-    } catch (error: any) { return { ok: false, error: error.message }; }
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
+    }
   });
 
   secureHandle('agent:pause', async (_e, agentId: string) => {
     // await pauseAgent — its Promise only resolves after the loop's .then has
     // written savedState, so the renderer can immediately call agent:resume
     // without racing the capture.
-    try { return { ok: true, data: { paused: await scheduler.pauseAgent(agentId) } }; }
-    catch (error: any) { return { ok: false, error: error.message }; }
+    try {
+      return { ok: true, data: { paused: await scheduler.pauseAgent(agentId) } };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
+    }
   });
 
   secureHandle('agent:resume', async (_e, agentId: string) => {
     // resumeAgent now async — awaits any in-flight pauseSettled so savedState
     // is guaranteed captured before dequeueAndStart reads it.
-    try { return { ok: true, data: { resumed: await scheduler.resumeAgent(agentId) } }; }
-    catch (error: any) { return { ok: false, error: error.message }; }
+    try {
+      return { ok: true, data: { resumed: await scheduler.resumeAgent(agentId) } };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
+    }
   });
 
   secureHandle('agent:continue', async (_e, agentId: string, instruction: string, displayInstruction?: string) => {
@@ -1224,10 +1329,10 @@ export function registerSchedulerIpc() {
       assertString(instruction, 'instruction');
       if (displayInstruction !== undefined) assertString(displayInstruction, 'displayInstruction');
       const r = await scheduler.continueAgent(agentId, instruction, displayInstruction);
-      return r.ok
-        ? { ok: true, data: { continued: true } }
-        : { ok: false, error: r.error };
-    } catch (error: any) { return { ok: false, error: error.message }; }
+      return r.ok ? { ok: true, data: { continued: true } } : { ok: false, error: r.error };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
+    }
   });
 
   secureHandle('agent:approveDelivery', async (_e, agentId: string) => {
@@ -1235,41 +1340,60 @@ export function registerSchedulerIpc() {
       assertString(agentId, 'agentId');
       const ok = scheduler.approveDelivery(agentId);
       return ok ? { ok: true, data: { approved: true } } : { ok: false, error: '任务不存在或不在待验收状态' };
-    } catch (error: any) { return { ok: false, error: error.message }; }
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
+    }
   });
 
   secureHandle('agent:setPriority', async (_e, agentId: string, priority: string) => {
-    try { return { ok: true, data: { set: scheduler.setPriority(agentId, priority as any) } }; }
-    catch (error: any) { return { ok: false, error: error.message }; }
+    try {
+      return { ok: true, data: { set: scheduler.setPriority(agentId, priority as any) } };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
+    }
   });
 
   secureHandle('agent:getQueue', async () => {
-    try { return { ok: true, data: scheduler.getQueue() }; }
-    catch (error: any) { return { ok: false, error: error.message }; }
+    try {
+      return { ok: true, data: scheduler.getQueue() };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
+    }
   });
 
   secureHandle('agent:setMaxConcurrent', async (_e, n: number) => {
-    try { scheduler.setMaxConcurrent(n); return { ok: true }; }
-    catch (error: any) { return { ok: false, error: error.message }; }
+    try {
+      scheduler.setMaxConcurrent(n);
+      return { ok: true };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
+    }
   });
 
   secureHandle('agent:getAll', async () => {
-    try { return { ok: true, data: scheduler.getAllAgentStates() }; }
-    catch (error: any) { return { ok: false, error: error.message }; }
+    try {
+      return { ok: true, data: scheduler.getAllAgentStates() };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
+    }
   });
 
   secureHandle('agent:schedulerRemove', async (_e, agentId: string) => {
     try {
       const removed = scheduler.removeAgent(agentId);
       return { ok: true, data: { removed } };
-    } catch (error: any) { return { ok: false, error: error.message }; }
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
+    }
   });
 
   secureHandle('agent:clearAll', async () => {
     try {
       const cleared = scheduler.clearAll();
       return { ok: true, data: { cleared } };
-    } catch (error: any) { return { ok: false, error: error.message }; }
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
+    }
   });
 
   secureHandle('agent:getState', async (_e, agentId: string) => {
@@ -1277,10 +1401,14 @@ export function registerSchedulerIpc() {
       const state = scheduler.getAgentState(agentId);
       if (!state) return { ok: false, error: 'Agent not found' };
       return { ok: true, data: state };
-    } catch (error: any) { return { ok: false, error: error.message }; }
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
+    }
   });
 
   // Durable checkpoints: persist in-flight work on quit, restore on startup.
-  app.on('before-quit', () => { scheduler.persistRunning(); });
+  app.on('before-quit', () => {
+    scheduler.persistRunning();
+  });
   void scheduler.restoreSnapshots();
 }

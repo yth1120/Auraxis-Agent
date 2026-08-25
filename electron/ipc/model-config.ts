@@ -1,4 +1,5 @@
 import { readSettings } from './settings-store';
+import { getDeepSeekBaseUrl } from '../api-config';
 import { BUILT_IN_MODELS } from '../types';
 import type { ModelDefinition } from '../types';
 
@@ -10,11 +11,11 @@ export function getProvider(_modelId: string): 'deepseek' {
 
 /**
  * Default API endpoint: OpenAI-compatible format (verified stable).
- * Set DEEPSEEK_ANTHROPIC_BASE_URL to opt into the Anthropic-compatible endpoint
- * (https://api.deepseek.com/anthropic/v1/messages) — native thinking blocks, structured SSE.
+ * Set DEEPSEEK_ANTHROPIC_BASE_URL to opt into the Anthropic-compatible endpoint,
+ * which provides native thinking blocks and structured SSE.
  */
 export function getDefaultApiBase(): string {
-  return process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com/beta/chat/completions';
+  return getDeepSeekBaseUrl();
 }
 
 /** Parse custom models from AURAXIS_MODELS env var (JSON) — cached */
@@ -23,20 +24,28 @@ function parseEnvModels(): ModelDefinition[] {
   if (_cachedEnvModels) return _cachedEnvModels;
   try {
     const raw = process.env.AURAXIS_MODELS;
-    if (!raw) { _cachedEnvModels = []; return []; }
+    if (!raw) {
+      _cachedEnvModels = [];
+      return [];
+    }
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) { _cachedEnvModels = []; return []; }
-    _cachedEnvModels = parsed.filter((m: any) => m?.id && m?.name).map((m: any) => ({
-      id: m.id,
-      name: m.name,
-      provider: 'deepseek' as const,
-      maxTokens: m.maxTokens,
-      contextWindow: m.contextWindow ?? m.context_window,
-      supportsImages: m.supportsImages ?? m.supports_images,
-      experimental: m.experimental ?? false,
-      apiBase: m.apiBase || m.api_base,
-      apiKey: m.apiKey || m.api_key,
-    }));
+    if (!Array.isArray(parsed)) {
+      _cachedEnvModels = [];
+      return [];
+    }
+    _cachedEnvModels = parsed
+      .filter((m: any) => m?.id && m?.name)
+      .map((m: any) => ({
+        id: m.id,
+        name: m.name,
+        provider: 'deepseek' as const,
+        maxTokens: m.maxTokens,
+        contextWindow: m.contextWindow ?? m.context_window,
+        supportsImages: m.supportsImages ?? m.supports_images,
+        experimental: m.experimental ?? false,
+        apiBase: m.apiBase || m.api_base,
+        apiKey: m.apiKey || m.api_key,
+      }));
     return _cachedEnvModels;
   } catch {
     _cachedEnvModels = [];
@@ -62,7 +71,9 @@ export async function resolveModelApiBase(modelId: string): Promise<string> {
     const saved = settings.customModels as ModelDefinition[] | undefined;
     const savedMatch = Array.isArray(saved) ? saved.find((m) => m.id === modelId) : undefined;
     if (savedMatch?.apiBase) return savedMatch.apiBase;
-  } catch { /* 设置不可读时回退默认端点 */ }
+  } catch {
+    /* 设置不可读时回退默认端点 */
+  }
   return getDefaultApiBase();
 }
 
@@ -76,7 +87,9 @@ export async function resolveModelApiKey(modelId: string): Promise<string | unde
     const saved = settings.customModels as ModelDefinition[] | undefined;
     const savedMatch = Array.isArray(saved) ? saved.find((m) => m.id === modelId) : undefined;
     if (savedMatch?.apiKey) return savedMatch.apiKey;
-  } catch { /* 设置不可读时回退默认密钥 */ }
+  } catch {
+    /* 设置不可读时回退默认密钥 */
+  }
   return undefined;
 }
 

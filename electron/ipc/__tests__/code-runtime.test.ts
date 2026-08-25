@@ -1,4 +1,4 @@
-import { describe, it, expect , beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { spawnSync } from 'child_process';
 import { runCode } from '../../code-runtime';
 
@@ -10,10 +10,15 @@ const hasPython = (() => {
   }
 })();
 
-
 let UNSAFE_OLD: string | undefined;
-beforeAll(() => { UNSAFE_OLD = process.env.AURAXIS_ALLOW_UNSAFE_CODE; process.env.AURAXIS_ALLOW_UNSAFE_CODE = '1'; });
-afterAll(() => { if (UNSAFE_OLD === undefined) delete process.env.AURAXIS_ALLOW_UNSAFE_CODE; else process.env.AURAXIS_ALLOW_UNSAFE_CODE = UNSAFE_OLD; });
+beforeAll(() => {
+  UNSAFE_OLD = process.env.AURAXIS_ALLOW_UNSAFE_CODE;
+  process.env.AURAXIS_ALLOW_UNSAFE_CODE = '1';
+});
+afterAll(() => {
+  if (UNSAFE_OLD === undefined) delete process.env.AURAXIS_ALLOW_UNSAFE_CODE;
+  else process.env.AURAXIS_ALLOW_UNSAFE_CODE = UNSAFE_OLD;
+});
 describe('code-runtime', () => {
   it('runs JavaScript and captures stdout', async () => {
     const r = await runCode({ language: 'javascript', code: 'console.log(6 * 7)' });
@@ -34,7 +39,10 @@ describe('code-runtime', () => {
   });
 
   it('caps output size', async () => {
-    const r = await runCode({ language: 'javascript', code: 'for (let i = 0; i < 20000; i++) console.log("x".repeat(20));' });
+    const r = await runCode({
+      language: 'javascript',
+      code: 'for (let i = 0; i < 20000; i++) console.log("x".repeat(20));',
+    });
     expect(r.truncated).toBe(true);
     expect(r.stdout.length).toBeLessThanOrEqual(50_000);
   });

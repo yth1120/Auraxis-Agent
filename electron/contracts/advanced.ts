@@ -12,11 +12,7 @@ export { normalizeApprovalPolicy } from './core';
 export * from './permission';
 
 /** DeepSeek tool_choice：auto / none / required / 强制指定某个工具。 */
-export type DeepSeekToolChoice =
-  | 'auto'
-  | 'none'
-  | 'required'
-  | { type: 'function'; function: { name: string } };
+export type DeepSeekToolChoice = 'auto' | 'none' | 'required' | { type: 'function'; function: { name: string } };
 
 /** Work 模式执行自主度（档位）。
  *  · plan  — 计划确认：先规划并审批，审批后计划内动作自动执行。
@@ -86,7 +82,16 @@ export interface PermissionRequest {
 export type AgentStatus = 'idle' | 'running' | 'completed' | 'error' | 'stopped' | 'review';
 
 export interface AgentLogEntry {
-  type: 'text' | 'tool_start' | 'tool_end' | 'tool_error' | 'iteration_start' | 'iteration_end' | 'error' | 'plan' | 'context';
+  type:
+    | 'text'
+    | 'tool_start'
+    | 'tool_end'
+    | 'tool_error'
+    | 'iteration_start'
+    | 'iteration_end'
+    | 'error'
+    | 'plan'
+    | 'context';
   timestamp: number;
   text?: string;
   toolCallId?: string;

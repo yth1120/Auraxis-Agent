@@ -142,11 +142,7 @@ export const KEY_BINDINGS: KeyBinding[] = [
   },
 ];
 
-export function matchBinding(
-  e: KeyboardEvent,
-  binding: KeyBinding,
-  platform?: string,
-): boolean {
+export function matchBinding(e: KeyboardEvent, binding: KeyBinding, platform?: string): boolean {
   // Ctrl-bindings are Cmd-equivalent on macOS only. Treating Meta as Ctrl
   // everywhere makes Windows' Win key hijack app shortcuts (e.g. Win+K).
   const mac = /Mac|iPhone|iPad/.test(platform ?? (typeof navigator !== 'undefined' ? navigator.platform : ''));

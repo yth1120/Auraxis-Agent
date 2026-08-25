@@ -49,16 +49,20 @@ describe('agent-orchestration — 脚本/插件使用的多 Agent 编排面', ()
       ok: true,
       output: 'done',
     });
-    expect(agentHandlersMock.runSubAgent).toHaveBeenCalledWith(expect.objectContaining({
-      projectRoot: '/proj',
-      requestId: 'r1',
-      depth: 2,
-      subagentType: 'general-purpose',
-      autoApprove: false,
-    }));
+    expect(agentHandlersMock.runSubAgent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectRoot: '/proj',
+        requestId: 'r1',
+        depth: 2,
+        subagentType: 'general-purpose',
+        autoApprove: false,
+      }),
+    );
 
     vi.mocked(agentHandlersMock.runSubAgent).mockResolvedValue({ ok: false, error: '权限拒绝' });
-    await expect(orchestrateRunSubAgent(caller, { description: 'd', prompt: 'p', subagentType: 'Explore' })).resolves.toEqual({
+    await expect(
+      orchestrateRunSubAgent(caller, { description: 'd', prompt: 'p', subagentType: 'Explore' }),
+    ).resolves.toEqual({
       ok: false,
       error: '权限拒绝',
     });
@@ -76,22 +80,26 @@ describe('agent-orchestration — 脚本/插件使用的多 Agent 编排面', ()
   });
 
   it('listAgents 合并调度器任务与子代理', async () => {
-    vi.mocked(schedulerMock.getAgentInstances).mockReturnValue([{
-      agentId: 't1',
-      name: '重构',
-      description: 'd',
-      status: 'running',
-      startTime: 1,
-      endTime: null,
-    }]);
-    vi.mocked(agentHandlersMock.getSubAgentStates).mockReturnValue([{
-      id: 's1',
-      name: '子代理',
-      description: 'd',
-      status: 'completed',
-      parentAgentId: 'p1',
-      reports: [{ id: 'x', text: 'ok', ts: 1 }],
-    }]);
+    vi.mocked(schedulerMock.getAgentInstances).mockReturnValue([
+      {
+        agentId: 't1',
+        name: '重构',
+        description: 'd',
+        status: 'running',
+        startTime: 1,
+        endTime: null,
+      },
+    ]);
+    vi.mocked(agentHandlersMock.getSubAgentStates).mockReturnValue([
+      {
+        id: 's1',
+        name: '子代理',
+        description: 'd',
+        status: 'completed',
+        parentAgentId: 'p1',
+        reports: [{ id: 'x', text: 'ok', ts: 1 }],
+      },
+    ]);
     const list = await orchestrateListAgents();
     expect(list).toHaveLength(2);
     expect(list[0]).toMatchObject({ id: 't1', type: 'task' });

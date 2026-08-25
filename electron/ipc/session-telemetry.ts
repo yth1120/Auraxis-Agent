@@ -31,10 +31,27 @@ export interface TelemetryEvent {
 
 /** Metadata keys allowed to leave the machine — everything else is dropped. */
 const ALLOWED_KEYS = new Set([
-  'type', 'ts', 'seq', 'action', 'event', 'toolName', 'status', 'level',
-  'model', 'provider', 'iteration', 'durationMs', 'exitCode',
-  'tokensBefore', 'tokensAfter', 'messagesRemoved', 'tokensSaved',
-  'messageCount', 'eventCount', 'source', 'producer',
+  'type',
+  'ts',
+  'seq',
+  'action',
+  'event',
+  'toolName',
+  'status',
+  'level',
+  'model',
+  'provider',
+  'iteration',
+  'durationMs',
+  'exitCode',
+  'tokensBefore',
+  'tokensAfter',
+  'messagesRemoved',
+  'tokensSaved',
+  'messageCount',
+  'eventCount',
+  'source',
+  'producer',
 ]);
 
 export function redactTelemetryEvent(e: Record<string, unknown>): Record<string, unknown> {
@@ -98,7 +115,9 @@ export function resetTelemetryBuffer(): void {
 // Flush whatever is left when the app quits (best-effort).
 try {
   if (typeof app?.on === 'function') {
-    app.on('before-quit', () => { void flushTelemetry(); });
+    app.on('before-quit', () => {
+      void flushTelemetry();
+    });
   }
 } catch {
   /* headless/test environments without a full electron app */

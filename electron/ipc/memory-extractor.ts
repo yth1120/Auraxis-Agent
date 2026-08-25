@@ -57,13 +57,9 @@ function buildExistingMemoriesText(
     .join('\n');
 }
 
-function buildToolResultsText(
-  results: { toolName: string; summary: string; success: boolean }[],
-): string {
+function buildToolResultsText(results: { toolName: string; summary: string; success: boolean }[]): string {
   if (!results || results.length === 0) return '（无工具执行记录）';
-  return results
-    .map((r) => `[${r.success ? '成功' : '失败'}] ${r.toolName}: ${r.summary}`)
-    .join('\n');
+  return results.map((r) => `[${r.success ? '成功' : '失败'}] ${r.toolName}: ${r.summary}`).join('\n');
 }
 
 export function buildEvidenceContextText(evidence: EvidenceRecord[] | undefined): string {
@@ -126,7 +122,7 @@ function similarityScore(a: string, b: string): number {
   // Simple word-overlap Jaccard index
   const aWords = new Set(al.split(/\s+/));
   const bWords = new Set(bl.split(/\s+/));
-  const intersection = new Set([...aWords].filter(w => bWords.has(w)));
+  const intersection = new Set([...aWords].filter((w) => bWords.has(w)));
   const union = new Set([...aWords, ...bWords]);
   return union.size === 0 ? 0 : intersection.size / union.size;
 }
@@ -156,7 +152,10 @@ function parseExtractedJson(raw: string): ExtractedMemory[] {
   // Strip markdown fences if present
   let json = raw.trim();
   if (json.startsWith('```')) {
-    json = json.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '').trim();
+    json = json
+      .replace(/^```(?:json)?\s*/, '')
+      .replace(/\s*```$/, '')
+      .trim();
   }
 
   try {
@@ -171,9 +170,7 @@ function parseExtractedJson(raw: string): ExtractedMemory[] {
         content: String(item.content).slice(0, 500),
         tags: Array.isArray(item.tags) ? item.tags.map(String).slice(0, 10) : [],
         importance: Math.min(5, Math.max(1, Number(item.importance) || 3)),
-        evidenceIds: Array.isArray(item.evidence_ids)
-          ? item.evidence_ids.map(String).filter(Boolean).slice(0, 8)
-          : [],
+        evidenceIds: Array.isArray(item.evidence_ids) ? item.evidence_ids.map(String).filter(Boolean).slice(0, 8) : [],
       }));
   } catch {
     return [];
@@ -182,10 +179,7 @@ function parseExtractedJson(raw: string): ExtractedMemory[] {
 
 // ─── Main export ───────────────────────────────────────
 
-export async function extractMemories(
-  ctx: SessionContext,
-  config: ExtractorConfig,
-): Promise<ExtractedMemory[]> {
+export async function extractMemories(ctx: SessionContext, config: ExtractorConfig): Promise<ExtractedMemory[]> {
   const prompt = buildExtractionPrompt(ctx);
 
   try {

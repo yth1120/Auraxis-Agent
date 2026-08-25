@@ -62,9 +62,7 @@ export async function readSettings(): Promise<Record<string, unknown>> {
         if (settings[key].startsWith('enc:')) {
           try {
             const buf = Buffer.from(settings[key].slice(4), 'base64');
-            settings[key] = safeStorage.isEncryptionAvailable()
-              ? safeStorage.decryptString(buf)
-              : settings[key];
+            settings[key] = safeStorage.isEncryptionAvailable() ? safeStorage.decryptString(buf) : settings[key];
           } catch {
             // Cannot decrypt, remove key
             delete settings[key];
@@ -81,9 +79,7 @@ export async function readSettings(): Promise<Record<string, unknown>> {
         if (typeof m.apiKey === 'string' && m.apiKey.startsWith('enc:')) {
           try {
             const buf = Buffer.from(m.apiKey.slice(4), 'base64');
-            m.apiKey = safeStorage.isEncryptionAvailable()
-              ? safeStorage.decryptString(buf)
-              : m.apiKey;
+            m.apiKey = safeStorage.isEncryptionAvailable() ? safeStorage.decryptString(buf) : m.apiKey;
           } catch {
             delete m.apiKey;
           }

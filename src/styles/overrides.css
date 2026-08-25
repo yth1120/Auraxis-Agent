@@ -11,15 +11,15 @@
 .ant-modal-content {
   border: none !important;
   box-shadow:
-    0 0 0 1px rgba(0,0,0,0.08),
-    0 4px 16px rgba(0,0,0,0.10),
-    0 12px 36px rgba(0,0,0,0.14) !important;
+    0 0 0 1px rgba(0, 0, 0, 0.08),
+    0 4px 16px rgba(0, 0, 0, 0.1),
+    0 12px 36px rgba(0, 0, 0, 0.14) !important;
 }
 .dark .ant-modal-content {
   box-shadow:
-    0 0 0 1px rgba(255,255,255,0.08),
-    0 4px 16px rgba(0,0,0,0.35),
-    0 12px 40px rgba(0,0,0,0.50) !important;
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 4px 16px rgba(0, 0, 0, 0.35),
+    0 12px 40px rgba(0, 0, 0, 0.5) !important;
 }
 
 .ant-modal-header {
@@ -90,15 +90,15 @@
 .ant-dropdown-menu {
   border: none !important;
   box-shadow:
-    0 0 0 1px rgba(0,0,0,0.08),
-    0 4px 16px rgba(0,0,0,0.10),
-    0 12px 28px rgba(0,0,0,0.14) !important;
+    0 0 0 1px rgba(0, 0, 0, 0.08),
+    0 4px 16px rgba(0, 0, 0, 0.1),
+    0 12px 28px rgba(0, 0, 0, 0.14) !important;
 }
 .dark .ant-dropdown-menu {
   box-shadow:
-    0 0 0 1px rgba(255,255,255,0.08),
-    0 4px 16px rgba(0,0,0,0.35),
-    0 12px 28px rgba(0,0,0,0.50) !important;
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 4px 16px rgba(0, 0, 0, 0.35),
+    0 12px 28px rgba(0, 0, 0, 0.5) !important;
 }
 
 .ant-dropdown-menu {
@@ -115,16 +115,16 @@
   border: none !important;
   border-radius: 12px !important;
   box-shadow:
-    0 0 0 1px rgba(0,0,0,0.08),
-    0 4px 12px rgba(0,0,0,0.10),
-    0 8px 24px rgba(0,0,0,0.14) !important;
+    0 0 0 1px rgba(0, 0, 0, 0.08),
+    0 4px 12px rgba(0, 0, 0, 0.1),
+    0 8px 24px rgba(0, 0, 0, 0.14) !important;
 }
 .dark .ant-popover-inner,
 .dark .ant-popconfirm .ant-popover-inner {
   box-shadow:
-    0 0 0 1px rgba(255,255,255,0.08),
-    0 4px 12px rgba(0,0,0,0.35),
-    0 8px 24px rgba(0,0,0,0.50) !important;
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 4px 12px rgba(0, 0, 0, 0.35),
+    0 8px 24px rgba(0, 0, 0, 0.5) !important;
 }
 
 .ant-popconfirm .ant-btn {
@@ -136,40 +136,44 @@
 .ant-tooltip-inner {
   border: none !important;
   border-radius: 8px !important;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.18) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18) !important;
 }
 .dark .ant-tooltip-inner {
-  box-shadow: 0 2px 8px rgba(0,0,0,0.55) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.55) !important;
 }
 
 .ant-card {
   border: none !important;
-  box-shadow: 0 0 0 1px rgba(0,0,0,0.06), var(--shadow-sm);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.06),
+    var(--shadow-sm);
 }
 .dark .ant-card {
-  box-shadow: 0 0 0 1px rgba(255,255,255,0.08), var(--shadow-sm);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    var(--shadow-sm);
 }
 
 .ant-notification-notice {
   border: none !important;
   border-radius: 12px !important;
   box-shadow:
-    0 0 0 1px rgba(0,0,0,0.08),
-    0 4px 16px rgba(0,0,0,0.10),
-    0 12px 28px rgba(0,0,0,0.14) !important;
+    0 0 0 1px rgba(0, 0, 0, 0.08),
+    0 4px 16px rgba(0, 0, 0, 0.1),
+    0 12px 28px rgba(0, 0, 0, 0.14) !important;
 }
 
 .ant-message .ant-message-notice-content {
   border-radius: 12px !important;
   box-shadow:
-    0 0 0 1px rgba(0,0,0,0.06),
-    0 4px 12px rgba(0,0,0,0.10) !important;
+    0 0 0 1px rgba(0, 0, 0, 0.06),
+    0 4px 12px rgba(0, 0, 0, 0.1) !important;
 }
 
 .dark .ant-message .ant-message-notice-content {
   box-shadow:
-    0 0 0 1px rgba(255,255,255,0.08),
-    0 4px 12px rgba(0,0,0,0.35) !important;
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 4px 12px rgba(0, 0, 0, 0.35) !important;
 }
 
 /* ── Input focus/hover: quiet hover, primary activation ring ── */
@@ -378,7 +382,9 @@ button:not(.ant-btn)[aria-pressed='true'],
   height: 28px;
   border-radius: 2px;
   background: var(--color-border-default);
-  transition: background 0.15s ease, height 0.15s ease;
+  transition:
+    background 0.15s ease,
+    height 0.15s ease;
 }
 
 .workbench-layout .sash:hover::after {

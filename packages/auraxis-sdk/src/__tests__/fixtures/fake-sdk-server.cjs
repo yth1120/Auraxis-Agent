@@ -15,11 +15,14 @@ const server = net.createServer((socket) => {
       try {
         req = JSON.parse(line);
       } catch {
-        socket.write(`${JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } })}\n`);
+        socket.write(
+          `${JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } })}\n`,
+        );
         continue;
       }
       const reply = (result) => socket.write(`${JSON.stringify({ jsonrpc: '2.0', id: req.id, result })}\n`);
-      const fail = (code, message) => socket.write(`${JSON.stringify({ jsonrpc: '2.0', id: req.id, error: { code, message } })}\n`);
+      const fail = (code, message) =>
+        socket.write(`${JSON.stringify({ jsonrpc: '2.0', id: req.id, error: { code, message } })}\n`);
       switch (req.method) {
         case 'ping':
           reply({ pong: true, time: 1 });

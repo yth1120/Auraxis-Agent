@@ -1,4 +1,5 @@
-import { ipcMain, BrowserWindow, app } from 'electron';
+import { errorText } from '../errors';
+import { BrowserWindow, app } from 'electron';
 import { secureHandle } from './trust';
 import { resolveTrustedProjectRoot } from './project-access';
 import type { TaskPlan } from './agent-loop';
@@ -65,26 +66,32 @@ export function registerPlanHandlers(): void {
       const root = params?.projectRoot ? await resolveTrustedProjectRoot(params.projectRoot) : undefined;
       const data = await listPlanFiles(root, app.getPath('userData'));
       return { ok: true, data };
-    } catch (error: any) {
-      return { ok: false, error: error?.message ?? String(error) };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
-  secureHandle('plan:approve', async (_event, params: {
-    planId: string;
-    approvedStepIds: string[];
-  }) => {
-    const pending = pendingApprovals.get(params.planId);
-    if (!pending) {
-      return { ok: false, error: '未找到对应的计划审批请求（可能已超时）' };
-    }
-    clearTimeout(pending.timer);
-    pendingApprovals.delete(params.planId);
+  secureHandle(
+    'plan:approve',
+    async (
+      _event,
+      params: {
+        planId: string;
+        approvedStepIds: string[];
+      },
+    ) => {
+      const pending = pendingApprovals.get(params.planId);
+      if (!pending) {
+        return { ok: false, error: '未找到对应的计划审批请求（可能已超时）' };
+      }
+      clearTimeout(pending.timer);
+      pendingApprovals.delete(params.planId);
 
-    // Resolve with the approved step IDs (empty array = reject all)
-    pending.resolve(params.approvedStepIds.length > 0 ? params.approvedStepIds : null);
-    return { ok: true };
-  });
+      // Resolve with the approved step IDs (empty array = reject all)
+      pending.resolve(params.approvedStepIds.length > 0 ? params.approvedStepIds : null);
+      return { ok: true };
+    },
+  );
 
   secureHandle('plan:reject', async (_event, params: { planId: string }) => {
     const pending = pendingApprovals.get(params.planId);

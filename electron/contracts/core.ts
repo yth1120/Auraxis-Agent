@@ -119,7 +119,13 @@ export interface ModelDefinition {
 }
 
 export const BUILT_IN_MODELS: ModelDefinition[] = [
-  { id: 'deepseek-v4-flash', name: 'DeepSeek V4 Flash', provider: 'deepseek', maxTokens: 384000, contextWindow: 1_000_000 },
+  {
+    id: 'deepseek-v4-flash',
+    name: 'DeepSeek V4 Flash',
+    provider: 'deepseek',
+    maxTokens: 384000,
+    contextWindow: 1_000_000,
+  },
   { id: 'deepseek-v4-pro', name: 'DeepSeek V4 Pro', provider: 'deepseek', maxTokens: 384000, contextWindow: 1_000_000 },
   {
     id: 'deepseek-v4-flash-vision-exp',
@@ -179,9 +185,10 @@ export function normalizeDeepSeekMessageContent(message: ApiMessage, model: stri
 
   const filtered = content.filter((part) => {
     if (!isApiImagePart(part)) return true;
-    const url = (part as Record<string, unknown>).type === 'image_url'
-      ? ((part as Record<string, unknown>).image_url as Record<string, unknown> | undefined)?.url
-      : undefined;
+    const url =
+      (part as Record<string, unknown>).type === 'image_url'
+        ? ((part as Record<string, unknown>).image_url as Record<string, unknown> | undefined)?.url
+        : undefined;
     if (typeof url !== 'string') return true;
     const mime = /^data:image\/([^;]+);/i.exec(url);
     return !mime || DEEPSEEK_IMAGE_MIME_TYPES.has(mime[1].toLowerCase());

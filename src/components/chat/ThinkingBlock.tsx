@@ -37,24 +37,22 @@ export default memo(function ThinkingBlock({ blocks, isStreaming }: ThinkingBloc
         aria-label={isStreaming ? t('msg.thinkingStreaming') : t('msg.thinkingDone')}
       >
         <span className="ax-tool-row-leading">
-          {userOpen
-            ? <DownOutlined className="ax-tool-row-chevron" />
-            : (
-              <>
-                <span className="ax-tool-row-icon">
-                  <Lightbulb />
-                </span>
-                <DownOutlined className="ax-tool-row-chevron ax-tool-row-chevron-hover" />
-              </>
-            )}
+          {userOpen ? (
+            <DownOutlined className="ax-tool-row-chevron" />
+          ) : (
+            <>
+              <span className="ax-tool-row-icon">
+                <Lightbulb />
+              </span>
+              <DownOutlined className="ax-tool-row-chevron ax-tool-row-chevron-hover" />
+            </>
+          )}
         </span>
         <span className="ax-tool-row-title">{t('thinking.title')}</span>
         <span className="ax-tool-row-sep" aria-hidden />
         <span className={clsx('ax-tool-row-summary', isStreaming && '[text-overflow:clip]')}>{summary}</span>
       </button>
-      {userOpen && (
-        <div className="ax-thinking-body">{content}</div>
-      )}
+      {userOpen && <div className="ax-thinking-body">{content}</div>}
     </div>
   );
 });

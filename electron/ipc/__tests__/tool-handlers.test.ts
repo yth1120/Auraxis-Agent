@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
@@ -8,15 +8,55 @@ import os from 'os';
 // handling via mocked primitives so Electron is never required.
 
 const SAFE_EXTENSIONS = new Set([
-  '.ts', '.tsx', '.js', '.jsx', '.json', '.css', '.scss', '.less',
-  '.html', '.md', '.py', '.rs', '.go', '.java', '.sql', '.yml', '.yaml',
-  '.xml', '.svg', '.txt', '.env', '.toml', '.ini', '.cfg',
+  '.ts',
+  '.tsx',
+  '.js',
+  '.jsx',
+  '.json',
+  '.css',
+  '.scss',
+  '.less',
+  '.html',
+  '.md',
+  '.py',
+  '.rs',
+  '.go',
+  '.java',
+  '.sql',
+  '.yml',
+  '.yaml',
+  '.xml',
+  '.svg',
+  '.txt',
+  '.env',
+  '.toml',
+  '.ini',
+  '.cfg',
 ]);
 
 const WIN_RESERVED_NAMES = new Set([
-  'nul', 'con', 'prn', 'aux',
-  'com1', 'com2', 'com3', 'com4', 'com5', 'com6', 'com7', 'com8', 'com9',
-  'lpt1', 'lpt2', 'lpt3', 'lpt4', 'lpt5', 'lpt6', 'lpt7', 'lpt8', 'lpt9',
+  'nul',
+  'con',
+  'prn',
+  'aux',
+  'com1',
+  'com2',
+  'com3',
+  'com4',
+  'com5',
+  'com6',
+  'com7',
+  'com8',
+  'com9',
+  'lpt1',
+  'lpt2',
+  'lpt3',
+  'lpt4',
+  'lpt5',
+  'lpt6',
+  'lpt7',
+  'lpt8',
+  'lpt9',
 ]);
 
 function isPathInside(target: string, root: string): boolean {

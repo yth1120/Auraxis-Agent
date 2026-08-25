@@ -7,7 +7,7 @@ import {
   PencilSimple as PencilIcon,
   Wrench as WrenchIcon,
   Clock as ClockIcon,
-} from '@/components/common/icons'
+} from '@/components/common/icons';
 import type { PermissionRequest, PermissionRule } from '../../types/advanced';
 import { permissionBridge } from '../../services/replBridge';
 import { useAdvancedStore } from '../../stores/useAdvancedStore';
@@ -43,13 +43,20 @@ const COLLAPSE_LINES = 3;
 /** Tool-aware one-glance summary — replaces the old full-JSON dump. */
 function summarize(toolName: string, input: Record<string, unknown>): { primary: string; isCommand: boolean } {
   switch (toolName) {
-    case 'Bash': return { primary: String(input.command ?? ''), isCommand: true };
-    case 'Read': case 'Write': case 'Edit':
+    case 'Bash':
+      return { primary: String(input.command ?? ''), isCommand: true };
+    case 'Read':
+    case 'Write':
+    case 'Edit':
       return { primary: String(input.file_path ?? ''), isCommand: false };
-    case 'Grep': return { primary: String(input.pattern ?? '') + (input.path ? `  in ${input.path}` : ''), isCommand: false };
-    case 'Glob': return { primary: String(input.pattern ?? ''), isCommand: false };
-    case 'WebFetch': return { primary: String(input.url ?? ''), isCommand: false };
-    case 'WebSearch': return { primary: String(input.query ?? ''), isCommand: false };
+    case 'Grep':
+      return { primary: String(input.pattern ?? '') + (input.path ? `  in ${input.path}` : ''), isCommand: false };
+    case 'Glob':
+      return { primary: String(input.pattern ?? ''), isCommand: false };
+    case 'WebFetch':
+      return { primary: String(input.url ?? ''), isCommand: false };
+    case 'WebSearch':
+      return { primary: String(input.query ?? ''), isCommand: false };
     default: {
       const kv = Object.entries(input)
         .map(([k, v]) => `${k}: ${typeof v === 'string' ? v : JSON.stringify(v)}`)
@@ -75,7 +82,10 @@ export default function InlinePermissionCard({ request, onResolved }: InlinePerm
     const elapsed = Math.floor((Date.now() - request.timestamp) / 1000);
     const remaining = Math.max(0, 120 - elapsed);
     setExpiresIn(remaining);
-    if (remaining === 0) { onResolved(); return; }
+    if (remaining === 0) {
+      onResolved();
+      return;
+    }
     const interval = setInterval(() => {
       setExpiresIn((s) => Math.max(0, s - 1));
     }, 1000);
@@ -86,28 +96,31 @@ export default function InlinePermissionCard({ request, onResolved }: InlinePerm
     if (expiresIn === 0) onResolved();
   }, [expiresIn, onResolved]);
 
-  const handleRespond = useCallback(async (allowed: boolean, scope: 'once' | 'session' | 'always' = 'once') => {
-    setResponding(true);
-    try {
-      if (allowed && scope !== 'once') {
-        const rule: PermissionRule = {
-          id: `rule-${Date.now()}`,
-          toolName: request.toolName,
-          action: 'allow',
-          scope,
-          createdAt: Date.now(),
-        };
-        await permissionBridge.addRule(rule, request.requestId);
-        useAdvancedStore.getState().addPermissionRule(rule);
+  const handleRespond = useCallback(
+    async (allowed: boolean, scope: 'once' | 'session' | 'always' = 'once') => {
+      setResponding(true);
+      try {
+        if (allowed && scope !== 'once') {
+          const rule: PermissionRule = {
+            id: `rule-${Date.now()}`,
+            toolName: request.toolName,
+            action: 'allow',
+            scope,
+            createdAt: Date.now(),
+          };
+          await permissionBridge.addRule(rule, request.requestId);
+          useAdvancedStore.getState().addPermissionRule(rule);
+        }
+        await permissionBridge.respond(request.requestId, allowed);
+      } catch {
+        await window.electronAPI?.permission?.respond(request.requestId, allowed);
+      } finally {
+        setResponding(false);
+        onResolved();
       }
-      await permissionBridge.respond(request.requestId, allowed);
-    } catch {
-      await window.electronAPI?.permission?.respond(request.requestId, allowed);
-    } finally {
-      setResponding(false);
-      onResolved();
-    }
-  }, [request, onResolved]);
+    },
+    [request, onResolved],
+  );
 
   const risk = TOOL_RISK[request.toolName];
   const riskLabel = risk ? t(risk.labelKey) : undefined;
@@ -130,23 +143,28 @@ export default function InlinePermissionCard({ request, onResolved }: InlinePerm
   const collapsible = lines.length > COLLAPSE_LINES;
   const shown = collapsible && !expanded ? lines.slice(0, COLLAPSE_LINES).join('\n') : primary;
 
-  const btnBase = 'px-3 py-[3px] rounded-md text-xs leading-5 cursor-pointer transition-colors duration-fast ease-out disabled:opacity-50 disabled:cursor-default';
+  const btnBase =
+    'px-3 py-[3px] rounded-md text-xs leading-5 cursor-pointer transition-colors duration-fast ease-out disabled:opacity-50 disabled:cursor-default';
 
   return (
     <div className="my-2.5 px-3 py-2.5 border border-dim rounded-md bg-warning-soft text-xs">
       {/* ── Head: icon + tool + risk hint + countdown ── */}
       <div className="flex items-center gap-2 min-w-0">
-        <span className="inline-flex text-base text-secondary shrink-0">{TOOL_ICONS[request.toolName] || <WrenchIcon />}</span>
+        <span className="inline-flex text-base text-secondary shrink-0">
+          {TOOL_ICONS[request.toolName] || <WrenchIcon />}
+        </span>
         <span className="font-semibold text-xs text-primary shrink-0">{request.toolName}</span>
         {risk && (
           <span className={clsx('text-2xs text-muted truncate', risk.level === 'high' && 'text-text-muted')}>
             {riskLabel}
           </span>
         )}
-        <span className={clsx(
-          'inline-flex items-center gap-0.5 ml-auto text-2xs text-muted tabular-nums shrink-0',
-          expiresIn < 30 && 'text-text-muted'
-        )}>
+        <span
+          className={clsx(
+            'inline-flex items-center gap-0.5 ml-auto text-2xs text-muted tabular-nums shrink-0',
+            expiresIn < 30 && 'text-text-muted',
+          )}
+        >
           <ClockIcon /> {expiresIn}s
         </span>
       </div>
@@ -176,7 +194,7 @@ export default function InlinePermissionCard({ request, onResolved }: InlinePerm
                 className="mt-1 p-0 border-none bg-transparent text-2xs text-muted cursor-pointer hover:text-primary transition-colors duration-fast ease-out"
                 onClick={() => setExpanded((v) => !v)}
               >
-{expanded ? t('perm.collapse') : t('perm.expandLines', { n: lines.length })}
+                {expanded ? t('perm.collapse') : t('perm.expandLines', { n: lines.length })}
               </button>
             )}
           </div>
@@ -191,7 +209,7 @@ export default function InlinePermissionCard({ request, onResolved }: InlinePerm
           disabled={responding}
           onClick={() => handleRespond(false)}
         >
-  {t('perm.deny')}
+          {t('perm.deny')}
         </button>
         <button
           type="button"
@@ -199,7 +217,7 @@ export default function InlinePermissionCard({ request, onResolved }: InlinePerm
           disabled={responding}
           onClick={() => handleRespond(true, 'once')}
         >
-  {t('perm.allowOnce')}
+          {t('perm.allowOnce')}
         </button>
         <button
           type="button"
@@ -207,7 +225,7 @@ export default function InlinePermissionCard({ request, onResolved }: InlinePerm
           disabled={responding}
           onClick={() => handleRespond(true, 'always')}
         >
-  {t('perm.always')}
+          {t('perm.always')}
         </button>
       </div>
     </div>

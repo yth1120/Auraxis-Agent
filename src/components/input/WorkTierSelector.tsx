@@ -1,11 +1,6 @@
 import { useState } from 'react';
 import { Dropdown, App } from 'antd';
-import {
-  CaretRight,
-  Gauge,
-  Key,
-  ListChecks,
-} from '@/components/common/icons';
+import { CaretRight, Gauge, Key, ListChecks } from '@/components/common/icons';
 import type { ReactNode } from 'react';
 import clsx from 'clsx';
 import { useT, type I18nKey } from '../../i18n';
@@ -85,9 +80,7 @@ export default function WorkTierSelector({ popDirection = 'up' }: WorkTierSelect
             useAppStore.getState().setShowSettings(true);
           }}
         >
-          <span className="flex-1 min-w-0 text-xs text-text-muted truncate">
-            {t('access.more')}
-          </span>
+          <span className="flex-1 min-w-0 text-xs text-text-muted truncate">{t('access.more')}</span>
           <span className="flex flex-none items-center justify-center text-text-faint">
             <CaretRight size={12} />
           </span>
@@ -122,10 +115,7 @@ export default function WorkTierSelector({ popDirection = 'up' }: WorkTierSelect
       <button
         type="button"
         title={t('work.tier.title')}
-        className={clsx(
-          'ax-icon-button',
-          open && '!bg-primary-soft !text-primary',
-        )}
+        className={clsx('ax-icon-button', open && '!bg-primary-soft !text-primary')}
         aria-haspopup="menu"
         aria-expanded={open}
       >

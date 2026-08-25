@@ -19,7 +19,9 @@ describe('vision model content mapping', () => {
   });
 
   it('keeps raw text for non-vision models', () => {
-    expect(toApiMessageContent('看图\n【图片: a.png】\ndata:image/png;base64,AA==', false)).toBe('看图\n【图片: a.png】\ndata:image/png;base64,AA==');
+    expect(toApiMessageContent('看图\n【图片: a.png】\ndata:image/png;base64,AA==', false)).toBe(
+      '看图\n【图片: a.png】\ndata:image/png;base64,AA==',
+    );
   });
 
   it('recognizes the built-in vision model', () => {

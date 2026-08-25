@@ -1,10 +1,7 @@
 import { memo, useCallback, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { message as antdMessage } from 'antd';
-import {
-  GitBranch as BranchesOutlined,
-} from '@/components/common/icons'
-import clsx from 'clsx';
+import { GitBranch as BranchesOutlined } from '@/components/common/icons';
 import { useT } from '../../i18n';
 import type { Message } from '../../types/chat';
 import { useChatStore } from '../../stores/useChatStore';
@@ -18,10 +15,9 @@ import InlinePermissionCard from '../permissions/InlinePermissionCard';
 
 interface MessageBubbleProps {
   message: Message;
-  searchQuery?: string;
 }
 
-export default memo(function MessageBubble({ message, searchQuery }: MessageBubbleProps) {
+export default memo(function MessageBubble({ message }: MessageBubbleProps) {
   const t = useT();
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
 
@@ -29,8 +25,6 @@ export default memo(function MessageBubble({ message, searchQuery }: MessageBubb
     e.preventDefault();
     setCtxMenu({ x: e.clientX, y: e.clientY });
   }, []);
-
-  const closeCtxMenu = useCallback(() => setCtxMenu(null), []);
 
   useEffect(() => {
     if (ctxMenu) {
@@ -57,10 +51,10 @@ export default memo(function MessageBubble({ message, searchQuery }: MessageBubb
         useChatStore.setState({ messages: session.messages });
         if (session.model) chatStore.setSelectedModel(session.model);
       }
-    antdMessage.success(t('msg.forked'));
+      antdMessage.success(t('msg.forked'));
     }
     setCtxMenu(null);
-  }, [message.id]);
+  }, [message.id, t]);
 
   // ── Inline permission resolution — remove card and dequeue ──
   const handlePermissionResolved = useCallback(() => {
@@ -85,32 +79,28 @@ export default memo(function MessageBubble({ message, searchQuery }: MessageBubb
     >
       {/* Inline permission card — renders in place of a system message */}
       {message.permissionRequest && (
-        <InlinePermissionCard
-          request={message.permissionRequest}
-          onResolved={handlePermissionResolved}
-        />
+        <InlinePermissionCard request={message.permissionRequest} onResolved={handlePermissionResolved} />
       )}
       {!message.permissionRequest && message.role === 'user' && <UserMessage message={message} />}
-      {!message.permissionRequest && message.role === 'assistant' && (
-        <AssistantMessage
-          message={message}
-          searchQuery={searchQuery}
-        />
-      )}
+      {!message.permissionRequest && message.role === 'assistant' && <AssistantMessage message={message} />}
       {!message.permissionRequest && message.role === 'system' && <SystemMessage message={message} />}
 
-      {ctxMenu && createPortal(
-        <div className="fixed z-[2000] bg-[var(--color-bg-elevated)] border border-[var(--color-border-strong)] rounded-md shadow-lg p-1 min-w-[140px]" style={{ left: ctxMenu.x, top: ctxMenu.y }}>
-          <button
-            className="flex items-center gap-2 px-3 py-2 text-sm text-[var(--color-text-primary)] rounded-md cursor-pointer transition-colors duration-150 ease-out border-none bg-transparent w-full text-left hover:bg-[var(--color-accent-soft)] hover:text-accent"
-            onClick={handleFork}
+      {ctxMenu &&
+        createPortal(
+          <div
+            className="fixed z-[2000] bg-[var(--color-bg-elevated)] border border-[var(--color-border-strong)] rounded-md shadow-lg p-1 min-w-[140px]"
+            style={{ left: ctxMenu.x, top: ctxMenu.y }}
           >
-            <BranchesOutlined />
-      {t('msg.fork')}
-          </button>
-        </div>,
-        document.body,
-      )}
+            <button
+              className="flex items-center gap-2 px-3 py-2 text-sm text-[var(--color-text-primary)] rounded-md cursor-pointer transition-colors duration-150 ease-out border-none bg-transparent w-full text-left hover:bg-[var(--color-accent-soft)] hover:text-accent"
+              onClick={handleFork}
+            >
+              <BranchesOutlined />
+              {t('msg.fork')}
+            </button>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 });

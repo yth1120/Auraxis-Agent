@@ -149,7 +149,15 @@ describe('Belief 证据链 / 拒绝审计 / read runs（M3）', () => {
       latency_ms: 3,
       ts: 100,
     });
-    addReadResult({ id: 'rr-1', read_run_id: 'run-1', belief_id: 'bel-1', evidence_ids: '["ev1"]', route: 'keyword', rank: 0, score: 0.9 });
+    addReadResult({
+      id: 'rr-1',
+      read_run_id: 'run-1',
+      belief_id: 'bel-1',
+      evidence_ids: '["ev1"]',
+      route: 'keyword',
+      rank: 0,
+      score: 0.9,
+    });
     expect(getReadRun('run-1')?.query).toBe('react');
     expect(listReadResults('run-1')).toHaveLength(1);
   });

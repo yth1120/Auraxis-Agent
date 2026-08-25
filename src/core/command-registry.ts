@@ -9,4 +9,3 @@ export function registerCommands(pluginId: string, commands: CommandDefinition[]
 export function unregisterCommands(pluginId: string) {
   pluginCommands.delete(pluginId);
 }
-

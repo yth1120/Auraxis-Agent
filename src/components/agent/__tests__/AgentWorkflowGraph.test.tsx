@@ -6,11 +6,14 @@ import AgentWorkflowGraph from '../AgentWorkflowGraph';
 
 // React Flow uses ResizeObserver internally — mock it for jsdom
 beforeEach(() => {
-  vi.stubGlobal('ResizeObserver', vi.fn(() => ({
-    observe: vi.fn(),
-    unobserve: vi.fn(),
-    disconnect: vi.fn(),
-  })));
+  vi.stubGlobal(
+    'ResizeObserver',
+    vi.fn(() => ({
+      observe: vi.fn(),
+      unobserve: vi.fn(),
+      disconnect: vi.fn(),
+    })),
+  );
 });
 
 describe('AgentWorkflowGraph', () => {
@@ -44,9 +47,7 @@ describe('AgentWorkflowGraph', () => {
 
   it('renders todo status as node data', () => {
     const plan = {
-      todos: [
-        { content: 'Test task', status: 'completed' },
-      ],
+      todos: [{ content: 'Test task', status: 'completed' }],
     };
     const { container } = render(<AgentWorkflowGraph plan={plan} />);
     expect(container.textContent).toContain('Test task');
@@ -54,9 +55,7 @@ describe('AgentWorkflowGraph', () => {
 
   it('handles todo with activeForm field', () => {
     const plan = {
-      todos: [
-        { content: 'Write tests', status: 'in_progress', activeForm: '正在写测试…' },
-      ],
+      todos: [{ content: 'Write tests', status: 'in_progress', activeForm: '正在写测试…' }],
     };
     const { container } = render(<AgentWorkflowGraph plan={plan} />);
     expect(container.textContent).toContain('Write tests');

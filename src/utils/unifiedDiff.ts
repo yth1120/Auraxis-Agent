@@ -2,12 +2,7 @@
  * Compact line-level unified diff (LCS) for follow-up prompts — gives the next
  * agent concrete change context without dumping whole files into the input.
  */
-export function buildUnifiedDiff(
-  filePath: string,
-  oldContent: string,
-  newContent: string,
-  maxLines = 120,
-): string {
+export function buildUnifiedDiff(filePath: string, oldContent: string, newContent: string, maxLines = 120): string {
   const out = diffLines(oldContent, newContent);
   if (out.length <= maxLines) {
     return [`--- ${filePath}`, `+++ ${filePath}`, ...out].join('\n');
@@ -49,9 +44,7 @@ function lcsDiff(oldLines: string[], newLines: string[]): string[] {
   const dp: number[][] = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0));
   for (let i = n - 1; i >= 0; i -= 1) {
     for (let j = m - 1; j >= 0; j -= 1) {
-      dp[i][j] = oldLines[i] === newLines[j]
-        ? dp[i + 1][j + 1] + 1
-        : Math.max(dp[i + 1][j], dp[i][j + 1]);
+      dp[i][j] = oldLines[i] === newLines[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
     }
   }
 

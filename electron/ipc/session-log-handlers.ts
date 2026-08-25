@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron';
+import { errorText } from '../errors';
 import { secureHandle } from './trust';
 import { projectAgentLog, readAgentLog } from '../session-log';
 
@@ -8,8 +8,8 @@ export function registerSessionLogHandlers() {
     try {
       if (!agentId || typeof agentId !== 'string') return { ok: false, error: '任务 ID 无效' };
       return { ok: true, data: await readAgentLog(agentId) };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
@@ -18,8 +18,8 @@ export function registerSessionLogHandlers() {
     try {
       if (!agentId || typeof agentId !== 'string') return { ok: false, error: '任务 ID 无效' };
       return { ok: true, data: await projectAgentLog(agentId) };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 }

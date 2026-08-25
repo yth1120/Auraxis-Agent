@@ -69,11 +69,17 @@ describe('useProjectStore — 项目工作区', () => {
 
   it('hydrateProjectStore 恢复磁盘注册表', () => {
     hydrateProjectStore({
-      projects: [{
-        id: 'p1', name: 'demo', path: 'C:/proj/demo',
-        roots: ['C:/proj/demo'], writableRoots: ['C:/proj/demo'],
-        createdAt: 1, updatedAt: 2,
-      }],
+      projects: [
+        {
+          id: 'p1',
+          name: 'demo',
+          path: 'C:/proj/demo',
+          roots: ['C:/proj/demo'],
+          writableRoots: ['C:/proj/demo'],
+          createdAt: 1,
+          updatedAt: 2,
+        },
+      ],
       currentProjectId: 'p1',
       view: { groupBy: 'flat', orderBy: 'updated' },
       workspaceOrder: ['p1'],

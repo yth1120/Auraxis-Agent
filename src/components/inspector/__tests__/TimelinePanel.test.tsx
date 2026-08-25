@@ -129,9 +129,7 @@ describe('TimelinePanel — 右侧时间线', () => {
 
   it('switches to the duration timeline view', () => {
     const { container } = render(<TimelinePanel />);
-    const timelineBtn = [...container.querySelectorAll('button')].find(
-      (b) => (b.textContent ?? '') === '时间线',
-    );
+    const timelineBtn = [...container.querySelectorAll('button')].find((b) => (b.textContent ?? '') === '时间线');
     expect(timelineBtn).toBeTruthy();
     fireEvent.click(timelineBtn!);
     expect(container.textContent).toContain('块宽 ∝ 实际耗时');

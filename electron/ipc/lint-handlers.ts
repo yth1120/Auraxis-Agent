@@ -5,7 +5,7 @@
  * `--no-install` makes a missing eslint config/package fail fast instead of
  * prompting to download packages inside a non-interactive shell.
  */
-import { ipcMain } from 'electron';
+import { errorText } from '../errors';
 import { secureHandle } from './trust';
 import { spawn } from 'child_process';
 import { safeProcessEnv } from '../safe-env';
@@ -35,19 +35,20 @@ export interface LintFixResult {
   error?: string;
 }
 
-export function runLintFix(
-  projectRoot: string,
-  files?: string[],
-  opts: LintFixOptions = {},
-): Promise<LintFixResult> {
+export function runLintFix(projectRoot: string, files?: string[], opts: LintFixOptions = {}): Promise<LintFixResult> {
   return new Promise((resolve) => {
     const command = opts.command ?? lintCommand();
     const args = opts.args ?? buildLintArgs(files);
     let child;
     try {
-      child = spawn(command, args, { cwd: projectRoot, windowsHide: true, shell: false, env: safeProcessEnv(opts.env) });
-    } catch (e: any) {
-      resolve({ exitCode: null, output: '', error: e?.message || '启动 lint 失败' });
+      child = spawn(command, args, {
+        cwd: projectRoot,
+        windowsHide: true,
+        shell: false,
+        env: safeProcessEnv(opts.env),
+      });
+    } catch (e: unknown) {
+      resolve({ exitCode: null, output: '', error: errorText(e) || '启动 lint 失败' });
       return;
     }
 
@@ -61,16 +62,22 @@ export function runLintFix(
       resolve(res);
     };
     const timer = setTimeout(() => {
-      try { child.kill(); } catch { /* gone */ }
+      try {
+        child.kill();
+      } catch {
+        /* gone */
+      }
       finish({ exitCode: null, output: (stdout + stderr).trim(), error: 'lint 执行超时' });
     }, opts.timeoutMs ?? 120_000);
 
-    child.stdout?.on('data', (d: Buffer) => { stdout += d.toString(); });
-    child.stderr?.on('data', (d: Buffer) => { stderr += d.toString(); });
+    child.stdout?.on('data', (d: Buffer) => {
+      stdout += d.toString();
+    });
+    child.stderr?.on('data', (d: Buffer) => {
+      stderr += d.toString();
+    });
     child.on('error', (e: any) => {
-      const msg = e?.code === 'ENOENT'
-        ? '未找到 npx / eslint，请确认依赖已安装'
-        : (e?.message || '启动 lint 失败');
+      const msg = e?.code === 'ENOENT' ? '未找到 npx / eslint，请确认依赖已安装' : e?.message || '启动 lint 失败';
       finish({ exitCode: null, output: (stdout + stderr).trim(), error: msg });
     });
     child.on('close', (code) => {
@@ -88,8 +95,8 @@ export function registerLintHandlers() {
       const result = await runLintFix(root, params.files);
       if (result.error) return { ok: false, error: result.error };
       return { ok: true, data: result };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 }

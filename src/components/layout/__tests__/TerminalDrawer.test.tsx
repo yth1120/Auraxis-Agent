@@ -15,9 +15,7 @@ describe('TerminalDrawer — 底部终端抽屉', () => {
 
   it('drags to change height with clamping', () => {
     const onChange = vi.fn();
-    const { getByLabelText } = render(
-      <TerminalDrawer open height={300} onChange={onChange} onClose={() => {}} />,
-    );
+    const { getByLabelText } = render(<TerminalDrawer open height={300} onChange={onChange} onClose={() => {}} />);
     fireEvent.pointerDown(getByLabelText('拖动调整终端高度'), { clientY: 500 });
     fireEvent.pointerMove(window, { clientY: 200 });
     fireEvent.pointerUp(window);
@@ -37,9 +35,7 @@ describe('TerminalDrawer — 底部终端抽屉', () => {
   });
 
   it('collapses to a fully hidden state (zero height + opacity)', () => {
-    const { container } = render(
-      <TerminalDrawer open={false} height={300} onChange={() => {}} onClose={() => {}} />,
-    );
+    const { container } = render(<TerminalDrawer open={false} height={300} onChange={() => {}} onClose={() => {}} />);
     const drawer = container.firstElementChild as HTMLElement;
     expect(drawer.style.height).toBe('0px');
     expect(drawer.className).toContain('!opacity-0');

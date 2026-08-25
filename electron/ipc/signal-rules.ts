@@ -30,15 +30,9 @@ const CORRECTION_PATTERNS = [
   /不对|不是这样|应该是|更正|纠正|修正|错了|重新理解|实际上/,
   /\b(correction|corrected|actually|should be|not right|wrong)\b/i,
 ];
-const DECISION_PATTERNS = [
-  /决定|采用|选择|改用|确定|方案|decided|adopted|chosen|chose/i,
-];
-const APPROVAL_PATTERNS = [
-  /批准|同意|没问题|可以|认可|approved|accepted|agreed/i,
-];
-const REJECTION_PATTERNS = [
-  /拒绝|否决|不同意|不要这么做|不行|rejected|denied|declined/i,
-];
+const DECISION_PATTERNS = [/决定|采用|选择|改用|确定|方案|decided|adopted|chosen|chose/i];
+const APPROVAL_PATTERNS = [/批准|同意|没问题|可以|认可|approved|accepted|agreed/i];
+const REJECTION_PATTERNS = [/拒绝|否决|不同意|不要这么做|不行|rejected|denied|declined/i];
 const ENTITY_HINTS = [
   /项目(?:名|名称)?[:：]\s*([^\s，。；、]+)/,
   /用户(?:名|名称)?[:：]\s*([^\s，。；、]+)/,
@@ -68,7 +62,7 @@ function pushSignal(
 }
 
 /** 纯规则信号检测（确定性、无 LLM、无随机）。 */
-export function detectSignals(content: string, evidenceId: string, role: EvidenceRole): SignalRecord[] {
+export function detectSignals(content: string, evidenceId: string, _role: EvidenceRole): SignalRecord[] {
   const out: SignalRecord[] = [];
   const text = content || '';
 

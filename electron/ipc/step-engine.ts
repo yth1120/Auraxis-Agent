@@ -12,8 +12,9 @@ import type { WorkAutonomyTier } from '../types';
 import type { ToolDef } from '../tool-defs';
 import type { SandboxMode } from '../sandbox-policy';
 import { writeSpill } from '../spill';
-import type { AssistantMessage, ContextConfig, TaskPlan } from './agent-loop';
+import type { AssistantMessage, TaskPlan } from './agent-loop';
 import type { DeepSeekToolChoice } from '../contracts/advanced';
+import { errorRecord, errorText } from '../errors';
 import {
   stopPolicyEvaluate,
   markInjected,
@@ -192,7 +193,11 @@ export interface StepEngineConfig {
   /** Pre-flight permission gate — denied calls are not executed. */
   preCheckPermission?: (toolName: string, input: Record<string, unknown>, toolCallId: string) => Promise<boolean>;
   /** MAP-Graph 记忆风险门控（M5，opt-in）。 */
-  riskGate?: (toolName: string, input: Record<string, unknown>, toolCallId: string) => Promise<{ allowed: boolean; reason?: string }>;
+  riskGate?: (
+    toolName: string,
+    input: Record<string, unknown>,
+    toolCallId: string,
+  ) => Promise<{ allowed: boolean; reason?: string }>;
   onBeforeToolDispatch?: (tc: RunnerToolCall, toolCallId: string) => void;
   onToolStart?: (tc: RunnerToolCall, toolCallId: string) => void;
   onToolProgress?: (tc: RunnerToolCall, toolCallId: string, chunk: string) => void;
@@ -275,11 +280,7 @@ const DEFAULT_COMPACT_MODEL = 'deepseek-v4-flash';
  * Run one full ReAct iteration. Mutates `state` (messages + counters) and
  * returns what the driver should do next.
  */
-export async function runStep(
-  cfg: StepEngineConfig,
-  state: StepState,
-  stepGroupId: string,
-): Promise<StepOutcome> {
+export async function runStep(cfg: StepEngineConfig, state: StepState, stepGroupId: string): Promise<StepOutcome> {
   const { emit, signal } = cfg;
   const messages = state.messages;
   const iteration = state.iteration;
@@ -309,7 +310,7 @@ export async function runStep(
   // ══ Step A: LLM invoke with retry ══
   emit({ type: 'request_start', model: cfg.model, provider: cfg.adapter ?? 'deepseek', timestamp: Date.now() });
   let assistantMsg: AssistantMessage | null = null;
-  let lastApiErr: any;
+  let lastApiErr: unknown;
   const maxRetries = DEFAULT_MAX_RETRIES;
   const baseDelay = cfg.retryBaseDelayMs ?? 2000;
   const tools = cfg.tools ?? getAllTools();
@@ -373,24 +374,32 @@ export async function runStep(
         },
       });
       break;
-    } catch (apiErr: any) {
+    } catch (apiErr: unknown) {
+      const apiError = errorRecord(apiErr);
+      const status =
+        typeof apiError.response === 'object' && apiError.response
+          ? (apiError.response as { status?: number }).status
+          : undefined;
       // Pause/stop aborts the in-flight request — axios surfaces these as
       // CanceledError/ERR_CANCELED, NOT AbortError. They must never be
       // reported as "API 请求失败: canceled".
       if (
-        apiErr?.name === 'AbortError'
-        || apiErr?.name === 'CanceledError'
-        || apiErr?.code === 'ERR_CANCELED'
-        || signal?.aborted
-      ) break;
+        apiError.name === 'AbortError' ||
+        apiError.name === 'CanceledError' ||
+        apiError.code === 'ERR_CANCELED' ||
+        signal?.aborted
+      )
+        break;
       lastApiErr = apiErr;
       const isRetryable =
-        apiErr.response?.status === 429 ||
-        (apiErr.response?.status && apiErr.response.status >= 500) ||
-        apiErr.code === 'ECONNRESET' || apiErr.code === 'ETIMEDOUT';
+        status === 429 || (status && status >= 500) || apiError.code === 'ECONNRESET' || apiError.code === 'ETIMEDOUT';
       if (isRetryable && attempt < maxRetries - 1) {
         const delay = Math.min(baseDelay * Math.pow(2, attempt), 16000);
-        emit({ type: 'system_message', level: 'info', content: `API 请求失败 (${apiErr.response?.status || apiErr.code})，${Math.round(delay / 1000)}s 后重试...` });
+        emit({
+          type: 'system_message',
+          level: 'info',
+          content: `API 请求失败 (${status || apiError.code})，${Math.round(delay / 1000)}s 后重试...`,
+        });
         await new Promise((r) => setTimeout(r, delay));
         if (signal?.aborted) break;
         continue;
@@ -406,24 +415,37 @@ export async function runStep(
 
   if (signal?.aborted) return { status: 'aborted' };
   if (!assistantMsg && lastApiErr) {
+    const savedApiError = errorRecord(lastApiErr);
     // Pause/stop surfaces as CanceledError/ERR_CANCELED from axios even when
     // the AbortSignal flag hasn't flipped yet — never report that as an API
     // failure ("API 请求失败: canceled").
     if (
-      lastApiErr.name === 'AbortError'
-      || lastApiErr.name === 'CanceledError'
-      || lastApiErr.code === 'ERR_CANCELED'
+      savedApiError.name === 'AbortError' ||
+      savedApiError.name === 'CanceledError' ||
+      savedApiError.code === 'ERR_CANCELED'
     ) {
       return { status: 'aborted' };
     }
     const errorBody = await readErrorBody(lastApiErr);
     let apiDetail = '';
-    try { const p = JSON.parse(errorBody); apiDetail = p?.error?.message || p?.message || p?.error || ''; }
-    catch { apiDetail = errorBody.slice(0, 200); }
-    const errMsg = lastApiErr.response?.status
-      ? `API 请求失败 (HTTP ${lastApiErr.response.status}): ${apiDetail || lastApiErr.response.statusText || lastApiErr.message}`
-      : `API 请求失败: ${lastApiErr.message}`;
-    console.error('[step-engine] API error:', { status: lastApiErr.response?.status, body: errorBody.slice(0, 500) });
+    try {
+      const p = JSON.parse(errorBody);
+      apiDetail = p?.error?.message || p?.message || p?.error || '';
+    } catch {
+      apiDetail = errorBody.slice(0, 200);
+    }
+    const savedStatus =
+      typeof savedApiError.response === 'object' && savedApiError.response
+        ? (savedApiError.response as { status?: number; statusText?: string }).status
+        : undefined;
+    const savedStatusText =
+      typeof savedApiError.response === 'object' && savedApiError.response
+        ? (savedApiError.response as { statusText?: string }).statusText
+        : undefined;
+    const errMsg = savedStatus
+      ? `API 请求失败 (HTTP ${savedStatus}): ${apiDetail || savedStatusText || errorText(lastApiErr)}`
+      : `API 请求失败: ${errorText(lastApiErr)}`;
+    console.error('[step-engine] API error:', { status: savedStatus, body: errorBody.slice(0, 500) });
     emit({ type: 'error', error: errMsg });
     throw lastApiErr;
   }
@@ -508,85 +530,122 @@ export async function runStep(
   state.consecutiveTextOnly = 0;
   state.emptyResponseCount = 0;
   toolsThisIteration = assistantMsg.toolCalls.length;
-  const sandboxMode: SandboxMode = cfg.sandboxMode
-    ?? (process.env.AURAXIS_SANDBOX_MODE === 'read' || process.env.AURAXIS_SANDBOX_MODE === 'workspace-write'
+  const sandboxMode: SandboxMode =
+    cfg.sandboxMode ??
+    (process.env.AURAXIS_SANDBOX_MODE === 'read' || process.env.AURAXIS_SANDBOX_MODE === 'workspace-write'
       ? process.env.AURAXIS_SANDBOX_MODE
       : 'full');
 
-  const collectedResults = await runToolBatch(assistantMsg.toolCalls, {
-    projectRoot: cfg.projectRoot,
-    requestId: cfg.requestId,
-    // 权限路由 / 工作区会话 / 冲突检测都以稳定任务 ID 为 key；
-    // requestId 是每次运行的随机 ID，不能当 agentId 用。
-    agentId: cfg.sessionId ?? cfg.requestId,
-    sessionId: cfg.sessionId ?? cfg.requestId,
-    checkPermission: cfg.checkPermission,
-    autoApprove: cfg.autoApprove,
-    abortSignal: signal,
-    mode: cfg.mode,
-    approvedPlanSteps: cfg.approvedPlanSteps,
-    workTier: cfg.workTier,
-    workspaceRoots: cfg.workspaceRoots,
-    writableRoots: cfg.writableRoots,
-    depth: cfg.depth,
-    sandboxMode,
-    surface: cfg.surface,
-    stepGroupId,
-    executeTool: cfg.executeTool,
-    interceptTool: cfg.interceptTool,
-    riskGate: cfg.riskGate ?? (
-      process.env.AURAXIS_MEMORY_RISK_GATE === '1'
-        ? async (toolName: string) => {
-            const { createMemoryRiskGate, recordRiskAudit, roleForAgent } = await import('./memory-graph');
-            const role = roleForAgent(cfg.agentName || '');
-            const verdict = createMemoryRiskGate(cfg.projectRoot, role)(toolName);
-            if (!verdict.allowed) recordRiskAudit(cfg.projectRoot, toolName, verdict);
-            return Promise.resolve({ allowed: verdict.allowed, reason: verdict.reason });
-          }
-        : undefined
-    ),
-  }, {
-    makeToolCallId: cfg.makeToolCallId ?? ((tc) => `tc-${Date.now()}-${tc.name}`),
-    preCheckPermission: cfg.preCheckPermission,
-    onBeforeDispatch: cfg.onBeforeToolDispatch,
-    onToolStart: (tc, toolCallId) => {
-      state.toolCallCount++;
-      // Canonical tool lifecycle events — emitted by the engine, not by callers.
-      emit({ type: 'tool_start', toolCallId, toolName: tc.name, input: tc.input, stepGroupId: tc.stepGroupId ?? '' });
-      cfg.onToolStart?.(tc, toolCallId);
+  const collectedResults = await runToolBatch(
+    assistantMsg.toolCalls,
+    {
+      projectRoot: cfg.projectRoot,
+      requestId: cfg.requestId,
+      // 权限路由 / 工作区会话 / 冲突检测都以稳定任务 ID 为 key；
+      // requestId 是每次运行的随机 ID，不能当 agentId 用。
+      agentId: cfg.sessionId ?? cfg.requestId,
+      sessionId: cfg.sessionId ?? cfg.requestId,
+      checkPermission: cfg.checkPermission,
+      autoApprove: cfg.autoApprove,
+      abortSignal: signal,
+      mode: cfg.mode,
+      approvedPlanSteps: cfg.approvedPlanSteps,
+      workTier: cfg.workTier,
+      workspaceRoots: cfg.workspaceRoots,
+      writableRoots: cfg.writableRoots,
+      depth: cfg.depth,
+      sandboxMode,
+      surface: cfg.surface,
+      stepGroupId,
+      executeTool: cfg.executeTool,
+      interceptTool: cfg.interceptTool,
+      riskGate:
+        cfg.riskGate ??
+        (process.env.AURAXIS_MEMORY_RISK_GATE === '1'
+          ? async (toolName: string) => {
+              const { createMemoryRiskGate, recordRiskAudit, roleForAgent } = await import('./memory-graph');
+              const role = roleForAgent(cfg.agentName || '');
+              const verdict = createMemoryRiskGate(cfg.projectRoot, role)(toolName);
+              if (!verdict.allowed) recordRiskAudit(cfg.projectRoot, toolName, verdict);
+              return Promise.resolve({ allowed: verdict.allowed, reason: verdict.reason });
+            }
+          : undefined),
     },
-    onToolProgress: (tc, toolCallId, chunk) => {
-      emit({ type: 'tool_progress', toolCallId, toolName: tc.name, input: tc.input, progress: chunk, stepGroupId: tc.stepGroupId ?? '' });
-      cfg.onToolProgress?.(tc, toolCallId, chunk);
+    {
+      makeToolCallId: cfg.makeToolCallId ?? ((tc) => `tc-${Date.now()}-${tc.name}`),
+      preCheckPermission: cfg.preCheckPermission,
+      onBeforeDispatch: cfg.onBeforeToolDispatch,
+      onToolStart: (tc, toolCallId) => {
+        state.toolCallCount++;
+        // Canonical tool lifecycle events — emitted by the engine, not by callers.
+        emit({ type: 'tool_start', toolCallId, toolName: tc.name, input: tc.input, stepGroupId: tc.stepGroupId ?? '' });
+        cfg.onToolStart?.(tc, toolCallId);
+      },
+      onToolProgress: (tc, toolCallId, chunk) => {
+        emit({
+          type: 'tool_progress',
+          toolCallId,
+          toolName: tc.name,
+          input: tc.input,
+          progress: chunk,
+          stepGroupId: tc.stepGroupId ?? '',
+        });
+        cfg.onToolProgress?.(tc, toolCallId, chunk);
+      },
+      onToolResult: (r, tc, toolCallId) => {
+        const isAbort = r.error === '用户手动中止' || isDeniedError(r.error);
+        if (r.error) {
+          emit({
+            type: isAbort ? 'tool_aborted' : 'tool_error',
+            toolCallId,
+            toolName: tc.name,
+            input: tc.input,
+            error: r.error,
+            stepGroupId: tc.stepGroupId ?? '',
+          });
+        } else {
+          emit({
+            type: 'tool_end',
+            toolCallId,
+            toolName: tc.name,
+            input: tc.input,
+            output: r.output,
+            durationMs: r.durationMs,
+            stepGroupId: tc.stepGroupId ?? '',
+            summary: cfg.onToolSummary?.(r, tc),
+          });
+        }
+        cfg.onToolResult?.(r, tc, toolCallId);
+      },
     },
-    onToolResult: (r, tc, toolCallId) => {
-      const isAbort = r.error === '用户手动中止' || isDeniedError(r.error);
-      if (r.error) {
-        emit({ type: isAbort ? 'tool_aborted' : 'tool_error',
-          toolCallId, toolName: tc.name, input: tc.input, error: r.error, stepGroupId: tc.stepGroupId ?? '' });
-      } else {
-        emit({ type: 'tool_end',
-          toolCallId, toolName: tc.name, input: tc.input, output: r.output, durationMs: r.durationMs, stepGroupId: tc.stepGroupId ?? '',
-          summary: cfg.onToolSummary?.(r, tc) });
-      }
-      cfg.onToolResult?.(r, tc, toolCallId);
-    },
-  });
+  );
 
-  await appendToolResults(messages, collectedResults.map((r) => ({
-    toolUseId: r.toolUseId,
-    toolName: r.toolName,
-    input: r.input,
-    output: r.output,
-    error: r.error,
-  })), cfg.requestId, cfg.model);
+  await appendToolResults(
+    messages,
+    collectedResults.map((r) => ({
+      toolUseId: r.toolUseId,
+      toolName: r.toolName,
+      input: r.input,
+      output: r.output,
+      error: r.error,
+    })),
+    cfg.requestId,
+    cfg.model,
+  );
 
   cfg.onToolBatchEnd?.();
 
   // Context compaction after tool round
   await maybeCompact(cfg, state, stepGroupId);
 
-  emit({ type: 'step_end', iteration, toolsThisIteration, llmLatencyMs: Date.now() - stepStartedAt, timestamp: Date.now(), ...stepMetrics() });
+  emit({
+    type: 'step_end',
+    iteration,
+    toolsThisIteration,
+    llmLatencyMs: Date.now() - stepStartedAt,
+    timestamp: Date.now(),
+    ...stepMetrics(),
+  });
   return { status: 'continue', metrics: stepMetrics() };
 }
 
@@ -605,6 +664,11 @@ async function maybeCompact(cfg: StepEngineConfig, state: StepState, _stepGroupI
   state.messages.length = 0;
   state.messages.push(...result.messages);
   const tokensAfter = estimateTokens(state.messages);
-  emit({ type: 'context_compressed', tokensBefore, tokensAfter,
-    messagesRemoved: result.messagesRemoved, tokensSaved: result.tokensSaved });
+  emit({
+    type: 'context_compressed',
+    tokensBefore,
+    tokensAfter,
+    messagesRemoved: result.messagesRemoved,
+    tokensSaved: result.tokensSaved,
+  });
 }

@@ -4,7 +4,9 @@ const sendMock = vi.fn();
 vi.mock('electron', () => ({
   ipcMain: { handle: vi.fn() },
   BrowserWindow: class {
-    isDestroyed() { return false; }
+    isDestroyed() {
+      return false;
+    }
     get webContents() {
       return { send: sendMock };
     }

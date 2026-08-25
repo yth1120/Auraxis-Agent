@@ -1,4 +1,5 @@
-import { ipcMain, dialog } from 'electron';
+import { errorText } from '../errors';
+import { dialog } from 'electron';
 import { secureHandle } from './trust';
 import { readFile, writeFile, readdir, rm, rename, mkdir, stat, open } from 'fs/promises';
 import path from 'path';
@@ -26,13 +27,16 @@ async function requireProjectRoot(projectRoot?: string): Promise<string> {
 }
 
 export function registerFileHandlers() {
-  secureHandle('file:open', async (event,  projectRoot?: string) => {
+  secureHandle('file:open', async (event, _projectRoot?: string) => {
     assertTrustedIpcSender(event);
     try {
       const result = await dialog.showOpenDialog({
         properties: ['openFile', 'multiSelections'],
         filters: [
-          { name: '代码文件', extensions: ['ts', 'tsx', 'js', 'jsx', 'css', 'html', 'json', 'md', 'mjs', 'cjs', 'vue', 'svelte'] },
+          {
+            name: '代码文件',
+            extensions: ['ts', 'tsx', 'js', 'jsx', 'css', 'html', 'json', 'md', 'mjs', 'cjs', 'vue', 'svelte'],
+          },
           { name: '所有文件', extensions: ['*'] },
         ],
       });
@@ -51,16 +55,16 @@ export function registerFileHandlers() {
             content,
             mimeType,
           };
-        })
+        }),
       );
 
       return { ok: true, data: files };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
-  secureHandle('file:read', async (event,  filePath: string, projectRoot?: string) => {
+  secureHandle('file:read', async (event, filePath: string, projectRoot?: string) => {
     assertTrustedIpcSender(event);
     try {
       const root = await requireProjectRoot(projectRoot);
@@ -68,12 +72,12 @@ export function registerFileHandlers() {
       if (!normalizedPath) return { ok: false, error: '不允许读取项目目录外的文件' };
       const content = await readFile(normalizedPath, 'utf-8');
       return { ok: true, data: content };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
-  secureHandle('file:estimateTokens', async (event,  files: string[], projectRoot?: string) => {
+  secureHandle('file:estimateTokens', async (event, files: string[], projectRoot?: string) => {
     assertTrustedIpcSender(event);
     try {
       if (!Array.isArray(files)) return { ok: false, error: 'files 必须是数组' };
@@ -95,15 +99,17 @@ export function registerFileHandlers() {
             continue;
           }
           results.push({ path: String(raw), bytes: st.size, tokens: estimateTokens(text) });
-        } catch { /* missing/unreadable — skip */ }
+        } catch {
+          /* missing/unreadable — skip */
+        }
       }
       return { ok: true, data: results };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
-  secureHandle('file:readPreview', async (event,  filePath: string, projectRoot?: string) => {
+  secureHandle('file:readPreview', async (event, filePath: string, projectRoot?: string) => {
     assertTrustedIpcSender(event);
     try {
       const root = await requireProjectRoot(projectRoot);
@@ -114,9 +120,7 @@ export function registerFileHandlers() {
       const st = await stat(normalizedPath);
       if (st.size > PREVIEW_MAX_BYTES) return { ok: false, error: '文件过大，无法预览' };
       const buf = await readFile(normalizedPath);
-      const mimeType = ext === '.svg'
-        ? 'image/svg+xml'
-        : mime.lookup(normalizedPath) || 'application/octet-stream';
+      const mimeType = ext === '.svg' ? 'image/svg+xml' : mime.lookup(normalizedPath) || 'application/octet-stream';
       return {
         ok: true,
         data: {
@@ -126,12 +130,12 @@ export function registerFileHandlers() {
           size: buf.length,
         },
       };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
-  secureHandle('file:write', async (event,  filePath: string, content: string, projectRoot?: string) => {
+  secureHandle('file:write', async (event, filePath: string, content: string, projectRoot?: string) => {
     assertTrustedIpcSender(event);
     try {
       assertString(filePath, 'filePath');
@@ -152,12 +156,12 @@ export function registerFileHandlers() {
 
       await writeFile(normalizedPath, content, 'utf-8');
       return { ok: true };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
-  secureHandle('file:search', async (event,  keyword: string, projectRoot: string) => {
+  secureHandle('file:search', async (event, keyword: string, projectRoot: string) => {
     assertTrustedIpcSender(event);
     try {
       if (!keyword || keyword.length < 1) {
@@ -165,14 +169,59 @@ export function registerFileHandlers() {
       }
 
       const root = await requireProjectRoot(projectRoot);
-      const results: { name: string; path: string; isDirectory: boolean; snippet?: string; matchType?: 'name' | 'content' }[] = [];
+      const results: {
+        name: string;
+        path: string;
+        isDirectory: boolean;
+        snippet?: string;
+        matchType?: 'name' | 'content';
+      }[] = [];
       const lowerKeyword = keyword.toLowerCase();
       const TEXT_EXT = new Set([
-        'ts', 'tsx', 'js', 'jsx', 'mjs', 'cjs', 'json', 'md', 'mdx', 'css', 'scss', 'html',
-        'py', 'rs', 'go', 'java', 'c', 'cc', 'cpp', 'h', 'hpp', 'cs', 'rb', 'php', 'sh',
-        'yml', 'yaml', 'toml', 'txt', 'vue', 'svelte', 'xml', 'svg',
+        'ts',
+        'tsx',
+        'js',
+        'jsx',
+        'mjs',
+        'cjs',
+        'json',
+        'md',
+        'mdx',
+        'css',
+        'scss',
+        'html',
+        'py',
+        'rs',
+        'go',
+        'java',
+        'c',
+        'cc',
+        'cpp',
+        'h',
+        'hpp',
+        'cs',
+        'rb',
+        'php',
+        'sh',
+        'yml',
+        'yaml',
+        'toml',
+        'txt',
+        'vue',
+        'svelte',
+        'xml',
+        'svg',
       ]);
-      const SKIP_DIRS = new Set(['node_modules', 'dist', 'dist-electron', 'release', 'coverage', 'out', 'build', '.git']);
+      const SKIP_DIRS = new Set([
+        'node_modules',
+        'dist',
+        'dist-electron',
+        'release',
+        'coverage',
+        'out',
+        'build',
+        '.git',
+      ]);
 
       const searchDir = async (dirPath: string, depth: number): Promise<void> => {
         if (depth > 4 || results.length >= 50) return;
@@ -234,12 +283,12 @@ export function registerFileHandlers() {
 
       await searchDir(root, 0);
       return { ok: true, data: results };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
-  secureHandle('file:delete', async (event,  filePath: string, projectRoot?: string) => {
+  secureHandle('file:delete', async (event, filePath: string, projectRoot?: string) => {
     assertTrustedIpcSender(event);
     try {
       const root = await requireProjectRoot(projectRoot);
@@ -250,12 +299,12 @@ export function registerFileHandlers() {
       }
       await rm(normalizedPath, { recursive: true, force: true });
       return { ok: true };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
-  secureHandle('file:rename', async (event,  oldPath: string, newPath: string, projectRoot?: string) => {
+  secureHandle('file:rename', async (event, oldPath: string, newPath: string, projectRoot?: string) => {
     assertTrustedIpcSender(event);
     try {
       const root = await requireProjectRoot(projectRoot);
@@ -263,18 +312,22 @@ export function registerFileHandlers() {
       const normalizedNew = path.resolve(normalizeWinPath(newPath));
       // Renaming the project root itself would silently move the whole
       // workspace out from under the app.
-      if (normalizedOld === root || normalizedNew === root
-        || !isPathInside(normalizedOld, root) || !isPathInside(normalizedNew, root)) {
+      if (
+        normalizedOld === root ||
+        normalizedNew === root ||
+        !isPathInside(normalizedOld, root) ||
+        !isPathInside(normalizedNew, root)
+      ) {
         return { ok: false, error: '不允许操作项目目录外的文件' };
       }
       await rename(normalizedOld, normalizedNew);
       return { ok: true };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
-  secureHandle('file:createFolder', async (event,  dirPath: string, projectRoot?: string) => {
+  secureHandle('file:createFolder', async (event, dirPath: string, projectRoot?: string) => {
     assertTrustedIpcSender(event);
     try {
       const root = await requireProjectRoot(projectRoot);
@@ -284,12 +337,12 @@ export function registerFileHandlers() {
       }
       await mkdir(normalizedPath, { recursive: true });
       return { ok: true };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
-  secureHandle('file:createFile', async (event,  filePath: string, projectRoot?: string) => {
+  secureHandle('file:createFile', async (event, filePath: string, projectRoot?: string) => {
     assertTrustedIpcSender(event);
     try {
       const root = await requireProjectRoot(projectRoot);
@@ -305,8 +358,8 @@ export function registerFileHandlers() {
       }
       await writeFile(normalizedPath, '', 'utf-8');
       return { ok: true };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 }

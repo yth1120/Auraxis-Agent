@@ -51,11 +51,7 @@ class ToolInertiaGraph {
    * 预测下一个最可能的工具。`history` 为当前回合已调用的工具序列；
    * 缺省时用该 scope 上一次批次结尾。概率低于 minProbability 返回 null。
    */
-  suggestNext(
-    scope: string,
-    history?: string[],
-    opts: { minProbability?: number } = {},
-  ): ToolInertiaSuggestion | null {
+  suggestNext(scope: string, history?: string[], opts: { minProbability?: number } = {}): ToolInertiaSuggestion | null {
     const minProb = opts.minProbability ?? 0.5;
     const seq = (history || []).filter((n): n is string => typeof n === 'string' && n.length > 0);
     const last = seq.length > 0 ? seq[seq.length - 1] : this.lastTool.get(scope);

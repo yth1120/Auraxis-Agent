@@ -28,9 +28,7 @@ async function loadStore() {
 }
 
 async function readRawSettings(): Promise<Record<string, unknown>> {
-  return JSON.parse(
-    await fs.readFile(path.join(userData, 'auraxis-settings.json'), 'utf8'),
-  ) as Record<string, unknown>;
+  return JSON.parse(await fs.readFile(path.join(userData, 'auraxis-settings.json'), 'utf8')) as Record<string, unknown>;
 }
 
 async function waitForEncrypted(key: string, timeoutMs = 1000): Promise<void> {
@@ -51,12 +49,10 @@ beforeEach(async () => {
   userData = await fs.mkdtemp(path.join(os.tmpdir(), 'auraxis-settings-'));
   process.env.AURAXIS_TEST_USERDATA = userData;
   electronMock.safeStorage.isEncryptionAvailable.mockReset().mockReturnValue(true);
-  electronMock.safeStorage.encryptString.mockReset().mockImplementation(
-    (s: string) => Buffer.from(`enc:${s}`, 'utf8'),
-  );
-  electronMock.safeStorage.decryptString.mockReset().mockImplementation(
-    (b: Buffer) => b.toString('utf8').replace(/^enc:/, ''),
-  );
+  electronMock.safeStorage.encryptString.mockReset().mockImplementation((s: string) => Buffer.from(`enc:${s}`, 'utf8'));
+  electronMock.safeStorage.decryptString
+    .mockReset()
+    .mockImplementation((b: Buffer) => b.toString('utf8').replace(/^enc:/, ''));
 });
 
 afterEach(async () => {

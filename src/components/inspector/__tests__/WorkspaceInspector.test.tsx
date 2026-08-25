@@ -8,15 +8,37 @@ import { useAppStore } from '@/stores/useAppStore';
 import type { AgentInfo } from '@/types/agent';
 
 const agent: AgentInfo = {
-  id: 'a1', name: '重构', description: '重构链路', type: 'general-purpose',
-  status: 'running', priority: 'normal', startTime: Date.now(),
-  iteration: 2, maxIterations: 10, toolCallCount: 3, messagesCount: 4,
-  totalInputTokens: 100, totalOutputTokens: 50,
-  plan: { todos: [{ content: '改代码', status: 'in_progress' }, { content: '跑测试', status: 'pending' }] },
+  id: 'a1',
+  name: '重构',
+  description: '重构链路',
+  type: 'general-purpose',
+  status: 'running',
+  priority: 'normal',
+  startTime: Date.now(),
+  iteration: 2,
+  maxIterations: 10,
+  toolCallCount: 3,
+  messagesCount: 4,
+  totalInputTokens: 100,
+  totalOutputTokens: 50,
+  plan: {
+    todos: [
+      { content: '改代码', status: 'in_progress' },
+      { content: '跑测试', status: 'pending' },
+    ],
+  },
   log: [
     { type: 'iteration_start', timestamp: 1, iteration: 1 },
     { type: 'tool_start', timestamp: 2, toolCallId: 'tc1', toolName: 'Bash', input: { command: 'npm test' } },
-    { type: 'tool_end', timestamp: 3, toolCallId: 'tc1', toolName: 'Bash', input: { command: 'npm test' }, output: { exitCode: 0 }, durationMs: 10 },
+    {
+      type: 'tool_end',
+      timestamp: 3,
+      toolCallId: 'tc1',
+      toolName: 'Bash',
+      input: { command: 'npm test' },
+      output: { exitCode: 0 },
+      durationMs: 10,
+    },
   ],
 };
 

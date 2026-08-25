@@ -1,6 +1,8 @@
-import { ipcMain, app } from 'electron';
+import { errorText } from '../errors';
+import { app } from 'electron';
 import { secureHandle } from './trust';
 import { resolveTrustedProjectRoot } from './project-access';
+import { getDeepSeekBalanceUrl } from '../api-config';
 import os from 'os';
 import { execFile } from 'child_process';
 
@@ -84,8 +86,8 @@ export function registerSystemHandlers() {
           arch: os.arch(),
         },
       };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
@@ -94,8 +96,8 @@ export function registerSystemHandlers() {
       const root = await resolveTrustedProjectRoot(projectRoot);
       const gitInfo = await getGitBranches(root);
       return { ok: true, data: gitInfo };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
@@ -106,7 +108,7 @@ export function registerSystemHandlers() {
   // ── DeepSeek account balance ─────────────────────────
   secureHandle('system:getAccountInfo', async (_event, apiKey: string) => {
     try {
-      const resp = await fetch('https://api.deepseek.com/user/balance', {
+      const resp = await fetch(getDeepSeekBalanceUrl(), {
         headers: { Authorization: `Bearer ${apiKey}` },
       });
       if (!resp.ok) {
@@ -122,8 +124,8 @@ export function registerSystemHandlers() {
           currency: info?.currency || 'CNY',
         },
       };
-    } catch (err: any) {
-      return { ok: false, error: err.message || '请求失败' };
+    } catch (err: unknown) {
+      return { ok: false, error: errorText(err) || '请求失败' };
     }
   });
 }

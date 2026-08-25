@@ -22,9 +22,7 @@ export function extractImageUrls(content: string): string[] {
 
 /** Remove `【图片: name】\ndata:...` blocks so the raw text stays clean. */
 export function stripImageBlocks(content: string): string {
-  return content
-    .replace(/【图片: [^\n】]*】\s*\n?data:image\/[^\s]+/g, '')
-    .replace(/^\n+/, '');
+  return content.replace(/【图片: [^\n】]*】\s*\n?data:image\/[^\s]+/g, '').replace(/^\n+/, '');
 }
 
 interface ImageGalleryProps {

@@ -8,11 +8,21 @@ import type { AgentInfo } from '@/types/agent';
 
 function makeAgent(id: string, status: AgentInfo['status']): AgentInfo {
   return {
-    id, name: `任务${id}`, description: `描述${id}`,
-    type: 'general-purpose', status, priority: 'normal',
-    startTime: Date.now(), iteration: 1, maxIterations: 10,
-    toolCallCount: 1, messagesCount: 1, totalInputTokens: 0, totalOutputTokens: 0,
-    surface: 'work', log: [],
+    id,
+    name: `任务${id}`,
+    description: `描述${id}`,
+    type: 'general-purpose',
+    status,
+    priority: 'normal',
+    startTime: Date.now(),
+    iteration: 1,
+    maxIterations: 10,
+    toolCallCount: 1,
+    messagesCount: 1,
+    totalInputTokens: 0,
+    totalOutputTokens: 0,
+    surface: 'work',
+    log: [],
   };
 }
 

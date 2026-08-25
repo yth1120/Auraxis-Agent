@@ -70,13 +70,15 @@ describe('feedback — 本地反馈日志', () => {
       projectPath: 'C:/proj',
     });
     expect(r.ok).toBe(true);
-    expect(captureFeedbackEvidence).toHaveBeenCalledWith(expect.objectContaining({
-      messageId: 'm1',
-      sessionId: 's1',
-      rating: 'down',
-      projectPath: 'C:/proj',
-      note: '不对，应该是 v6.2.1',
-    }));
+    expect(captureFeedbackEvidence).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messageId: 'm1',
+        sessionId: 's1',
+        rating: 'down',
+        projectPath: 'C:/proj',
+        note: '不对，应该是 v6.2.1',
+      }),
+    );
   });
 
   it('INO：up 评分且无备注不产生证据', async () => {

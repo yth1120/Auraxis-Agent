@@ -52,27 +52,18 @@ describe('collectQualityRuns — 质量门结果收集', () => {
 
 describe('findLatestFailure — 最新可修复问题', () => {
   it('returns the latest failed gate even after earlier passes', () => {
-    const f = findLatestFailure([
-      reviewEnd(1, true, 'build'),
-      reviewEnd(2, false, 'test', '2 failed'),
-    ]);
+    const f = findLatestFailure([reviewEnd(1, true, 'build'), reviewEnd(2, false, 'test', '2 failed')]);
     expect(f?.title).toBe('test 审查未通过');
     expect(f?.detail).toContain('2 failed');
   });
 
   it('returns null when the latest gate passed', () => {
-    const f = findLatestFailure([
-      reviewEnd(1, false, 'build', 'old error'),
-      reviewEnd(2, true, 'build'),
-    ]);
+    const f = findLatestFailure([reviewEnd(1, false, 'build', 'old error'), reviewEnd(2, true, 'build')]);
     expect(f).toBeNull();
   });
 
   it('prefers a tool error after the last review result', () => {
-    const f = findLatestFailure([
-      reviewEnd(1, true, 'build'),
-      toolError(2, 'Bash', 'exit code 1'),
-    ]);
+    const f = findLatestFailure([reviewEnd(1, true, 'build'), toolError(2, 'Bash', 'exit code 1')]);
     expect(f?.title).toBe('Bash 执行失败');
     expect(f?.detail).toBe('exit code 1');
   });

@@ -5,7 +5,8 @@
 相关文档：[TS SDK](../packages/auraxis-sdk/README.md) · [Python SDK](../python/auraxis_sdk/README.md) · [工程规范](../AGENTS.md)
 
 ## 一、项目概述
-Auraxis v3.0.0 是一款基于 Electron 的桌面端智能体工作台，融合了统一 ReAct 步进引擎、多智能体调度、Code Mode 工具编排、插件扩展和持久化项目记忆。执行语义遵循通用约定（`end_turn` 即回合结束，无剧本/强制门），ReviewArtifact 作为可选验证工具。后端 LLM 默认为 DeepSeek API（兼容 OpenAI / Anthropic 格式），联网搜索默认使用 DeepSeek 官方原生搜索（失败自动降级 DuckDuckGo，另支持 Exa / Perplexity provider）。DeepSeek 官方能力已接入：思考强度 low/high/max 三档、strict tools（Beta）、计划生成 JSON 模式、对话前缀续写（代码块“继续写”）、FIM 补全（Beta）API、流式 usage 与上下文缓存命中展示、user_id 隔离、可配置单次最大输出 tokens（上限 384K）、官方离线 tokenizer 本地计数。
+
+Auraxis v3.1.0 是一款基于 Electron 的桌面端智能体工作台，融合了统一 ReAct 步进引擎、多智能体调度、Code Mode 工具编排、插件扩展和持久化项目记忆。执行语义遵循通用约定（`end_turn` 即回合结束，无剧本/强制门），ReviewArtifact 作为可选验证工具。后端 LLM 默认为 DeepSeek API（兼容 OpenAI / Anthropic 格式），联网搜索默认使用 DeepSeek 官方原生搜索（失败自动降级 DuckDuckGo，另支持 Exa / Perplexity provider）。DeepSeek 官方能力已接入：思考强度 low/high/max 三档、strict tools（Beta）、计划生成 JSON 模式、对话前缀续写（代码块“继续写”）、FIM 补全（Beta）API、流式 usage 与上下文缓存命中展示、user_id 隔离、可配置单次最大输出 tokens（上限 384K）、官方离线 tokenizer 本地计数。
 
 项目采用**论文驱动开发**：已落地 7 篇 arXiv 论文的核心技术——Eywa（溯源长期记忆）、MAP-Graph（多 Agent 共享记忆授权）、AGORA（步骤级上下文压缩）、SWE-Touch（工作区漂移感知）、Oversight Has a Capacity（审批疲劳守卫）、AutoTool（工具使用惯性）、Verifier-as-Gatekeeper（技能库污染门禁）；另落地 4 项缓存方向论文/系统技术——RadixAttention（规范历史重放 / 公共前缀最大化）、Prompt Cache（稳定块组织）、Cache-Aware Prompt Compression（动态内容尾部化）、Byte-Exact Deduplication（记忆块字节级去重）。论文地址、技术映射与落地模块详见「[第五章 研究论文与技术落地](#五研究论文与技术落地)」。产品侧新增本地账户登录、Chat / Work / Code 三模式、思考与联网搜索开关、Agent 执行流程视图、会话事件时间轴、上下文缓存对齐等能力。
 
@@ -14,19 +15,20 @@ Auraxis v3.0.0 是一款基于 Electron 的桌面端智能体工作台，融合�
 - **进程通信**：通过 Electron IPC（`contextBridge` + `ipcMain/ipcRenderer`）进行双向通信
 
 ### 技术栈
+
 <img width="1462" height="861" alt="" src="https://github.com/user-attachments/assets/7f6f67f1-d32c-4d82-a374-dd5d4174fdcc" />
 
-| 层 | 技术 |
-|---|------|
-| 桌面框架 | Electron 43（Node 24，内置 `node:sqlite`），无边框窗口，`contextIsolation: true` |
-| 前端 | React 18 + TypeScript 5.5 + Vite 7 |
-| UI 组件库 | Ant Design 5，自定义深色/浅色主题 |
-| 状态管理 | Zustand 4；会话/设置/插件状态以主进程为权威，localStorage 仅作渲染层缓存 |
-| 存储与检索 | 会话/Agent 统一 JSONL 事件日志 + SQLite 投影缓存 + FTS5 全文搜索 + 长期记忆（better-sqlite3，JSON 回退） |
-| Markdown 渲染 | react-markdown + remark-gfm + rehype-highlight + rehype-katex + mermaid |
-| AI API | axios（SSE 流式请求），支持 DeepSeek/OpenAI 格式和 Anthropic 格式；MCP、AGENTS.md、生命周期 hooks 协议 |
-| 测试 | Vitest + @testing-library/react + jsdom（渲染进程），node 环境（主进程） |
-| 构建 | Vite + electron-builder 26（NSIS/DMG/AppImage；原生依赖需 Python/VS 环境重编译） |
+| 层            | 技术                                                                                                     |
+| ------------- | -------------------------------------------------------------------------------------------------------- |
+| 桌面框架      | Electron 43（Node 24，内置 `node:sqlite`），无边框窗口，`contextIsolation: true`                         |
+| 前端          | React 18 + TypeScript 5.5 + Vite 7                                                                       |
+| UI 组件库     | Ant Design 5，自定义深色/浅色主题                                                                        |
+| 状态管理      | Zustand 4；会话/设置/插件状态以主进程为权威，localStorage 仅作渲染层缓存                                 |
+| 存储与检索    | 会话/Agent 统一 JSONL 事件日志 + SQLite 投影缓存 + FTS5 全文搜索 + 长期记忆（better-sqlite3，JSON 回退） |
+| Markdown 渲染 | react-markdown + remark-gfm + rehype-highlight + rehype-katex + mermaid                                  |
+| AI API        | axios（SSE 流式请求），支持 DeepSeek/OpenAI 格式和 Anthropic 格式；MCP、AGENTS.md、生命周期 hooks 协议   |
+| 测试          | Vitest + @testing-library/react + jsdom（渲染进程），node 环境（主进程）                                 |
+| 构建          | Vite + electron-builder 26（NSIS/DMG/AppImage；原生依赖需 Python/VS 环境重编译）                         |
 
 ### 基础设施
 
@@ -143,7 +145,7 @@ Auraxis/
 │       ├── session-store.ts     # 聊天/Agent 统一 JSONL 事件日志
 │       ├── sandbox-runner.ts    # 原生沙箱调度（restricted/AppContainer/linux/macos）
 │       ├── acp-server.ts / sdk-server.ts / headless-run.ts  # ACP / JSON-RPC SDK / 无头执行
- │       └── __tests__/           # 主进程测试（全仓 237 个测试文件 / 1740 用例）
+ │       └── __tests__/           # 主进程测试（全仓 244 个测试文件 / 1784 用例）
 │
 ├── src/                         # 渲染进程代码（浏览器环境）
 │   ├── main.tsx                 # React 入口
@@ -226,7 +228,7 @@ Auraxis/
 ```
 渲染进程 (React)                    主进程 (Electron)
 ─────────────────                   ─────────────────
-window.electronAPI.ai.sendQuery()   
+window.electronAPI.ai.sendQuery()
   → ipcRenderer.invoke()    ──→    ipcMain.handle('ai:sendQuery', ...)
                                       ↓
                                    query-engine.ts 执行 ReAct 循环
@@ -243,6 +245,7 @@ window.electronAPI.ai.sendQuery()
 ### 3.3 IPC 响应规范
 
 所有处理程序统一返回：
+
 ```typescript
 interface IpcResponse<T = unknown> {
   ok: boolean;
@@ -254,6 +257,7 @@ interface IpcResponse<T = unknown> {
 ### 3.4 流式通信
 
 流请求使用**独立的事件通道**：
+
 - 聊天流：`ai:chunk:${requestId}`
 - 查询流：`ai:queryEvent:${requestId}`
 - Agent 事件：`agent:event:${agentId}`
@@ -262,91 +266,91 @@ interface IpcResponse<T = unknown> {
 
 ### 3.5 完整 IPC 通道表
 
-| 域 | 通道 | 方向 | 说明 |
-|---|------|------|------|
-| **window** | `window:minimize` | 渲染→主 | 最小化窗口 |
-| | `window:maximize` | 渲染→主 | 最大化/还原窗口 |
-| | `window:close` | 渲染→主 | 关闭窗口 |
-| | `window:focus` | 渲染→主 | 聚焦窗口（通知点击） |
-| | `window:isMaximized` | 渲染→主 | 查询最大化状态 |
-| | `window:maximize-changed` | 主→渲染 | 最大化状态变更事件 |
-| | `window:setBackgroundMaterial` / `window:backgroundMaterialSupported` | 渲染→主 | 侧边栏 Acrylic 磨砂材质切换与支持检测（Windows 11） |
-| **shell** | `shell:openExternal` | 渲染→主 | 在默认浏览器打开 URL（仅 http/https） |
-| | `shell:openInVSCode` | 渲染→主 | 在 VS Code 中打开项目 |
-| **file** | `file:open` | 渲染→主 | 打开文件对话框 |
-| | `file:read` | 渲染→主 | 读取文件内容 |
-| | `file:write` | 渲染→主 | 写入文件 |
-| | `file:search` | 渲染→主 | 按关键词搜索文件 |
-| **project** | `project:getTree` | 渲染→主 | 获取项目文件树 |
-| | `project:applyCode` | 渲染→主 | 应用代码到文件 |
-| | `project:previewCode` | 渲染→主 | 预览代码（HTML/图片等） |
-| | `project:selectDirectory` | 渲染→主 | 选择项目目录 |
-| **context** | `context:getProjectContext` | 渲染→主 | 获取项目上下文（指令文件、文件树、package.json） |
-| | `context:getFileStructure` | 渲染→主 | 获取文件结构概览 |
-| | `context:readFile` | 渲染→主 | 读取文件（上下文用） |
-| **ai** | `ai:chatStream` | 渲染→主 | 发起聊天流（纯对话，无工具） |
-| | `ai:sendQuery` | 渲染→主 | 发起查询（完整的 ReAct 循环） |
-| | `ai:testConnection` | 渲染→主 | 测试 API 连接 |
-| | `ai:abortStream` / `ai:abortQuery` | 渲染→主 | 中止流/查询 |
-| | `ai:abortTool` | 渲染→主 | 中止单个工具执行 |
-| | `ai:retryTool` | 渲染→主 | 重试工具执行 |
-| | `ai:chunk:${requestId}` | 主→渲染 | 聊天流的文本块事件 |
-| | `ai:queryEvent:${requestId}` | 主→渲染 | 查询流的所有事件（工具开始/结束/文本等） |
-| **memory** | `memory:extract` | 渲染→主 | 从对话提取记忆 |
-| | `memory:getByProject` | 渲染→主 | 按项目获取记忆 |
-| | `memory:getByType` | 渲染→主 | 按类型获取记忆 |
-| | `memory:search` | 渲染→主 | 搜索记忆 |
-| | `memory:archive` / `memory:delete` | 渲染→主 | 归档/删除记忆 |
-| | `memory:evidenceList` / `memory:evidenceDetail` | 渲染→主 | 列出/查看不可变证据（Eywa M1） |
-| | `memory:readForQuery` | 渲染→主 | 确定性多路检索，返回 context + policy + facts + diagnostics（Eywa M3） |
-| | `memory:beliefAudit` | 渲染→主 | 信念的证据链、信号与修订历史（Eywa M4） |
-| | `memory:readTrace` | 渲染→主 | 按 read_run 返回逐路检索结果 |
-| | `memory:erase` | 渲染→主 | 按 scope 级联擦除证据/信念/读轨迹并留下审计事件 |
-| | `memory:reindex` | 渲染→主 | 从已有证据重建 signals/beliefs |
-| | `memory:graph` | 渲染→主 | MAP-Graph 类型化执行图（角色授权/血缘） |
-| **agent** | `agent:create` / `agent:start` | 渲染→主 | 创建/启动 Agent |
-| | `agent:stop` / `agent:schedulerStop` | 渲染→主 | 停止 Agent |
-| | `agent:pause` / `agent:resume` | 渲染→主 | 暂停/恢复 Agent |
-| | `agent:setPriority` | 渲染→主 | 设置优先级 |
-| | `agent:getQueue` | 渲染→主 | 获取待执行队列 |
-| | `agent:setMaxConcurrent` | 渲染→主 | 设置最大并发数 |
-| | `agent:getAll` / `agent:list` / `agent:get` | 渲染→主 | 查询 Agent 列表/详情 |
-| | `agent:remove` / `agent:clear` | 渲染→主 | 移除/清空 Agent |
-| | `agent:updated` | 主→渲染 | Agent 状态更新事件 |
-| | `agent:event:${agentId}` | 主→渲染 | Agent 执行事件（工具调用等） |
-| **mcp** | `mcp:getServers` / `mcp:setServers` | 渲染→主 | MCP 服务器配置 |
-| | `mcp:connect` / `mcp:disconnect` | 渲染→主 | 连接/断开 MCP 服务器 |
-| | `mcp:getStatuses` | 渲染→主 | 获取所有服务器状态 |
-| | `mcp:listTools` / `mcp:callTool` | 渲染→主 | 列出/调用 MCP 工具 |
-| **permission** | `permission:respond` | 渲染→主 | 用户对权限请求的回复 |
-| | `permission:addRule` | 渲染→主 | 添加权限规则 |
-| | `permission:getRules` | 渲染→主 | 获取所有规则 |
-| | `permission:request` | 主→渲染 | 权限请求事件 |
-| **plan** | `plan:approve` / `plan:reject` | 渲染→主 | 批准/拒绝计划 |
-| | `plan:generated` | 主→渲染 | 计划生成事件 |
-| **undo** | `undo:getHistory` / `undo:getList` | 渲染→主 | 获取撤销历史 |
-| | `undo:execute` / `undo:revert` / `undo:revertLast` | 渲染→主 | 执行撤销/恢复 |
-| | `undo:getSessionDiffs` / `undo:revertSessionFile` / `undo:revertSessions` | 渲染→主 | 按会话查看/回滚文件变更（右舱「变更」视图） |
-| **conflict** | `conflict:getConflicts` | 渲染→主 | 获取冲突列表 |
-| | `conflict:getFileHistory` | 渲染→主 | 获取文件修改历史 |
-| **snapshot** | `snapshot:create` / `list` / `restore` / `delete` | 渲染→主 | 命名快照管理 |
-| **system** | `system:getStats` | 渲染→主 | 获取系统统计 |
-| | `system:getGitBranches` | 渲染→主 | 获取 Git 分支列表 |
-| | `system:getVersion` | 渲染→主 | 获取应用版本 |
-| | `system:getAccountInfo` | 渲染→主 | 查询 DeepSeek 账户余额（/user/balance） |
-| **settings** | `settings:get` / `settings:set` | 渲染→主 | 读写设置 |
-| | `settings:getApiKey` / `api:setKey` | 渲染→主 | API Key 管理 |
-| | `settings:set`（permissionPreset / sandboxMode） | 渲染→主 | 统一运行权限持久化 |
-| **coverage** | `coverage:get` | 渲染→主 | 读取测试覆盖率报告（coverage/coverage-summary.json） |
-| **auth** | `auth:status` / `auth:setup` | 渲染→主 | 查询登录阶段 / 首次注册账户 |
-| | `auth:login` / `auth:logout` | 渲染→主 | 登录 / 登出 |
-| | `auth:changePassword` | 渲染→主 | 修改账户密码 |
-| | `auth:setAvatar` | 渲染→主 | 设置头像（PNG data URL） |
-| **model** | `model:getAll` | 渲染→主 | 获取所有可用模型 |
-| **app** | `app:error` | 主→渲染 | 未捕获异常/未处理 Promise 拒绝 |
-| **cron** | `cron:create` / `cron:delete` / `cron:list` | 渲染→主 | 定时任务的创建/删除/列出 |
-| **worktree** | `worktree:getStatus` | 渲染→主 | 查询 Agent worktree 沙箱状态 |
-| | `worktree:changed` | 主→渲染 | worktree 激活/失活事件 |
+| 域             | 通道                                                                      | 方向    | 说明                                                                   |
+| -------------- | ------------------------------------------------------------------------- | ------- | ---------------------------------------------------------------------- |
+| **window**     | `window:minimize`                                                         | 渲染→主 | 最小化窗口                                                             |
+|                | `window:maximize`                                                         | 渲染→主 | 最大化/还原窗口                                                        |
+|                | `window:close`                                                            | 渲染→主 | 关闭窗口                                                               |
+|                | `window:focus`                                                            | 渲染→主 | 聚焦窗口（通知点击）                                                   |
+|                | `window:isMaximized`                                                      | 渲染→主 | 查询最大化状态                                                         |
+|                | `window:maximize-changed`                                                 | 主→渲染 | 最大化状态变更事件                                                     |
+|                | `window:setBackgroundMaterial` / `window:backgroundMaterialSupported`     | 渲染→主 | 侧边栏 Acrylic 磨砂材质切换与支持检测（Windows 11）                    |
+| **shell**      | `shell:openExternal`                                                      | 渲染→主 | 在默认浏览器打开 URL（仅 http/https）                                  |
+|                | `shell:openInVSCode`                                                      | 渲染→主 | 在 VS Code 中打开项目                                                  |
+| **file**       | `file:open`                                                               | 渲染→主 | 打开文件对话框                                                         |
+|                | `file:read`                                                               | 渲染→主 | 读取文件内容                                                           |
+|                | `file:write`                                                              | 渲染→主 | 写入文件                                                               |
+|                | `file:search`                                                             | 渲染→主 | 按关键词搜索文件                                                       |
+| **project**    | `project:getTree`                                                         | 渲染→主 | 获取项目文件树                                                         |
+|                | `project:applyCode`                                                       | 渲染→主 | 应用代码到文件                                                         |
+|                | `project:previewCode`                                                     | 渲染→主 | 预览代码（HTML/图片等）                                                |
+|                | `project:selectDirectory`                                                 | 渲染→主 | 选择项目目录                                                           |
+| **context**    | `context:getProjectContext`                                               | 渲染→主 | 获取项目上下文（指令文件、文件树、package.json）                       |
+|                | `context:getFileStructure`                                                | 渲染→主 | 获取文件结构概览                                                       |
+|                | `context:readFile`                                                        | 渲染→主 | 读取文件（上下文用）                                                   |
+| **ai**         | `ai:chatStream`                                                           | 渲染→主 | 发起聊天流（纯对话，无工具）                                           |
+|                | `ai:sendQuery`                                                            | 渲染→主 | 发起查询（完整的 ReAct 循环）                                          |
+|                | `ai:testConnection`                                                       | 渲染→主 | 测试 API 连接                                                          |
+|                | `ai:abortStream` / `ai:abortQuery`                                        | 渲染→主 | 中止流/查询                                                            |
+|                | `ai:abortTool`                                                            | 渲染→主 | 中止单个工具执行                                                       |
+|                | `ai:retryTool`                                                            | 渲染→主 | 重试工具执行                                                           |
+|                | `ai:chunk:${requestId}`                                                   | 主→渲染 | 聊天流的文本块事件                                                     |
+|                | `ai:queryEvent:${requestId}`                                              | 主→渲染 | 查询流的所有事件（工具开始/结束/文本等）                               |
+| **memory**     | `memory:extract`                                                          | 渲染→主 | 从对话提取记忆                                                         |
+|                | `memory:getByProject`                                                     | 渲染→主 | 按项目获取记忆                                                         |
+|                | `memory:getByType`                                                        | 渲染→主 | 按类型获取记忆                                                         |
+|                | `memory:search`                                                           | 渲染→主 | 搜索记忆                                                               |
+|                | `memory:archive` / `memory:delete`                                        | 渲染→主 | 归档/删除记忆                                                          |
+|                | `memory:evidenceList` / `memory:evidenceDetail`                           | 渲染→主 | 列出/查看不可变证据（Eywa M1）                                         |
+|                | `memory:readForQuery`                                                     | 渲染→主 | 确定性多路检索，返回 context + policy + facts + diagnostics（Eywa M3） |
+|                | `memory:beliefAudit`                                                      | 渲染→主 | 信念的证据链、信号与修订历史（Eywa M4）                                |
+|                | `memory:readTrace`                                                        | 渲染→主 | 按 read_run 返回逐路检索结果                                           |
+|                | `memory:erase`                                                            | 渲染→主 | 按 scope 级联擦除证据/信念/读轨迹并留下审计事件                        |
+|                | `memory:reindex`                                                          | 渲染→主 | 从已有证据重建 signals/beliefs                                         |
+|                | `memory:graph`                                                            | 渲染→主 | MAP-Graph 类型化执行图（角色授权/血缘）                                |
+| **agent**      | `agent:create` / `agent:start`                                            | 渲染→主 | 创建/启动 Agent                                                        |
+|                | `agent:stop` / `agent:schedulerStop`                                      | 渲染→主 | 停止 Agent                                                             |
+|                | `agent:pause` / `agent:resume`                                            | 渲染→主 | 暂停/恢复 Agent                                                        |
+|                | `agent:setPriority`                                                       | 渲染→主 | 设置优先级                                                             |
+|                | `agent:getQueue`                                                          | 渲染→主 | 获取待执行队列                                                         |
+|                | `agent:setMaxConcurrent`                                                  | 渲染→主 | 设置最大并发数                                                         |
+|                | `agent:getAll` / `agent:list` / `agent:get`                               | 渲染→主 | 查询 Agent 列表/详情                                                   |
+|                | `agent:remove` / `agent:clear`                                            | 渲染→主 | 移除/清空 Agent                                                        |
+|                | `agent:updated`                                                           | 主→渲染 | Agent 状态更新事件                                                     |
+|                | `agent:event:${agentId}`                                                  | 主→渲染 | Agent 执行事件（工具调用等）                                           |
+| **mcp**        | `mcp:getServers` / `mcp:setServers`                                       | 渲染→主 | MCP 服务器配置                                                         |
+|                | `mcp:connect` / `mcp:disconnect`                                          | 渲染→主 | 连接/断开 MCP 服务器                                                   |
+|                | `mcp:getStatuses`                                                         | 渲染→主 | 获取所有服务器状态                                                     |
+|                | `mcp:listTools` / `mcp:callTool`                                          | 渲染→主 | 列出/调用 MCP 工具                                                     |
+| **permission** | `permission:respond`                                                      | 渲染→主 | 用户对权限请求的回复                                                   |
+|                | `permission:addRule`                                                      | 渲染→主 | 添加权限规则                                                           |
+|                | `permission:getRules`                                                     | 渲染→主 | 获取所有规则                                                           |
+|                | `permission:request`                                                      | 主→渲染 | 权限请求事件                                                           |
+| **plan**       | `plan:approve` / `plan:reject`                                            | 渲染→主 | 批准/拒绝计划                                                          |
+|                | `plan:generated`                                                          | 主→渲染 | 计划生成事件                                                           |
+| **undo**       | `undo:getHistory` / `undo:getList`                                        | 渲染→主 | 获取撤销历史                                                           |
+|                | `undo:execute` / `undo:revert` / `undo:revertLast`                        | 渲染→主 | 执行撤销/恢复                                                          |
+|                | `undo:getSessionDiffs` / `undo:revertSessionFile` / `undo:revertSessions` | 渲染→主 | 按会话查看/回滚文件变更（右舱「变更」视图）                            |
+| **conflict**   | `conflict:getConflicts`                                                   | 渲染→主 | 获取冲突列表                                                           |
+|                | `conflict:getFileHistory`                                                 | 渲染→主 | 获取文件修改历史                                                       |
+| **snapshot**   | `snapshot:create` / `list` / `restore` / `delete`                         | 渲染→主 | 命名快照管理                                                           |
+| **system**     | `system:getStats`                                                         | 渲染→主 | 获取系统统计                                                           |
+|                | `system:getGitBranches`                                                   | 渲染→主 | 获取 Git 分支列表                                                      |
+|                | `system:getVersion`                                                       | 渲染→主 | 获取应用版本                                                           |
+|                | `system:getAccountInfo`                                                   | 渲染→主 | 查询 DeepSeek 账户余额（/user/balance）                                |
+| **settings**   | `settings:get` / `settings:set`                                           | 渲染→主 | 读写设置                                                               |
+|                | `settings:getApiKey` / `api:setKey`                                       | 渲染→主 | API Key 管理                                                           |
+|                | `settings:set`（permissionPreset / sandboxMode）                          | 渲染→主 | 统一运行权限持久化                                                     |
+| **coverage**   | `coverage:get`                                                            | 渲染→主 | 读取测试覆盖率报告（coverage/coverage-summary.json）                   |
+| **auth**       | `auth:status` / `auth:setup`                                              | 渲染→主 | 查询登录阶段 / 首次注册账户                                            |
+|                | `auth:login` / `auth:logout`                                              | 渲染→主 | 登录 / 登出                                                            |
+|                | `auth:changePassword`                                                     | 渲染→主 | 修改账户密码                                                           |
+|                | `auth:setAvatar`                                                          | 渲染→主 | 设置头像（PNG data URL）                                               |
+| **model**      | `model:getAll`                                                            | 渲染→主 | 获取所有可用模型                                                       |
+| **app**        | `app:error`                                                               | 主→渲染 | 未捕获异常/未处理 Promise 拒绝                                         |
+| **cron**       | `cron:create` / `cron:delete` / `cron:list`                               | 渲染→主 | 定时任务的创建/删除/列出                                               |
+| **worktree**   | `worktree:getStatus`                                                      | 渲染→主 | 查询 Agent worktree 沙箱状态                                           |
+|                | `worktree:changed`                                                        | 主→渲染 | worktree 激活/失活事件                                                 |
 
 ---
 
@@ -375,6 +379,7 @@ ReAct 循环（最多 500 次迭代，业务上限 200 + 安全硬上限 500）�
 ```
 
 **特点**：
+
 - **无规划阶段**：直接执行 ReAct 循环
 - **API 重试**：429/5xx/网络错误自动重试 3 次指数退避
 - **上下文压缩**：基于规则的压缩，token 阈值约 100K
@@ -407,6 +412,7 @@ Agent 驱动（agentLoopRun，步进委托 step-engine）：
 ```
 
 **特点**：
+
 - **完整规划能力**：LLM 生成结构化 JSON 任务计划（含依赖关系 + 关键词匹配）
 - **计划审批**：`plan` 模式生成计划后等待用户审批（5 分钟超时），仅执行已批准步骤
 - **质量验证（可选）**：ReviewArtifact 可按需运行 build/test/typecheck/lint
@@ -435,32 +441,32 @@ Agent 驱动（agentLoopRun，步进委托 step-engine）：
 
 工具定义在 `electron/tool-defs.ts`（[查看文件](../electron/tool-defs.ts)），共 **71 个内置工具**。下表列出核心 24 个，其余按能力族补充在表后：
 
-| # | 工具 | 类别 | 说明 |
-|---|------|------|------|
-| 1 | **Bash** | 危险 | 在项目目录执行 Shell 命令。默认超时 120s，最大 600s。Windows 支持 Git Bash/cmd/PowerShell |
-| 2 | **Read** | 安全 | 读取文件内容，支持行偏移/限制，路径穿越检查。输出含 `summary`（文件路径、行数、大小） |
-| 3 | **Write** | 危险 | 创建/覆盖文件，扩展名白名单，Windows 保留名称检查，撤销前备份。输出含 `summary`（路径、字节数） |
-| 4 | **Edit** | 危险 | 文件内查找替换，需唯一匹配，撤销前备份 |
-| 5 | **Delete** | 危险 | 删除文件或目录（递归需确认），路径穿越检查，撤销前备份 |
-| 6 | **Grep** | 安全 | 正则搜索（最大深度 5 层，最多 50 结果）。输出含 `summary`（匹配数） |
-| 7 | **Glob** | 安全 | 文件模式匹配（最大深度 6 层，最多 100 文件）。输出含 `summary`（匹配数） |
-| 8 | **WebFetch** | 危险 | URL 内容获取（15s 超时），拦截本地/内网地址 |
-| 9 | **WebSearch** | 危险 | 通过 DuckDuckGo HTML 搜索（无需 API Key） |
-| 10 | **TodoWrite** | 安全 | 任务清单管理（pending/in_progress/completed），同一时间仅一个 in_progress |
-| 11 | **Agent** | 危险 | 启动子 Agent（Explore/Plan/general-purpose），递归深度限制 3，记录父子关系 |
-| 12 | **Replan** | 安全 | 生成新子计划（仅 Agent 循环可用，查询引擎会跳过） |
-| 13 | **CronCreate** | 危险 | 创建周期/一次性定时任务（5 字段 cron），应用运行时触发 |
-| 14 | **CronDelete** | 安全 | 按 ID 取消定时任务 |
-| 15 | **CronList** | 安全 | 列出所有活跃定时任务 |
-| 16 | **TaskOutput** | 安全 | 读取后台任务/子 Agent 的累积输出（不阻塞） |
-| 17 | **TaskStop** | 危险 | 按 ID 停止运行中的工具/子 Agent |
-| 18 | **EnterPlanMode** | 安全 | 进入计划模式，生成实现计划交用户审批 |
-| 19 | **ExitPlanMode** | 安全 | 用户批准后退出计划模式，开始实现 |
-| 20 | **NotebookEdit** | 危险 | 读/写/插入/删除 Jupyter Notebook（.ipynb）单元格 |
-| 21 | **EnterWorktree** | 危险 | 创建隔离的 Git worktree 沙箱，后续工具调用自动重定向到沙箱路径 |
-| 22 | **LSP** | 安全 | 代码智能：definition / references / diagnostics（tsc --noEmit） |
-| 23 | **ReviewArtifact** | 危险 | 可选验证工具：运行 build/test/typecheck/lint |
-| 24 | **GitCommit** | 危险 | 暂存所有变更并创建 Git 提交，返回 commit hash |
+| #   | 工具               | 类别 | 说明                                                                                            |
+| --- | ------------------ | ---- | ----------------------------------------------------------------------------------------------- |
+| 1   | **Bash**           | 危险 | 在项目目录执行 Shell 命令。默认超时 120s，最大 600s。Windows 支持 Git Bash/cmd/PowerShell       |
+| 2   | **Read**           | 安全 | 读取文件内容，支持行偏移/限制，路径穿越检查。输出含 `summary`（文件路径、行数、大小）           |
+| 3   | **Write**          | 危险 | 创建/覆盖文件，扩展名白名单，Windows 保留名称检查，撤销前备份。输出含 `summary`（路径、字节数） |
+| 4   | **Edit**           | 危险 | 文件内查找替换，需唯一匹配，撤销前备份                                                          |
+| 5   | **Delete**         | 危险 | 删除文件或目录（递归需确认），路径穿越检查，撤销前备份                                          |
+| 6   | **Grep**           | 安全 | 正则搜索（最大深度 5 层，最多 50 结果）。输出含 `summary`（匹配数）                             |
+| 7   | **Glob**           | 安全 | 文件模式匹配（最大深度 6 层，最多 100 文件）。输出含 `summary`（匹配数）                        |
+| 8   | **WebFetch**       | 危险 | URL 内容获取（15s 超时），拦截本地/内网地址                                                     |
+| 9   | **WebSearch**      | 危险 | 通过 DuckDuckGo HTML 搜索（无需 API Key）                                                       |
+| 10  | **TodoWrite**      | 安全 | 任务清单管理（pending/in_progress/completed），同一时间仅一个 in_progress                       |
+| 11  | **Agent**          | 危险 | 启动子 Agent（Explore/Plan/general-purpose），递归深度限制 3，记录父子关系                      |
+| 12  | **Replan**         | 安全 | 生成新子计划（仅 Agent 循环可用，查询引擎会跳过）                                               |
+| 13  | **CronCreate**     | 危险 | 创建周期/一次性定时任务（5 字段 cron），应用运行时触发                                          |
+| 14  | **CronDelete**     | 安全 | 按 ID 取消定时任务                                                                              |
+| 15  | **CronList**       | 安全 | 列出所有活跃定时任务                                                                            |
+| 16  | **TaskOutput**     | 安全 | 读取后台任务/子 Agent 的累积输出（不阻塞）                                                      |
+| 17  | **TaskStop**       | 危险 | 按 ID 停止运行中的工具/子 Agent                                                                 |
+| 18  | **EnterPlanMode**  | 安全 | 进入计划模式，生成实现计划交用户审批                                                            |
+| 19  | **ExitPlanMode**   | 安全 | 用户批准后退出计划模式，开始实现                                                                |
+| 20  | **NotebookEdit**   | 危险 | 读/写/插入/删除 Jupyter Notebook（.ipynb）单元格                                                |
+| 21  | **EnterWorktree**  | 危险 | 创建隔离的 Git worktree 沙箱，后续工具调用自动重定向到沙箱路径                                  |
+| 22  | **LSP**            | 安全 | 代码智能：definition / references / diagnostics（tsc --noEmit）                                 |
+| 23  | **ReviewArtifact** | 危险 | 可选验证工具：运行 build/test/typecheck/lint                                                    |
+| 24  | **GitCommit**      | 危险 | 暂存所有变更并创建 Git 提交，返回 commit hash                                                   |
 
 > 上表「类别」为按行为的直观归类；某工具是否实际触发权限对话框，以 `tool-handlers.ts` 中的危险工具集合为准。
 
@@ -476,6 +482,7 @@ Agent 驱动（agentLoopRun，步进委托 step-engine）：
 - **云连接器**：SlackListChannels / SlackPostMessage、DriveList / DriveRead、NotionSearch / NotionCreatePage
 
 **工具分类**：
+
 - **危险工具集合**：`['Bash', 'Write', 'Edit', 'Delete', 'WebFetch', 'WebSearch', 'CronCreate', 'TaskStop', 'EnterWorktree', 'ReviewArtifact', 'GitCommit', 'WriteDocument', 'SlackPostMessage', 'NotionCreatePage']` — 触发权限对话框
 - **文件修改工具**：`['Write', 'Edit', 'NotebookEdit', 'Delete', 'WriteDocument']` — 触发撤销备份和冲突检测文件锁
 - **只读工具**：`['Read', 'Grep', 'Glob', 'ReadDocument', 'SlackListChannels', 'DriveList', 'DriveRead', 'NotionSearch']` — 在 `ask` 和 `plan` 模式下自动批准
@@ -486,15 +493,16 @@ Agent 驱动（agentLoopRun，步进委托 step-engine）：
 
 审批策略（`electron/types.ts` → `src/types/`）：
 
-| 策略 | 行为 |
-|------|------|
-| `ask`（默认） | 每次危险工具调用弹出权限对话框。只读工具（Read/Grep/Glob）自动批准 |
-| `plan` | 计划审批步骤中明确批准的工具自动执行。不在计划内的工具按 `ask` 模式处理 |
+| 策略             | 行为                                                                                       |
+| ---------------- | ------------------------------------------------------------------------------------------ |
+| `ask`（默认）    | 每次危险工具调用弹出权限对话框。只读工具（Read/Grep/Glob）自动批准                         |
+| `plan`           | 计划审批步骤中明确批准的工具自动执行。不在计划内的工具按 `ask` 模式处理                    |
 | `auto`（全自动） | 无需确认批准所有工具。安全检查仍执行（路径检查、扩展名白名单、被拦截 URL），但不显示对话框 |
 
 Composer 的「运行权限」四档预设（每次确认 / 自动代批 / 完全访问 / 只读）映射到上述策略 + 沙箱模式 + autoApprove，见 `electron/contracts/permission.ts`。
 
 权限规则存储在 `permission-handlers.ts` 中，作用域分为：
+
 - `once` — 仅本次有效
 - `session` — 当前会话有效
 - `always` — 永久有效
@@ -539,19 +547,19 @@ Work/Code 统一引擎（`query-engine.ts` → `step-engine.ts`）为 DeepSeek �
 
 ### 5.1 论文总览
 
-| # | 论文（arXiv 链接） | arXiv ID | 核心洞察 | 落地模块 | 状态 |
-|---|--------------------|----------|---------|---------|------|
-| 1 | [Eywa: Provenance-Grounded Long-Term Memory for AI Agents](https://arxiv.org/abs/2605.30771) | 2605.30771（2026-05） | 证据先于信念；检索零 LLM；答案策略与上下文分离 | memory-evidence / signal-rules / belief-validation / memory-read / memory-db / MemoryPanel | ✅ 已落地 v1.0 |
-| 2 | [MAP-Graph: Provenance-Aware Shared Memory for Multi-Agent Workflows](https://arxiv.org/abs/2608.10509) | 2608.10509（2026-08） | 多 Agent 共享记忆的授权、信任与血缘 | memory-graph / agent-loop / tool-runner / agent-scheduler | ✅ 已落地（M5，opt-in） |
-| 3 | [AGORA: Adapter-Grounded Observation-Action Retention for Inference-Free Prompt Compression in LLM Agents](https://arxiv.org/abs/2605.26596) | 2605.26596（2026-05） | 步骤级免推理压缩，保护 action grammar | step-compressor / context-manager / agent-loop / step-engine | ✅ 已落地（Agent 循环默认） |
-| 4 | [SWE-Touch: Benchmarking Coding Agents When Users Touch the Code](https://arxiv.org/abs/2608.02499) | 2608.02499（2026-08） | 共享工作区漂移感知与定向验证 | workspace-drift / agent-loop / tool-handlers | ✅ 已落地 |
-| 5 | [Oversight Has a Capacity: Calibrating Agent Guards to a Subjective, Fatiguing Human](https://arxiv.org/abs/2606.08919) | 2606.08919（2026-06） | 人工监督存在容量上限，安全与审批率呈倒 U 型 | approval-fatigue / permission-handlers | ✅ 已落地（建议层） |
-| 6 | [AutoTool: Efficient Tool Selection for Large Language Model Agents](https://arxiv.org/abs/2511.14650) | 2511.14650（AAAI 2026） | 工具调用惯性 → 有向图预测，节省推理开销 | tool-inertia / tool-runner | ✅ 已落地（观测 + 预测层） |
-| 7 | [When Self-Evolution Backfires: Pre-Commit Gating against Skill Contamination in LLM Agents](https://arxiv.org/abs/2608.05810) | 2608.05810（2026-08） | 技能污染结构性不可逆，入库须 pre-commit 门禁 | skill-gate / tool-handlers（WriteSkill） | ✅ 已落地 |
-| 8 | [SGLang: Efficient Execution of Structured Language Model Programs（RadixAttention）](https://arxiv.org/abs/2312.07104) | 2312.07104（NeurIPS 2024） | 前缀树 KV 复用；客户端侧取「公共前缀最长化 + 规范历史重放」前提 | query-context / query-engine / useChatStore | ✅ 已落地（API 侧客户端适配） |
-| 9 | [Prompt Cache: Modular Attention Reuse for Low-Latency Inference](https://arxiv.org/abs/2311.04934) | 2311.04934（MLSys 2024） | 可复用内容做成连续稳定块，动态内容不插入稳定块 | context-manager / query-context | ✅ 已落地 |
-| 10 | [Cache-Aware Prompt Compression: A Two-Tier Cost Model for LLM API Caching](https://arxiv.org/abs/2607.15516) | 2607.15516（2026-07） | 按变更频率决定前缀/尾部边界，动态内容尾部化 | query-context / query-engine / useChatStore | ✅ 已落地 |
-| 11 | [Byte-Exact Deduplication in Retrieval-Augmented Generation](https://arxiv.org/abs/2605.09611) | 2605.09611（2026-05） | 检索上下文字节级去重，避免重复内容膨胀 | query-context（记忆块去重） | ✅ 已落地（去重思路） |
+| #   | 论文（arXiv 链接）                                                                                                                           | arXiv ID                   | 核心洞察                                                        | 落地模块                                                                                   | 状态                          |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ----------------------------- |
+| 1   | [Eywa: Provenance-Grounded Long-Term Memory for AI Agents](https://arxiv.org/abs/2605.30771)                                                 | 2605.30771（2026-05）      | 证据先于信念；检索零 LLM；答案策略与上下文分离                  | memory-evidence / signal-rules / belief-validation / memory-read / memory-db / MemoryPanel | ✅ 已落地 v1.0                |
+| 2   | [MAP-Graph: Provenance-Aware Shared Memory for Multi-Agent Workflows](https://arxiv.org/abs/2608.10509)                                      | 2608.10509（2026-08）      | 多 Agent 共享记忆的授权、信任与血缘                             | memory-graph / agent-loop / tool-runner / agent-scheduler                                  | ✅ 已落地（M5，opt-in）       |
+| 3   | [AGORA: Adapter-Grounded Observation-Action Retention for Inference-Free Prompt Compression in LLM Agents](https://arxiv.org/abs/2605.26596) | 2605.26596（2026-05）      | 步骤级免推理压缩，保护 action grammar                           | step-compressor / context-manager / agent-loop / step-engine                               | ✅ 已落地（Agent 循环默认）   |
+| 4   | [SWE-Touch: Benchmarking Coding Agents When Users Touch the Code](https://arxiv.org/abs/2608.02499)                                          | 2608.02499（2026-08）      | 共享工作区漂移感知与定向验证                                    | workspace-drift / agent-loop / tool-handlers                                               | ✅ 已落地                     |
+| 5   | [Oversight Has a Capacity: Calibrating Agent Guards to a Subjective, Fatiguing Human](https://arxiv.org/abs/2606.08919)                      | 2606.08919（2026-06）      | 人工监督存在容量上限，安全与审批率呈倒 U 型                     | approval-fatigue / permission-handlers                                                     | ✅ 已落地（建议层）           |
+| 6   | [AutoTool: Efficient Tool Selection for Large Language Model Agents](https://arxiv.org/abs/2511.14650)                                       | 2511.14650（AAAI 2026）    | 工具调用惯性 → 有向图预测，节省推理开销                         | tool-inertia / tool-runner                                                                 | ✅ 已落地（观测 + 预测层）    |
+| 7   | [When Self-Evolution Backfires: Pre-Commit Gating against Skill Contamination in LLM Agents](https://arxiv.org/abs/2608.05810)               | 2608.05810（2026-08）      | 技能污染结构性不可逆，入库须 pre-commit 门禁                    | skill-gate / tool-handlers（WriteSkill）                                                   | ✅ 已落地                     |
+| 8   | [SGLang: Efficient Execution of Structured Language Model Programs（RadixAttention）](https://arxiv.org/abs/2312.07104)                      | 2312.07104（NeurIPS 2024） | 前缀树 KV 复用；客户端侧取「公共前缀最长化 + 规范历史重放」前提 | query-context / query-engine / useChatStore                                                | ✅ 已落地（API 侧客户端适配） |
+| 9   | [Prompt Cache: Modular Attention Reuse for Low-Latency Inference](https://arxiv.org/abs/2311.04934)                                          | 2311.04934（MLSys 2024）   | 可复用内容做成连续稳定块，动态内容不插入稳定块                  | context-manager / query-context                                                            | ✅ 已落地                     |
+| 10  | [Cache-Aware Prompt Compression: A Two-Tier Cost Model for LLM API Caching](https://arxiv.org/abs/2607.15516)                                | 2607.15516（2026-07）      | 按变更频率决定前缀/尾部边界，动态内容尾部化                     | query-context / query-engine / useChatStore                                                | ✅ 已落地                     |
+| 11  | [Byte-Exact Deduplication in Retrieval-Augmented Generation](https://arxiv.org/abs/2605.09611)                                               | 2605.09611（2026-05）      | 检索上下文字节级去重，避免重复内容膨胀                          | query-context（记忆块去重）                                                                | ✅ 已落地（去重思路）         |
 
 ### 5.2 Eywa — 溯源长期记忆（M1–M4）
 
@@ -625,20 +633,20 @@ Work/Code 统一引擎（`query-engine.ts` → `step-engine.ts`）为 DeepSeek �
 
 ### 5.10 新增功能清单
 
-| 功能 | 说明 | 主要模块 |
-|------|------|---------|
-| 本地账户系统 | 首启注册 → 登录门 → 登出/改密；密码仅存 scrypt 哈希；`AURAXIS_AUTH_DISABLED=1` 仅供测试绕过登录门 | auth-store / auth-handlers / AuthGate / AccountPane |
-| DeepSeek API Key 注册时填写 | 注册流程可直接填 Key 并测试连接，也可跳过到设置面板配置 | AuthGate / settings / ai-handlers |
-| 头像与账户展示 | 顶部栏账户显示在设置按钮左侧，头像支持上传（居中裁剪为 PNG data URL），设置面板可改密 | Avatar / AccountPane / auth:setAvatar |
-| Chat / Work / Code 三模式 | 统一 ReAct 引擎下的三种产品形态：Chat 对话、Work 任务执行、Code 代码编程；模式切换不污染彼此状态 | useAppStore / useChatStore / code-mode |
-| Work 模式 Agent 执行流程视图 | 输入区居中 + 任务看板 + 执行流程（回合、工具行、交付物、状态） | ChatArea / WorkExecutionFlow / WorkItemView |
-| 思考开关与思考深度 | Chat 为 DeepSeek 风格：仅思考开关（开启默认 high，无强度选择）；Work/Code 默认思考开启并保留 low/medium/high 滑轨 | ChatInput / ThinkingDepthSelector / ModeToggler |
-| 联网搜索 | Chat 有独立联网按钮；Work/Code 不显示开关，任务中由模型自主调用 WebSearch/WebFetch；默认 DeepSeek 官方原生搜索，失败降级 DuckDuckGo | ChatInput / tool-handlers |
-| 每模式状态快照 | 思考开关 / 强度 / 联网状态按模式保存（modeThinkingPrefs），切回时还原 | useChatStore |
-| 溯源记忆 | 证据先于信念、确定性读路径、证据链 UI、五层失败归因 | memory-* / MemoryPanel |
-| 会话事件时间轴 | 右侧时间轴展示会话事件与工具调用，支持追溯 / 重放 | ToolCallTimeline / session-log |
-| 实时 diff 与变更回滚 | 右舱「变更」视图按会话查看文件变更并回滚 | undo-manager / undo:getSessionDiffs |
-| 测试覆盖率面板 | 设置面板实时读取 coverage-summary.json 展示行 / 分支 / 函数覆盖率 | coverage-handlers / settings |
+| 功能                         | 说明                                                                                                                                | 主要模块                                            |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| 本地账户系统                 | 首启注册 → 登录门 → 登出/改密；密码仅存 scrypt 哈希；`AURAXIS_AUTH_DISABLED=1` 仅供测试绕过登录门                                   | auth-store / auth-handlers / AuthGate / AccountPane |
+| DeepSeek API Key 注册时填写  | 注册流程可直接填 Key 并测试连接，也可跳过到设置面板配置                                                                             | AuthGate / settings / ai-handlers                   |
+| 头像与账户展示               | 顶部栏账户显示在设置按钮左侧，头像支持上传（居中裁剪为 PNG data URL），设置面板可改密                                               | Avatar / AccountPane / auth:setAvatar               |
+| Chat / Work / Code 三模式    | 统一 ReAct 引擎下的三种产品形态：Chat 对话、Work 任务执行、Code 代码编程；模式切换不污染彼此状态                                    | useAppStore / useChatStore / code-mode              |
+| Work 模式 Agent 执行流程视图 | 输入区居中 + 任务看板 + 执行流程（回合、工具行、交付物、状态）                                                                      | ChatArea / WorkExecutionFlow / WorkItemView         |
+| 思考开关与思考深度           | Chat 为 DeepSeek 风格：仅思考开关（开启默认 high，无强度选择）；Work/Code 默认思考开启并保留 low/medium/high 滑轨                   | ChatInput / ThinkingDepthSelector / ModeToggler     |
+| 联网搜索                     | Chat 有独立联网按钮；Work/Code 不显示开关，任务中由模型自主调用 WebSearch/WebFetch；默认 DeepSeek 官方原生搜索，失败降级 DuckDuckGo | ChatInput / tool-handlers                           |
+| 每模式状态快照               | 思考开关 / 强度 / 联网状态按模式保存（modeThinkingPrefs），切回时还原                                                               | useChatStore                                        |
+| 溯源记忆                     | 证据先于信念、确定性读路径、证据链 UI、五层失败归因                                                                                 | memory-* / MemoryPanel                              |
+| 会话事件时间轴               | 右侧时间轴展示会话事件与工具调用，支持追溯 / 重放                                                                                   | ToolCallTimeline / session-log                      |
+| 实时 diff 与变更回滚         | 右舱「变更」视图按会话查看文件变更并回滚                                                                                            | undo-manager / undo:getSessionDiffs                 |
+| 测试覆盖率面板               | 设置面板实时读取 coverage-summary.json 展示行 / 分支 / 函数覆盖率                                                                   | coverage-handlers / settings                        |
 
 ---
 
@@ -660,11 +668,11 @@ Agent 循环 (agent-loop.ts) — agentLoopRun()
 
 定义在 `agent-handlers.ts`（[查看文件](../electron/ipc/agent-handlers.ts)），三种内置类型：
 
-| 类型 | 能力 | 禁用工具 |
-|------|------|---------|
-| **Explore** | 只读探索：搜索文件、阅读代码、Web 获取/搜索 | Write, Edit, Agent |
-| **Plan** | 只读架构师：设计实现方案，输出结构化计划 | Write, Edit, Bash, Agent（工具白名单强制限制） |
-| **general-purpose** | 全能力：编码、调试、重构 | 无限制（全部 71 个工具可用） |
+| 类型                | 能力                                        | 禁用工具                                       |
+| ------------------- | ------------------------------------------- | ---------------------------------------------- |
+| **Explore**         | 只读探索：搜索文件、阅读代码、Web 获取/搜索 | Write, Edit, Agent                             |
+| **Plan**            | 只读架构师：设计实现方案，输出结构化计划    | Write, Edit, Bash, Agent（工具白名单强制限制） |
+| **general-purpose** | 全能力：编码、调试、重构                    | 无限制（全部 71 个工具可用）                   |
 
 ### 6.3 AgentScheduler 调度器
 
@@ -713,12 +721,12 @@ Agent 循环 (agent-loop.ts) — agentLoopRun()
 
 插件（`src/core/plugin-manager.ts`）提供以下扩展点：
 
-| 扩展点 | 说明 |
-|--------|------|
-| **commands** | 斜杠命令（`/example`），可操作聊天输入 |
-| **tools** | AI 工具（合并到工具注册表，LLM 可调用） |
-| **hooks** | 生命周期钩子：`onToolExecute`, `onAgentStart`, `onAgentEnd` |
-| **ui** | UI 扩展：`settingsPanel`（设置面板）, `statusBarItem`（状态栏） |
+| 扩展点       | 说明                                                            |
+| ------------ | --------------------------------------------------------------- |
+| **commands** | 斜杠命令（`/example`），可操作聊天输入                          |
+| **tools**    | AI 工具（合并到工具注册表，LLM 可调用）                         |
+| **hooks**    | 生命周期钩子：`onToolExecute`, `onAgentStart`, `onAgentEnd`     |
+| **ui**       | UI 扩展：`settingsPanel`（设置面板）, `statusBarItem`（状态栏） |
 
 ### 8.2 安全模型
 
@@ -749,17 +757,17 @@ Agent 循环 (agent-loop.ts) — agentLoopRun()
 
 使用 `zustand/middleware/persist` 中间件，存储至 `localStorage`：
 
-| Store | localStorage Key | 持久化内容 |
-|-------|-----------------|-----------|
-| useChatStore | `auraxis-chat-storage` | 最近 40 条消息 |
-| useSettingsStore | `auraxis-settings-storage` | API Key、默认模型、项目路径、通知设置、侧边栏透明度 |
-| useAppStore | `auraxis-app-storage` | 主题、侧边栏状态、面板宽度、右侧面板视图 |
-| useAgentStore | `auraxis-agent-storage` | Agent 列表、优先级、并发设置 |
-| useSessionStore | `auraxis-session-storage` | 会话列表（最多 40 个） |
-| useProjectStore | `auraxis-projects` | 项目注册表、当前项目、工作区/会话排序 |
-| usePluginStore | `auraxis-plugin-storage` | 已安装插件、启用状态 |
-| useAdvancedStore | `auraxis-advanced-storage` | MCP 服务器、Agent 旧设置 |
-| useKeybindingsStore | `auraxis_keybindings` | 快捷键覆盖 |
+| Store               | localStorage Key           | 持久化内容                                          |
+| ------------------- | -------------------------- | --------------------------------------------------- |
+| useChatStore        | `auraxis-chat-storage`     | 最近 40 条消息                                      |
+| useSettingsStore    | `auraxis-settings-storage` | API Key、默认模型、项目路径、通知设置、侧边栏透明度 |
+| useAppStore         | `auraxis-app-storage`      | 主题、侧边栏状态、面板宽度、右侧面板视图            |
+| useAgentStore       | `auraxis-agent-storage`    | Agent 列表、优先级、并发设置                        |
+| useSessionStore     | `auraxis-session-storage`  | 会话列表（最多 40 个）                              |
+| useProjectStore     | `auraxis-projects`         | 项目注册表、当前项目、工作区/会话排序               |
+| usePluginStore      | `auraxis-plugin-storage`   | 已安装插件、启用状态                                |
+| useAdvancedStore    | `auraxis-advanced-storage` | MCP 服务器、Agent 旧设置                            |
+| useKeybindingsStore | `auraxis_keybindings`      | 快捷键覆盖                                          |
 
 > **注意**：localStorage key 使用 `auraxis-` 统一前缀，`auraxis_keybindings` 例外。
 
@@ -832,24 +840,23 @@ SQLite 投影缓存与 FTS 索引均带 `PRAGMA user_version = 1`，后续结构
 
 参见 `.env.example`（[查看文件](../.env.example)）：
 
-| 变量 | 说明 | 默认值 |
-|------|------|--------|
-| `DEEPSEEK_API_KEY` | DeepSeek API 密钥 | 无（必填） |
-| `DEEPSEEK_BASE_URL` | OpenAI 格式端点 | `https://api.deepseek.com/beta/chat/completions` |
-| `DEEPSEEK_ANTHROPIC_BASE_URL` | Anthropic 格式端点 | `https://api.deepseek.com/anthropic/v1/messages` |
-| `ANTHROPIC_API_KEY` | Anthropic API 密钥 | 无 |
-| `ANTHROPIC_BASE_URL` | Anthropic 端点 | `https://api.anthropic.com/v1/messages` |
-| `OPENAI_API_KEY` | OpenAI API 密钥 | 无 |
-| `OPENAI_BASE_URL` | OpenAI 端点 | `https://api.openai.com/v1/chat/completions` |
-| `AURAXIS_MODELS` | 自定义模型（JSON 数组） | 无 |
-| `AURAXIS_MEMORY_RISK_GATE` | 启用 MAP-Graph 记忆风险门控（M5） | `1` 时启用，默认关闭 |
-| `AURAXIS_MEMORY_EMBEDDINGS` | 启用 R4 本地确定性向量路由 | 默认关闭 |
-| `AURAXIS_MEMORY_LLM_SIGNALS` | 在规则信号之外追加 LLM 信号检测 | 默认关闭 |
-| `AURAXIS_AUTH_DISABLED` | 测试/CI 环境跳过登录门（正常桌面使用勿设） | 默认关闭 |
-| `AURAXIS_USER_DATA_DIR` | 覆盖 userData 目录（账户/设置隔离，测试用） | 默认无 |
-| `AURAXIS_TELEMETRY_MODE` | 遥测开关（opt-in） | 默认关闭 |
-| `AURAXIS_LOG_RETENTION_DAYS` / `AURAXIS_LOG_MAX_FILE_MB` | 日志保留天数 / 单文件上限 | 180 / 256 |
-
+| 变量                                                     | 说明                                        | 默认值                                           |
+| -------------------------------------------------------- | ------------------------------------------- | ------------------------------------------------ |
+| `DEEPSEEK_API_KEY`                                       | DeepSeek API 密钥                           | 无（必填）                                       |
+| `DEEPSEEK_BASE_URL`                                      | OpenAI 格式端点                             | `https://api.deepseek.com/beta/chat/completions` |
+| `DEEPSEEK_ANTHROPIC_BASE_URL`                            | Anthropic 格式端点                          | `https://api.deepseek.com/anthropic/v1/messages` |
+| `ANTHROPIC_API_KEY`                                      | Anthropic API 密钥                          | 无                                               |
+| `ANTHROPIC_BASE_URL`                                     | Anthropic 端点                              | `https://api.anthropic.com/v1/messages`          |
+| `OPENAI_API_KEY`                                         | OpenAI API 密钥                             | 无                                               |
+| `OPENAI_BASE_URL`                                        | OpenAI 端点                                 | `https://api.openai.com/v1/chat/completions`     |
+| `AURAXIS_MODELS`                                         | 自定义模型（JSON 数组）                     | 无                                               |
+| `AURAXIS_MEMORY_RISK_GATE`                               | 启用 MAP-Graph 记忆风险门控（M5）           | `1` 时启用，默认关闭                             |
+| `AURAXIS_MEMORY_EMBEDDINGS`                              | 启用 R4 本地确定性向量路由                  | 默认关闭                                         |
+| `AURAXIS_MEMORY_LLM_SIGNALS`                             | 在规则信号之外追加 LLM 信号检测             | 默认关闭                                         |
+| `AURAXIS_AUTH_DISABLED`                                  | 测试/CI 环境跳过登录门（正常桌面使用勿设）  | 默认关闭                                         |
+| `AURAXIS_USER_DATA_DIR`                                  | 覆盖 userData 目录（账户/设置隔离，测试用） | 默认无                                           |
+| `AURAXIS_TELEMETRY_MODE`                                 | 遥测开关（opt-in）                          | 默认关闭                                         |
+| `AURAXIS_LOG_RETENTION_DAYS` / `AURAXIS_LOG_MAX_FILE_MB` | 日志保留天数 / 单文件上限                   | 180 / 256                                        |
 
 ### 10.3 自定义模型格式
 
@@ -915,6 +922,7 @@ dist-electron/ + dist/ ──→ electron-builder ──→ release/
 ### 12.2 打包配置
 
 `electron-builder.yml` 支持三个平台：
+
 - **Windows**：NSIS 安装程序
 - **macOS**：DMG（x64 + arm64）
 - **Linux**：AppImage
@@ -939,9 +947,9 @@ dist-electron/ + dist/ ──→ electron-builder ──→ release/
 - **测试框架**：Vitest（`describe`, `it`, `expect`, `vi` 通过 globals 注入）
 - **主进程测试**：`electron/**/__tests__/`，node 环境，依赖 `electron` 的模块用 `vi.mock('electron', ...)` 隔离
 - **渲染进程测试**：`src/**/__tests__/`，jsdom 环境（@testing-library/react）
-- **测试总数**：237 个测试文件 / 1740 个用例通过（另有 3 例环境性跳过）
+- **测试总数**：244 个测试文件 / 1784 个用例通过（另有 3 例环境性跳过）
 - **覆盖率口径**：门槛统计范围仅为 `electron/ipc/`、`src/stores/`、`src/core/`；UI 组件（`src/components/`）与主进程入口（`main.ts` / `preload.ts` 等）不计入该门槛，另有组件级测试与 Playwright 端到端测试（`npm run test:e2e`）覆盖
-- **覆盖率阈值**：行/语句 80%，分支 70%，函数 80%（scope: `electron/ipc/`, `src/stores/`, `src/core/`；当前实际 85.42% 行/语句、79.08% 分支、86.63% 函数）
+- **覆盖率阈值**：行/语句 80%，分支 70%，函数 80%（scope: `electron/ipc/`, `src/stores/`, `src/core/`；当前实际 85.18% 行/语句、78.86% 分支、87.78% 函数）
 - **覆盖率报告**：`npm run test:coverage` 同时输出 `coverage/coverage-summary.json`（gitignore 的开发期产物）；设置面板「测试覆盖率」页经 `coverage:get` IPC 实时读取，纯浏览器 dev 由 Vite 中间件提供同一路径，生产构建将其拷入 `dist/coverage/`。报告缺失时面板提示运行命令，不显示伪造数字。
 - **端到端测试**：15 条 Playwright UI 链路通过（真实 Electron）
 - **实战验收（DeepSeek 真实 API）**：Chat 流式回答、Code 自动代批 Bash、Code「每次确认」权限卡（允许一次后写入文件）、Work 智能放行执行流、Work 计划审批面板均跑通；沙箱脚本直启 `dist-electron/main.js` 时增加 cwd 回退（`electron/sandbox-runner.ts`）。
@@ -993,6 +1001,7 @@ dist-electron/ + dist/ ──→ electron-builder ──→ release/
 ### 13.6 设计系统
 
 Aura 设计系统 —「Black is the Axis，White is the Structure，Purple is the Aura」：
+
 - **品牌色**：Auraxis Black `#111216`（深底）/ Ivory `#F1F1EE`（浅底文字）+ Aura 紫灰 `#8C8AA8` 仅作约 3% 强调；**禁止蓝色与大面积彩色渐变**
 - **圆角六档**：5 / 6 / 8 / 12 / 14 / 9999，禁用 3/4/7/9/10px 碎角
 - **hairline 边框**：`--color-border-dim` 统一发丝线，不加深色实线、不加硬阴影堆叠
@@ -1007,6 +1016,7 @@ Aura 设计系统 —「Black is the Axis，White is the Structure，Purple is t
 ### 13.7 IDE 别名
 
 Vite 和 TypeScript 均配置 `@/` 别名映射到 `src/`：
+
 ```typescript
 // 等价于 src/components/chat/MessageBubble.tsx
 import { MessageBubble } from '@/components/chat/MessageBubble';
@@ -1031,34 +1041,34 @@ npm run build            # 生产构建
 
 ### 关键文件索引
 
-| 文件 | 职责 |
-|------|------|
-| [electron/main.ts](../electron/main.ts) | 应用入口 |
-| [electron/preload.ts](../electron/preload.ts) | IPC 桥接 |
-| [electron/ipc/index.ts](../electron/ipc/index.ts) | IPC 注册总入口 |
-| [electron/tool-defs.ts](../electron/tool-defs.ts) | 工具定义 |
-| [electron/ipc/step-engine.ts](../electron/ipc/step-engine.ts) | 统一 ReAct 步进引擎 |
-| [electron/ipc/query-engine.ts](../electron/ipc/query-engine.ts) | 聊天驱动 |
-| [electron/ipc/query-context.ts](../electron/ipc/query-context.ts) | 规范上下文快照（缓存对齐重放 / 记忆去重 / 失效墓碑） |
-| [electron/ipc/agent-loop.ts](../electron/ipc/agent-loop.ts) | Agent 驱动（规划/审批/偏差/停止策略） |
-| [electron/ipc/agent-scheduler.ts](../electron/ipc/agent-scheduler.ts) | 多 Agent 调度 |
-| [electron/ipc/tool-handlers.ts](../electron/ipc/tool-handlers.ts) | 工具执行 |
-| [electron/ipc/permission-handlers.ts](../electron/ipc/permission-handlers.ts) | 权限控制 |
-| [electron/code-mode.ts](../electron/code-mode.ts) | Code Mode（TS 工具编排） |
-| [electron/step-compressor.ts](../electron/step-compressor.ts) | AGORA 步骤级压缩 |
-| [electron/workspace-drift.ts](../electron/workspace-drift.ts) | SWE-Touch 工作区漂移 |
-| [electron/approval-fatigue.ts](../electron/approval-fatigue.ts) | Oversight 审批疲劳 |
-| [electron/tool-inertia.ts](../electron/tool-inertia.ts) | AutoTool 工具惯性 |
-| [electron/skill-gate.ts](../electron/skill-gate.ts) | VaG 技能门禁 |
-| [electron/auth-store.ts](../electron/auth-store.ts) | 本地账户（注册/登录/头像） |
-| [electron/ipc/memory-read.ts](../electron/ipc/memory-read.ts) | Eywa 确定性读路径 |
-| [electron/ipc/memory-graph.ts](../electron/ipc/memory-graph.ts) | MAP-Graph 授权门控 |
-| [electron/contracts/](../electron/contracts/) | 跨进程类型契约 |
-| [electron/session-store.ts](../electron/session-store.ts) | 统一事件日志 |
-| [src/App.tsx](../src/App.tsx) | React 根组件 |
-| [src/stores/useChatStore.ts](../src/stores/useChatStore.ts) | 聊天状态 |
-| [src/components/auth/AuthGate.tsx](../src/components/auth/AuthGate.tsx) | 登录门 |
-| [src/components/work/WorkExecutionFlow.tsx](../src/components/work/WorkExecutionFlow.tsx) | Work 执行流程视图 |
-| [src/components/input/ThinkingDepthSelector.tsx](../src/components/input/ThinkingDepthSelector.tsx) | 思考深度滑轨（磁吸流式特效） |
-| [src/core/plugin-manager.ts](../src/core/plugin-manager.ts) | 插件管理 |
-| [src/styles/theme.ts](../src/styles/theme.ts) | 主题配置 |
+| 文件                                                                                                | 职责                                                 |
+| --------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| [electron/main.ts](../electron/main.ts)                                                             | 应用入口                                             |
+| [electron/preload.ts](../electron/preload.ts)                                                       | IPC 桥接                                             |
+| [electron/ipc/index.ts](../electron/ipc/index.ts)                                                   | IPC 注册总入口                                       |
+| [electron/tool-defs.ts](../electron/tool-defs.ts)                                                   | 工具定义                                             |
+| [electron/ipc/step-engine.ts](../electron/ipc/step-engine.ts)                                       | 统一 ReAct 步进引擎                                  |
+| [electron/ipc/query-engine.ts](../electron/ipc/query-engine.ts)                                     | 聊天驱动                                             |
+| [electron/ipc/query-context.ts](../electron/ipc/query-context.ts)                                   | 规范上下文快照（缓存对齐重放 / 记忆去重 / 失效墓碑） |
+| [electron/ipc/agent-loop.ts](../electron/ipc/agent-loop.ts)                                         | Agent 驱动（规划/审批/偏差/停止策略）                |
+| [electron/ipc/agent-scheduler.ts](../electron/ipc/agent-scheduler.ts)                               | 多 Agent 调度                                        |
+| [electron/ipc/tool-handlers.ts](../electron/ipc/tool-handlers.ts)                                   | 工具执行                                             |
+| [electron/ipc/permission-handlers.ts](../electron/ipc/permission-handlers.ts)                       | 权限控制                                             |
+| [electron/code-mode.ts](../electron/code-mode.ts)                                                   | Code Mode（TS 工具编排）                             |
+| [electron/step-compressor.ts](../electron/step-compressor.ts)                                       | AGORA 步骤级压缩                                     |
+| [electron/workspace-drift.ts](../electron/workspace-drift.ts)                                       | SWE-Touch 工作区漂移                                 |
+| [electron/approval-fatigue.ts](../electron/approval-fatigue.ts)                                     | Oversight 审批疲劳                                   |
+| [electron/tool-inertia.ts](../electron/tool-inertia.ts)                                             | AutoTool 工具惯性                                    |
+| [electron/skill-gate.ts](../electron/skill-gate.ts)                                                 | VaG 技能门禁                                         |
+| [electron/auth-store.ts](../electron/auth-store.ts)                                                 | 本地账户（注册/登录/头像）                           |
+| [electron/ipc/memory-read.ts](../electron/ipc/memory-read.ts)                                       | Eywa 确定性读路径                                    |
+| [electron/ipc/memory-graph.ts](../electron/ipc/memory-graph.ts)                                     | MAP-Graph 授权门控                                   |
+| [electron/contracts/](../electron/contracts/)                                                       | 跨进程类型契约                                       |
+| [electron/session-store.ts](../electron/session-store.ts)                                           | 统一事件日志                                         |
+| [src/App.tsx](../src/App.tsx)                                                                       | React 根组件                                         |
+| [src/stores/useChatStore.ts](../src/stores/useChatStore.ts)                                         | 聊天状态                                             |
+| [src/components/auth/AuthGate.tsx](../src/components/auth/AuthGate.tsx)                             | 登录门                                               |
+| [src/components/work/WorkExecutionFlow.tsx](../src/components/work/WorkExecutionFlow.tsx)           | Work 执行流程视图                                    |
+| [src/components/input/ThinkingDepthSelector.tsx](../src/components/input/ThinkingDepthSelector.tsx) | 思考深度滑轨（磁吸流式特效）                         |
+| [src/core/plugin-manager.ts](../src/core/plugin-manager.ts)                                         | 插件管理                                             |
+| [src/styles/theme.ts](../src/styles/theme.ts)                                                       | 主题配置                                             |

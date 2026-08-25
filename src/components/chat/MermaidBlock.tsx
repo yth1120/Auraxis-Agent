@@ -1,3 +1,4 @@
+import { errorText } from '../../../electron/errors';
 import { useState, useEffect, useRef } from 'react';
 import mermaid from 'mermaid';
 import { t, useT } from '../../i18n';
@@ -35,9 +36,9 @@ export default function MermaidBlock({ code }: MermaidBlockProps) {
           setSvg(result);
           setError(null);
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (token === renderTokenRef.current) {
-          setError(err.message || t('mermaid.renderFailed'));
+          setError(errorText(err) || t('mermaid.renderFailed'));
         }
       }
     };

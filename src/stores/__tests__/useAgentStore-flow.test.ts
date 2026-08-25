@@ -83,10 +83,9 @@ beforeEach(async () => {
 
 describe('useAgentStore — startAgent', () => {
   it('成功后返回 agentId 并插入本地实例', async () => {
-    const id = await useAgentStore.getState().startAgent(
-      { name: '任务', description: '描述', type: 'general-purpose', model: 'm' },
-      'C:/p',
-    );
+    const id = await useAgentStore
+      .getState()
+      .startAgent({ name: '任务', description: '描述', type: 'general-purpose', model: 'm' }, 'C:/p');
     expect(id).toBe('a1');
     const agent = useAgentStore.getState().agents[0];
     expect(agent).toMatchObject({ id: 'a1', name: '任务', status: 'running', model: 'm' });
@@ -96,7 +95,9 @@ describe('useAgentStore — startAgent', () => {
   it('广播先到时不重复插入', async () => {
     sharedOnUpdated({ id: 'a1', name: '任务', status: 'running' });
 
-    await useAgentStore.getState().startAgent({ name: '任务', description: 'd', type: 'general-purpose', model: 'm' }, 'C:/p');
+    await useAgentStore
+      .getState()
+      .startAgent({ name: '任务', description: 'd', type: 'general-purpose', model: 'm' }, 'C:/p');
     expect(useAgentStore.getState().agents.filter((a) => a.id === 'a1')).toHaveLength(1);
   });
 
@@ -107,15 +108,24 @@ describe('useAgentStore — startAgent', () => {
     ).rejects.toThrow('目录不存在');
 
     (window as any).electronAPI = undefined;
-    expect(await useAgentStore.getState().startAgent({ name: 'x', description: 'd', type: 'general-purpose', model: 'm' }, 'C:/p')).toBeNull();
+    expect(
+      await useAgentStore
+        .getState()
+        .startAgent({ name: 'x', description: 'd', type: 'general-purpose', model: 'm' }, 'C:/p'),
+    ).toBeNull();
   });
 });
 
 describe('useAgentStore — 事件流与日志', () => {
   it('把后端事件归一化为日志并更新计数/计划/用量', async () => {
     sharedOnUpdated({
-      id: 'a1', name: '任务', status: 'running', iterations: 3,
-      projectPath: 'C:/p', toolCallCount: 1, messagesCount: 2,
+      id: 'a1',
+      name: '任务',
+      status: 'running',
+      iterations: 3,
+      projectPath: 'C:/p',
+      toolCallCount: 1,
+      messagesCount: 2,
     });
     const agent = useAgentStore.getState().agents[0];
     expect(agent).toMatchObject({ iteration: 3, projectRoot: 'C:/p', toolCallCount: 1 });
@@ -130,7 +140,14 @@ describe('useAgentStore — 事件流与日志', () => {
     await tick();
     sharedOnEvent({ type: 'tool_end', toolName: 'Read', toolCallId: 'c1', output: {}, durationMs: 5 });
     sharedOnEvent({ type: 'iteration_start', iteration: 1, maxIterations: 200 });
-    sharedOnEvent({ type: 'iteration_end', iteration: 1, toolsThisIteration: 1, llmLatencyMs: 10, firstTokenMs: 20, outputTokens: 30 });
+    sharedOnEvent({
+      type: 'iteration_end',
+      iteration: 1,
+      toolsThisIteration: 1,
+      llmLatencyMs: 10,
+      firstTokenMs: 20,
+      outputTokens: 30,
+    });
     sharedOnEvent({ type: 'turn_start', turnId: 't1' });
     sharedOnEvent({ type: 'turn_end', turnId: 't1', reason: 'completed' });
     sharedOnEvent({ type: 'deviance_warning', message: 'warn' });
@@ -147,10 +164,24 @@ describe('useAgentStore — 事件流与日志', () => {
 
     const a = useAgentStore.getState().agents[0];
     const types = a.log.map((e) => e.type);
-    expect(types).toEqual(expect.arrayContaining([
-      'text', 'thinking', 'tool_start', 'tool_end', 'iteration_start', 'iteration_end',
-      'turn_start', 'turn_end', 'warning', 'progress', 'context', 'user_message', 'error', 'plan',
-    ]));
+    expect(types).toEqual(
+      expect.arrayContaining([
+        'text',
+        'thinking',
+        'tool_start',
+        'tool_end',
+        'iteration_start',
+        'iteration_end',
+        'turn_start',
+        'turn_end',
+        'warning',
+        'progress',
+        'context',
+        'user_message',
+        'error',
+        'plan',
+      ]),
+    );
     expect(a.log.find((e) => e.type === 'text')?.text).toBe('hi there');
     const toolEnd = a.log.find((e) => e.type === 'tool_end');
     expect((toolEnd as any).streamOutput).toBe('out');
@@ -165,7 +196,22 @@ describe('useAgentStore — 事件流与日志', () => {
 describe('useAgentStore — 控制动作与状态刷新', () => {
   function seedAgent() {
     useAgentStore.setState({
-      agents: [{ id: 'a1', name: 'T', description: '', type: 'general-purpose', status: 'running', priority: 'normal', startTime: 1, iteration: 0, maxIterations: 200, toolCallCount: 0, messagesCount: 0, log: [] } as any],
+      agents: [
+        {
+          id: 'a1',
+          name: 'T',
+          description: '',
+          type: 'general-purpose',
+          status: 'running',
+          priority: 'normal',
+          startTime: 1,
+          iteration: 0,
+          maxIterations: 200,
+          toolCallCount: 0,
+          messagesCount: 0,
+          log: [],
+        } as any,
+      ],
     });
   }
 
@@ -194,12 +240,15 @@ describe('useAgentStore — 控制动作与状态刷新', () => {
     expect(await useAgentStore.getState().continueAgent('a1', '继续')).toEqual({ ok: false, error: 'ipc down' });
 
     (window as any).electronAPI = undefined;
-    expect(await useAgentStore.getState().continueAgent('a1', '继续')).toEqual({ ok: false, error: '当前环境不支持续写' });
+    expect(await useAgentStore.getState().continueAgent('a1', '继续')).toEqual({
+      ok: false,
+      error: '当前环境不支持续写',
+    });
   });
 
   it('removeAgent 打墓碑并清理权限', async () => {
     sharedOnUpdated({ id: 'a1', name: 'T', status: 'running' });
-    useAgentStore.setState((s) => ({
+    useAgentStore.setState(() => ({
       agentPermissions: { a1: [{ requestId: 'r1', toolName: 'Write', input: {}, timestamp: 1 } as any] },
     }));
 
@@ -214,7 +263,23 @@ describe('useAgentStore — 控制动作与状态刷新', () => {
 
   it('refreshStates 合并后端并清理孤儿选中', async () => {
     useAgentStore.setState({
-      agents: [{ id: 'e1', name: '旧', description: '', type: 'x', status: 'running', priority: 'normal', startTime: 1, iteration: 0, maxIterations: 200, toolCallCount: 0, messagesCount: 0, model: 'm', log: [{ type: 'text', text: 'keep', timestamp: 1 }] } as any],
+      agents: [
+        {
+          id: 'e1',
+          name: '旧',
+          description: '',
+          type: 'x',
+          status: 'running',
+          priority: 'normal',
+          startTime: 1,
+          iteration: 0,
+          maxIterations: 200,
+          toolCallCount: 0,
+          messagesCount: 0,
+          model: 'm',
+          log: [{ type: 'text', text: 'keep', timestamp: 1 }],
+        } as any,
+      ],
       currentAgentId: 'gone',
     });
     mocks.getAll.mockResolvedValueOnce({
@@ -235,7 +300,20 @@ describe('useAgentStore — 控制动作与状态刷新', () => {
 
   it('appendAgentLog 合并同类型流式分块', () => {
     useAgentStore.setState({ agents: [] });
-    useAgentStore.getState().addAgent({ id: 'a1', name: 'T', description: '', type: 'x', status: 'running', priority: 'normal', startTime: 1, iteration: 0, maxIterations: 200, toolCallCount: 0, messagesCount: 0, log: [] } as any);
+    useAgentStore.getState().addAgent({
+      id: 'a1',
+      name: 'T',
+      description: '',
+      type: 'x',
+      status: 'running',
+      priority: 'normal',
+      startTime: 1,
+      iteration: 0,
+      maxIterations: 200,
+      toolCallCount: 0,
+      messagesCount: 0,
+      log: [],
+    } as any);
     useAgentStore.getState().appendAgentLog('a1', [
       { type: 'text', text: 'a', timestamp: 1 },
       { type: 'text', text: 'b', timestamp: 2 },
@@ -247,7 +325,20 @@ describe('useAgentStore — 控制动作与状态刷新', () => {
   });
 
   it('setCurrentAgent / setPlanFile / 权限增删', () => {
-    useAgentStore.getState().addAgent({ id: 'a1', name: 'T', description: '', type: 'x', status: 'running', priority: 'normal', startTime: 1, iteration: 0, maxIterations: 200, toolCallCount: 0, messagesCount: 0, log: [] } as any);
+    useAgentStore.getState().addAgent({
+      id: 'a1',
+      name: 'T',
+      description: '',
+      type: 'x',
+      status: 'running',
+      priority: 'normal',
+      startTime: 1,
+      iteration: 0,
+      maxIterations: 200,
+      toolCallCount: 0,
+      messagesCount: 0,
+      log: [],
+    } as any);
     useAgentStore.getState().setCurrentAgent('a1');
     useAgentStore.getState().setPlanFile('/p.md');
     expect(useAgentStore.getState().currentAgentId).toBe('a1');

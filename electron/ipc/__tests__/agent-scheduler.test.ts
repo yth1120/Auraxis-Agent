@@ -21,7 +21,12 @@ describe('AgentScheduler — queue management', () => {
     const runningCount = () => agents.filter((a) => a.status === 'running').length;
 
     // Start agent 1
-    const a1: SimAgent = { id: '1', status: runningCount() < maxConcurrent ? 'running' : 'queued', priority: 'normal', name: 'A1' };
+    const a1: SimAgent = {
+      id: '1',
+      status: runningCount() < maxConcurrent ? 'running' : 'queued',
+      priority: 'normal',
+      name: 'A1',
+    };
     agents.push(a1);
     expect(a1.status).toBe('running');
     expect(runningCount()).toBe(1);
@@ -35,7 +40,12 @@ describe('AgentScheduler — queue management', () => {
     ];
     const runningCount = () => agents.filter((a) => a.status === 'running').length;
 
-    const a3: SimAgent = { id: '3', status: runningCount() < maxConcurrent ? 'running' : 'queued', priority: 'normal', name: 'A3' };
+    const a3: SimAgent = {
+      id: '3',
+      status: runningCount() < maxConcurrent ? 'running' : 'queued',
+      priority: 'normal',
+      name: 'A3',
+    };
     agents.push(a3);
     expect(a3.status).toBe('queued');
   });
@@ -145,5 +155,4 @@ describe('AgentScheduler — priority and reorder', () => {
     expect(agents[2].status).toBe('running');
     expect(runningCount()).toBe(2);
   });
-
 });

@@ -59,15 +59,20 @@ describe('extractMemories — 提示词构建', () => {
 
 describe('extractMemories — 解析与归一化', () => {
   it('解析 JSON 数组并夹紧 importance、截断长度', async () => {
-    rawOf(JSON.stringify([
-      {
-        type: 'decision', title: 'T'.repeat(150), content: 'C'.repeat(600),
-        tags: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k'], importance: 9,
-      },
-      { type: 'preference', title: 'x', content: 'y', tags: 'not-array', importance: 0 },
-      { type: 'bogus', title: 'z', content: 'w' },
-      null,
-    ]));
+    rawOf(
+      JSON.stringify([
+        {
+          type: 'decision',
+          title: 'T'.repeat(150),
+          content: 'C'.repeat(600),
+          tags: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k'],
+          importance: 9,
+        },
+        { type: 'preference', title: 'x', content: 'y', tags: 'not-array', importance: 0 },
+        { type: 'bogus', title: 'z', content: 'w' },
+        null,
+      ]),
+    );
 
     const out = await extractMemories(baseCtx, config);
     expect(out).toHaveLength(3);
@@ -97,13 +102,34 @@ describe('extractMemories — 解析与归一化', () => {
 
 describe('extractMemories — 去重与异常', () => {
   it('与已有记忆标题相同或高度相似时跳过', async () => {
-    rawOf(JSON.stringify([
-      { type: 'decision', title: '使用 React Router', content: '项目统一使用 React Router v6', tags: [], importance: 3 },
-      { type: 'decision', title: 'React Router 选择', content: '项目统一使用 React Router v6 版本', tags: [], importance: 3 },
-      { type: 'progress', title: '新进展', content: '今天完成了登录页', tags: [], importance: 3 },
-    ]));
+    rawOf(
+      JSON.stringify([
+        {
+          type: 'decision',
+          title: '使用 React Router',
+          content: '项目统一使用 React Router v6',
+          tags: [],
+          importance: 3,
+        },
+        {
+          type: 'decision',
+          title: 'React Router 选择',
+          content: '项目统一使用 React Router v6 版本',
+          tags: [],
+          importance: 3,
+        },
+        { type: 'progress', title: '新进展', content: '今天完成了登录页', tags: [], importance: 3 },
+      ]),
+    );
     const existing = [
-      { id: 'e1', title: '使用 React Router', content: '项目统一使用 React Router v6', type: 'decision' as const, tags: '[]', importance: 3 },
+      {
+        id: 'e1',
+        title: '使用 React Router',
+        content: '项目统一使用 React Router v6',
+        type: 'decision' as const,
+        tags: '[]',
+        importance: 3,
+      },
     ];
     const out = await extractMemories({ ...baseCtx, existingMemories: existing }, config);
     expect(out.map((m) => m.title)).toEqual(['React Router 选择', '新进展']);

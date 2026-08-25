@@ -5,7 +5,7 @@
  * its own capability catalog by writing skills. Plugin *mounting* stays with
  * the renderer plugin manager — the backend only mirrors the catalog.
  */
-import { ipcMain, app } from 'electron';
+import { app } from 'electron';
 import { secureHandle } from './ipc/trust';
 import path from 'path';
 import { getAllTools } from './tool-registry';
@@ -31,7 +31,9 @@ export function syncPluginCatalog(plugins: RuntimePluginInfo[]): void {
       const settings = await readSettings();
       settings.pluginCatalog = pluginCatalog;
       await writeSettings(settings);
-    } catch { /* non-critical */ }
+    } catch {
+      /* non-critical */
+    }
   })();
 }
 

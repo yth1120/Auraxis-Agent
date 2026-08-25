@@ -77,10 +77,7 @@ describe('validateBeliefAnchors — 三态硬门', () => {
   });
 
   it('纠错类信念必须引用两条证据', () => {
-    const single = validate(
-      { text: '不对，应该是 React Router v6', evidenceIds: ['ev1'] },
-      { ev1: 'React Router v6' },
-    );
+    const single = validate({ text: '不对，应该是 React Router v6', evidenceIds: ['ev1'] }, { ev1: 'React Router v6' });
     expect(single.ok).toBe(false);
     expect(single.reasons.join('; ')).toContain('两条 evidence');
 
@@ -92,10 +89,7 @@ describe('validateBeliefAnchors — 三态硬门', () => {
   });
 
   it('无锚点时仅要求证据存在（支持强度 0.5）', () => {
-    const r = validate(
-      { text: '用户喜欢简洁风格', evidenceIds: ['ev1'] },
-      { ev1: '用户说：保持界面简洁' },
-    );
+    const r = validate({ text: '用户喜欢简洁风格', evidenceIds: ['ev1'] }, { ev1: '用户说：保持界面简洁' });
     expect(r.ok).toBe(true);
     expect(r.supportStrength).toBe(0.5);
   });

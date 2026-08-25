@@ -1,0 +1,9 @@
+dist/
+dist-electron/
+release/
+coverage/
+node_modules/
+vendor/
+package-lock.json
+electron/tokenizer/tokenizer.json
+python/

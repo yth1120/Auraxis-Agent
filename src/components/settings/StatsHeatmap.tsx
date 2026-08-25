@@ -52,7 +52,7 @@ function streakStats(days: HeatmapDay[]): { activeDays: number; currentStreak: n
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  let cursor = new Date(today);
+  const cursor = new Date(today);
   if (!set.has(dayKey(cursor))) {
     cursor.setDate(cursor.getDate() - 1);
     if (!set.has(dayKey(cursor))) {
@@ -100,7 +100,9 @@ export default function StatsHeatmap() {
       }
     };
     void load();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Re-render the chart when the theme class flips (light ↔ dark).
@@ -217,9 +219,7 @@ export default function StatsHeatmap() {
                   key={chip.key}
                   className="flex-1 rounded-xl bg-[var(--color-bg-secondary)] border border-[var(--color-border-dim)] px-3 py-2"
                 >
-                  <div className="text-lg font-semibold text-text-primary tabular-nums leading-6">
-                    {chip.value}
-                  </div>
+                  <div className="text-lg font-semibold text-text-primary tabular-nums leading-6">{chip.value}</div>
                   <div className="text-2xs text-text-muted mt-0.5">{tPanel(chip.key)}</div>
                 </div>
               ))}

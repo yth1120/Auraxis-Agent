@@ -1,3 +1,4 @@
+import { errorText } from '../../../electron/errors';
 import { useCallback } from 'react';
 import { ArrowsClockwise } from '@/components/common/icons';
 import { Modal, message } from 'antd';
@@ -34,8 +35,8 @@ export default function RollbackToMessage({
           if (!r?.ok) throw new Error(r?.error || t('rollback.failed'));
           message.success(t('rollback.success', { n: r.data?.reverted ?? 0 }));
           useAppStore.getState().incrementFileTreeVersion();
-        } catch (e: any) {
-          message.error(e?.message || t('rollback.failed'));
+        } catch (e: unknown) {
+          message.error(errorText(e) || t('rollback.failed'));
         }
       },
     });

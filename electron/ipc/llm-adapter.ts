@@ -16,7 +16,7 @@ import { createStreamFilter } from './text-filter';
 import { getDeepSeekUserId } from '../auth-store';
 import { readSettings, resolveMaxOutputTokens } from './settings-store';
 import type { DeepSeekToolChoice } from '../contracts/advanced';
-import type { AssistantMessage, ContentBlock, ToolCall } from './agent-loop';
+import type { AssistantMessage, ToolCall } from './agent-loop';
 import { modelSupportsImageInput, isDeepSeekVisionModel } from '../types';
 
 export { modelSupportsImageInput, isDeepSeekVisionModel };
@@ -69,9 +69,7 @@ export function getLlmAdapter(id: string): LlmAdapter | undefined {
  * auto-detects Anthropic-format endpoints by apiBase. Unknown explicit adapter
  * ids throw so misconfiguration is loud instead of silently falling back.
  */
-export async function invokeLlm(
-  params: LlmInvokeParams & { adapter?: string },
-): Promise<AssistantMessage | null> {
+export async function invokeLlm(params: LlmInvokeParams & { adapter?: string }): Promise<AssistantMessage | null> {
   const id = params.adapter ?? 'deepseek';
   const adapter = adapters.get(id);
   if (adapter) return adapter(params);
@@ -145,14 +143,15 @@ export function buildOpenAIFormatTools(tools: ToolDef[], opts?: { strict?: boole
         name: t.name,
         description: t.description,
         ...(strict ? { strict: true } : {}),
-        parameters: cleaned === null
-          ? { type: 'object' }
-          : strict
-            ? normalizeStrictSchema(cleaned)
-            : {
-                ...cleaned,
-                additionalProperties: cleaned.additionalProperties ?? false,
-              },
+        parameters:
+          cleaned === null
+            ? { type: 'object' }
+            : strict
+              ? normalizeStrictSchema(cleaned)
+              : {
+                  ...cleaned,
+                  additionalProperties: cleaned.additionalProperties ?? false,
+                },
       },
     };
   });
@@ -234,9 +233,7 @@ export function sanitizeToolCallPairing(messages: any[]): any[] {
  */
 function toolResultMeta(output: unknown): { image: string | null; obj: Record<string, unknown> } | null {
   const obj = (output && typeof output === 'object' ? output : {}) as Record<string, unknown>;
-  const image = typeof obj.image === 'string' && obj.image.startsWith('data:image/')
-    ? obj.image
-    : null;
+  const image = typeof obj.image === 'string' && obj.image.startsWith('data:image/') ? obj.image : null;
   return { image, obj };
 }
 
@@ -256,7 +253,9 @@ export function buildToolResultText(output: unknown, error?: string): string {
     `文件: ${String(obj.file_path ?? obj.attachment_id ?? '')}`,
     `大小: ${Number(obj.bytes) || 0} 字节`,
     ...(Object.keys(meta).length > 0 ? [JSON.stringify(meta)] : []),
-  ].filter(Boolean).join(' · ');
+  ]
+    .filter(Boolean)
+    .join(' · ');
 }
 
 export function buildToolResultContent(output: unknown, error?: string): string | Array<Record<string, unknown>> {
@@ -279,7 +278,8 @@ function normalizeProviderContent(m: any, provider: 'openai' | 'anthropic', mode
   let parts: any[] | string = m.content;
   const isDeepSeek = model.toLowerCase().startsWith('deepseek-');
   const supportsImage = modelSupportsImageInput(model);
-  const hasImage = Array.isArray(parts) && parts.some((p) => p?.type === 'image_url' || p?.type === 'image' || p?.type === 'file');
+  const hasImage =
+    Array.isArray(parts) && parts.some((p) => p?.type === 'image_url' || p?.type === 'image' || p?.type === 'file');
   if (hasImage && Array.isArray(parts) && (!supportsImage || (isDeepSeek && m.role !== 'user'))) {
     parts = parts.filter((p) => !['image_url', 'image', 'file'].includes(p?.type));
   }
@@ -315,9 +315,7 @@ function normalizeProviderContent(m: any, provider: 'openai' | 'anthropic', mode
 
 // ─── Built-in adapter ────────────────────────────────────
 
-export async function llmClientInvoke(
-  params: LlmInvokeParams,
-): Promise<AssistantMessage | null> {
+export async function llmClientInvoke(params: LlmInvokeParams): Promise<AssistantMessage | null> {
   if (isAnthropicFormatEndpoint(params.apiBase)) {
     return invokeDeepSeekAnthropic(params);
   }
@@ -325,7 +323,19 @@ export async function llmClientInvoke(
 }
 
 async function invokeDeepSeekAnthropic(params: LlmInvokeParams): Promise<AssistantMessage | null> {
-  const { model, apiKey, apiBase, systemPrompt, messages, tools, isDeepThink, signal, onTextChunk, onThinkingChunk, onUsage } = params;
+  const {
+    model,
+    apiKey,
+    apiBase,
+    systemPrompt,
+    messages,
+    tools,
+    isDeepThink,
+    signal,
+    onTextChunk,
+    onThinkingChunk,
+    onUsage,
+  } = params;
   // Stateful per-invoke filter — catches XML tool-call rehearsal spanning chunks.
   const streamFilter = createStreamFilter();
   const anthropicTools = buildAnthropicFormatTools(tools);
@@ -336,14 +346,17 @@ async function invokeDeepSeekAnthropic(params: LlmInvokeParams): Promise<Assista
   // must only contain user/assistant roles. Strip any system-role message from
   // the array and merge its content into the top-level system field.
   const hasSystemMsg = messages.length > 0 && messages[0].role === 'system';
-  const systemContent = hasSystemMsg
-    ? String(messages[0].content)
-    : systemPrompt;
-  const effectiveMessages = sanitizeToolCallPairing(hasSystemMsg ? messages.slice(1) : messages)
-    .map((m) => normalizeProviderContent(m, 'anthropic', model));
+  const systemContent = hasSystemMsg ? String(messages[0].content) : systemPrompt;
+  const effectiveMessages = sanitizeToolCallPairing(hasSystemMsg ? messages.slice(1) : messages).map((m) =>
+    normalizeProviderContent(m, 'anthropic', model),
+  );
 
   const body: Record<string, unknown> = {
-    model, max_tokens: maxTokens, messages: effectiveMessages, stream: true, system: systemContent,
+    model,
+    max_tokens: maxTokens,
+    messages: effectiveMessages,
+    stream: true,
+    system: systemContent,
   };
 
   if (anthropicTools.length > 0) {
@@ -372,7 +385,9 @@ async function invokeDeepSeekAnthropic(params: LlmInvokeParams): Promise<Assista
 
   const response = await axios.post(apiBase, body, {
     headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-    responseType: 'stream', signal, timeout: 180000,
+    responseType: 'stream',
+    signal,
+    timeout: 180000,
   });
 
   let buffer = '';
@@ -438,7 +453,11 @@ async function invokeDeepSeekAnthropic(params: LlmInvokeParams): Promise<Assista
             }
             if (currentTool) {
               let toolInput: Record<string, unknown> = {};
-              try { toolInput = JSON.parse(currentTool.input); } catch { toolInput = { raw: currentTool.input }; }
+              try {
+                toolInput = JSON.parse(currentTool.input);
+              } catch {
+                toolInput = { raw: currentTool.input };
+              }
               toolCalls.push({ id: currentTool.id, name: currentTool.name, input: toolInput });
               contentTimeline.push({ type: 'tool_use', id: currentTool.id, name: currentTool.name, input: toolInput });
               currentTool = null;
@@ -460,7 +479,9 @@ async function invokeDeepSeekAnthropic(params: LlmInvokeParams): Promise<Assista
             }
             break;
         }
-      } catch { /* skip malformed SSE */ }
+      } catch {
+        /* skip malformed SSE */
+      }
     }
   }
 
@@ -488,7 +509,19 @@ async function invokeDeepSeekAnthropic(params: LlmInvokeParams): Promise<Assista
 }
 
 async function invokeDeepSeekOpenAI(params: LlmInvokeParams): Promise<AssistantMessage | null> {
-  const { model, apiKey, apiBase, systemPrompt, messages, tools, isDeepThink, signal, onTextChunk, onThinkingChunk, onUsage } = params;
+  const {
+    model,
+    apiKey,
+    apiBase,
+    systemPrompt,
+    messages,
+    tools,
+    isDeepThink,
+    signal,
+    onTextChunk,
+    onThinkingChunk,
+    onUsage,
+  } = params;
   // Stateful per-invoke filter — catches XML tool-call rehearsal spanning chunks.
   const streamFilter = createStreamFilter();
   // strict tools 是 DeepSeek 官方 Beta 能力，仅对官方端点启用；
@@ -506,7 +539,10 @@ async function invokeDeepSeekOpenAI(params: LlmInvokeParams): Promise<AssistantM
   ).map((m) => normalizeProviderContent(m, 'openai', model));
 
   const body: Record<string, unknown> = {
-    model, max_tokens: maxTokens, messages: effectiveMessages, stream: true,
+    model,
+    max_tokens: maxTokens,
+    messages: effectiveMessages,
+    stream: true,
     // 官方用法：流式末尾额外返回 usage（含缓存命中与推理 tokens）。
     stream_options: { include_usage: true },
   };
@@ -535,7 +571,9 @@ async function invokeDeepSeekOpenAI(params: LlmInvokeParams): Promise<AssistantM
 
   const response = await axios.post(apiBase, body, {
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-    responseType: 'stream', signal, timeout: 180000,
+    responseType: 'stream',
+    signal,
+    timeout: 180000,
   });
 
   let buffer = '';
@@ -598,7 +636,11 @@ async function invokeDeepSeekOpenAI(params: LlmInvokeParams): Promise<AssistantM
             if (lastSegment === 'tool' && currentTCs.size > 0) {
               for (const [, tc] of currentTCs) {
                 let input: Record<string, unknown> = {};
-                try { input = JSON.parse(tc.arguments); } catch { input = { raw: tc.arguments }; }
+                try {
+                  input = JSON.parse(tc.arguments);
+                } catch {
+                  input = { raw: tc.arguments };
+                }
                 contentTimeline.push({ type: 'tool_use', id: tc.id, name: tc.name, input });
               }
               currentTCs.clear();
@@ -644,7 +686,9 @@ async function invokeDeepSeekOpenAI(params: LlmInvokeParams): Promise<AssistantM
             completionStopReason = fr;
           }
         }
-      } catch { /* skip */ }
+      } catch {
+        /* skip */
+      }
     }
   }
 
@@ -656,7 +700,11 @@ async function invokeDeepSeekOpenAI(params: LlmInvokeParams): Promise<AssistantM
   if (lastSegment === 'tool' && currentTCs.size > 0) {
     for (const [, tc] of currentTCs) {
       let input: Record<string, unknown> = {};
-      try { input = JSON.parse(tc.arguments); } catch { input = { raw: tc.arguments }; }
+      try {
+        input = JSON.parse(tc.arguments);
+      } catch {
+        input = { raw: tc.arguments };
+      }
       contentTimeline.push({ type: 'tool_use', id: tc.id, name: tc.name, input });
     }
   }

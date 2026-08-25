@@ -1,6 +1,7 @@
 import { getApiKeyFromStore } from '../stores/useSettingsStore';
 import type { ApiMessage } from '../../electron/types';
 import { normalizeDeepSeekMessages } from '../../electron/types';
+import { getDeepSeekBaseUrl } from '../../electron/api-config';
 
 interface ChatRequest {
   model: string;
@@ -11,14 +12,14 @@ interface ChatRequest {
   maxOutputTokens?: number;
 }
 
-const DEEPSEEK_API_URL = 'https://api.deepseek.com/beta/chat/completions';
-
 function getApiUrl(): string {
   try {
     const viteEnv = (import.meta as any).env;
     if (viteEnv?.VITE_DEEPSEEK_API_BASE) return viteEnv.VITE_DEEPSEEK_API_BASE;
-  } catch { /* not Vite */ }
-  return DEEPSEEK_API_URL;
+  } catch {
+    /* not Vite */
+  }
+  return getDeepSeekBaseUrl();
 }
 
 export async function streamChat(
@@ -27,9 +28,7 @@ export async function streamChat(
   signal?: AbortSignal,
   onThinking?: (text: string) => void,
 ): Promise<void> {
-  const apiKey = getApiKeyFromStore()
-    || ((import.meta as any).env?.VITE_DEEPSEEK_API_KEY as string | undefined)
-    || '';
+  const apiKey = getApiKeyFromStore() || ((import.meta as any).env?.VITE_DEEPSEEK_API_KEY as string | undefined) || '';
 
   if (!apiKey) {
     throw new Error('Missing DeepSeek API key. Please set it in settings.');
@@ -89,7 +88,10 @@ export async function streamChat(
 
   while (true) {
     const { done, value } = await reader.read();
-    if (done) { onDone(); break; }
+    if (done) {
+      onDone();
+      break;
+    }
 
     buffer += decoder.decode(value, { stream: true });
     const lines = buffer.split('\n');
@@ -98,7 +100,10 @@ export async function streamChat(
     for (const line of lines) {
       if (line.startsWith('data: ')) {
         const data = line.slice(6).trim();
-        if (data === '[DONE]') { onDone(); return; }
+        if (data === '[DONE]') {
+          onDone();
+          return;
+        }
 
         try {
           const parsed = JSON.parse(data);

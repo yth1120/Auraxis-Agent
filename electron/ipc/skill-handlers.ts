@@ -1,4 +1,5 @@
-import { ipcMain, app } from 'electron';
+import { errorText } from '../errors';
+import { app } from 'electron';
 import { secureHandle } from './trust';
 import path from 'path';
 import { ensureSkillsDirectory, listSkills, readSkill, seedBuiltinSkills } from '../skill-store';
@@ -15,8 +16,8 @@ export function registerSkillHandlers() {
       await ensureSkillsDirectory(root);
       await seedBuiltinSkills(root);
       return { ok: true, data: await listSkills(root) };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
@@ -24,11 +25,9 @@ export function registerSkillHandlers() {
     try {
       if (!name || typeof name !== 'string') return { ok: false, error: '技能名称无效' };
       const skill = await readSkill(skillsRoot(), name);
-      return skill
-        ? { ok: true, data: skill }
-        : { ok: false, error: '技能不存在' };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+      return skill ? { ok: true, data: skill } : { ok: false, error: '技能不存在' };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 }

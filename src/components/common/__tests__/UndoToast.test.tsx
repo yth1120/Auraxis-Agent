@@ -18,7 +18,9 @@ describe('UndoToast — 撤销按钮浮层', () => {
   it('renders the undo button and reverts on click', async () => {
     const revert = vi.fn(async () => {});
     useUndoStore.setState({
-      undos: [{ id: 'u1', description: '删除消息', sessionId: 's1', timestamp: Date.now(), type: 'message:delete', revert }],
+      undos: [
+        { id: 'u1', description: '删除消息', sessionId: 's1', timestamp: Date.now(), type: 'message:delete', revert },
+      ],
     });
     render(<UndoToast />);
     // UndoToast 通过 createPortal 挂到 document.body。

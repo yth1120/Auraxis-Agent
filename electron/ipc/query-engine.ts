@@ -18,6 +18,7 @@ import type { BrowserWindow } from 'electron';
 import { normalizeApprovalPolicy } from '../contracts/core';
 import type { ApprovalPolicy } from '../types';
 import type { SandboxMode } from '../sandbox-policy';
+import { errorRecord, errorText } from '../errors';
 import { makeTurnId, type EngineEvent } from './engine-events';
 import type { ContextConfig } from './agent-loop';
 import { isDeniedError } from './tool-runner';
@@ -25,19 +26,14 @@ import { runStep, createStepState } from './step-engine';
 import type { StepEngineConfig } from './step-engine';
 import { loadAgentInstructions } from '../agent-instructions';
 import { appendWorkRules, type WorkSurface } from '../work-docs-policy';
-import { trackMessage, trackTokens, trackToolCall, trackLinesGenerated, trackSession } from './stats-handlers';
+import { trackTokens, trackToolCall, trackLinesGenerated, trackSession } from './stats-handlers';
 import {
   STATIC_SYSTEM_PROMPT,
   WORK_GUIDE_MESSAGE,
   buildSessionPreamble,
   prepareCacheAlignedMessages,
 } from './context-manager';
-import {
-  buildModeHint,
-  loadLlmContext,
-  saveLlmContext,
-  tryReplayStoredContext,
-} from './query-context';
+import { buildModeHint, loadLlmContext, saveLlmContext, tryReplayStoredContext } from './query-context';
 
 // ─── Types ────────────────────────────────────────────────
 
@@ -84,9 +80,6 @@ type EventCallback = (event: EngineEvent) => void;
 /** 安全硬上限（强制终止）。业务上限由请求配置，默认 200。 */
 const SAFETY_MAX_ITERATIONS = 500;
 
-/** Token threshold for context compaction (90% trigger for headroom). */
-const COMPACT_TOKEN_THRESHOLD = 100_000;
-
 // ─── Permission interceptor (three-tier guard) ─────────────
 
 async function permissionInterceptor(
@@ -118,21 +111,6 @@ async function permissionInterceptor(
   return false;
 }
 
-// ─── Tool result append (preserves API protocol) ───────────
-
-function appendToolResults(
-  messages: any[],
-  results: { toolUseId: string; toolName: string; input: Record<string, unknown>; output: unknown; error?: string }[],
-): void {
-  for (const tr of results) {
-    messages.push({
-      role: 'tool' as const,
-      tool_call_id: tr.toolUseId,
-      content: tr.error ? `Error: ${tr.error}` : JSON.stringify(tr.output),
-    });
-  }
-}
-
 // ─── Context-compression helpers ───────────────────────────
 
 /** Snapshot head must match the CURRENT app version — system prompt, session
@@ -146,21 +124,19 @@ function storedHeadIsCurrent(stored: any[], req: QueryRequest): boolean {
     projectRoot: req.projectRoot,
     isDeepThink: req.isDeepThink,
   });
-  return stored[0]?.role === 'system'
-    && stored[0]?.content === STATIC_SYSTEM_PROMPT
-    && stored[1]?.role === 'user'
-    && stored[1]?.content === expectedPreamble
-    && stored[2]?.role === 'user'
-    && stored[2]?.content === WORK_GUIDE_MESSAGE;
+  return (
+    stored[0]?.role === 'system' &&
+    stored[0]?.content === STATIC_SYSTEM_PROMPT &&
+    stored[1]?.role === 'user' &&
+    stored[1]?.content === expectedPreamble &&
+    stored[2]?.role === 'user' &&
+    stored[2]?.content === WORK_GUIDE_MESSAGE
+  );
 }
 
 // ─── Main unified while(true) ReAct loop ──────────────────
 
-async function runUnifiedLoop(
-  req: QueryRequest,
-  emit: EventCallback,
-  signal: AbortSignal,
-): Promise<void> {
+async function runUnifiedLoop(req: QueryRequest, emit: EventCallback, signal: AbortSignal): Promise<void> {
   const instructions = await loadAgentInstructions(req.projectRoot);
   let modeHint = buildModeHint(req.mode);
   // Work 模式规则（docs-only + 开工前澄清）挂在 mode hint 上：同一会话内
@@ -177,9 +153,9 @@ async function runUnifiedLoop(
     let stored: unknown[] | null = null;
     try {
       stored = await loadLlmContext(req.sessionId);
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Snapshot read failure must not break the turn — degrade to fresh.
-      console.warn('[query-engine] loadLlmContext failed, falling back to fresh assembly:', error?.message ?? error);
+      console.warn('[query-engine] loadLlmContext failed, falling back to fresh assembly:', errorText(error));
     }
     if (stored && stored.length > 0 && storedHeadIsCurrent(stored, req)) {
       const replay = tryReplayStoredContext(stored, req.messages, instructions, modeHint, req.memoryContext);
@@ -262,32 +238,44 @@ async function runUnifiedLoop(
         tc.input._agentId = subAgentId;
         if (req.win && !req.win.isDestroyed()) {
           req.win.webContents.send('agent:updated', {
-            id: subAgentId, agentId: subAgentId,
+            id: subAgentId,
+            agentId: subAgentId,
             name: `${tc.input.subagent_type || 'general-purpose'}: ${tc.input.description || '子任务'}`,
             description: tc.input.prompt || tc.input.description || '',
             type: tc.input.subagent_type || 'general-purpose',
-            status: 'running', priority: 'normal', startTime: Date.now(),
-            iteration: 0, maxIterations: 25, toolCallCount: 0,
-            messagesCount: 0, model: req.model, log: [],
+            status: 'running',
+            priority: 'normal',
+            startTime: Date.now(),
+            iteration: 0,
+            maxIterations: 25,
+            toolCallCount: 0,
+            messagesCount: 0,
+            model: req.model,
+            log: [],
           });
         }
       }
     },
 
-    onToolResult: (r, tc, toolCallId) => {
+    onToolResult: (r, tc, _toolCallId) => {
       const durationMs = r.durationMs;
-      const stepGroupId = tc.stepGroupId ?? '';
       const isAbort = r.error === '用户手动中止' || isDeniedError(r.error);
       if (r.error) {
         if (!isAbort) trackToolCall(false, durationMs).catch(() => {});
 
         if (tc.name === 'Agent' && req.win && !req.win.isDestroyed()) {
-          try { req.win.webContents.send('agent:updated', {
-            id: subAgentIds.get(tc.index) || '', status: 'error', error: r.error, endTime: Date.now() }); } catch { /* best-effort */ }
+          try {
+            req.win.webContents.send('agent:updated', {
+              id: subAgentIds.get(tc.index) || '',
+              status: 'error',
+              error: r.error,
+              endTime: Date.now(),
+            });
+          } catch {
+            /* best-effort */
+          }
         }
-
       } else {
-
         // Stats tracking
         trackToolCall(true, durationMs).catch(() => {});
         if (tc.name === 'Write' || tc.name === 'Edit') {
@@ -297,12 +285,18 @@ async function runUnifiedLoop(
         }
 
         if (tc.name === 'Agent' && req.win && !req.win.isDestroyed()) {
-          try { req.win.webContents.send('agent:updated', {
-            id: subAgentIds.get(tc.index) || '', status: 'completed',
-            result: typeof r.output === 'string' ? r.output : JSON.stringify(r.output).slice(0, 500),
-            toolCallCount: (r.output as any)?.toolCallCount || 0,
-            iteration: (r.output as any)?.iterations || 0,
-            endTime: Date.now() }); } catch { /* best-effort */ }
+          try {
+            req.win.webContents.send('agent:updated', {
+              id: subAgentIds.get(tc.index) || '',
+              status: 'completed',
+              result: typeof r.output === 'string' ? r.output : JSON.stringify(r.output).slice(0, 500),
+              toolCallCount: (r.output as any)?.toolCallCount || 0,
+              iteration: (r.output as any)?.iterations || 0,
+              endTime: Date.now(),
+            });
+          } catch {
+            /* best-effort */
+          }
         }
       }
     },
@@ -315,7 +309,10 @@ async function runUnifiedLoop(
 
     state.iteration++;
     if (state.iteration > businessMax) {
-      emit({ type: 'error', error: `已达到业务迭代上限 ${businessMax} 次，任务暂停收尾。已完成 ${state.toolCallCount} 次工具调用。` });
+      emit({
+        type: 'error',
+        error: `已达到业务迭代上限 ${businessMax} 次，任务暂停收尾。已完成 ${state.toolCallCount} 次工具调用。`,
+      });
       break;
     }
     if (state.iteration > SAFETY_MAX_ITERATIONS) {
@@ -334,9 +331,9 @@ async function runUnifiedLoop(
   if (completedNaturally && req.sessionId) {
     try {
       await saveLlmContext(req.sessionId, state.messages);
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Persistence is best-effort — the reply already streamed successfully.
-      console.warn('[query-engine] saveLlmContext failed (cache alignment degraded):', error?.message ?? error);
+      console.warn('[query-engine] saveLlmContext failed (cache alignment degraded):', errorText(error));
     }
   }
 
@@ -344,11 +341,7 @@ async function runUnifiedLoop(
 }
 // ─── Public entry point ───────────────────────────────────
 
-export async function runQuery(
-  req: QueryRequest,
-  emit: EventCallback,
-  signal: AbortSignal,
-): Promise<void> {
+export async function runQuery(req: QueryRequest, emit: EventCallback, signal: AbortSignal): Promise<void> {
   // Normalise approval policy — chat queries are always explicit-ask; plan
   // and auto flows go through per-task agent configs instead. Legacy 'afe'
   // spellings from old clients are folded into 'auto' here.
@@ -361,22 +354,28 @@ export async function runQuery(
     if (!signal.aborted) {
       emit({ type: 'done' });
     }
-  } catch (error: any) {
-    if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') return;
+  } catch (error: unknown) {
+    const apiError = errorRecord(error);
+    const status =
+      typeof apiError.response === 'object' && apiError.response
+        ? (apiError.response as { status?: number }).status
+        : undefined;
+    if (apiError.name === 'AbortError' || apiError.code === 'ERR_CANCELED') return;
 
-    const message = error.response?.status === 401
-      ? 'API Key 无效或已过期'
-      : error.response?.status === 429
-        ? '请求过于频繁，请稍后重试'
-        : error.response?.status === 402
-          ? '账户余额不足，请前往 DeepSeek 平台充值后重试'
-          : error.response?.status === 503
-            ? '服务繁忙，请稍后重试'
-            : error.response?.status === 500
-              ? '服务器故障，请稍后重试'
-        : error.response?.status
-          ? `API 错误 (${error.response.status})`
-          : `请求失败: ${error.message}`;
+    const message =
+      status === 401
+        ? 'API Key 无效或已过期'
+        : status === 429
+          ? '请求过于频繁，请稍后重试'
+          : status === 402
+            ? '账户余额不足，请前往 DeepSeek 平台充值后重试'
+            : status === 503
+              ? '服务繁忙，请稍后重试'
+              : status === 500
+                ? '服务器故障，请稍后重试'
+                : status
+                  ? `API 错误 (${status})`
+                  : `请求失败: ${errorText(error)}`;
 
     emit({ type: 'error', error: message });
   }

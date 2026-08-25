@@ -37,9 +37,7 @@ const ChevronDown = ({ open }: { open?: boolean }) => (
   />
 );
 
-const Check = () => (
-  <CheckIcon size={16} className="shrink-0 text-text-primary" />
-);
+const Check = () => <CheckIcon size={16} className="shrink-0 text-text-primary" />;
 
 /* ── Trigger button (28px 胶囊按钮) ── */
 
@@ -72,9 +70,7 @@ export const ModeTrigger = memo(
         aria-expanded={open}
       >
         <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{modelName(selectedModel)}</span>
-        {showEffort && (
-          <span className="shrink-0 text-text-muted">/ {effortLabel}</span>
-        )}
+        {showEffort && <span className="shrink-0 text-text-muted">/ {effortLabel}</span>}
         <ChevronDown open={open} />
       </button>
     );
@@ -106,7 +102,8 @@ export const ModePanelContent = memo(function ModePanelContent({ onSelect }: { o
     return () => window.removeEventListener('keydown', onKey);
   }, [onSelect]);
 
-  const optionCls = 'flex items-center gap-2 w-full min-h-[32px] px-2 py-[4px] border-none rounded-lg bg-transparent text-left cursor-pointer transition-colors duration-150 hover:bg-[var(--color-hover)]';
+  const optionCls =
+    'flex items-center gap-2 w-full min-h-[32px] px-2 py-[4px] border-none rounded-lg bg-transparent text-left cursor-pointer transition-colors duration-150 hover:bg-[var(--color-hover)]';
 
   const sectionHeader = (icon: ReactNode, label: string) => (
     <div className="flex items-center gap-1.5 px-2 pt-[4px] pb-[3px] text-text-muted">
@@ -134,9 +131,17 @@ export const ModePanelContent = memo(function ModePanelContent({ onSelect }: { o
             }}
           >
             <span className="flex-1 min-w-0 flex flex-col">
-              <span className="overflow-hidden text-ellipsis whitespace-nowrap text-sm leading-5 font-medium text-text-primary">{m.name}</span>
-              {m.experimental && <span className="shrink-0 text-[10px] leading-4 px-1.5 rounded-full bg-[var(--color-warning-soft)] text-warning">{t('model.experimental')}</span>}
-              <span className="overflow-hidden text-ellipsis whitespace-nowrap text-xs leading-[17px] text-text-muted">{t(modelDescriptionKey(m.id))}</span>
+              <span className="overflow-hidden text-ellipsis whitespace-nowrap text-sm leading-5 font-medium text-text-primary">
+                {m.name}
+              </span>
+              {m.experimental && (
+                <span className="shrink-0 text-[10px] leading-4 px-1.5 rounded-full bg-[var(--color-warning-soft)] text-warning">
+                  {t('model.experimental')}
+                </span>
+              )}
+              <span className="overflow-hidden text-ellipsis whitespace-nowrap text-xs leading-[17px] text-text-muted">
+                {t(modelDescriptionKey(m.id))}
+              </span>
             </span>
             <span className="flex flex-none w-5 items-center justify-center">{selected ? <Check /> : null}</span>
           </button>

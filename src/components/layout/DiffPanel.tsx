@@ -23,9 +23,7 @@ interface DiffPanelProps {
 export default function DiffPanel({ tabId: _tabId }: DiffPanelProps) {
   const t = useT();
   const currentAgentId = useAgentStore((s) => s.currentAgentId);
-  const agentStatus = useAgentStore(
-    (s) => s.agents.find((a) => a.id === s.currentAgentId)?.status,
-  );
+  const agentStatus = useAgentStore((s) => s.agents.find((a) => a.id === s.currentAgentId)?.status);
   const projectPath = useSettingsStore((s) => s.projectPath);
   const [diffs, setDiffs] = useState<WorkspaceFileDiff[]>([]);
   const [selected, setSelected] = useState(0);
@@ -103,8 +101,10 @@ export default function DiffPanel({ tabId: _tabId }: DiffPanelProps) {
     backfillComposer(buildFileFollowUpInstruction(d.path, d.oldContent ?? '', d.newContent ?? ''), currentAgentId);
   };
 
-  const gitBtn = 'flex items-center justify-center w-6 h-6 border-none rounded-md bg-transparent text-muted text-sm cursor-pointer transition-colors duration-fast ease-out enabled:hover:bg-[var(--color-hover)] enabled:hover:text-secondary disabled:opacity-40 disabled:cursor-default';
-  const smallBtn = 'text-2xs text-text-muted px-1.5 py-[2px] rounded-md cursor-pointer enabled:hover:bg-[var(--color-hover)] enabled:hover:text-text-secondary disabled:opacity-40 disabled:cursor-default';
+  const gitBtn =
+    'flex items-center justify-center w-6 h-6 border-none rounded-md bg-transparent text-muted text-sm cursor-pointer transition-colors duration-fast ease-out enabled:hover:bg-[var(--color-hover)] enabled:hover:text-secondary disabled:opacity-40 disabled:cursor-default';
+  const smallBtn =
+    'text-2xs text-text-muted px-1.5 py-[2px] rounded-md cursor-pointer enabled:hover:bg-[var(--color-hover)] enabled:hover:text-text-secondary disabled:opacity-40 disabled:cursor-default';
 
   return (
     <div className="flex flex-col h-full w-full bg-transparent overflow-hidden">
@@ -141,7 +141,9 @@ export default function DiffPanel({ tabId: _tabId }: DiffPanelProps) {
         loading ? (
           <LoadingState label={t('diff.loading')} />
         ) : (
-          <div className="flex-1 flex items-center justify-center p-8 px-4 text-xs text-muted">{t('diff.unchanged')}</div>
+          <div className="flex-1 flex items-center justify-center p-8 px-4 text-xs text-muted">
+            {t('diff.unchanged')}
+          </div>
         )
       ) : (
         <>
@@ -163,16 +165,15 @@ export default function DiffPanel({ tabId: _tabId }: DiffPanelProps) {
                     title={d.path}
                   >
                     <span className="font-mono whitespace-nowrap shrink-0 text-text-primary">{name}</span>
-                    {dir && <span className="font-mono text-2xs text-muted whitespace-nowrap overflow-hidden text-ellipsis">{dir}</span>}
+                    {dir && (
+                      <span className="font-mono text-2xs text-muted whitespace-nowrap overflow-hidden text-ellipsis">
+                        {dir}
+                      </span>
+                    )}
                   </button>
                   {settled && (
                     <span className="flex items-center gap-0.5 pr-2 shrink-0">
-                      <button
-                        type="button"
-                        className={smallBtn}
-                        disabled={busy}
-                        onClick={() => void revertFile(d)}
-                      >
+                      <button type="button" className={smallBtn} disabled={busy} onClick={() => void revertFile(d)}>
                         {t('diff.revert')}
                       </button>
                       <button

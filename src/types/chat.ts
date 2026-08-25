@@ -1,5 +1,8 @@
 import type { ToolCall } from './tools';
-import { BUILT_IN_MODELS as SHARED_MODELS, modelSupportsImageInput as sharedModelSupportsImageInput } from '../../electron/types';
+import {
+  BUILT_IN_MODELS as SHARED_MODELS,
+  modelSupportsImageInput as sharedModelSupportsImageInput,
+} from '../../electron/types';
 import type { ApiMessageContent } from '../../electron/types';
 import type { PermissionRequest, DeepSeekToolChoice, WorkAutonomyTier } from './advanced';
 
@@ -67,9 +70,11 @@ const RAW_IMAGE_BLOCK_RE = /【图片: ([^\n】]*)】\s*\n?(data:image\/[^\s]+)/
 export function toApiMessageContent(content: string | ContentBlock[], supportsImages: boolean): ApiMessageContent {
   if (!supportsImages) return typeof content === 'string' ? content : getContentText(content);
   if (typeof content !== 'string') {
-    return content.map((part) => part.type === 'image'
-      ? { type: 'image_url', image_url: { url: `data:${part.source.media_type};base64,${part.source.data}` } }
-      : part);
+    return content.map((part) =>
+      part.type === 'image'
+        ? { type: 'image_url', image_url: { url: `data:${part.source.media_type};base64,${part.source.data}` } }
+        : part,
+    );
   }
   const parts: Record<string, unknown>[] = [];
   let cursor = 0;
@@ -85,7 +90,6 @@ export function toApiMessageContent(content: string | ContentBlock[], supportsIm
   if (cursor < content.length) parts.push({ type: 'text', text: content.slice(cursor) });
   return parts;
 }
-
 
 // ─── Plan approval ─────────────────────────────────────
 
@@ -176,10 +180,15 @@ export interface ChatStore {
   reasoningEffort: 'low' | 'medium' | 'high';
   /** Per-mode thinking snapshot — each surface restores its own switch + depth
    *  when switched back to (Chat 自己记住开关，Work/Code 各自记住深度). */
-  modeThinkingPrefs: Partial<Record<'chat' | 'work' | 'code', {
-    isDeepThink: boolean;
-    reasoningEffort: 'low' | 'medium' | 'high';
-  }>>;
+  modeThinkingPrefs: Partial<
+    Record<
+      'chat' | 'work' | 'code',
+      {
+        isDeepThink: boolean;
+        reasoningEffort: 'low' | 'medium' | 'high';
+      }
+    >
+  >;
   isWebSearch: boolean;
   /** Legacy per-send auto-approve flag — the permission preset owns this axis now. */
   autoApprove: boolean;
@@ -207,7 +216,13 @@ export interface ChatStore {
   /** DeepSeek 上下文硬盘缓存命中/未命中 tokens（API 实测值，会话级累计）。 */
   cacheHitTokens: number;
   cacheMissTokens: number;
-  lastCompression: { tokensBefore: number; tokensAfter: number; timestamp: number; messagesRemoved?: number; tokensSaved?: number } | null;
+  lastCompression: {
+    tokensBefore: number;
+    tokensAfter: number;
+    timestamp: number;
+    messagesRemoved?: number;
+    tokensSaved?: number;
+  } | null;
   lastUserMessage: string | null;
   /** Bumped when another view asks the composer to focus (diff 继续改, 错误修复). */
   composerFocusTick: number;
@@ -259,12 +274,7 @@ export type LeftPanelTab = 'agents' | 'sessions' | 'files' | 'git';
 export type ThemeMode = 'system' | 'light' | 'dark';
 
 /** Full-screen tool entry views (front-end shells; real engines land later). */
-export type ToolView =
-  | 'none'
-  | 'notifications'
-  | 'scheduled'
-  | 'plugins'
-  | 'terminal';
+export type ToolView = 'none' | 'notifications' | 'scheduled' | 'plugins' | 'terminal';
 
 /** Goal-mode state — `/goal` shell until the real long-running engine lands. */
 export interface GoalState {

@@ -24,12 +24,10 @@ function useParagraphs(content: string): { paragraphs: string[]; inFence: boolea
     const s = prev.current;
 
     // Content shrank or changed non-append — full reparse.
-    const needRestart = content.length < s.totalLength
-      || (content.length === s.totalLength && !content.startsWith(
-          s.paragraphs.length > 0
-            ? s.paragraphs.join('\n\n')
-            : (s.buf || '')
-        ));
+    const needRestart =
+      content.length < s.totalLength ||
+      (content.length === s.totalLength &&
+        !content.startsWith(s.paragraphs.length > 0 ? s.paragraphs.join('\n\n') : s.buf || ''));
 
     if (needRestart) {
       const result: string[] = [];
@@ -41,7 +39,10 @@ function useParagraphs(content: string): { paragraphs: string[]; inFence: boolea
           inFence = !inFence;
         }
         if (!inFence && content[i] === '\n' && content[i + 1] === '\n') {
-          if (buf.length > 0) { result.push(buf); buf = ''; }
+          if (buf.length > 0) {
+            result.push(buf);
+            buf = '';
+          }
           i += 2;
           continue;
         }
@@ -67,7 +68,10 @@ function useParagraphs(content: string): { paragraphs: string[]; inFence: boolea
         inFence = !inFence;
       }
       if (!inFence && content[i] === '\n' && content[i + 1] === '\n') {
-        if (buf.length > 0) { paragraphs.push(buf); buf = ''; }
+        if (buf.length > 0) {
+          paragraphs.push(buf);
+          buf = '';
+        }
         i += 2;
         continue;
       }

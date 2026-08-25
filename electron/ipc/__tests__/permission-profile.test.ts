@@ -165,12 +165,7 @@ describe('permission profiles', () => {
     });
     const secondary = path.join(os.tmpdir(), 'auraxis-secondary-root');
     const secondaryFile = path.join(secondary, 'src/a.ts');
-    const denied = await evaluateToolProfileGate(
-      'Write',
-      { file_path: secondaryFile },
-      projectRoot,
-      [secondary],
-    );
+    const denied = await evaluateToolProfileGate('Write', { file_path: secondaryFile }, projectRoot, [secondary]);
     expect(denied.allowed).toBe(false);
     expect(denied.reason).toContain('只读');
   });

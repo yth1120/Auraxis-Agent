@@ -10,13 +10,7 @@
  */
 
 export type SessionEventType =
-  | 'user'
-  | 'assistant_chunk'
-  | 'thinking_chunk'
-  | 'tool'
-  | 'command'
-  | 'system'
-  | 'agent_status';
+  'user' | 'assistant_chunk' | 'thinking_chunk' | 'tool' | 'command' | 'system' | 'agent_status';
 
 /** Canonical LLM context snapshot persisted as a `system` event in chat logs.
  *  Stores the exact messages array sent to the model so the next turn can

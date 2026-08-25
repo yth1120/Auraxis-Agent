@@ -12,7 +12,11 @@ export function createDebouncedStorage(delayMs = 1000): DebouncedStorage {
   return {
     getItem: (name: string): string | null => {
       if (pending.has(name)) return pending.get(name)!;
-      try { return localStorage.getItem(name); } catch { return null; }
+      try {
+        return localStorage.getItem(name);
+      } catch {
+        return null;
+      }
     },
     setItem: (name: string, value: string) => {
       pending.set(name, value);
@@ -20,7 +24,11 @@ export function createDebouncedStorage(delayMs = 1000): DebouncedStorage {
         timer = setTimeout(() => {
           timer = null;
           for (const [k, v] of pending) {
-            try { localStorage.setItem(k, v); } catch { /* quota exceeded */ }
+            try {
+              localStorage.setItem(k, v);
+            } catch {
+              /* quota exceeded */
+            }
           }
           pending.clear();
         }, delayMs);
@@ -28,7 +36,11 @@ export function createDebouncedStorage(delayMs = 1000): DebouncedStorage {
     },
     removeItem: (name: string) => {
       pending.delete(name);
-      try { localStorage.removeItem(name); } catch { /* ignore */ }
+      try {
+        localStorage.removeItem(name);
+      } catch {
+        /* ignore */
+      }
     },
   };
 }

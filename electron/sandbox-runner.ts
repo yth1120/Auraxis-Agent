@@ -3,6 +3,7 @@
  * launcher (restricted token + medium integrity + Job Object). Output is
  * streamed through the inherited stdio pipes so the existing Bash UX works.
  */
+import { errorText } from './errors';
 import { spawn } from 'child_process';
 import { existsSync } from 'fs';
 import { promises as fs } from 'fs';
@@ -45,19 +46,21 @@ export function sandboxBackend(): SandboxBackend {
 }
 
 export function sandboxScriptPath(backend: SandboxBackend = sandboxBackend()): string | null {
-  const envKey = backend === 'appcontainer'
-    ? 'AURAXIS_APPCONTAINER_PS1'
-    : backend === 'restricted'
-      ? 'AURAXIS_SANDBOX_PS1'
-      : `AURAXIS_${backend.toUpperCase()}_SCRIPT`;
+  const envKey =
+    backend === 'appcontainer'
+      ? 'AURAXIS_APPCONTAINER_PS1'
+      : backend === 'restricted'
+        ? 'AURAXIS_SANDBOX_PS1'
+        : `AURAXIS_${backend.toUpperCase()}_SCRIPT`;
   if (process.env[envKey]) return process.env[envKey]!;
-  const fileName = backend === 'appcontainer'
-    ? 'sandbox-appcontainer.ps1'
-    : backend === 'restricted'
-      ? 'sandbox-windows.ps1'
-      : backend === 'linux'
-        ? 'sandbox-linux.sh'
-        : 'sandbox-macos.sh';
+  const fileName =
+    backend === 'appcontainer'
+      ? 'sandbox-appcontainer.ps1'
+      : backend === 'restricted'
+        ? 'sandbox-windows.ps1'
+        : backend === 'linux'
+          ? 'sandbox-linux.sh'
+          : 'sandbox-macos.sh';
   const appPath = (app as any)?.getAppPath?.() ?? process.cwd();
   const dev = path.join(appPath, 'electron', fileName);
   if (existsSync(dev)) return dev;
@@ -82,16 +85,19 @@ export function isSandboxSupported(backend: SandboxBackend = sandboxBackend()): 
 
 export async function runSandboxedCommand(opts: SandboxCommandOptions): Promise<SandboxCommandResult> {
   return new Promise((resolve) => {
-    const resolvedBackend = opts.backend
-      ?? (opts.mode && process.platform === 'win32' && sandboxScriptPath('appcontainer')
+    const resolvedBackend =
+      opts.backend ??
+      (opts.mode && process.platform === 'win32' && sandboxScriptPath('appcontainer')
         ? 'appcontainer'
         : sandboxBackend());
     const backend = resolvedBackend;
     const mode = opts.mode ?? 'read';
     const isWinBackend = backend === 'restricted' || backend === 'appcontainer';
-    if ((isWinBackend && process.platform !== 'win32') ||
-        (backend === 'linux' && process.platform !== 'linux') ||
-        (backend === 'macos' && process.platform !== 'darwin')) {
+    if (
+      (isWinBackend && process.platform !== 'win32') ||
+      (backend === 'linux' && process.platform !== 'linux') ||
+      (backend === 'macos' && process.platform !== 'darwin')
+    ) {
       resolve({ supported: false, exitCode: null, error: `原生沙箱后端 ${backend} 不适用于当前平台` });
       return;
     }
@@ -106,8 +112,8 @@ export async function runSandboxedCommand(opts: SandboxCommandOptions): Promise<
       if (backend === 'appcontainer' || backend === 'linux' || backend === 'macos') {
         try {
           writeDir = await fs.mkdtemp(path.join(os.tmpdir(), 'auraxis-sandbox-'));
-        } catch (e: any) {
-          resolve({ supported: true, exitCode: null, error: `创建沙箱写目录失败: ${e?.message ?? e}` });
+        } catch (e: unknown) {
+          resolve({ supported: true, exitCode: null, error: `创建沙箱写目录失败: ${errorText(e)}` });
           return;
         }
       }
@@ -117,17 +123,17 @@ export async function runSandboxedCommand(opts: SandboxCommandOptions): Promise<
         const psArgs = [
           '-NoProfile',
           '-NonInteractive',
-          '-ExecutionPolicy', 'Bypass',
-          '-File', script,
-          '-ChildArgvJson', JSON.stringify(opts.argv),
-          '-Cwd', opts.cwd,
+          '-ExecutionPolicy',
+          'Bypass',
+          '-File',
+          script,
+          '-ChildArgvJson',
+          JSON.stringify(opts.argv),
+          '-Cwd',
+          opts.cwd,
         ];
         if (backend === 'appcontainer') {
-          psArgs.push(
-            '-ProjectRoot', opts.projectRoot ?? opts.cwd,
-            '-WriteDir', writeDir,
-            '-Mode', mode,
-          );
+          psArgs.push('-ProjectRoot', opts.projectRoot ?? opts.cwd, '-WriteDir', writeDir, '-Mode', mode);
         }
         child = spawn('powershell.exe', psArgs, {
           cwd: opts.cwd,
@@ -140,11 +146,16 @@ export async function runSandboxedCommand(opts: SandboxCommandOptions): Promise<
         const shell = process.platform === 'darwin' ? '/bin/bash' : 'bash';
         const shArgs = [
           script,
-          '--argv-json', JSON.stringify(opts.argv),
-          '--cwd', opts.cwd,
-          '--project-root', opts.projectRoot ?? opts.cwd,
-          '--write-dir', writeDir,
-          '--mode', mode,
+          '--argv-json',
+          JSON.stringify(opts.argv),
+          '--cwd',
+          opts.cwd,
+          '--project-root',
+          opts.projectRoot ?? opts.cwd,
+          '--write-dir',
+          writeDir,
+          '--mode',
+          mode,
         ];
         // detached: true creates a process group so timeout/abort can SIGKILL
         // the whole sandbox tree (bwrap --die-with-parent or seatbelt child).
@@ -179,25 +190,34 @@ export async function runSandboxedCommand(opts: SandboxCommandOptions): Promise<
           } else {
             currentChild.kill();
           }
-        } catch { /* gone */ }
+        } catch {
+          /* gone */
+        }
         forceKillTimer = setTimeout(() => {
           try {
             if (currentChild.pid && isWinBackend) {
               // AppContainer backend: the Job Object already kills the whole
               // tree when the launcher dies, and /T would also kill the
               // detached ACL-restore watcher. Only force-kill the launcher.
-              const taskkillArgs = backend === 'appcontainer'
-                ? ['/F', '/PID', String(currentChild.pid)]
-                : ['/F', '/PID', String(currentChild.pid), '/T'];
+              const taskkillArgs =
+                backend === 'appcontainer'
+                  ? ['/F', '/PID', String(currentChild.pid)]
+                  : ['/F', '/PID', String(currentChild.pid), '/T'];
               spawn('taskkill', taskkillArgs, { windowsHide: true, shell: true });
             }
-          } catch { /* best effort */ }
+          } catch {
+            /* best effort */
+          }
         }, 2_000);
       }, opts.timeoutMs ?? 120_000);
 
       const cleanupWriteDir = async () => {
         if (writeDir) {
-          try { await fs.rm(writeDir, { recursive: true, force: true }); } catch { /* best effort */ }
+          try {
+            await fs.rm(writeDir, { recursive: true, force: true });
+          } catch {
+            /* best effort */
+          }
         }
       };
 
@@ -221,11 +241,13 @@ export async function runSandboxedCommand(opts: SandboxCommandOptions): Promise<
           if (stderr.length < 50_000) stderr += chunk;
           opts.onStderr?.(chunk);
         });
-        proc.on('error', (e: any) => finish({
-          supported: true,
-          exitCode: null,
-          error: `沙箱启动失败: ${e?.message ?? e}`,
-        }));
+        proc.on('error', (e: any) =>
+          finish({
+            supported: true,
+            exitCode: null,
+            error: `沙箱启动失败: ${e?.message ?? e}`,
+          }),
+        );
         proc.on('close', (code: number | null) => {
           const stderrTail = stderrDecoder.flush();
           if (stderrTail) stderr += stderrTail;
@@ -236,8 +258,8 @@ export async function runSandboxedCommand(opts: SandboxCommandOptions): Promise<
           }
           // Git Bash（msys2）在受限令牌下无法创建 \BaseNamedObjects\msys-*
           // 内核对象，启动即崩（0xC0000022）。此时必须拒绝执行，绝不降级到非沙箱模式。
-          const launchError = stderr.includes('SANDBOX_LAUNCH_ERROR')
-            || stderr.includes('fatal error - NtCreateDirectoryObject');
+          const launchError =
+            stderr.includes('SANDBOX_LAUNCH_ERROR') || stderr.includes('fatal error - NtCreateDirectoryObject');
           if (launchError && isWinBackend) {
             finish({ supported: true, exitCode: null, error: '原生沙箱启动失败，已拒绝执行（fail-closed）' });
             return;
@@ -252,16 +274,22 @@ export async function runSandboxedCommand(opts: SandboxCommandOptions): Promise<
       };
       attachChild(child);
 
-      opts.signal?.addEventListener('abort', () => {
-        if (settled) return;
-        try {
-          if (process.platform !== 'win32' && currentChild.pid) {
-            process.kill(-currentChild.pid, 'SIGKILL');
-          } else {
-            currentChild.kill();
+      opts.signal?.addEventListener(
+        'abort',
+        () => {
+          if (settled) return;
+          try {
+            if (process.platform !== 'win32' && currentChild.pid) {
+              process.kill(-currentChild.pid, 'SIGKILL');
+            } else {
+              currentChild.kill();
+            }
+          } catch {
+            /* gone */
           }
-        } catch { /* gone */ }
-      }, { once: true });
+        },
+        { once: true },
+      );
     })();
   });
 }

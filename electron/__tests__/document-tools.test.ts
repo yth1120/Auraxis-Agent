@@ -30,7 +30,13 @@ describe('document-tools', () => {
       blocks: [
         { type: 'heading', text: '第一章', level: 1 },
         { type: 'paragraph', text: '这是段落内容 hello world' },
-        { type: 'table', rows: [['A', 'B'], ['1', '2']] },
+        {
+          type: 'table',
+          rows: [
+            ['A', 'B'],
+            ['1', '2'],
+          ],
+        },
       ],
     });
     const r = await readDocument(file);
@@ -43,7 +49,15 @@ describe('document-tools', () => {
     const dir = await scratch();
     const file = path.join(dir, 'data.xlsx');
     await writeDocument(file, {
-      sheets: [{ name: '数据', rows: [['列A', '列B'], ['1', '2']] }],
+      sheets: [
+        {
+          name: '数据',
+          rows: [
+            ['列A', '列B'],
+            ['1', '2'],
+          ],
+        },
+      ],
     });
     const r = await readDocument(file);
     expect(r.format).toBe('xlsx');
@@ -56,9 +70,7 @@ describe('document-tools', () => {
     const dir = await scratch();
     const file = path.join(dir, 'deck.pptx');
     await writeDocument(file, {
-      slides: [
-        { title: '季度汇报', bullets: ['第一点', '第二点'], notes: '讲解备注' },
-      ],
+      slides: [{ title: '季度汇报', bullets: ['第一点', '第二点'], notes: '讲解备注' }],
     });
     const r = await readDocument(file);
     expect(r.format).toBe('pptx');

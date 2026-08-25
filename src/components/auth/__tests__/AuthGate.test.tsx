@@ -17,7 +17,11 @@ describe('AuthGate — 注册登录按钮', () => {
   });
 
   it('registers through the submit button', async () => {
-    render(<AuthGate><div /></AuthGate>);
+    render(
+      <AuthGate>
+        <div />
+      </AuthGate>,
+    );
     const nameInput = await screen.findByPlaceholderText('怎么称呼你');
     fireEvent.change(nameInput, { target: { value: '测试' } });
     fireEvent.change(screen.getByPlaceholderText('you@example.com'), { target: { value: 'a@b.com' } });

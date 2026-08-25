@@ -60,22 +60,33 @@ export const nodeShellExecutor: ShellExecutor = {
       if (req.stdin && child.stdin) {
         // 子进程可能在 stdin 刷新前退出：EPIPE 以异步事件抛出，
         // 仅靠 try/catch 拦不住，必须显式吞掉流错误。
-        child.stdin.on('error', () => { /* stdin closed */ });
+        child.stdin.on('error', () => {
+          /* stdin closed */
+        });
         try {
           child.stdin.write(req.stdin);
           child.stdin.end();
-        } catch { /* stdin closed */ }
+        } catch {
+          /* stdin closed */
+        }
       } else if (child.stdin) {
-        try { child.stdin.end(); } catch { /* noop */ }
+        try {
+          child.stdin.end();
+        } catch {
+          /* noop */
+        }
       }
 
-      let stdout = '';
-      let stderr = '';
+      const stdout = '';
+      const stderr = '';
       let truncated = false;
       let timedOut = false;
 
       const append = (target: { value: string }, chunk: string) => {
-        if (target.value.length >= outputCap) { truncated = true; return; }
+        if (target.value.length >= outputCap) {
+          truncated = true;
+          return;
+        }
         const remaining = outputCap - target.value.length;
         target.value += chunk.slice(0, remaining);
         if (chunk.length > remaining) truncated = true;

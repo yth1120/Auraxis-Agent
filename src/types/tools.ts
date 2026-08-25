@@ -1,6 +1,6 @@
 // Tool-related type definitions shared between renderer and main process.
 // Tool identity + base ToolDef live in electron/contracts/tools.ts.
-import type { ToolName, ToolDef } from '../../electron/contracts/tools';
+import type { ToolName } from '../../electron/contracts/tools';
 export type { ToolName, BuiltInToolName, ToolDef } from '../../electron/contracts/tools';
 
 type ToolStatus = 'pending' | 'running' | 'done' | 'error';
@@ -62,10 +62,32 @@ export type ToolStreamEvent =
   | ToolEndEvent
   | ToolErrorEvent
   | { type: 'iteration'; requestId: string; iteration: number; maxIterations: number }
-  | { type: 'context_compressed'; requestId: string; tokensBefore: number; tokensAfter: number; messagesRemoved?: number; tokensSaved?: number }
-  | { type: 'tool_aborted'; requestId: string; toolCallId: string; toolName: ToolName; input: Record<string, unknown>; timestamp: number; error: string; stepGroupId: string }
+  | {
+      type: 'context_compressed';
+      requestId: string;
+      tokensBefore: number;
+      tokensAfter: number;
+      messagesRemoved?: number;
+      tokensSaved?: number;
+    }
+  | {
+      type: 'tool_aborted';
+      requestId: string;
+      toolCallId: string;
+      toolName: ToolName;
+      input: Record<string, unknown>;
+      timestamp: number;
+      error: string;
+      stepGroupId: string;
+    }
   | { type: 'system_message'; requestId: string; level: 'warning' | 'info'; content: string }
-  | { type: 'context_injected'; requestId: string; source: 'instructions' | 'memory'; producer: string; detail?: string }
+  | {
+      type: 'context_injected';
+      requestId: string;
+      source: 'instructions' | 'memory';
+      producer: string;
+      detail?: string;
+    }
   | { type: 'thinking_chunk'; requestId: string; chunk: string; isNewBlock: boolean }
   | {
       type: 'usage_update';
@@ -76,6 +98,13 @@ export type ToolStreamEvent =
       cacheHitTokens?: number;
       cacheMissTokens?: number;
     }
-  | { type: 'plan_generated'; requestId: string; planId: string; steps: import('./chat').PlanStep[]; filePath?: string; agentId?: string }
+  | {
+      type: 'plan_generated';
+      requestId: string;
+      planId: string;
+      steps: import('./chat').PlanStep[];
+      filePath?: string;
+      agentId?: string;
+    }
   | { type: 'done'; requestId: string }
   | { type: 'error'; requestId: string; error: string };

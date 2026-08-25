@@ -15,12 +15,16 @@ const electronMock = vi.hoisted(() => ({
     openPath: vi.fn(async () => ''),
   },
   BrowserWindow: class {
-    static fromWebContents() { return null; }
+    static fromWebContents() {
+      return null;
+    }
     minimize() {}
     maximize() {}
     unmaximize() {}
     close() {}
-    isMaximized() { return false; }
+    isMaximized() {
+      return false;
+    }
   },
 }));
 
@@ -79,9 +83,15 @@ const registerFns = vi.hoisted(() => ({
   registerPluginStateHandlers: vi.fn(),
   readSettings: vi.fn(),
   writeSettings: vi.fn(),
-  redactSettings: vi.fn((settings: any) => {
-    const { deepseekApiKey, exaApiKey, perplexityApiKey, slackToken, driveToken, notionToken, ...rest } = settings || {};
-    return rest;
+  redactSettings: vi.fn((settings: Record<string, unknown>) => {
+    const copy = { ...(settings || {}) };
+    delete copy.deepseekApiKey;
+    delete copy.exaApiKey;
+    delete copy.perplexityApiKey;
+    delete copy.slackToken;
+    delete copy.driveToken;
+    delete copy.notionToken;
+    return copy;
   }),
   getAllModels: vi.fn(),
   getActiveWorktree: vi.fn(),
@@ -183,11 +193,25 @@ describe('index — registerIpcHandlers 总注册与窗口/shell/设置处理器
     registerIpcHandlers();
     const h = handlers();
     for (const channel of [
-      'window:minimize', 'window:maximize', 'window:close', 'window:isMaximized', 'window:zoom',
-      'window:setBackgroundMaterial', 'window:backgroundMaterialSupported', 'window:glassState',
-      'shell:openExternal', 'shell:openPath', 'shell:openInVSCode', 'shell:openFileInVSCode',
-      'shell:openSkillsDirectory', 'settings:get', 'settings:set', 'settings:getApiKey',
-      'api:setKey', 'model:getAll', 'worktree:getStatus',
+      'window:minimize',
+      'window:maximize',
+      'window:close',
+      'window:isMaximized',
+      'window:zoom',
+      'window:setBackgroundMaterial',
+      'window:backgroundMaterialSupported',
+      'window:glassState',
+      'shell:openExternal',
+      'shell:openPath',
+      'shell:openInVSCode',
+      'shell:openFileInVSCode',
+      'shell:openSkillsDirectory',
+      'settings:get',
+      'settings:set',
+      'settings:getApiKey',
+      'api:setKey',
+      'model:getAll',
+      'worktree:getStatus',
     ]) {
       expect(h.has(channel)).toBe(true);
     }

@@ -1,3 +1,4 @@
+import { errorText } from '../../electron/errors';
 import { message } from 'antd';
 import { useChatStore } from '../stores/useChatStore';
 import { useSessionStore } from '../stores/useSessionStore';
@@ -48,9 +49,11 @@ export async function compactChatContext(): Promise<void> {
       ],
       lastCompression: { ...compaction, timestamp: Date.now() },
     });
-    message.success(t('conv.compressSuccess', { n: d.messagesRemoved ?? 0, tokens: (d.tokensSaved ?? 0).toLocaleString() }));
-  } catch (e: any) {
-    message.error(e?.message || t('conv.compressFailed'));
+    message.success(
+      t('conv.compressSuccess', { n: d.messagesRemoved ?? 0, tokens: (d.tokensSaved ?? 0).toLocaleString() }),
+    );
+  } catch (e: unknown) {
+    message.error(errorText(e) || t('conv.compressFailed'));
   }
 }
 

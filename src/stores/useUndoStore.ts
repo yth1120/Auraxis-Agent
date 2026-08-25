@@ -48,18 +48,13 @@ export const useUndoStore = create<UndoStore>()((set, get) => ({
     set((s) => ({ undos: s.undos.filter((u) => u.id !== id) }));
   },
 
-  clearBySession: (sessionId) =>
-    set((s) => ({ undos: s.undos.filter((u) => u.sessionId !== sessionId) })),
+  clearBySession: (sessionId) => set((s) => ({ undos: s.undos.filter((u) => u.sessionId !== sessionId) })),
 
   getByAgentId: (agentId) => get().undos.filter((u) => u.agentId === agentId),
 
   expireSession: (sessionId) =>
     set((s) => ({
-      undos: s.undos.map((u) =>
-        u.sessionId === sessionId
-          ? { ...u, expiresAt: Date.now() + SESSION_EXPIRE_MS }
-          : u,
-      ),
+      undos: s.undos.map((u) => (u.sessionId === sessionId ? { ...u, expiresAt: Date.now() + SESSION_EXPIRE_MS } : u)),
     })),
 }));
 

@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron';
+import { errorText } from '../errors';
 import { secureHandle } from './trust';
 import { resolveTrustedProjectRoot } from './project-access';
 import {
@@ -16,23 +16,26 @@ import { removeFtsDoc } from '../fts';
 
 /** Chat-log IPC — durable session event stream + authoritative session directory. */
 export function registerChatLogHandlers() {
-  secureHandle('chatLog:append', async (_e, sessionId: string, events: Array<Omit<ChatLogEvent, 'seq'>>, projectRoot?: string) => {
-    try {
-      if (!sessionId || typeof sessionId !== 'string') return { ok: false, error: '会话 ID 无效' };
-      const root = projectRoot ? await resolveTrustedProjectRoot(projectRoot) : undefined;
-      await appendChatEvents(sessionId, events || [], root);
-      return { ok: true };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
-    }
-  });
+  secureHandle(
+    'chatLog:append',
+    async (_e, sessionId: string, events: Array<Omit<ChatLogEvent, 'seq'>>, projectRoot?: string) => {
+      try {
+        if (!sessionId || typeof sessionId !== 'string') return { ok: false, error: '会话 ID 无效' };
+        const root = projectRoot ? await resolveTrustedProjectRoot(projectRoot) : undefined;
+        await appendChatEvents(sessionId, events || [], root);
+        return { ok: true };
+      } catch (error: unknown) {
+        return { ok: false, error: errorText(error) };
+      }
+    },
+  );
 
   secureHandle('chatLog:read', async (_e, sessionId: string) => {
     try {
       if (!sessionId || typeof sessionId !== 'string') return { ok: false, error: '会话 ID 无效' };
       return { ok: true, data: await readChatLog(sessionId) };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
@@ -40,8 +43,8 @@ export function registerChatLogHandlers() {
   secureHandle('chatLog:list', async () => {
     try {
       return { ok: true, data: await listChatSessions() };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
@@ -50,8 +53,8 @@ export function registerChatLogHandlers() {
     try {
       if (!sessionId || typeof sessionId !== 'string') return { ok: false, error: '会话 ID 无效' };
       return { ok: true, data: await projectChatSession(sessionId) };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
@@ -63,8 +66,8 @@ export function registerChatLogHandlers() {
       // otherwise stale hits keep pointing at a session that can't open.
       await removeFtsDoc(sessionId);
       return { ok: true };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
@@ -72,8 +75,8 @@ export function registerChatLogHandlers() {
     try {
       if (!sessionId || typeof sessionId !== 'string') return { ok: false, error: '会话 ID 无效' };
       return { ok: true, data: await forkChatSession(sessionId, uptoMessageId) };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
@@ -85,8 +88,8 @@ export function registerChatLogHandlers() {
       }
       await appendChatMeta(sessionId, meta);
       return { ok: true };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 }

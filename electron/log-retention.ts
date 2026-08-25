@@ -23,9 +23,7 @@ export function retentionPolicy(): { retentionDays: number; maxFileBytes: number
   };
 }
 
-export async function runLogRetention(
-  opts: LogRetentionOptions,
-): Promise<{ removed: number; scanned: number }> {
+export async function runLogRetention(opts: LogRetentionOptions): Promise<{ removed: number; scanned: number }> {
   const { retentionDays, maxFileBytes } = retentionPolicy();
   const retentionMs = retentionDays * 24 * 60 * 60 * 1000;
   let removed = 0;

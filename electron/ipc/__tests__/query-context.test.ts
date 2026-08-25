@@ -11,7 +11,6 @@ vi.mock('../../chat-log', () => ({
 
 import { readChatLog, appendChatEvents } from '../../chat-log';
 import {
-  AGENTS_MD_PREFIX,
   MEMORY_PREAMBLE_PREFIX,
   buildAgentsMdMessage,
   buildModeHint,
@@ -131,23 +130,13 @@ describe('tryReplayStoredContext', () => {
   it('AGENTS.md 被删除后拒绝重放旧规则', () => {
     const stored = storedBase();
     stored[4] = { role: 'user', content: buildAgentsMdMessage('OLD RULES') };
-    const result = tryReplayStoredContext(
-      stored,
-      [{ role: 'user', content: '新问题' }],
-      '',
-      buildModeHint('ask'),
-    );
+    const result = tryReplayStoredContext(stored, [{ role: 'user', content: '新问题' }], '', buildModeHint('ask'));
     expect(result.ok).toBe(false);
   });
 
   it('模式变化时原位替换模式提示', () => {
     const stored = storedBase();
-    const result = tryReplayStoredContext(
-      stored,
-      [{ role: 'user', content: '新问题' }],
-      '',
-      buildModeHint('auto'),
-    );
+    const result = tryReplayStoredContext(stored, [{ role: 'user', content: '新问题' }], '', buildModeHint('auto'));
     expect(result.ok).toBe(true);
     expect(result.messages[6].content).toBe(buildModeHint('auto'));
   });
@@ -161,7 +150,9 @@ describe('tryReplayStoredContext', () => {
 
   it('缺少模式提示或新用户消息时拒绝重放', () => {
     const noMode = storedBase().filter((m) => !String(m.content).startsWith('当前为'));
-    expect(tryReplayStoredContext(noMode, [{ role: 'user', content: '新问题' }], '', buildModeHint('ask')).ok).toBe(false);
+    expect(tryReplayStoredContext(noMode, [{ role: 'user', content: '新问题' }], '', buildModeHint('ask')).ok).toBe(
+      false,
+    );
     expect(tryReplayStoredContext(storedBase(), [], '', buildModeHint('ask')).ok).toBe(false);
   });
 });
@@ -172,9 +163,7 @@ describe('load/save/clearLlmContext', () => {
   });
 
   it('save 把规范消息写入 chat-log system 事件并剥离内部标记', async () => {
-    await saveLlmContext('s1', [
-      { role: 'assistant', content: 'x', _ddInjected: true },
-    ]);
+    await saveLlmContext('s1', [{ role: 'assistant', content: 'x', _ddInjected: true }]);
     expect(appendChatEvents).toHaveBeenCalledWith('s1', [
       expect.objectContaining({
         type: 'system',

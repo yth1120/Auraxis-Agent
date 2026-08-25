@@ -15,8 +15,11 @@ vi.mock('../settings-store', () => ({
 }));
 
 import {
-  shouldAutoApprove, checkPermission, requestPermission,
-  loadPermissionRules, registerPermissionHandlers,
+  shouldAutoApprove,
+  checkPermission,
+  requestPermission,
+  loadPermissionRules,
+  registerPermissionHandlers,
 } from '../permission-handlers';
 import { readSettings, writeSettings } from '../settings-store';
 import { approvalFatigue } from '../../approval-fatigue';
@@ -54,9 +57,17 @@ describe('shouldAutoApprove / checkPermission（真实实现）', () => {
     expect(checkPermission('Read', { file_path: 'a.ts' })).toBe('allow');
     expect(checkPermission('Bash', { command: 'ls' })).toBe('ask');
 
-    await handler('permission:addRule')({}, {
-      id: 'r1', toolName: 'Bash', action: 'deny', scope: 'always', createdAt: 1,
-    }, 'fake-request');
+    await handler('permission:addRule')(
+      {},
+      {
+        id: 'r1',
+        toolName: 'Bash',
+        action: 'deny',
+        scope: 'always',
+        createdAt: 1,
+      },
+      'fake-request',
+    );
     // 无对应 pending 请求时不能加规则
     expect((await handler('permission:getRules')({})).data).toEqual([]);
   });
@@ -74,9 +85,17 @@ describe('requestPermission — 自动批准与规则', () => {
     // 先制造一个 pending 请求以便加规则
     const p = requestPermission('Bash', { command: 'npm test' }, win, 'c1', { mode: 'ask' });
     const sent = win.webContents.send.mock.calls[0][1] as any;
-    await handler('permission:addRule')({}, {
-      id: 'r1', toolName: 'Bash', action: 'allow', scope: 'always', createdAt: 1,
-    }, sent.requestId);
+    await handler('permission:addRule')(
+      {},
+      {
+        id: 'r1',
+        toolName: 'Bash',
+        action: 'allow',
+        scope: 'always',
+        createdAt: 1,
+      },
+      sent.requestId,
+    );
     await handler('permission:respond')({}, sent.requestId, false);
     await p;
 
@@ -112,9 +131,14 @@ describe('requestPermission — 审批疲劳统计（Oversight）', () => {
 
   it('人工拒绝计入 rejected', async () => {
     const win = makeWin();
-    const p = requestPermission('Write', { file_path: 'a.ts', content: 'x' }, win, 'c1', { mode: 'ask', agentId: 'agent-c' });
+    const p = requestPermission('Write', { file_path: 'a.ts', content: 'x' }, win, 'c1', {
+      mode: 'ask',
+      agentId: 'agent-c',
+    });
     // Write 在发弹窗前有一次异步读文件，需等微任务完成。
-    await vi.waitFor(() => { expect(win.webContents.send).toHaveBeenCalled(); });
+    await vi.waitFor(() => {
+      expect(win.webContents.send).toHaveBeenCalled();
+    });
     const sent = win.webContents.send.mock.calls[0][1] as any;
     await handler('permission:respond')({}, sent.requestId, false);
     await p;
@@ -192,7 +216,11 @@ describe('requestPermission — 弹窗与摘要', () => {
 describe('loadPermissionRules 与规则 IPC', () => {
   it('loadPermissionRules 恢复持久化规则并截断 200', async () => {
     const rules = Array.from({ length: 210 }, (_, i) => ({
-      id: `r${i}`, toolName: 'Bash', action: 'allow', scope: 'always' as const, createdAt: i,
+      id: `r${i}`,
+      toolName: 'Bash',
+      action: 'allow',
+      scope: 'always' as const,
+      createdAt: i,
     }));
     vi.mocked(readSettings).mockResolvedValue({ permissionRules: rules });
     await loadPermissionRules();
@@ -205,7 +233,13 @@ describe('loadPermissionRules 与规则 IPC', () => {
     const win = makeWin();
     const p = requestPermission('Bash', { command: 'ls' }, win, 'c1', { mode: 'ask' });
     const sent = win.webContents.send.mock.calls[0][1] as any;
-    expect(await handler('permission:addRule')({}, { id: 'r1', toolName: 'Bash', action: 'deny', scope: 'once', createdAt: 1 }, sent.requestId)).toEqual({ ok: true });
+    expect(
+      await handler('permission:addRule')(
+        {},
+        { id: 'r1', toolName: 'Bash', action: 'deny', scope: 'once', createdAt: 1 },
+        sent.requestId,
+      ),
+    ).toEqual({ ok: true });
     expect(writeSettings).toHaveBeenCalled();
     await handler('permission:respond')({}, sent.requestId, false);
     await p;
@@ -220,7 +254,11 @@ describe('loadPermissionRules 与规则 IPC', () => {
     const win = makeWin();
     const p = requestPermission('Bash', { command: 'ls' }, win, 'c1', { mode: 'ask' });
     const sent = win.webContents.send.mock.calls[0][1] as any;
-    await handler('permission:addRule')({}, { id: 'r1', toolName: 'Bash', action: 'allow', scope: 'always', createdAt: 1 }, sent.requestId);
+    await handler('permission:addRule')(
+      {},
+      { id: 'r1', toolName: 'Bash', action: 'allow', scope: 'always', createdAt: 1 },
+      sent.requestId,
+    );
     await handler('permission:respond')({}, sent.requestId, false);
     await p;
 

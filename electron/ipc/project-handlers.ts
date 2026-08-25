@@ -1,15 +1,12 @@
-import { ipcMain, dialog, app } from 'electron';
+import { errorText } from '../errors';
+import { dialog, app } from 'electron';
 import { secureHandle } from './trust';
 import { readFile, writeFile, readdir, stat, mkdir } from 'fs/promises';
 import path from 'path';
 import os from 'os';
 import crypto from 'crypto';
 import type { ApplyCodePayload } from '../types';
-import {
-  EMPTY_PROJECT_GLOBAL_STATE,
-  normalizeProjectGlobalState,
-  type ProjectGlobalState,
-} from '../contracts/project';
+import { EMPTY_PROJECT_GLOBAL_STATE, normalizeProjectGlobalState, type ProjectGlobalState } from '../contracts/project';
 import { isPathInside, isAllowedExtension, EXCLUDED_DIRS, assertString, assertObject } from './shared';
 import { assertTrustedIpcSender } from './trust';
 import { resolveTrustedProjectRoot } from './project-access';
@@ -121,8 +118,8 @@ export function registerProjectHandlers() {
     assertTrustedIpcSender(event);
     try {
       return { ok: true, data: await readProjectGlobalState() };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
@@ -131,8 +128,8 @@ export function registerProjectHandlers() {
     try {
       await writeProjectGlobalState(normalizeProjectGlobalState(state));
       return { ok: true };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
@@ -143,8 +140,8 @@ export function registerProjectHandlers() {
       const ignorePatterns = await loadGitignore(root);
       const tree = await buildDirectoryTree(root, 0, root, ignorePatterns);
       return { ok: true, data: tree };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
@@ -160,10 +157,12 @@ export function registerProjectHandlers() {
       try {
         const { undoManager } = await import('./undo-manager');
         await undoManager.init(result.filePaths[0]);
-      } catch { /* non-critical */ }
+      } catch {
+        /* non-critical */
+      }
       return { ok: true, data: result.filePaths[0] };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
@@ -197,8 +196,13 @@ export function registerProjectHandlers() {
       await writeFile(fullPath, code, 'utf-8');
 
       return { ok: true, filePath, action };
-    } catch (error: any) {
-      return { ok: false, filePath: (payload as { filePath?: string })?.filePath, action: 'created', error: error.message };
+    } catch (error: unknown) {
+      return {
+        ok: false,
+        filePath: (payload as { filePath?: string })?.filePath,
+        action: 'created',
+        error: errorText(error),
+      };
     }
   });
 
@@ -225,8 +229,8 @@ export function registerProjectHandlers() {
         filePath: previewPath,
         url: `file://${previewPath}`,
       };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 }

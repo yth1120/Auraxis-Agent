@@ -5,7 +5,6 @@ import {
   Stop,
   PauseCircle,
   PlayCircle,
-  ArrowsClockwise,
   CheckCircle,
   XCircle,
   Clock,
@@ -61,14 +60,16 @@ function formatTokens(n: number): string {
 
 function EventLine({ entry }: { entry: AgentLogEntry }) {
   if (entry.type === 'tool_start') {
-    const inputHint = entry.input
-      ? Object.values(entry.input).join(' ').slice(0, 40)
-      : '';
+    const inputHint = entry.input ? Object.values(entry.input).join(' ').slice(0, 40) : '';
     return (
       <div className="flex items-center gap-1 text-2xs text-[var(--color-text-secondary)] leading-snug">
         <Lightning className="shrink-0 text-2xs text-[var(--color-text-muted)]" />
         <span className="font-mono font-medium whitespace-nowrap">{entry.toolName}</span>
-        {inputHint && <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[var(--color-text-muted)] flex-1 min-w-0">{inputHint}</span>}
+        {inputHint && (
+          <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[var(--color-text-muted)] flex-1 min-w-0">
+            {inputHint}
+          </span>
+        )}
       </div>
     );
   }
@@ -87,7 +88,9 @@ function EventLine({ entry }: { entry: AgentLogEntry }) {
       <div className="flex items-center gap-1 text-2xs text-text-secondary leading-snug">
         <XCircle className="shrink-0 text-2xs" />
         <span className="font-mono font-medium whitespace-nowrap">{entry.toolName}</span>
-        <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[var(--color-text-muted)] flex-1 min-w-0">{(entry.error || '').slice(0, 40)}</span>
+        <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[var(--color-text-muted)] flex-1 min-w-0">
+          {(entry.error || '').slice(0, 40)}
+        </span>
       </div>
     );
   }
@@ -115,25 +118,23 @@ function AgentCard({ agent }: { agent: AgentInfo }) {
   const iteration = agent?.iteration ?? 0;
   const maxIterations = agent?.maxIterations ?? 0;
   const error = agent?.error ?? '';
-  const todos = (agent?.plan?.todos) || [];
+  const todos = agent?.plan?.todos || [];
   const totalIn = agent?.totalInputTokens ?? 0;
   const totalOut = agent?.totalOutputTokens ?? 0;
   const [showConsole, setShowConsole] = useState(false);
 
   const recentEvents = useMemo(() => {
     const log = agent?.log || [];
-    return log
-      .filter((e) => e.type === 'tool_start' || e.type === 'tool_end' || e.type === 'tool_error')
-      .slice(-6);
+    return log.filter((e) => e.type === 'tool_start' || e.type === 'tool_end' || e.type === 'tool_error').slice(-6);
   }, [agent?.log]);
 
   const elapsed = useElapsed(startTime, endTime);
   const cfg = STATUS_CFG[status] || STATUS_CFG.idle;
   const cfgLabel = t(cfg.labelKey);
 
-  const doneCount = todos.filter((t) => (t?.status) === 'completed').length;
+  const doneCount = todos.filter((t) => t?.status === 'completed').length;
   const planPct = todos.length > 0 ? Math.round((doneCount / todos.length) * 100) : 0;
-  const activeTask = todos.find((t) => (t?.status) === 'in_progress');
+  const activeTask = todos.find((t) => t?.status === 'in_progress');
 
   return (
     <Card
@@ -168,7 +169,11 @@ function AgentCard({ agent }: { agent: AgentInfo }) {
                   : 'bg-[var(--color-bg-secondary)] text-text-secondary border-[var(--color-border-dim)] hover:bg-[var(--color-hover)]',
             )}
           >
-            {priority === 'high' ? t('dashboard.priorityHigh') : priority === 'normal' ? t('dashboard.priorityMedium') : t('dashboard.priorityLow')}
+            {priority === 'high'
+              ? t('dashboard.priorityHigh')
+              : priority === 'normal'
+                ? t('dashboard.priorityMedium')
+                : t('dashboard.priorityLow')}
           </button>
           <Tooltip title={t('dashboard.viewDetails')}>
             <Button type="text" size="small" icon={<ArrowsOut />} onClick={() => setExpanded(!expanded)} />
@@ -176,16 +181,35 @@ function AgentCard({ agent }: { agent: AgentInfo }) {
           {status === 'running' && (
             <>
               <Tooltip title={t('dashboard.pause')}>
-                <Button type="text" size="small" icon={<PauseCircle />} onClick={() => pauseAgent(id)} aria-label={t('dashboard.pauseAgent')} />
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<PauseCircle />}
+                  onClick={() => pauseAgent(id)}
+                  aria-label={t('dashboard.pauseAgent')}
+                />
               </Tooltip>
               <Tooltip title={t('dashboard.stop')}>
-                <Button type="text" size="small" danger icon={<Stop />} onClick={() => stopAgent(id)} aria-label={t('dashboard.stopAgent')} />
+                <Button
+                  type="text"
+                  size="small"
+                  danger
+                  icon={<Stop />}
+                  onClick={() => stopAgent(id)}
+                  aria-label={t('dashboard.stopAgent')}
+                />
               </Tooltip>
             </>
           )}
           {status === 'paused' && (
             <Tooltip title={t('dashboard.resume')}>
-              <Button type="text" size="small" icon={<PlayCircle />} onClick={() => resumeAgent(id)} aria-label={t('dashboard.resumeAgent')} />
+              <Button
+                type="text"
+                size="small"
+                icon={<PlayCircle />}
+                onClick={() => resumeAgent(id)}
+                aria-label={t('dashboard.resumeAgent')}
+              />
             </Tooltip>
           )}
         </Space>
@@ -195,8 +219,15 @@ function AgentCard({ agent }: { agent: AgentInfo }) {
         {/* Progress bar */}
         {todos.length > 0 && (
           <div className="flex items-center gap-2">
-            <Progress percent={planPct} size="small" showInfo={false} status={status === 'running' ? 'active' : 'normal'} />
-            <span className="text-xs text-[var(--color-text-muted)] font-mono whitespace-nowrap">{doneCount}/{todos.length}</span>
+            <Progress
+              percent={planPct}
+              size="small"
+              showInfo={false}
+              status={status === 'running' ? 'active' : 'normal'}
+            />
+            <span className="text-xs text-[var(--color-text-muted)] font-mono whitespace-nowrap">
+              {doneCount}/{todos.length}
+            </span>
           </div>
         )}
 
@@ -211,20 +242,32 @@ function AgentCard({ agent }: { agent: AgentInfo }) {
         {/* Meta row */}
         <div className="flex gap-3 text-xs text-[var(--color-text-secondary)]">
           <Tooltip title={t('dashboard.runtime')}>
-            <span className="inline-flex items-center gap-1"><Clock /> {elapsed.toFixed(1)}s</span>
+            <span className="inline-flex items-center gap-1">
+              <Clock /> {elapsed.toFixed(1)}s
+            </span>
           </Tooltip>
           <Tooltip title={t('dashboard.tools')}>
-            <span className="inline-flex items-center gap-1"><Lightning /> {toolCallCount}</span>
+            <span className="inline-flex items-center gap-1">
+              <Lightning /> {toolCallCount}
+            </span>
           </Tooltip>
-          <span className="inline-flex items-center gap-1">{t('dashboard.rounds', { current: iteration, max: maxIterations })}</span>
+          <span className="inline-flex items-center gap-1">
+            {t('dashboard.rounds', { current: iteration, max: maxIterations })}
+          </span>
           {(totalIn > 0 || totalOut > 0) && (
             <Tooltip title={t('dashboard.tokens', { in: totalIn.toLocaleString(), out: totalOut.toLocaleString() })}>
-              <span className="font-mono text-2xs text-[var(--color-text-muted)] bg-[var(--color-bg-elevated)] px-1 py-px rounded-[5px]">{formatTokens(totalIn + totalOut)} tok</span>
+              <span className="font-mono text-2xs text-[var(--color-text-muted)] bg-[var(--color-bg-elevated)] px-1 py-px rounded-[5px]">
+                {formatTokens(totalIn + totalOut)} tok
+              </span>
             </Tooltip>
           )}
           {recentEvents.length > 0 && (
             <Tooltip title={showConsole ? t('dashboard.collapseEvents') : t('dashboard.expandEvents')}>
-              <button className="border-none bg-transparent cursor-pointer inline-flex items-center text-2xs text-[var(--color-text-muted)] p-[1px_3px] rounded-[5px] transition-colors duration-fast ease-out hover:text-accent hover:bg-[var(--color-bg-elevated)]" onClick={() => setShowConsole(!showConsole)} aria-label={t('dashboard.eventsConsole')}>
+              <button
+                className="border-none bg-transparent cursor-pointer inline-flex items-center text-2xs text-[var(--color-text-muted)] p-[1px_3px] rounded-[5px] transition-colors duration-fast ease-out hover:text-accent hover:bg-[var(--color-bg-elevated)]"
+                onClick={() => setShowConsole(!showConsole)}
+                aria-label={t('dashboard.eventsConsole')}
+              >
                 <Code />
               </button>
             </Tooltip>
@@ -242,26 +285,39 @@ function AgentCard({ agent }: { agent: AgentInfo }) {
 
         {/* Error */}
         {error && (
-          <div className="text-xs text-text-secondary bg-[var(--color-danger-soft)] px-2 py-1 rounded-md">{error.slice(0, 80)}</div>
+          <div className="text-xs text-text-secondary bg-[var(--color-danger-soft)] px-2 py-1 rounded-md">
+            {error.slice(0, 80)}
+          </div>
         )}
 
         {/* Expanded detail */}
         {expanded && todos.length > 0 && (
           <div className="mt-1 pt-2 border-t border-[var(--color-border-dim)] flex flex-col gap-1">
             {todos.map((t, i) => (
-              <div key={i} className={clsx(
-                'flex items-start gap-2 text-xs',
-                (t?.status) === 'pending' && 'text-[var(--color-text-muted)]',
-                (t?.status) === 'completed' && 'text-[var(--color-text-secondary)] line-through',
-                (t?.status) === 'in_progress' && 'text-[var(--color-text-primary)]',
-              )}>
-                <span className={clsx(
-                  'shrink-0 mt-1 text-xs',
-                  (t?.status) === 'pending' && 'text-[var(--color-text-muted)]',
-                  (t?.status) === 'completed' && 'text-text-secondary',
-                  (t?.status) === 'in_progress' && 'text-text-primary',
-                )}>
-                  {(t?.status) === 'completed' ? <CheckCircle /> : (t?.status) === 'in_progress' ? <ExecutingIndicator size={14} /> : <Clock />}
+              <div
+                key={i}
+                className={clsx(
+                  'flex items-start gap-2 text-xs',
+                  t?.status === 'pending' && 'text-[var(--color-text-muted)]',
+                  t?.status === 'completed' && 'text-[var(--color-text-secondary)] line-through',
+                  t?.status === 'in_progress' && 'text-[var(--color-text-primary)]',
+                )}
+              >
+                <span
+                  className={clsx(
+                    'shrink-0 mt-1 text-xs',
+                    t?.status === 'pending' && 'text-[var(--color-text-muted)]',
+                    t?.status === 'completed' && 'text-text-secondary',
+                    t?.status === 'in_progress' && 'text-text-primary',
+                  )}
+                >
+                  {t?.status === 'completed' ? (
+                    <CheckCircle />
+                  ) : t?.status === 'in_progress' ? (
+                    <ExecutingIndicator size={14} />
+                  ) : (
+                    <Clock />
+                  )}
                 </span>
                 <span>{t?.content ?? '-'}</span>
               </div>
@@ -296,7 +352,8 @@ export default function AgentDashboard() {
   // Poll for conflicts
   useEffect(() => {
     const check = () => {
-      window.electronAPI?.conflict?.getConflicts()
+      window.electronAPI?.conflict
+        ?.getConflicts()
         .then((r) => {
           if (r.ok) setConflicts((r.data as any[]) || []);
         })
@@ -316,7 +373,9 @@ export default function AgentDashboard() {
   const activeCount = (agents || []).filter((a) => a?.status === 'running').length;
   const pausedCount = (agents || []).filter((a) => a?.status === 'paused').length;
   const queuedCount = (agents || []).filter((a) => a?.status === 'queued').length;
-  const terminal = (agents || []).filter((a) => a?.status === 'completed' || a?.status === 'error' || a?.status === 'stopped');
+  const terminal = (agents || []).filter(
+    (a) => a?.status === 'completed' || a?.status === 'error' || a?.status === 'stopped',
+  );
   const completedCount = (agents || []).filter((a) => a?.status === 'completed').length;
   const totalTools = (agents || []).reduce((sum, a) => sum + (a?.toolCallCount || 0), 0);
   const goalCount = (agents || []).filter((a) => a?.goal).length;
@@ -383,8 +442,17 @@ export default function AgentDashboard() {
               content={
                 <div style={{ maxWidth: 300, fontSize: 12 }}>
                   {conflicts.map((c, i) => (
-                    <div key={i} style={{ marginBottom: 6, padding: '4px 0', borderBottom: i < conflicts.length - 1 ? '1px solid var(--border-hairline)' : 'none' }}>
-                      <div style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-danger)', fontWeight: 600 }}>{c.filePath}</div>
+                    <div
+                      key={i}
+                      style={{
+                        marginBottom: 6,
+                        padding: '4px 0',
+                        borderBottom: i < conflicts.length - 1 ? '1px solid var(--border-hairline)' : 'none',
+                      }}
+                    >
+                      <div style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-danger)', fontWeight: 600 }}>
+                        {c.filePath}
+                      </div>
                       <div style={{ color: 'var(--color-text-secondary)', marginTop: 2 }}>
                         {t('dashboard.conflictBy', { agents: (c.agentIds || []).join(', ') })}
                       </div>
@@ -407,7 +475,10 @@ export default function AgentDashboard() {
         <div className="grid grid-cols-4 gap-px px-3 py-2 border-b border-[var(--color-border-dim)] bg-[var(--color-bg-secondary)] shrink-0">
           {[
             [t('dashboard.taskTotal'), String((agents || []).length)],
-            [t('dashboard.completionRate'), terminal.length > 0 ? `${Math.round((completedCount / terminal.length) * 100)}%` : '—'],
+            [
+              t('dashboard.completionRate'),
+              terminal.length > 0 ? `${Math.round((completedCount / terminal.length) * 100)}%` : '—',
+            ],
             [t('dashboard.tools'), String(totalTools)],
             [t('dashboard.goalTasks'), String(goalCount)],
           ].map(([label, value]) => (
@@ -422,10 +493,7 @@ export default function AgentDashboard() {
       <div className="flex-1 overflow-y-auto p-3 pr-2">
         {(agents || []).length === 0 ? (
           <div className="flex justify-center py-10">
-            <EmptyState
-              title={t('agentDash.noRunning')}
-              description={t('agentDash.multiAgentHint')}
-            />
+            <EmptyState title={t('agentDash.noRunning')} description={t('agentDash.multiAgentHint')} />
           </div>
         ) : (
           <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">

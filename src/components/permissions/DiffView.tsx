@@ -49,11 +49,13 @@ function computeUnifiedDiff(oldText: string, newText: string): DiffLine[] {
   }
 
   const result: DiffLine[] = [];
-  let i = m, j = n;
+  let i = m,
+    j = n;
   while (i > 0 || j > 0) {
     if (i > 0 && j > 0 && oldLines[i - 1] === newLines[j - 1]) {
       result.push({ type: 'context', content: oldLines[i - 1], oldLineNum: i, newLineNum: j });
-      i--; j--;
+      i--;
+      j--;
     } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
       result.push({ type: 'add', content: newLines[j - 1], newLineNum: j });
       j--;
@@ -139,10 +141,7 @@ function highlightLine(content: string, lang: string | undefined): string {
 }
 
 function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 function padNum(n: number | undefined): string {
@@ -167,7 +166,8 @@ export default function DiffView({
 
   const isNewFile = oldContent === '' && newContent !== '';
 
-  const cellBase = 'flex items-start min-h-[22px] px-1.5 whitespace-pre border-r border-dim overflow-x-auto last:border-r-0';
+  const cellBase =
+    'flex items-start min-h-[22px] px-1.5 whitespace-pre border-r border-dim overflow-x-auto last:border-r-0';
 
   return (
     <div className="flex flex-col rounded-xl overflow-hidden border border-dim bg-inset my-2">
@@ -181,9 +181,7 @@ export default function DiffView({
             aria-selected={mode === 'split'}
             className={clsx(
               'border-none bg-transparent text-2xs px-2 py-0.5 cursor-pointer transition-colors duration-fast ease-out',
-              mode === 'split'
-                ? 'bg-primary-soft text-primary'
-                : 'text-muted hover:bg-dim hover:text-primary'
+              mode === 'split' ? 'bg-primary-soft text-primary' : 'text-muted hover:bg-dim hover:text-primary',
             )}
             onClick={() => setMode('split')}
           >
@@ -195,9 +193,7 @@ export default function DiffView({
             aria-selected={mode === 'unified'}
             className={clsx(
               'border-none bg-transparent text-2xs px-2 py-0.5 cursor-pointer transition-colors duration-fast ease-out',
-              mode === 'unified'
-                ? 'bg-primary-soft text-primary'
-                : 'text-muted hover:bg-dim hover:text-primary'
+              mode === 'unified' ? 'bg-primary-soft text-primary' : 'text-muted hover:bg-dim hover:text-primary',
             )}
             onClick={() => setMode('unified')}
           >
@@ -220,7 +216,10 @@ export default function DiffView({
                 if (row.type === 'ellipsis') return clsx(cellBase, 'bg-inset justify-center text-faint italic py-0.5');
                 const cell = side === 'left' ? row.left : row.right;
                 if (!cell) return clsx(cellBase, 'bg-tertiary');
-                if (row.type === 'modify') return side === 'left' ? clsx(cellBase, 'bg-danger-soft text-danger') : clsx(cellBase, 'bg-success-soft text-success');
+                if (row.type === 'modify')
+                  return side === 'left'
+                    ? clsx(cellBase, 'bg-danger-soft text-danger')
+                    : clsx(cellBase, 'bg-success-soft text-success');
                 if (row.type === 'remove') return clsx(cellBase, 'bg-danger-soft text-danger');
                 if (row.type === 'add') return clsx(cellBase, 'bg-success-soft text-success');
                 return clsx(cellBase, 'text-muted');
@@ -232,8 +231,12 @@ export default function DiffView({
                       <span className="text-faint italic">...</span>
                     ) : (
                       <>
-                        <span className="w-9 text-right pr-2 text-faint shrink-0 select-none">{padNum(row.left?.lineNum)}</span>
-                        <span className="w-3 shrink-0 font-semibold text-center">{row.left ? (row.type === 'remove' || row.type === 'modify' ? '-' : ' ') : ' '}</span>
+                        <span className="w-9 text-right pr-2 text-faint shrink-0 select-none">
+                          {padNum(row.left?.lineNum)}
+                        </span>
+                        <span className="w-3 shrink-0 font-semibold text-center">
+                          {row.left ? (row.type === 'remove' || row.type === 'modify' ? '-' : ' ') : ' '}
+                        </span>
                         <code
                           className="flex-1 whitespace-pre bg-transparent"
                           dangerouslySetInnerHTML={{ __html: row.left ? highlightLine(row.left.content, lang) : '' }}
@@ -246,8 +249,12 @@ export default function DiffView({
                       <span className="text-faint italic">...</span>
                     ) : (
                       <>
-                        <span className="w-9 text-right pr-2 text-faint shrink-0 select-none">{padNum(row.right?.lineNum)}</span>
-                        <span className="w-3 shrink-0 font-semibold text-center">{row.right ? (row.type === 'add' || row.type === 'modify' ? '+' : ' ') : ' '}</span>
+                        <span className="w-9 text-right pr-2 text-faint shrink-0 select-none">
+                          {padNum(row.right?.lineNum)}
+                        </span>
+                        <span className="w-3 shrink-0 font-semibold text-center">
+                          {row.right ? (row.type === 'add' || row.type === 'modify' ? '+' : ' ') : ' '}
+                        </span>
                         <code
                           className="flex-1 whitespace-pre bg-transparent"
                           dangerouslySetInnerHTML={{ __html: row.right ? highlightLine(row.right.content, lang) : '' }}
@@ -264,18 +271,21 @@ export default function DiffView({
         <div className="max-h-80 overflow-auto font-mono text-xs leading-[1.55]">
           {unified.map((line, i) => {
             const lineBase = 'flex items-start min-h-5 px-2 whitespace-pre';
-            const lineCls = line.type === 'add'
-              ? clsx(lineBase, 'bg-success-soft text-success')
-              : line.type === 'remove'
-                ? clsx(lineBase, 'bg-danger-soft text-danger')
-                : clsx(lineBase, 'text-muted');
+            const lineCls =
+              line.type === 'add'
+                ? clsx(lineBase, 'bg-success-soft text-success')
+                : line.type === 'remove'
+                  ? clsx(lineBase, 'bg-danger-soft text-danger')
+                  : clsx(lineBase, 'text-muted');
             const prefix = line.type === 'add' ? '+' : line.type === 'remove' ? '-' : ' ';
             const isEllipsis = line.content === '...';
             return (
               <div key={i} className={lineCls}>
                 <span className="w-9 text-right pr-2 text-faint shrink-0 select-none">{padNum(line.oldLineNum)}</span>
                 <span className="w-9 text-right pr-2 text-faint shrink-0 select-none">{padNum(line.newLineNum)}</span>
-                <span className={isEllipsis ? 'text-faint italic' : 'w-3 shrink-0 font-semibold text-center'}>{prefix}</span>
+                <span className={isEllipsis ? 'text-faint italic' : 'w-3 shrink-0 font-semibold text-center'}>
+                  {prefix}
+                </span>
                 {isEllipsis ? (
                   <span className="text-faint italic">{line.content}</span>
                 ) : (

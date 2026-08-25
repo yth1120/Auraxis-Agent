@@ -27,8 +27,20 @@ jobs:
 
       - run: npm run electron:compile
       - run: npx tsc --noEmit -p tsconfig.json
+      - run: npm run sdk:build
       - run: npx vite build
       - run: npx vitest run --coverage
+      - run: npm run sdk:test:py
+      - run: npm audit --audit-level=high
+      - run: npm run lint
+
+      - name: Run E2E (Linux)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a npm run test:e2e
+
+      - name: Run E2E (macOS / Windows)
+        if: runner.os != 'Linux'
+        run: npm run test:e2e
 
       - name: Build (Linux)
         if: runner.os == 'Linux'

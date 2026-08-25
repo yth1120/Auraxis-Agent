@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron';
+import { errorText } from '../errors';
 import { secureHandle } from './trust';
 import { resolveTrustedProjectRoot } from './project-access';
 import { describeCredential, setCredential, unsetCredential } from '../credentials';
@@ -7,8 +7,8 @@ function wrap<T>(fn: () => Promise<T>) {
   return async () => {
     try {
       return { ok: true, data: await fn() };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   };
 }

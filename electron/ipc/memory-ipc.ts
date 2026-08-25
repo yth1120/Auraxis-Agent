@@ -6,7 +6,7 @@
  * erase / reindex / graph 溯源通道。
  */
 
-import { ipcMain } from 'electron';
+import { errorText } from '../errors';
 import { secureHandle } from './trust';
 import { extractMemories, type ExtractedMemory } from './memory-extractor';
 import {
@@ -46,9 +46,12 @@ import { readSettings } from './settings-store';
 // ─── Helpers ───────────────────────────────────────────
 
 async function getApiConfig() {
-  const settings = await readSettings() as Record<string, unknown>;
+  const settings = (await readSettings()) as Record<string, unknown>;
   const modelId = (settings.defaultModel as string) || 'deepseek-v4-pro';
-  const apiKey = ((await resolveModelApiKey(modelId)) || process.env.DEEPSEEK_API_KEY || settings.deepseekApiKey || '') as string;
+  const apiKey = ((await resolveModelApiKey(modelId)) ||
+    process.env.DEEPSEEK_API_KEY ||
+    settings.deepseekApiKey ||
+    '') as string;
 
   return {
     model: modelId,
@@ -69,10 +72,7 @@ function similarityScore(a: string, b: string): number {
   return union.size === 0 ? 0 : intersection.size / union.size;
 }
 
-function findSimilarBelief(
-  mem: ExtractedMemory,
-  existing: BeliefRecord[],
-): BeliefRecord | null {
+function findSimilarBelief(mem: ExtractedMemory, existing: BeliefRecord[]): BeliefRecord | null {
   for (const old of existing) {
     const titleSim = similarityScore(mem.title, old.title);
     const contentSim = similarityScore(mem.content, old.text);
@@ -124,10 +124,7 @@ async function runExtraction(ctx: ExtractContext): Promise<{ ok: boolean; data?:
       return { ok: true, data: [] };
     }
 
-    const memories = await extractMemories(
-      { ...ctx, existingMemories: existing, evidence },
-      config,
-    );
+    const memories = await extractMemories({ ...ctx, existingMemories: existing, evidence }, config);
 
     const saved: MemoryRecord[] = [];
     for (const mem of memories) {
@@ -183,8 +180,8 @@ async function runExtraction(ctx: ExtractContext): Promise<{ ok: boolean; data?:
     }
 
     return { ok: true, data: saved };
-  } catch (error: any) {
-    return { ok: false, error: error.message };
+  } catch (error: unknown) {
+    return { ok: false, error: errorText(error) };
   }
 }
 
@@ -198,8 +195,8 @@ export function registerMemoryIpc() {
   secureHandle('memory:getByProject', async (_event, projectPath: string) => {
     try {
       return { ok: true, data: toLegacyList(getBeliefsByScope(projectPath, { activeOnly: true })) };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
@@ -209,16 +206,16 @@ export function registerMemoryIpc() {
         (b) => beliefKindToLegacyType(b.kind) === type,
       );
       return { ok: true, data: toLegacyList(beliefs) };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
   secureHandle('memory:search', async (_event, projectPath: string, query: string) => {
     try {
       return { ok: true, data: toLegacyList(searchBeliefs(projectPath, query)) };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
@@ -226,8 +223,8 @@ export function registerMemoryIpc() {
     try {
       archiveBelief(memoryId);
       return { ok: true };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
@@ -235,16 +232,16 @@ export function registerMemoryIpc() {
     try {
       deleteBelief(memoryId);
       return { ok: true };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
   secureHandle('memory:evidenceList', async (_event, projectPath: string) => {
     try {
       return { ok: true, data: listEvidence(projectPath) };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
@@ -252,8 +249,8 @@ export function registerMemoryIpc() {
     try {
       const evidence = getEvidenceById(id);
       return { ok: true, data: evidence ? { evidence, signals: listSignals(id) } : null };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
@@ -265,11 +262,13 @@ export function registerMemoryIpc() {
       const evidence = links
         .map((l) => {
           const ev = getEvidenceById(l.evidence_id);
-          return ev ? {
-            evidence: ev,
-            support_strength: l.support_strength,
-            signals: listSignals(ev.id),
-          } : null;
+          return ev
+            ? {
+                evidence: ev,
+                support_strength: l.support_strength,
+                signals: listSignals(ev.id),
+              }
+            : null;
         })
         .filter(Boolean);
       return {
@@ -280,24 +279,24 @@ export function registerMemoryIpc() {
           revisions: listBeliefRevisions(beliefId),
         },
       };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
   secureHandle('memory:readForQuery', async (_event, projectPath: string, query: string, opts?: any) => {
     try {
       return { ok: true, data: readForQuery(query, projectPath, opts) };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
   secureHandle('memory:readTrace', async (_event, runId: string) => {
     try {
       return { ok: true, data: getReadTrace(runId) };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
@@ -306,8 +305,8 @@ export function registerMemoryIpc() {
       const erased = eraseScope(scope);
       const audit = listEraseAudits(scope, 1)[0] ?? null;
       return { ok: true, data: { erased, auditId: audit?.id ?? null } };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
@@ -336,31 +335,34 @@ export function registerMemoryIpc() {
         }
       }
       return { ok: true, data: { signals, beliefsChecked: beliefs.length, rejected } };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
-  secureHandle('memory:graph', async (_event, projectPath: string, role?: AgentRole, agent?: { id?: string; name?: string }) => {
-    try {
-      const resolvedRole = role ?? (agent?.name ? roleForAgent(agent.name) : undefined);
-      const graph = buildScopeGraph(projectPath, {
-        agentId: agent?.id,
-        agentName: agent?.name,
-        role: resolvedRole,
-      });
-      const filtered = resolvedRole ? filterGraphByRole(graph, resolvedRole) : graph;
-      return { ok: true, data: { ...filtered, role: resolvedRole ?? null } };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
-    }
-  });
+  secureHandle(
+    'memory:graph',
+    async (_event, projectPath: string, role?: AgentRole, agent?: { id?: string; name?: string }) => {
+      try {
+        const resolvedRole = role ?? (agent?.name ? roleForAgent(agent.name) : undefined);
+        const graph = buildScopeGraph(projectPath, {
+          agentId: agent?.id,
+          agentName: agent?.name,
+          role: resolvedRole,
+        });
+        const filtered = resolvedRole ? filterGraphByRole(graph, resolvedRole) : graph;
+        return { ok: true, data: { ...filtered, role: resolvedRole ?? null } };
+      } catch (error: unknown) {
+        return { ok: false, error: errorText(error) };
+      }
+    },
+  );
 
   secureHandle('memory:rejections', async (_event, projectPath: string) => {
     try {
       return { ok: true, data: listBeliefRejections(projectPath) };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 }

@@ -1,7 +1,6 @@
+import { errorText } from '../../../electron/errors';
 import { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
-import {
-  Input, InputNumber, Modal, Select, Button, Space, message, Switch, Popconfirm, Segmented, Slider,
-} from 'antd';
+import { Input, InputNumber, Modal, Select, Button, Space, message, Switch, Popconfirm, Segmented, Slider } from 'antd';
 import {
   MinusCircle as MinusCircleOutlined,
   Clock as ClockCircleOutlined,
@@ -29,6 +28,7 @@ import {
 } from '@/components/common/icons';
 import clsx from 'clsx';
 import { useSettingsStore } from '../../stores/useSettingsStore';
+import { getDeepSeekModelsUrl } from '../../../electron/api-config';
 import logoPng from '../../assets/auraxis-logo.png';
 import { useAdvancedStore } from '../../stores/useAdvancedStore';
 import { useAppStore } from '../../stores/useAppStore';
@@ -143,9 +143,7 @@ const NAV_GROUPS: { labelKey: I18nKey; items: { key: string; labelKey: I18nKey; 
   },
   {
     labelKey: 'settings.nav.about',
-    items: [
-      { key: 'about', labelKey: 'settings.item.about', icon: <Info size={16} /> },
-    ],
+    items: [{ key: 'about', labelKey: 'settings.item.about', icon: <Info size={16} /> }],
   },
 ];
 
@@ -165,12 +163,42 @@ export default function SettingsModal({ open, onClose, initialKey }: SettingsMod
   const runtimeFields = useMemo(() => buildAgentRuntimeFields(models, t), [models, t]);
   const [credSource, setCredSource] = useState<string | null>(null);
   const [projectActions, setProjectActions] = useState<{ name: string; command: string; platform?: string }[]>([]);
-  const [sshConnections, setSshConnections] = useState<{ id: string; name: string; host: string; port: number; username: string; keyPath?: string; useAgent?: boolean; createdAt: number }[]>([]);
-  const [sshForm, setSshForm] = useState({ name: '', host: '', port: '22', username: 'root', keyPath: '', useAgent: false });
+  const [sshConnections, setSshConnections] = useState<
+    {
+      id: string;
+      name: string;
+      host: string;
+      port: number;
+      username: string;
+      keyPath?: string;
+      useAgent?: boolean;
+      createdAt: number;
+    }[]
+  >([]);
+  const [sshForm, setSshForm] = useState({
+    name: '',
+    host: '',
+    port: '22',
+    username: 'root',
+    keyPath: '',
+    useAgent: false,
+  });
   const [sshTesting, setSshTesting] = useState(false);
-  const [rulesList, setRulesList] = useState<{ pattern: string[]; decision: string; justification?: string; source: string }[]>([]);
-  const [workflows, setWorkflows] = useState<{ id: string; name: string; description?: string; source?: 'json' | 'markdown'; steps: { id: string; name: string }[] }[]>([]);
-  const [workflowRuns, setWorkflowRuns] = useState<{ runId: string; workflowName: string; status: string; startedAt: number; endedAt?: number }[]>([]);
+  const [rulesList, setRulesList] = useState<
+    { pattern: string[]; decision: string; justification?: string; source: string }[]
+  >([]);
+  const [workflows, setWorkflows] = useState<
+    {
+      id: string;
+      name: string;
+      description?: string;
+      source?: 'json' | 'markdown';
+      steps: { id: string; name: string }[];
+    }[]
+  >([]);
+  const [workflowRuns, setWorkflowRuns] = useState<
+    { runId: string; workflowName: string; status: string; startedAt: number; endedAt?: number }[]
+  >([]);
 
   // 弹窗已打开时再次点击 账户/设置 等入口，也要能切换面板。
   useEffect(() => {
@@ -184,15 +212,11 @@ export default function SettingsModal({ open, onClose, initialKey }: SettingsMod
   const q = settingsQuery.trim().toLowerCase();
   const visibleGroups = useMemo(() => {
     if (!q) return NAV_GROUPS;
-    return NAV_GROUPS
-      .map((g) => {
-        const groupHit = t(g.labelKey).toLowerCase().includes(q);
-        const items = groupHit
-          ? g.items
-          : g.items.filter((i) => t(i.labelKey).toLowerCase().includes(q));
-        return items.length > 0 ? { ...g, items } : null;
-      })
-      .filter((g): g is NonNullable<typeof g> => g !== null);
+    return NAV_GROUPS.map((g) => {
+      const groupHit = t(g.labelKey).toLowerCase().includes(q);
+      const items = groupHit ? g.items : g.items.filter((i) => t(i.labelKey).toLowerCase().includes(q));
+      return items.length > 0 ? { ...g, items } : null;
+    }).filter((g): g is NonNullable<typeof g> => g !== null);
   }, [q, t]);
 
   useEffect(() => {
@@ -205,24 +229,47 @@ export default function SettingsModal({ open, onClose, initialKey }: SettingsMod
 
   useEffect(() => {
     if (!open) return;
-    window.electronAPI?.credentials?.describe('DEEPSEEK_API_KEY')
+    window.electronAPI?.credentials
+      ?.describe('DEEPSEEK_API_KEY')
       .then((r) => setCredSource(r.ok && r.data?.configured ? (r.data.source ?? null) : null))
       .catch(() => setCredSource(null));
   }, [open]);
 
   const {
-    deepseekApiKey, defaultModel, fallbackModel, projectPath,
-    setApiKey, setDefaultModel, setFallbackModel, clearApiKeys,
-    notificationMode, setNotificationMode,
-    permissionNotifications, setPermissionNotifications,
-    alwaysShowMessageActions, setAlwaysShowMessageActions,
-    inputPricePerM, outputPricePerM,
-    setInputPricePerM, setOutputPricePerM,
-    webSearchProvider, exaApiKey, perplexityApiKey,
-    setWebSearchProvider, setExaApiKey, setPerplexityApiKey,
-    maxOutputTokens, setMaxOutputTokens,
-    sidebarGlass, setSidebarGlass, sidebarGlassSupported, sidebarGlassReady,
-    aquaGlass, setAquaGlass, wallpaper, setWallpaper,
+    deepseekApiKey,
+    defaultModel,
+    fallbackModel,
+    projectPath,
+    setApiKey,
+    setDefaultModel,
+    setFallbackModel,
+    clearApiKeys,
+    notificationMode,
+    setNotificationMode,
+    permissionNotifications,
+    setPermissionNotifications,
+    alwaysShowMessageActions,
+    setAlwaysShowMessageActions,
+    inputPricePerM,
+    outputPricePerM,
+    setInputPricePerM,
+    setOutputPricePerM,
+    webSearchProvider,
+    exaApiKey,
+    perplexityApiKey,
+    setWebSearchProvider,
+    setExaApiKey,
+    setPerplexityApiKey,
+    maxOutputTokens,
+    setMaxOutputTokens,
+    sidebarGlass,
+    setSidebarGlass,
+    sidebarGlassSupported,
+    sidebarGlassReady,
+    aquaGlass,
+    setAquaGlass,
+    wallpaper,
+    setWallpaper,
   } = useSettingsStore();
   const wallpaperInputRef = useRef<HTMLInputElement>(null);
   const [wallpaperBusy, setWallpaperBusy] = useState(false);
@@ -247,21 +294,24 @@ export default function SettingsModal({ open, onClose, initialKey }: SettingsMod
       setProjectActions([]);
       return;
     }
-    window.electronAPI?.actions?.list(projectPath)
+    window.electronAPI?.actions
+      ?.list(projectPath)
       .then((r) => setProjectActions(r.ok && r.data ? r.data : []))
       .catch(() => setProjectActions([]));
   }, [activeKey, projectPath]);
 
   useEffect(() => {
     if (activeKey !== 'connections') return;
-    window.electronAPI?.ssh?.list()
+    window.electronAPI?.ssh
+      ?.list()
       .then((r) => setSshConnections(r.ok && r.data ? r.data : []))
       .catch(() => setSshConnections([]));
   }, [activeKey]);
 
   useEffect(() => {
     if (activeKey !== 'rules') return;
-    window.electronAPI?.rules?.list(projectPath ?? undefined)
+    window.electronAPI?.rules
+      ?.list(projectPath ?? undefined)
       .then((r) => setRulesList(r.ok && r.data ? r.data : []))
       .catch(() => setRulesList([]));
   }, [activeKey, projectPath]);
@@ -295,8 +345,12 @@ export default function SettingsModal({ open, onClose, initialKey }: SettingsMod
     if (activeKey !== 'permissions') return;
     window.electronAPI?.permission
       ?.getRules()
-      .then((r) => { if (r?.ok && r.data) setPermissionRules(r.data); })
-      .catch(() => { /* keep local list */ });
+      .then((r) => {
+        if (r?.ok && r.data) setPermissionRules(r.data);
+      })
+      .catch(() => {
+        /* keep local list */
+      });
   }, [activeKey, setPermissionRules]);
   const keybindOverrides = useKeybindingsStore((s) => s.overrides);
   const setKeybindOverride = useKeybindingsStore((s) => s.setOverride);
@@ -312,23 +366,33 @@ export default function SettingsModal({ open, onClose, initialKey }: SettingsMod
   const [, setTestResults] = useState<Record<string, { ok: boolean; message: string; models?: string[] } | null>>({});
 
   const handleTestConnection = async () => {
-    if (!deepseekApiKey) { message.warning(t('settings.needApiKey')); return; }
+    if (!deepseekApiKey) {
+      message.warning(t('settings.needApiKey'));
+      return;
+    }
     setTestingProvider('deepseek');
     setTestResults((prev) => ({ ...prev, deepseek: null }));
     try {
       if (window.electronAPI?.ai) {
         const result = await window.electronAPI.ai.testConnection(deepseekApiKey);
-        setTestResults((prev) => ({ ...prev, deepseek: { ok: result.ok, message: result.data?.message || result.error || '', models: result.data?.models } }));
+        setTestResults((prev) => ({
+          ...prev,
+          deepseek: { ok: result.ok, message: result.data?.message || result.error || '', models: result.data?.models },
+        }));
         if (result.ok) message.success(result.data?.message || t('settings.connectSuccess'));
         else message.error(result.error || t('settings.connectFailed'));
       } else {
-        const resp = await fetch('https://api.deepseek.com/v1/models', {
+        const resp = await fetch(getDeepSeekModelsUrl(), {
           headers: { Authorization: `Bearer ${deepseekApiKey}` },
         });
         let r: { ok: boolean; message: string; models?: string[] };
         if (resp.ok) {
           const data = await resp.json();
-          r = { ok: true, message: t('settings.deepseekConnected'), models: (data.data || []).map((m: any) => m.id).slice(0, 10) };
+          r = {
+            ok: true,
+            message: t('settings.deepseekConnected'),
+            models: (data.data || []).map((m: any) => m.id).slice(0, 10),
+          };
         } else if (resp.status === 401 || resp.status === 403) {
           r = { ok: false, message: t('settings.apiKeyInvalid') };
         } else {
@@ -338,9 +402,12 @@ export default function SettingsModal({ open, onClose, initialKey }: SettingsMod
         if (r.ok) message.success(r.message);
         else message.error(r.message);
       }
-    } catch (err: any) {
-      const errMsg = err.message || t('settings.unknownError');
-      setTestResults((prev) => ({ ...prev, deepseek: { ok: false, message: t('settings.connectFailWith', { msg: errMsg }) } }));
+    } catch (err: unknown) {
+      const errMsg = errorText(err) || t('settings.unknownError');
+      setTestResults((prev) => ({
+        ...prev,
+        deepseek: { ok: false, message: t('settings.connectFailWith', { msg: errMsg }) },
+      }));
       message.error(t('settings.connectFailWith', { msg: errMsg }));
     } finally {
       setTestingProvider(null);
@@ -368,22 +435,32 @@ export default function SettingsModal({ open, onClose, initialKey }: SettingsMod
         // matching logic (Ctrl-or-Cmd on macOS only) can find it again;
         // a Windows Win-key press must NOT be stored as Ctrl.
         ctrl: isCtrlOrCmd(e) || undefined,
-        shift: e.shiftKey || undefined, alt: e.altKey || undefined,
+        shift: e.shiftKey || undefined,
+        alt: e.altKey || undefined,
         description: KEY_BINDINGS[recordingIndex].description,
         category: KEY_BINDINGS[recordingIndex].category,
       };
-      const conflictIdx = activeKeybinds.findIndex((b, i) =>
-        i !== recordingIndex && b.key === newBinding.key &&
-        (b.ctrl ?? false) === (newBinding.ctrl ?? false) &&
-        (b.shift ?? false) === (newBinding.shift ?? false) &&
-        (b.alt ?? false) === (newBinding.alt ?? false),
+      const conflictIdx = activeKeybinds.findIndex(
+        (b, i) =>
+          i !== recordingIndex &&
+          b.key === newBinding.key &&
+          (b.ctrl ?? false) === (newBinding.ctrl ?? false) &&
+          (b.shift ?? false) === (newBinding.shift ?? false) &&
+          (b.alt ?? false) === (newBinding.alt ?? false),
       );
       if (conflictIdx >= 0) {
         Modal.confirm({
           title: t('settings.shortcutConflict'),
-          content: t('settings.shortcutConflictBody', { new: formatBinding(newBinding), desc: KEY_BINDINGS[conflictIdx].description }),
-          okText: t('settings.overwrite'), cancelText: t('common.cancel'),
-          onOk: () => { setKeybindOverride(recordingIndex, newBinding); setRecordingIndex(null); },
+          content: t('settings.shortcutConflictBody', {
+            new: formatBinding(newBinding),
+            desc: KEY_BINDINGS[conflictIdx].description,
+          }),
+          okText: t('settings.overwrite'),
+          cancelText: t('common.cancel'),
+          onOk: () => {
+            setKeybindOverride(recordingIndex, newBinding);
+            setRecordingIndex(null);
+          },
           onCancel: () => setRecordingIndex(null),
         });
       } else {
@@ -393,7 +470,7 @@ export default function SettingsModal({ open, onClose, initialKey }: SettingsMod
     };
     window.addEventListener('keydown', handler, true);
     return () => window.removeEventListener('keydown', handler, true);
-  }, [recordingIndex, activeKeybinds, setKeybindOverride]);
+  }, [recordingIndex, activeKeybinds, setKeybindOverride, t]);
 
   /* ── Panes ──────────────────────────────────────────── */
 
@@ -452,7 +529,10 @@ export default function SettingsModal({ open, onClose, initialKey }: SettingsMod
           <div className="flex w-full gap-1 p-1 border border-border-default rounded-lg overflow-hidden">
             <Input.Password
               value={deepseekApiKey}
-              onChange={(e) => { setApiKey(e.target.value); window.electronAPI?.ai.setApiKey(e.target.value); }}
+              onChange={(e) => {
+                setApiKey(e.target.value);
+                window.electronAPI?.ai.setApiKey(e.target.value);
+              }}
               placeholder="sk-..."
               className="flex-1 !border-none !shadow-none !rounded-none !bg-transparent"
               autoComplete="off"
@@ -467,10 +547,15 @@ export default function SettingsModal({ open, onClose, initialKey }: SettingsMod
             </Button>
             <Button
               onClick={async () => {
-                if (!deepseekApiKey) { message.warning(t('settings.needApiKey')); return; }
+                if (!deepseekApiKey) {
+                  message.warning(t('settings.needApiKey'));
+                  return;
+                }
                 const r = await window.electronAPI?.credentials.set('DEEPSEEK_API_KEY', deepseekApiKey);
-                if (r?.ok) { message.success(t('settings.savedToEnv')); setCredSource('user-env'); }
-                else message.error(r?.error || t('settings.saveFailed'));
+                if (r?.ok) {
+                  message.success(t('settings.savedToEnv'));
+                  setCredSource('user-env');
+                } else message.error(r?.error || t('settings.saveFailed'));
               }}
               disabled={!deepseekApiKey}
               className="!border-none !shadow-none !rounded-md"
@@ -480,14 +565,24 @@ export default function SettingsModal({ open, onClose, initialKey }: SettingsMod
           </div>
           {credSource && (
             <div className="mt-1 text-2xs text-text-muted">
-              {t('settings.source', { source: credSource === 'env' ? t('settings.sourceEnv') : credSource === 'user-env' ? t('settings.sourceUserEnv') : t('settings.sourceProjectEnv') })}
+              {t('settings.source', {
+                source:
+                  credSource === 'env'
+                    ? t('settings.sourceEnv')
+                    : credSource === 'user-env'
+                      ? t('settings.sourceUserEnv')
+                      : t('settings.sourceProjectEnv'),
+              })}
             </div>
           )}
         </SettingItem>
         <SettingItem title={t('settings.defaultModel')} description={t('settings.defaultModel.desc')} noBorder>
           <Select
             value={defaultModel}
-            onChange={(val) => { setDefaultModel(val); window.electronAPI?.settings.set('defaultModel', val); }}
+            onChange={(val) => {
+              setDefaultModel(val);
+              window.electronAPI?.settings.set('defaultModel', val);
+            }}
             style={{ width: '100%' }}
             getPopupContainer={(t) => t.parentElement || document.body}
             options={models.map((m) => ({ value: m.id, label: m.name }))}
@@ -568,7 +663,11 @@ export default function SettingsModal({ open, onClose, initialKey }: SettingsMod
             ]}
           />
         </SettingItem>
-        <SettingItem title={t('settings.notify.permission')} description={t('settings.notify.permission.desc')} noBorder>
+        <SettingItem
+          title={t('settings.notify.permission')}
+          description={t('settings.notify.permission.desc')}
+          noBorder
+        >
           <Switch checked={permissionNotifications} onChange={setPermissionNotifications} />
         </SettingItem>
       </section>
@@ -576,7 +675,15 @@ export default function SettingsModal({ open, onClose, initialKey }: SettingsMod
       <SectionTitle>{t('settings.section.danger')}</SectionTitle>
       <section className="mb-2">
         <SettingItem title={t('settings.clearKeys')} description={t('settings.clearKeys.desc')} noBorder>
-          <Button danger size="small" onClick={() => { clearApiKeys(); window.electronAPI?.ai.setApiKey(''); message.success(t('settings.cleared')); }}>
+          <Button
+            danger
+            size="small"
+            onClick={() => {
+              clearApiKeys();
+              window.electronAPI?.ai.setApiKey('');
+              message.success(t('settings.cleared'));
+            }}
+          >
             {t('settings.clear')}
           </Button>
         </SettingItem>
@@ -603,26 +710,22 @@ export default function SettingsModal({ open, onClose, initialKey }: SettingsMod
       </section>
       <SectionTitle>{t('settings.section.theme')}</SectionTitle>
       <section className="mb-2">
-      <SettingItem title={t('settings.theme.mode')} description={t('settings.theme.mode.desc')} noBorder>
-        <Segmented
-          value={themeMode}
-          onChange={(val) => setTheme(val as 'system' | 'light' | 'dark')}
-          block
-          options={[
-            { value: 'system', label: t('settings.theme.mode.system') },
-            { value: 'light', label: t('settings.theme.mode.light') },
-            { value: 'dark', label: t('settings.theme.mode.dark') },
-          ]}
-        />
-      </SettingItem>
+        <SettingItem title={t('settings.theme.mode')} description={t('settings.theme.mode.desc')} noBorder>
+          <Segmented
+            value={themeMode}
+            onChange={(val) => setTheme(val as 'system' | 'light' | 'dark')}
+            block
+            options={[
+              { value: 'system', label: t('settings.theme.mode.system') },
+              { value: 'light', label: t('settings.theme.mode.light') },
+              { value: 'dark', label: t('settings.theme.mode.dark') },
+            ]}
+          />
+        </SettingItem>
       </section>
       <SectionTitle>{t('settings.section.aqua')}</SectionTitle>
       <section className="mb-2">
-        <SettingItem
-          title={t('settings.aquaGlass')}
-          description={t('settings.aquaGlass.desc')}
-          noBorder
-        >
+        <SettingItem title={t('settings.aquaGlass')} description={t('settings.aquaGlass.desc')} noBorder>
           <div className="flex items-center gap-3 w-full">
             <Slider
               className="flex-1 min-w-0"
@@ -640,11 +743,7 @@ export default function SettingsModal({ open, onClose, initialKey }: SettingsMod
             <span className="w-12 shrink-0 text-right text-xs tabular-nums text-text-muted">{aquaGlass}%</span>
           </div>
         </SettingItem>
-        <SettingItem
-          title={t('settings.aquaWallpaper')}
-          description={t('settings.aquaWallpaper.desc')}
-          noBorder
-        >
+        <SettingItem title={t('settings.aquaWallpaper')} description={t('settings.aquaWallpaper.desc')} noBorder>
           <div className="flex items-center gap-3 w-full">
             {wallpaper ? (
               <img
@@ -677,11 +776,7 @@ export default function SettingsModal({ open, onClose, initialKey }: SettingsMod
       </section>
       <SectionTitle>{t('settings.section.sidebar')}</SectionTitle>
       <section className="mb-2">
-        <SettingItem
-          title={t('settings.sidebarGlass')}
-          description={t('settings.sidebarGlass.desc')}
-          noBorder
-        >
+        <SettingItem title={t('settings.sidebarGlass')} description={t('settings.sidebarGlass.desc')} noBorder>
           <div className="flex items-center gap-3 w-full">
             <Slider
               className="flex-1 min-w-0"
@@ -700,14 +795,10 @@ export default function SettingsModal({ open, onClose, initialKey }: SettingsMod
             <span className="w-12 shrink-0 text-right text-xs tabular-nums text-text-muted">{sidebarGlass}%</span>
           </div>
           {!sidebarGlassSupported && (
-            <div className="mt-1.5 text-2xs text-text-faint">
-              {t('settings.sidebarGlass.unsupported')}
-            </div>
+            <div className="mt-1.5 text-2xs text-text-faint">{t('settings.sidebarGlass.unsupported')}</div>
           )}
           {sidebarGlassSupported && !sidebarGlassReady && (
-            <div className="mt-1.5 text-2xs text-warning">
-              {t('settings.sidebarGlass.restart')}
-            </div>
+            <div className="mt-1.5 text-2xs text-warning">{t('settings.sidebarGlass.restart')}</div>
           )}
         </SettingItem>
       </section>
@@ -718,10 +809,7 @@ export default function SettingsModal({ open, onClose, initialKey }: SettingsMod
           description={t('settings.showMessageActions.desc')}
           noBorder
         >
-          <Switch
-            checked={alwaysShowMessageActions}
-            onChange={setAlwaysShowMessageActions}
-          />
+          <Switch checked={alwaysShowMessageActions} onChange={setAlwaysShowMessageActions} />
         </SettingItem>
       </section>
     </>
@@ -732,14 +820,20 @@ export default function SettingsModal({ open, onClose, initialKey }: SettingsMod
       <PaneHeader title={t('settings.item.keybindings')} description={t('settings.pane.keybindings.desc')} />
       <div className="flex items-center justify-between mb-1">
         <span className="text-sm font-semibold text-text-primary">{t('settings.bindings')}</span>
-        <Button size="small" onClick={() => {
-          Modal.confirm({
-            title: t('settings.restoreDefaultConfirmTitle'),
-            content: t('settings.restoreDefaultConfirmBody'),
-            okText: t('settings.confirm'), cancelText: t('common.cancel'),
-            onOk: () => clearKeybindOverrides(),
-          });
-        }}>{t('settings.restoreDefault')}</Button>
+        <Button
+          size="small"
+          onClick={() => {
+            Modal.confirm({
+              title: t('settings.restoreDefaultConfirmTitle'),
+              content: t('settings.restoreDefaultConfirmBody'),
+              okText: t('settings.confirm'),
+              cancelText: t('common.cancel'),
+              onOk: () => clearKeybindOverrides(),
+            });
+          }}
+        >
+          {t('settings.restoreDefault')}
+        </Button>
       </div>
       <div>
         {KEY_BINDINGS.map((def, i) => {
@@ -750,10 +844,12 @@ export default function SettingsModal({ open, onClose, initialKey }: SettingsMod
             <div key={i} className="flex items-center justify-between py-3">
               <span className="text-sm text-text-primary">{t(keybindingDescKey(def.description))}</span>
               <Space size={8}>
-                <span className={clsx(
-                  "font-mono text-xs text-text-secondary bg-border-dim px-2 py-[2px] rounded-md",
-                  isOverridden && "text-text-primary bg-primary-soft"
-                )}>
+                <span
+                  className={clsx(
+                    'font-mono text-xs text-text-secondary bg-border-dim px-2 py-[2px] rounded-md',
+                    isOverridden && 'text-text-primary bg-primary-soft',
+                  )}
+                >
                   {formatBinding(active)}
                 </span>
                 <Button
@@ -778,42 +874,82 @@ export default function SettingsModal({ open, onClose, initialKey }: SettingsMod
       <SectionTitle>{t('settings.section.rules')}</SectionTitle>
       <div className="flex items-center justify-between mb-1">
         {permissionRules.length > 0 && (
-          <Button danger size="small" onClick={() => {
-            Modal.confirm({
-              title: t('settings.clearRulesTitle'),
-              content: t('settings.clearRulesBody', { n: permissionRules.length }),
-              okText: t('settings.confirmClear'), cancelText: t('common.cancel'),
-              okButtonProps: { danger: true },
-              onOk: () => { clearPermissionRules(); message.success(t('settings.rulesCleared')); },
-            });
-          }}>{t('settings.clearAll', { n: permissionRules.length })}</Button>
+          <Button
+            danger
+            size="small"
+            onClick={() => {
+              Modal.confirm({
+                title: t('settings.clearRulesTitle'),
+                content: t('settings.clearRulesBody', { n: permissionRules.length }),
+                okText: t('settings.confirmClear'),
+                cancelText: t('common.cancel'),
+                okButtonProps: { danger: true },
+                onOk: () => {
+                  clearPermissionRules();
+                  message.success(t('settings.rulesCleared'));
+                },
+              });
+            }}
+          >
+            {t('settings.clearAll', { n: permissionRules.length })}
+          </Button>
         )}
       </div>
       {permissionRules.length === 0 ? (
         <InlineEmpty description={t('settings.noRules')} compact />
       ) : (
         <div>
-          {permissionRules.slice().reverse().map((rule) => (
-            <div key={rule.id} className="flex items-start gap-3 py-3">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <span className="inline-flex items-center px-2 py-[1px] rounded-full text-2xs font-medium leading-[1.6] whitespace-nowrap bg-border-dim text-text-secondary">{rule.toolName}</span>
-                  <span className={clsx(
-                    "inline-flex items-center px-2 py-[1px] rounded-full text-2xs font-medium leading-[1.6] whitespace-nowrap",
-                    rule.scope === 'always' ? "bg-success-soft text-text-secondary" : "bg-border-dim text-text-secondary"
-                  )}>
-                    {rule.scope === 'always' ? t('settings.ruleAlways') : rule.scope === 'session' ? t('settings.ruleSession') : t('settings.ruleOnce')}
-                  </span>
-                  {rule.action === 'deny' && <span className="inline-flex items-center px-2 py-[1px] rounded-full text-2xs font-medium leading-[1.6] whitespace-nowrap bg-danger-soft text-text-secondary">{t('settings.ruleDeny')}</span>}
+          {permissionRules
+            .slice()
+            .reverse()
+            .map((rule) => (
+              <div key={rule.id} className="flex items-start gap-3 py-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <span className="inline-flex items-center px-2 py-[1px] rounded-full text-2xs font-medium leading-[1.6] whitespace-nowrap bg-border-dim text-text-secondary">
+                      {rule.toolName}
+                    </span>
+                    <span
+                      className={clsx(
+                        'inline-flex items-center px-2 py-[1px] rounded-full text-2xs font-medium leading-[1.6] whitespace-nowrap',
+                        rule.scope === 'always'
+                          ? 'bg-success-soft text-text-secondary'
+                          : 'bg-border-dim text-text-secondary',
+                      )}
+                    >
+                      {rule.scope === 'always'
+                        ? t('settings.ruleAlways')
+                        : rule.scope === 'session'
+                          ? t('settings.ruleSession')
+                          : t('settings.ruleOnce')}
+                    </span>
+                    {rule.action === 'deny' && (
+                      <span className="inline-flex items-center px-2 py-[1px] rounded-full text-2xs font-medium leading-[1.6] whitespace-nowrap bg-danger-soft text-text-secondary">
+                        {t('settings.ruleDeny')}
+                      </span>
+                    )}
+                  </div>
+                  {rule.matchPattern && (
+                    <div className="text-xs text-text-muted mt-1 font-mono">
+                      {t('settings.ruleMatch', { pattern: rule.matchPattern })}
+                    </div>
+                  )}
+                  <div className="text-2xs text-text-faint mt-1">
+                    <ClockCircleOutlined style={{ marginRight: 4 }} />
+                    {new Date(rule.createdAt).toLocaleString()}
+                  </div>
                 </div>
-                {rule.matchPattern && <div className="text-xs text-text-muted mt-1 font-mono">{t('settings.ruleMatch', { pattern: rule.matchPattern })}</div>}
-                <div className="text-2xs text-text-faint mt-1"><ClockCircleOutlined style={{ marginRight: 4 }} />{new Date(rule.createdAt).toLocaleString()}</div>
+                <Popconfirm
+                  title={t('settings.deleteRuleConfirm')}
+                  onConfirm={() => removePermissionRule(rule.id)}
+                  okText={t('sidebar.delete')}
+                  cancelText={t('common.cancel')}
+                  okButtonProps={{ danger: true, type: 'primary' }}
+                >
+                  <Button type="text" size="small" danger icon={<MinusCircleOutlined />} />
+                </Popconfirm>
               </div>
-              <Popconfirm title={t('settings.deleteRuleConfirm')} onConfirm={() => removePermissionRule(rule.id)} okText={t('sidebar.delete')} cancelText={t('common.cancel')} okButtonProps={{ danger: true, type: 'primary' }}>
-                <Button type="text" size="small" danger icon={<MinusCircleOutlined />} />
-              </Popconfirm>
-            </div>
-          ))}
+            ))}
         </div>
       )}
     </>
@@ -823,19 +959,28 @@ export default function SettingsModal({ open, onClose, initialKey }: SettingsMod
     <>
       <PaneHeader title={t('settings.item.plugins')} description={t('settings.pane.plugins.desc')} />
       <div className="flex items-center justify-between mb-1">
-        <span className="text-sm font-semibold text-text-primary">{t('settings.installedN', { n: installedPlugins.length })}</span>
-        <Button size="small" icon={<PlusCircleOutlined />} onClick={() => {
-          const input = document.createElement('input');
-          input.type = 'file'; input.accept = '.js,.ts';
-          input.onchange = async (e) => {
-            const file = (e.target as HTMLInputElement).files?.[0];
-            if (!file) return;
-            const ok = await pluginManager.installFromPath((file as any).path || file.name);
-            if (ok) message.success(t('settings.pluginInstalled', { name: file.name }));
-            else message.warning(t('settings.pluginInstallFailed'));
-          };
-          input.click();
-        }}>{t('settings.installPlugin')}</Button>
+        <span className="text-sm font-semibold text-text-primary">
+          {t('settings.installedN', { n: installedPlugins.length })}
+        </span>
+        <Button
+          size="small"
+          icon={<PlusCircleOutlined />}
+          onClick={() => {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.js,.ts';
+            input.onchange = async (e) => {
+              const file = (e.target as HTMLInputElement).files?.[0];
+              if (!file) return;
+              const ok = await pluginManager.installFromPath((file as any).path || file.name);
+              if (ok) message.success(t('settings.pluginInstalled', { name: file.name }));
+              else message.warning(t('settings.pluginInstallFailed'));
+            };
+            input.click();
+          }}
+        >
+          {t('settings.installPlugin')}
+        </Button>
       </div>
       {installedPlugins.length === 0 ? (
         <InlineEmpty description={t('settings.noPlugins')} compact />
@@ -849,35 +994,56 @@ export default function SettingsModal({ open, onClose, initialKey }: SettingsMod
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 mb-1">
                     <span className="text-sm font-medium text-text-primary">{p.name}</span>
-                    <span className="inline-flex items-center px-2 py-[1px] rounded-full text-2xs font-medium leading-[1.6] whitespace-nowrap bg-border-dim text-text-secondary">v{p.version}</span>
-                    <span className={clsx(
-                      "inline-flex items-center px-2 py-[1px] rounded-full text-2xs font-medium leading-[1.6] whitespace-nowrap",
-                      p.enabled ? "bg-success-soft text-text-secondary" : "bg-danger-soft text-text-secondary"
-                    )}>{p.enabled ? t('settings.enabled') : t('settings.disabled')}</span>
+                    <span className="inline-flex items-center px-2 py-[1px] rounded-full text-2xs font-medium leading-[1.6] whitespace-nowrap bg-border-dim text-text-secondary">
+                      v{p.version}
+                    </span>
+                    <span
+                      className={clsx(
+                        'inline-flex items-center px-2 py-[1px] rounded-full text-2xs font-medium leading-[1.6] whitespace-nowrap',
+                        p.enabled ? 'bg-success-soft text-text-secondary' : 'bg-danger-soft text-text-secondary',
+                      )}
+                    >
+                      {p.enabled ? t('settings.enabled') : t('settings.disabled')}
+                    </span>
                   </div>
                   <div className="text-xs text-text-muted mt-1">{p.description}</div>
                   {summary && <div className="text-xs text-text-faint mt-1">{summary}</div>}
                 </div>
                 <Space size={4}>
-                  <Button size="small" onClick={() => {
-                    if (!p.enabled) {
+                  <Button
+                    size="small"
+                    onClick={() => {
+                      if (!p.enabled) {
+                        Modal.confirm({
+                          title: t('settings.enablePluginTitle', { name: p.name }),
+                          content: t('settings.enablePluginBody'),
+                          okText: t('settings.confirmEnable'),
+                          cancelText: t('common.cancel'),
+                          onOk: () => enablePlugin(p.id),
+                        });
+                      } else {
+                        disablePlugin(p.id);
+                      }
+                    }}
+                  >
+                    {p.enabled ? t('settings.disable') : t('settings.enable')}
+                  </Button>
+                  <Button
+                    size="small"
+                    danger
+                    onClick={() => {
                       Modal.confirm({
-                        title: t('settings.enablePluginTitle', { name: p.name }),
-                        content: t('settings.enablePluginBody'),
-                        okText: t('settings.confirmEnable'), cancelText: t('common.cancel'),
-                        onOk: () => enablePlugin(p.id),
+                        title: t('settings.uninstallPlugin'),
+                        content: t('settings.uninstallBody', { name: p.name }),
+                        okText: t('settings.uninstall'),
+                        cancelText: t('common.cancel'),
+                        okButtonProps: { danger: true },
+                        onOk: () => pluginManager.uninstall(p.id),
                       });
-                    } else { disablePlugin(p.id); }
-                  }}>{p.enabled ? t('settings.disable') : t('settings.enable')}</Button>
-                  <Button size="small" danger onClick={() => {
-                    Modal.confirm({
-                      title: t('settings.uninstallPlugin'),
-                      content: t('settings.uninstallBody', { name: p.name }),
-                      okText: t('settings.uninstall'), cancelText: t('common.cancel'),
-                      okButtonProps: { danger: true },
-                      onOk: () => pluginManager.uninstall(p.id),
-                    });
-                  }}>{t('settings.uninstall')}</Button>
+                    }}
+                  >
+                    {t('settings.uninstall')}
+                  </Button>
                 </Space>
               </div>
             );
@@ -890,14 +1056,19 @@ export default function SettingsModal({ open, onClose, initialKey }: SettingsMod
   const renderAbout = () => (
     <div className="text-center py-8">
       <img src={logoPng} alt="Auraxis" className="w-16 h-16 object-contain mx-auto mb-3" />
-      <h2 className="auraxis-wordmark" style={{ fontSize: 30, margin: '0 0 6px' }}>Auraxis</h2>
+      <h2 className="auraxis-wordmark" style={{ fontSize: 30, margin: '0 0 6px' }}>
+        Auraxis
+      </h2>
       <p className="text-text-muted text-sm font-mono my-1 mb-6">Version {appVersion}</p>
-      <p className="text-text-secondary text-sm leading-[1.8] mx-auto mb-6 max-w-[400px]">
-        {t('settings.aboutBody')}
-      </p>
+      <p className="text-text-secondary text-sm leading-[1.8] mx-auto mb-6 max-w-[400px]">{t('settings.aboutBody')}</p>
       <div className="flex justify-center flex-wrap gap-2">
         {['Electron', 'React 18', 'TypeScript', 'Ant Design 5', 'Zustand', 'DeepSeek SDK'].map((t) => (
-          <span key={t} className="inline-flex items-center h-6 px-2.5 rounded-full text-2xs font-medium whitespace-nowrap bg-[var(--color-bg-secondary)] border border-[var(--color-border-dim)] text-text-secondary">{t}</span>
+          <span
+            key={t}
+            className="inline-flex items-center h-6 px-2.5 rounded-full text-2xs font-medium whitespace-nowrap bg-[var(--color-bg-secondary)] border border-[var(--color-border-dim)] text-text-secondary"
+          >
+            {t}
+          </span>
         ))}
       </div>
     </div>
@@ -905,220 +1076,346 @@ export default function SettingsModal({ open, onClose, initialKey }: SettingsMod
 
   const renderPane = () => {
     switch (activeKey) {
-      case 'general': return renderGeneral();
-      case 'cost': return renderCost();
-      case 'account': return <AccountPane />;
-      case 'appearance': return renderAppearance();
-      case 'stats': return <Suspense fallback={paneFallback}><StatsHeatmap /></Suspense>;
-      case 'keybindings': return renderKeybindings();
-      case 'permissions': return renderPermissions();
-      case 'mcp': return (
-        <Suspense fallback={paneFallback}>
-          <MCPSettings servers={mcpServers} statuses={mcpStatuses} onUpdateServers={setMcpServers} />
-        </Suspense>
-      );
-      case 'plugins': return renderPlugins();
-      case 'agents': return <Suspense fallback={paneFallback}><AgentDashboard /></Suspense>;
-      case 'agent-runtime': return (
-        <SchemaPanel
-        title={t('settings.item.agentRuntime')}
-          description={t('settings.pane.agentRuntime.desc')}
-          fields={runtimeFields}
-        />
-      );
-      case 'memory': return <Suspense fallback={paneFallback}><MemoryPanel /></Suspense>;
-      case 'project-rules': return <Suspense fallback={paneFallback}><ProjectRulesPane /></Suspense>;
-      case 'custom-models': return <Suspense fallback={paneFallback}><CustomModelsPane /></Suspense>;
-      case 'connectors': return <Suspense fallback={paneFallback}><ConnectorsPane /></Suspense>;
-      case 'actions': return (
-        <>
-      <PaneHeader title={t('settings.item.actions')} description={t('settings.actionsDesc')} />
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-sm font-semibold text-text-primary">{t('settings.projectCommands')}</span>
-            {projectPath && <span className="text-2xs text-text-faint font-mono truncate max-w-[220px]">{projectPath}/.auraxis/actions.json</span>}
-          </div>
-          {!projectPath ? (
-            <InlineEmpty description={t('settings.actionsNeedProject')} compact />
-          ) : projectActions.length === 0 ? (
-            <InlineEmpty description={t('settings.actionsNotFound')} compact />
-          ) : (
-            <ul className="list-none m-0 p-0 flex flex-col gap-2">
-              {projectActions.map((a) => (
-                <li key={a.name} className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[var(--color-bg-secondary)]">
-                  <span className="text-sm font-medium text-text-primary">{a.name}</span>
-                  {a.platform && <span className="text-2xs text-text-muted">{a.platform}</span>}
-                  <code className="ml-auto text-xs text-text-muted font-mono truncate max-w-[260px]">{a.command}</code>
-                </li>
-              ))}
-            </ul>
-          )}
-          <div className="mt-3 text-xs text-text-muted leading-[1.6]">
-            {t('settings.actionsFormat', { code: '{"actions":[{"name":"Run","command":"npm start"}]}' })}
-          </div>
-        </>
-      );
-      case 'workflows': return (
-        <>
-      <PaneHeader title={t('settings.item.workflows')} description={t('settings.workflowsDesc')} />
-          {!projectPath ? (
-            <InlineEmpty description={t('settings.actionsNeedProject')} compact />
-          ) : workflows.length === 0 ? (
-            <InlineEmpty description={t('settings.workflowsNotFound')} compact />
-          ) : (
-            <ul className="list-none m-0 p-0 flex flex-col gap-2">
-              {workflows.map((wf) => (
-                <li key={wf.id} className="px-4 py-3 rounded-xl bg-[var(--color-bg-secondary)]">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-text-primary">{wf.name}</span>
-                    <span className="text-2xs text-text-muted">{t('settings.stepsN', { n: wf.steps.length })}</span>
-                    <span className="inline-flex items-center h-5 px-1.5 rounded-md text-2xs font-medium leading-none bg-border-dim text-text-muted">
-                      {wf.source === 'markdown' ? 'MD' : 'JSON'}
-                    </span>
-                    <Button
-                      className="ml-auto"
-                      size="small"
-                      type="primary"
-                      onClick={async () => {
-                        const r = await window.electronAPI?.workflow?.run({ workflowId: wf.id, projectRoot: projectPath! });
-                        if (r?.ok) message.success(t('settings.workflowStarted', { id: r.data?.runId ?? '' }));
-                        else message.error(r?.error || t('settings.startFailed'));
-                        const runs = await window.electronAPI?.workflow?.runs();
-                        setWorkflowRuns(runs?.ok && runs.data ? runs.data : []);
-                      }}
-                    >
-                      {t('settings.run')}
-                    </Button>
-                  </div>
-                  {wf.description && <div className="mt-1 text-xs text-text-muted">{wf.description}</div>}
-                  <div className="mt-1 text-2xs text-text-faint truncate">{wf.steps.map((s) => s.name).join(' → ')}</div>
-                </li>
-              ))}
-            </ul>
-          )}
-          {workflowRuns.length > 0 && (
-            <div className="mt-4">
-              <div className="text-sm font-semibold text-text-primary mb-1">{t('settings.recentRuns')}</div>
-              <ul className="list-none m-0 p-0 flex flex-col gap-1">
-                {workflowRuns.slice(0, 10).map((run) => (
-                  <li key={run.runId} className="flex items-center gap-2 text-xs text-text-secondary px-2 py-2 rounded-md bg-[var(--color-bg-secondary)]">
-                    <span className="font-mono">{run.runId}</span>
-                    <span className="truncate">{run.workflowName}</span>
-                    <span className="ml-auto text-2xs text-text-muted">{run.status}</span>
+      case 'general':
+        return renderGeneral();
+      case 'cost':
+        return renderCost();
+      case 'account':
+        return <AccountPane />;
+      case 'appearance':
+        return renderAppearance();
+      case 'stats':
+        return (
+          <Suspense fallback={paneFallback}>
+            <StatsHeatmap />
+          </Suspense>
+        );
+      case 'keybindings':
+        return renderKeybindings();
+      case 'permissions':
+        return renderPermissions();
+      case 'mcp':
+        return (
+          <Suspense fallback={paneFallback}>
+            <MCPSettings servers={mcpServers} statuses={mcpStatuses} onUpdateServers={setMcpServers} />
+          </Suspense>
+        );
+      case 'plugins':
+        return renderPlugins();
+      case 'agents':
+        return (
+          <Suspense fallback={paneFallback}>
+            <AgentDashboard />
+          </Suspense>
+        );
+      case 'agent-runtime':
+        return (
+          <SchemaPanel
+            title={t('settings.item.agentRuntime')}
+            description={t('settings.pane.agentRuntime.desc')}
+            fields={runtimeFields}
+          />
+        );
+      case 'memory':
+        return (
+          <Suspense fallback={paneFallback}>
+            <MemoryPanel />
+          </Suspense>
+        );
+      case 'project-rules':
+        return (
+          <Suspense fallback={paneFallback}>
+            <ProjectRulesPane />
+          </Suspense>
+        );
+      case 'custom-models':
+        return (
+          <Suspense fallback={paneFallback}>
+            <CustomModelsPane />
+          </Suspense>
+        );
+      case 'connectors':
+        return (
+          <Suspense fallback={paneFallback}>
+            <ConnectorsPane />
+          </Suspense>
+        );
+      case 'actions':
+        return (
+          <>
+            <PaneHeader title={t('settings.item.actions')} description={t('settings.actionsDesc')} />
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-sm font-semibold text-text-primary">{t('settings.projectCommands')}</span>
+              {projectPath && (
+                <span className="text-2xs text-text-faint font-mono truncate max-w-[220px]">
+                  {projectPath}/.auraxis/actions.json
+                </span>
+              )}
+            </div>
+            {!projectPath ? (
+              <InlineEmpty description={t('settings.actionsNeedProject')} compact />
+            ) : projectActions.length === 0 ? (
+              <InlineEmpty description={t('settings.actionsNotFound')} compact />
+            ) : (
+              <ul className="list-none m-0 p-0 flex flex-col gap-2">
+                {projectActions.map((a) => (
+                  <li
+                    key={a.name}
+                    className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[var(--color-bg-secondary)]"
+                  >
+                    <span className="text-sm font-medium text-text-primary">{a.name}</span>
+                    {a.platform && <span className="text-2xs text-text-muted">{a.platform}</span>}
+                    <code className="ml-auto text-xs text-text-muted font-mono truncate max-w-[260px]">
+                      {a.command}
+                    </code>
                   </li>
                 ))}
               </ul>
+            )}
+            <div className="mt-3 text-xs text-text-muted leading-[1.6]">
+              {t('settings.actionsFormat', { code: '{"actions":[{"name":"Run","command":"npm start"}]}' })}
             </div>
-          )}
-          <div className="mt-3 text-xs text-text-muted leading-[1.6]">
-            {t('settings.workflowFormat', { ref: '{{stepId.result}}' })}
-          </div>
-        </>
-      );
-      case 'connections': return (
-        <>
-      <PaneHeader title={t('settings.item.connections')} description={t('settings.connectionsDesc')} />
-          <div className="flex flex-col gap-2 mb-3">
-            <div className="grid grid-cols-2 gap-2">
-              <Input placeholder={t('settings.sshName')} value={sshForm.name} onChange={(e) => setSshForm({ ...sshForm, name: e.target.value })} />
-              <Input placeholder={t('settings.sshHost')} value={sshForm.host} onChange={(e) => setSshForm({ ...sshForm, host: e.target.value })} />
-              <Input placeholder={t('settings.sshPort')} value={sshForm.port} onChange={(e) => setSshForm({ ...sshForm, port: e.target.value })} />
-              <Input placeholder={t('settings.sshUser')} value={sshForm.username} onChange={(e) => setSshForm({ ...sshForm, username: e.target.value })} />
-              <Input placeholder={t('settings.sshKeyPath')} value={sshForm.keyPath} onChange={(e) => setSshForm({ ...sshForm, keyPath: e.target.value })} className="col-span-2" />
+          </>
+        );
+      case 'workflows':
+        return (
+          <>
+            <PaneHeader title={t('settings.item.workflows')} description={t('settings.workflowsDesc')} />
+            {!projectPath ? (
+              <InlineEmpty description={t('settings.actionsNeedProject')} compact />
+            ) : workflows.length === 0 ? (
+              <InlineEmpty description={t('settings.workflowsNotFound')} compact />
+            ) : (
+              <ul className="list-none m-0 p-0 flex flex-col gap-2">
+                {workflows.map((wf) => (
+                  <li key={wf.id} className="px-4 py-3 rounded-xl bg-[var(--color-bg-secondary)]">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-text-primary">{wf.name}</span>
+                      <span className="text-2xs text-text-muted">{t('settings.stepsN', { n: wf.steps.length })}</span>
+                      <span className="inline-flex items-center h-5 px-1.5 rounded-md text-2xs font-medium leading-none bg-border-dim text-text-muted">
+                        {wf.source === 'markdown' ? 'MD' : 'JSON'}
+                      </span>
+                      <Button
+                        className="ml-auto"
+                        size="small"
+                        type="primary"
+                        onClick={async () => {
+                          const r = await window.electronAPI?.workflow?.run({
+                            workflowId: wf.id,
+                            projectRoot: projectPath!,
+                          });
+                          if (r?.ok) message.success(t('settings.workflowStarted', { id: r.data?.runId ?? '' }));
+                          else message.error(r?.error || t('settings.startFailed'));
+                          const runs = await window.electronAPI?.workflow?.runs();
+                          setWorkflowRuns(runs?.ok && runs.data ? runs.data : []);
+                        }}
+                      >
+                        {t('settings.run')}
+                      </Button>
+                    </div>
+                    {wf.description && <div className="mt-1 text-xs text-text-muted">{wf.description}</div>}
+                    <div className="mt-1 text-2xs text-text-faint truncate">
+                      {wf.steps.map((s) => s.name).join(' → ')}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {workflowRuns.length > 0 && (
+              <div className="mt-4">
+                <div className="text-sm font-semibold text-text-primary mb-1">{t('settings.recentRuns')}</div>
+                <ul className="list-none m-0 p-0 flex flex-col gap-1">
+                  {workflowRuns.slice(0, 10).map((run) => (
+                    <li
+                      key={run.runId}
+                      className="flex items-center gap-2 text-xs text-text-secondary px-2 py-2 rounded-md bg-[var(--color-bg-secondary)]"
+                    >
+                      <span className="font-mono">{run.runId}</span>
+                      <span className="truncate">{run.workflowName}</span>
+                      <span className="ml-auto text-2xs text-text-muted">{run.status}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            <div className="mt-3 text-xs text-text-muted leading-[1.6]">
+              {t('settings.workflowFormat', { ref: '{{stepId.result}}' })}
             </div>
-            <div className="flex items-center gap-3">
-              <label className="flex items-center gap-1.5 text-xs text-text-muted cursor-pointer">
-                <input type="checkbox" checked={sshForm.useAgent} onChange={(e) => setSshForm({ ...sshForm, useAgent: e.target.checked })} />
-                SSH Agent
-              </label>
-              <Button
-                size="small"
-                loading={sshTesting}
-                onClick={async () => {
-                  if (!sshForm.host.trim()) { message.warning(t('settings.needHost')); return; }
-                  setSshTesting(true);
-                  const r = await window.electronAPI?.ssh.test({
-                    host: sshForm.host.trim(), port: Number(sshForm.port) || 22,
-                    username: sshForm.username || 'root', keyPath: sshForm.keyPath || undefined, useAgent: sshForm.useAgent,
-                  });
-                  setSshTesting(false);
-                  if (r?.ok) message.success(t('settings.connected', { out: r.data?.output || '' }));
-                  else message.error(r?.error || t('settings.connectFailed'));
-                }}
-              >
-                {t('settings.testConnection')}
-              </Button>
-              <Button
-                size="small"
-                type="primary"
-                onClick={async () => {
-                  const r = await window.electronAPI?.ssh.save({
-                    name: sshForm.name || sshForm.host, host: sshForm.host.trim(),
-                    port: Number(sshForm.port) || 22, username: sshForm.username || 'root',
-                    keyPath: sshForm.keyPath || undefined, useAgent: sshForm.useAgent,
-                  });
-                  if (r?.ok) { message.success(t('settings.saved')); setSshConnections(r.data || []); setSshForm({ name: '', host: '', port: '22', username: 'root', keyPath: '', useAgent: false }); }
-                  else message.error(r?.error || t('settings.saveFailed'));
-                }}
-              >
-                {t('settings.saveConnection')}
-              </Button>
+          </>
+        );
+      case 'connections':
+        return (
+          <>
+            <PaneHeader title={t('settings.item.connections')} description={t('settings.connectionsDesc')} />
+            <div className="flex flex-col gap-2 mb-3">
+              <div className="grid grid-cols-2 gap-2">
+                <Input
+                  placeholder={t('settings.sshName')}
+                  value={sshForm.name}
+                  onChange={(e) => setSshForm({ ...sshForm, name: e.target.value })}
+                />
+                <Input
+                  placeholder={t('settings.sshHost')}
+                  value={sshForm.host}
+                  onChange={(e) => setSshForm({ ...sshForm, host: e.target.value })}
+                />
+                <Input
+                  placeholder={t('settings.sshPort')}
+                  value={sshForm.port}
+                  onChange={(e) => setSshForm({ ...sshForm, port: e.target.value })}
+                />
+                <Input
+                  placeholder={t('settings.sshUser')}
+                  value={sshForm.username}
+                  onChange={(e) => setSshForm({ ...sshForm, username: e.target.value })}
+                />
+                <Input
+                  placeholder={t('settings.sshKeyPath')}
+                  value={sshForm.keyPath}
+                  onChange={(e) => setSshForm({ ...sshForm, keyPath: e.target.value })}
+                  className="col-span-2"
+                />
+              </div>
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-1.5 text-xs text-text-muted cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={sshForm.useAgent}
+                    onChange={(e) => setSshForm({ ...sshForm, useAgent: e.target.checked })}
+                  />
+                  SSH Agent
+                </label>
+                <Button
+                  size="small"
+                  loading={sshTesting}
+                  onClick={async () => {
+                    if (!sshForm.host.trim()) {
+                      message.warning(t('settings.needHost'));
+                      return;
+                    }
+                    setSshTesting(true);
+                    const r = await window.electronAPI?.ssh.test({
+                      host: sshForm.host.trim(),
+                      port: Number(sshForm.port) || 22,
+                      username: sshForm.username || 'root',
+                      keyPath: sshForm.keyPath || undefined,
+                      useAgent: sshForm.useAgent,
+                    });
+                    setSshTesting(false);
+                    if (r?.ok) message.success(t('settings.connected', { out: r.data?.output || '' }));
+                    else message.error(r?.error || t('settings.connectFailed'));
+                  }}
+                >
+                  {t('settings.testConnection')}
+                </Button>
+                <Button
+                  size="small"
+                  type="primary"
+                  onClick={async () => {
+                    const r = await window.electronAPI?.ssh.save({
+                      name: sshForm.name || sshForm.host,
+                      host: sshForm.host.trim(),
+                      port: Number(sshForm.port) || 22,
+                      username: sshForm.username || 'root',
+                      keyPath: sshForm.keyPath || undefined,
+                      useAgent: sshForm.useAgent,
+                    });
+                    if (r?.ok) {
+                      message.success(t('settings.saved'));
+                      setSshConnections(r.data || []);
+                      setSshForm({ name: '', host: '', port: '22', username: 'root', keyPath: '', useAgent: false });
+                    } else message.error(r?.error || t('settings.saveFailed'));
+                  }}
+                >
+                  {t('settings.saveConnection')}
+                </Button>
+              </div>
             </div>
-          </div>
-          {sshConnections.length === 0 ? (
-            <InlineEmpty description={t('settings.noSsh')} compact />
-          ) : (
-            <ul className="list-none m-0 p-0 flex flex-col gap-2">
-              {sshConnections.map((c) => (
-                <li key={c.id} className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[var(--color-bg-secondary)]">
-                  <span className="text-sm font-medium text-text-primary">{c.name}</span>
-                  <span className="text-2xs text-text-muted font-mono">{c.username}@{c.host}:{c.port}</span>
-                  <span className="ml-auto flex items-center gap-1">
-                    <Button size="small" onClick={async () => {
-                      const r = await window.electronAPI?.ssh.test(c);
-                      if (r?.ok) message.success(t('settings.connected', { out: r.data?.output || '' }));
-                      else message.error(r?.error || t('settings.connectFailed'));
-        }}>{t('settings.test')}</Button>
-                    <Button size="small" danger onClick={async () => {
-                      const r = await window.electronAPI?.ssh.remove(c.id);
-                      if (r?.ok) { message.success(t('settings.deleted')); setSshConnections(r.data || []); }
-                      else message.error(r?.error || t('settings.deleteFailed'));
-                    }}>{t('sidebar.delete')}</Button>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-          <div className="mt-3 text-xs text-text-muted leading-[1.6]">
-            {t('settings.sshHint')}
-          </div>
-        </>
-      );
-      case 'rules': return (
-        <>
-      <PaneHeader title={t('settings.item.rules')} description={t('settings.rulesDesc')} />
-          {rulesList.length === 0 ? (
-            <InlineEmpty description={t('settings.noRulesFiles')} compact />
-          ) : (
-            <ul className="list-none m-0 p-0 flex flex-col gap-2">
-              {rulesList.map((r, i) => (
-                <li key={i} className="px-4 py-3 rounded-xl bg-[var(--color-bg-secondary)]">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono text-text-primary truncate">{r.pattern.join(' ')}</span>
-                    <span className={`text-2xs px-1.5 rounded-full ${r.decision === 'allow' ? 'bg-[var(--color-success-soft)]' : r.decision === 'deny' ? 'bg-[var(--color-danger-soft)]' : 'bg-[var(--color-primary-soft)]'} text-text-secondary`}>
-                      {r.decision === 'allow' ? t('settings.ruleAllow') : r.decision === 'deny' ? t('settings.ruleDeny') : t('settings.ruleAsk')}
+            {sshConnections.length === 0 ? (
+              <InlineEmpty description={t('settings.noSsh')} compact />
+            ) : (
+              <ul className="list-none m-0 p-0 flex flex-col gap-2">
+                {sshConnections.map((c) => (
+                  <li
+                    key={c.id}
+                    className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[var(--color-bg-secondary)]"
+                  >
+                    <span className="text-sm font-medium text-text-primary">{c.name}</span>
+                    <span className="text-2xs text-text-muted font-mono">
+                      {c.username}@{c.host}:{c.port}
                     </span>
-                  </div>
-                  {r.justification && <div className="mt-1 text-xs text-text-muted">{r.justification}</div>}
-                  <div className="mt-0.5 text-2xs text-text-faint font-mono truncate">{r.source}</div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </>
-      );
-      case 'about': return renderAbout();
-      case 'coverage': return <Suspense fallback={paneFallback}><CoverageBadge /></Suspense>;
-      default: return null;
+                    <span className="ml-auto flex items-center gap-1">
+                      <Button
+                        size="small"
+                        onClick={async () => {
+                          const r = await window.electronAPI?.ssh.test(c);
+                          if (r?.ok) message.success(t('settings.connected', { out: r.data?.output || '' }));
+                          else message.error(r?.error || t('settings.connectFailed'));
+                        }}
+                      >
+                        {t('settings.test')}
+                      </Button>
+                      <Button
+                        size="small"
+                        danger
+                        onClick={async () => {
+                          const r = await window.electronAPI?.ssh.remove(c.id);
+                          if (r?.ok) {
+                            message.success(t('settings.deleted'));
+                            setSshConnections(r.data || []);
+                          } else message.error(r?.error || t('settings.deleteFailed'));
+                        }}
+                      >
+                        {t('sidebar.delete')}
+                      </Button>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="mt-3 text-xs text-text-muted leading-[1.6]">{t('settings.sshHint')}</div>
+          </>
+        );
+      case 'rules':
+        return (
+          <>
+            <PaneHeader title={t('settings.item.rules')} description={t('settings.rulesDesc')} />
+            {rulesList.length === 0 ? (
+              <InlineEmpty description={t('settings.noRulesFiles')} compact />
+            ) : (
+              <ul className="list-none m-0 p-0 flex flex-col gap-2">
+                {rulesList.map((r, i) => (
+                  <li key={i} className="px-4 py-3 rounded-xl bg-[var(--color-bg-secondary)]">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-mono text-text-primary truncate">{r.pattern.join(' ')}</span>
+                      <span
+                        className={`text-2xs px-1.5 rounded-full ${r.decision === 'allow' ? 'bg-[var(--color-success-soft)]' : r.decision === 'deny' ? 'bg-[var(--color-danger-soft)]' : 'bg-[var(--color-primary-soft)]'} text-text-secondary`}
+                      >
+                        {r.decision === 'allow'
+                          ? t('settings.ruleAllow')
+                          : r.decision === 'deny'
+                            ? t('settings.ruleDeny')
+                            : t('settings.ruleAsk')}
+                      </span>
+                    </div>
+                    {r.justification && <div className="mt-1 text-xs text-text-muted">{r.justification}</div>}
+                    <div className="mt-0.5 text-2xs text-text-faint font-mono truncate">{r.source}</div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
+        );
+      case 'about':
+        return renderAbout();
+      case 'coverage':
+        return (
+          <Suspense fallback={paneFallback}>
+            <CoverageBadge />
+          </Suspense>
+        );
+      default:
+        return null;
     }
   };
 
@@ -1137,7 +1434,10 @@ export default function SettingsModal({ open, onClose, initialKey }: SettingsMod
       maskTransitionName=""
     >
       <div className="flex h-[640px]">
-        <nav className="w-[220px] shrink-0 px-3 py-5 bg-bg-secondary overflow-y-auto" aria-label={t('settings.navAria')}>
+        <nav
+          className="w-[220px] shrink-0 px-3 py-5 bg-bg-secondary overflow-y-auto"
+          aria-label={t('settings.navAria')}
+        >
           <div className="px-[10px] pb-3">
             <Input
               size="middle"
@@ -1154,17 +1454,19 @@ export default function SettingsModal({ open, onClose, initialKey }: SettingsMod
             <div className="px-[10px] py-2 text-2xs text-text-faint">{t('settings.searchEmpty')}</div>
           )}
           {visibleGroups.map((g) => (
-      <div key={g.labelKey} className="mb-5 last:mb-0">
-              <div className="px-[10px] pb-1.5 text-2xs font-semibold text-text-muted tracking-[0.06em]">{t(g.labelKey)}</div>
+            <div key={g.labelKey} className="mb-5 last:mb-0">
+              <div className="px-[10px] pb-1.5 text-2xs font-semibold text-text-muted tracking-[0.06em]">
+                {t(g.labelKey)}
+              </div>
               <div className="flex flex-col gap-[2px]">
                 {g.items.map((item) => (
                   <button
                     key={item.key}
                     className={clsx(
-                      "nav-item-btn flex items-center gap-2 w-full h-8 px-[10px] border-none bg-transparent rounded-lg font-[inherit] text-sm font-medium text-left cursor-pointer",
+                      'nav-item-btn flex items-center gap-2 w-full h-8 px-[10px] border-none bg-transparent rounded-lg font-[inherit] text-sm font-medium text-left cursor-pointer',
                       activeKey === item.key
-                        ? "nav-item-btn-active bg-primary-soft text-text-primary"
-                        : "text-text-secondary hover:bg-[var(--color-hover)] hover:text-text-primary"
+                        ? 'nav-item-btn-active bg-primary-soft text-text-primary'
+                        : 'text-text-secondary hover:bg-[var(--color-hover)] hover:text-text-primary',
                     )}
                     onClick={() => setActiveKey(item.key)}
                   >

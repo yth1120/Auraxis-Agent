@@ -18,10 +18,18 @@ html.auraxis-aqua {
   /* Frost tint grows 0.28 → 0.68 so high levels still keep text readable. */
   --ax-aqua-alpha: calc(0.28 + var(--ax-aqua-level, 0) * 0.004);
   --ax-aqua-glass: color-mix(in srgb, var(--color-glass-panel) calc(var(--ax-aqua-alpha) * 100%), transparent);
-  --ax-aqua-glass-strong: color-mix(in srgb, var(--color-glass-panel) calc(min(1, var(--ax-aqua-alpha) + 0.16) * 100%), transparent);
+  --ax-aqua-glass-strong: color-mix(
+    in srgb,
+    var(--color-glass-panel) calc(min(1, var(--ax-aqua-alpha) + 0.16) * 100%),
+    transparent
+  );
   /* Composer sits slightly more transparent than the side cards, but keeps
      a stronger tint than the raw glass so typed text stays readable. */
-  --ax-aqua-glass-composer: color-mix(in srgb, var(--color-glass-panel) calc(min(1, var(--ax-aqua-alpha) + 0.08) * 100%), transparent);
+  --ax-aqua-glass-composer: color-mix(
+    in srgb,
+    var(--color-glass-panel) calc(min(1, var(--ax-aqua-alpha) + 0.08) * 100%),
+    transparent
+  );
   --ax-aqua-hairline: color-mix(in srgb, var(--color-border-default) 62%, transparent);
   /* Soft ambient shadow + a hairline top light: the floating cards sit
      gently on the backdrop instead of punching through it. */
@@ -35,7 +43,7 @@ html.auraxis-aqua {
 html.auraxis-aqua.dark {
   --ax-aqua-shadow: 0 1px 2px rgba(0, 0, 0, 0.16), 0 14px 36px -10px rgba(0, 0, 0, 0.42);
   --ax-aqua-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  --ax-aqua-composer-shadow: 0 2px 8px rgba(0, 0, 0, 0.30), 0 22px 52px -16px rgba(0, 0, 0, 0.55);
+  --ax-aqua-composer-shadow: 0 2px 8px rgba(0, 0, 0, 0.3), 0 22px 52px -16px rgba(0, 0, 0, 0.55);
 }
 
 html.auraxis-aqua body,
@@ -50,7 +58,11 @@ html.auraxis-aqua #root {
    active (Windows 11 Acrylic), the desktop itself shows through instead. */
 html.auraxis-aqua:not(.auraxis-glass) body {
   background:
-    radial-gradient(1100px 720px at 10% -10%, color-mix(in srgb, var(--color-violet) 12%, transparent), transparent 60%),
+    radial-gradient(
+      1100px 720px at 10% -10%,
+      color-mix(in srgb, var(--color-violet) 12%, transparent),
+      transparent 60%
+    ),
     radial-gradient(960px 680px at 104% 16%, color-mix(in srgb, var(--color-success) 8%, transparent), transparent 55%),
     radial-gradient(880px 880px at 50% 118%, color-mix(in srgb, var(--color-violet) 10%, transparent), transparent 62%),
     linear-gradient(160deg, var(--color-bg-secondary), var(--color-bg-primary) 45%, var(--color-bg-tertiary));
@@ -66,7 +78,9 @@ html.auraxis-aqua:not(.auraxis-glass) body::before {
   background-image:
     repeating-radial-gradient(circle at 17% 32%, rgba(255, 255, 255, 0.04) 0 1px, transparent 1px 4px),
     repeating-radial-gradient(circle at 78% 64%, rgba(0, 0, 0, 0.03) 0 1px, transparent 1px 5px);
-  background-size: 260px 260px, 380px 380px;
+  background-size:
+    260px 260px,
+    380px 380px;
 }
 
 /* ── Shared glass card recipe ───────────────────────────── */
@@ -128,7 +142,10 @@ html.auraxis-aqua .tab-bar {
   margin: 10px 10px 0;
   border-radius: 18px;
   box-shadow: var(--ax-aqua-shadow), var(--ax-aqua-highlight);
-  transition: background-color 200ms ease-out, border-color 200ms ease-out, box-shadow 200ms ease-out;
+  transition:
+    background-color 200ms ease-out,
+    border-color 200ms ease-out,
+    box-shadow 200ms ease-out;
 }
 
 html.auraxis-aqua.dark .ax-header,
@@ -188,7 +205,11 @@ html.auraxis-aqua .chat-area::before {
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background: radial-gradient(760px 420px at 50% 36%, color-mix(in srgb, var(--color-bg-primary) 9%, transparent), transparent 72%);
+  background: radial-gradient(
+    760px 420px at 50% 36%,
+    color-mix(in srgb, var(--color-bg-primary) 9%, transparent),
+    transparent 72%
+  );
 }
 
 /* Right panel: the stock rule forces an opaque base on every cockpit tab;

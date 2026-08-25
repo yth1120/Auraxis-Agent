@@ -32,7 +32,12 @@ describe('step-compressor（AGORA）', () => {
   it('按完整步骤分组，不拆分 assistant 与 tool_result', () => {
     const messages = [
       { role: 'system', content: 'sys' },
-      ...anthropicStep('t1', 'Read', { file_path: 'src/app.ts' }, '{"file_path":"src/app.ts","content":"x","total_lines":20}'),
+      ...anthropicStep(
+        't1',
+        'Read',
+        { file_path: 'src/app.ts' },
+        '{"file_path":"src/app.ts","content":"x","total_lines":20}',
+      ),
       ...anthropicStep('t2', 'Bash', { command: 'npm test' }, '{"passed":true}'),
     ];
     const { system, steps } = groupIntoSteps(messages);
@@ -50,7 +55,9 @@ describe('step-compressor（AGORA）', () => {
     ];
     const result = compressHistorySteps(messages, { keepRecentSteps: 2, plan: plan() });
     expect(result[0]).toEqual({ role: 'system', content: 'sys' });
-    const summaryIdx = result.findIndex((m: any) => typeof m.content === 'string' && m.content.startsWith('[历史上下文摘要]'));
+    const summaryIdx = result.findIndex(
+      (m: any) => typeof m.content === 'string' && m.content.startsWith('[历史上下文摘要]'),
+    );
     expect(summaryIdx).toBeGreaterThan(0);
     expect(result.some((m: any) => m.STEP_COMPRESSED)).toBe(true);
     // 最近两步（round2/round3）的 assistant 与 tool_result 必须成对出现。
@@ -63,7 +70,12 @@ describe('step-compressor（AGORA）', () => {
   it('计划相关的关键步骤被救回，不被压缩', () => {
     const messages = [
       { role: 'system', content: 'sys' },
-      ...anthropicStep('关键读取', 'Read', { file_path: 'src/app.ts' }, '{"file_path":"src/app.ts","content":"x","total_lines":20}'),
+      ...anthropicStep(
+        '关键读取',
+        'Read',
+        { file_path: 'src/app.ts' },
+        '{"file_path":"src/app.ts","content":"x","total_lines":20}',
+      ),
       ...anthropicStep('普通', 'Grep', { pattern: 'y' }, 'nothing'),
       ...anthropicStep('最近', 'Bash', { command: 'npm test' }, 'pass'),
     ];
@@ -74,11 +86,23 @@ describe('step-compressor（AGORA）', () => {
   });
 
   it('isCriticalStep 识别 Replan 与计划文件写入', () => {
-    const replan: StepGroup = { assistant: { role: 'assistant', content: [{ type: 'tool_use', id: 'r', name: 'Replan', input: {} }] }, tail: [] };
+    const replan: StepGroup = {
+      assistant: { role: 'assistant', content: [{ type: 'tool_use', id: 'r', name: 'Replan', input: {} }] },
+      tail: [],
+    };
     expect(isCriticalStep(replan, plan())).toBe(true);
-    const write: StepGroup = { assistant: { role: 'assistant', content: [{ type: 'tool_use', id: 'w', name: 'Write', input: { file_path: 'src/app.ts' } }] }, tail: [] };
+    const write: StepGroup = {
+      assistant: {
+        role: 'assistant',
+        content: [{ type: 'tool_use', id: 'w', name: 'Write', input: { file_path: 'src/app.ts' } }],
+      },
+      tail: [],
+    };
     expect(isCriticalStep(write, plan())).toBe(true);
-    const grep: StepGroup = { assistant: { role: 'assistant', content: [{ type: 'tool_use', id: 'g', name: 'Grep', input: { pattern: 'x' } }] }, tail: [] };
+    const grep: StepGroup = {
+      assistant: { role: 'assistant', content: [{ type: 'tool_use', id: 'g', name: 'Grep', input: { pattern: 'x' } }] },
+      tail: [],
+    };
     expect(isCriticalStep(grep, plan())).toBe(false);
   });
 
@@ -113,13 +137,17 @@ describe('step-compressor（AGORA）', () => {
     const messages = [
       { role: 'system', content: 'sys' },
       {
-        role: 'assistant', content: null,
+        role: 'assistant',
+        content: null,
         tool_calls: [{ id: 'c1', type: 'function', function: { name: 'Grep', arguments: '{"pattern":"x"}' } }],
       },
       { role: 'tool', tool_call_id: 'c1', content: '{"pattern":"x","results":[]}' },
       {
-        role: 'assistant', content: null,
-        tool_calls: [{ id: 'c2', type: 'function', function: { name: 'Read', arguments: '{"file_path":"src/app.ts"}' } }],
+        role: 'assistant',
+        content: null,
+        tool_calls: [
+          { id: 'c2', type: 'function', function: { name: 'Read', arguments: '{"file_path":"src/app.ts"}' } },
+        ],
       },
       { role: 'tool', tool_call_id: 'c2', content: '{"file_path":"src/app.ts","content":"x","total_lines":20}' },
       { role: 'assistant', content: '最近一轮', tool_calls: [] },

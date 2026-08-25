@@ -36,7 +36,9 @@ describe('安全边界回归', () => {
     expect(code.exitCode).toBe(1);
     expect(code.stderr).toContain('默认禁用');
     const plugin = mountDynamicPlugin({
-      id: 'p1', name: 'P', tools: [{ name: 'T', description: 'd', handler: '() => ({})' }],
+      id: 'p1',
+      name: 'P',
+      tools: [{ name: 'T', description: 'd', handler: '() => ({})' }],
     });
     expect(plugin.ok).toBe(false);
     const workflow = await runInlineWorkflow('return 1', { projectRoot: 'C:/x', requestId: 'r1', log: () => {} });
@@ -49,6 +51,8 @@ describe('安全边界回归', () => {
     expect(commandMutates('node -e "console.log(1)"').mutates).toBe(true);
     expect(commandMutates('rm -rf node_modules').mutates).toBe(true);
     expect(enforceSandbox({ sandboxMode: 'read', toolName: 'Bash', input: { command: 'ls' } }).allowed).toBe(true);
-    expect(enforceSandbox({ sandboxMode: 'read', toolName: 'Bash', input: { command: 'node -v' } }).allowed).toBe(false);
+    expect(enforceSandbox({ sandboxMode: 'read', toolName: 'Bash', input: { command: 'node -v' } }).allowed).toBe(
+      false,
+    );
   });
 });

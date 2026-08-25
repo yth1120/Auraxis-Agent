@@ -6,6 +6,7 @@
  * share these functions so one implementation stays authoritative.
  */
 import axios from 'axios';
+import { errorRecord, errorText } from './errors';
 import { readSettings, writeSettings } from './ipc/settings-store';
 
 export type ConnectorKind = 'slack' | 'drive' | 'notion';
@@ -98,8 +99,10 @@ export async function testConnector(kind: ConnectorKind): Promise<{ ok: boolean;
       },
     );
     return { ok: true, message: `Notion 连接成功（可访问 ${r.data?.results?.length ?? 0} 个页面示例）` };
-  } catch (error: any) {
-    return { ok: false, message: error?.response?.data?.error || error?.message || String(error) };
+  } catch (error: unknown) {
+    const record = errorRecord(error);
+    const response = record.response as { data?: { error?: string } } | undefined;
+    return { ok: false, message: response?.data?.error || errorText(error) };
   }
 }
 
@@ -116,7 +119,11 @@ export async function slackListChannels(limit = 100): Promise<SlackChannel[]> {
   const token = await requireToken('slack');
   const r = await axios.get('https://slack.com/api/conversations.list', {
     headers: { Authorization: `Bearer ${token}` },
-    params: { limit: Math.max(1, Math.min(200, Number(limit) || 100)), exclude_archived: true, types: 'public_channel,private_channel' },
+    params: {
+      limit: Math.max(1, Math.min(200, Number(limit) || 100)),
+      exclude_archived: true,
+      types: 'public_channel,private_channel',
+    },
     timeout: 20_000,
   });
   if (r.data?.ok === false) throw new Error(r.data.error || 'Slack API 返回错误');
@@ -129,7 +136,10 @@ export async function slackListChannels(limit = 100): Promise<SlackChannel[]> {
   }));
 }
 
-export async function slackPostMessage(channel: string, text: string): Promise<{ channel: string; ts: string; message: string }> {
+export async function slackPostMessage(
+  channel: string,
+  text: string,
+): Promise<{ channel: string; ts: string; message: string }> {
   if (!channel || !text?.trim()) throw new Error('SlackPostMessage 需要 channel 和 text');
   const token = await requireToken('slack');
   const r = await axios.post(
@@ -185,8 +195,13 @@ export interface DriveReadResult {
 }
 
 const TEXT_MIME = new Set([
-  'text/plain', 'text/csv', 'text/markdown', 'text/html',
-  'application/json', 'application/xml', 'application/yaml',
+  'text/plain',
+  'text/csv',
+  'text/markdown',
+  'text/html',
+  'application/json',
+  'application/xml',
+  'application/yaml',
   'application/vnd.google-apps.script+json',
 ]);
 
@@ -242,7 +257,11 @@ export async function notionSearch(query?: string, pageSize = 10): Promise<Notio
     'https://api.notion.com/v1/search',
     { query: query?.trim() || undefined, page_size: Math.max(1, Math.min(50, Number(pageSize) || 10)) },
     {
-      headers: { Authorization: `Bearer ${token}`, 'Notion-Version': NOTION_VERSION, 'Content-Type': 'application/json' },
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Notion-Version': NOTION_VERSION,
+        'Content-Type': 'application/json',
+      },
       timeout: 20_000,
     },
   );
@@ -305,7 +324,11 @@ function markdownToBlocks(markdown: string): Record<string, unknown>[] {
     const code = line.match(/^```\s*([\w-]*)$/);
     if (code) {
       flushParagraph();
-      blocks.push({ object: 'block', type: 'code', code: { language: code[1] || 'plain text', rich_text: [{ type: 'text', text: { content: '' } }] } });
+      blocks.push({
+        object: 'block',
+        type: 'code',
+        code: { language: code[1] || 'plain text', rich_text: [{ type: 'text', text: { content: '' } }] },
+      });
       continue;
     }
     if (/^```/.test(line)) {

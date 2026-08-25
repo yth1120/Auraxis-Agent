@@ -81,7 +81,7 @@ async function loadRulesFromDir(dir: string): Promise<PrefixRule[]> {
   const rules: PrefixRule[] = [];
   for (const file of files) {
     if (!file.endsWith('.rules')) continue;
-    rules.push(...await loadRulesFromFile(path.join(dir, file)));
+    rules.push(...(await loadRulesFromFile(path.join(dir, file))));
   }
   return rules;
 }
@@ -89,7 +89,7 @@ async function loadRulesFromDir(dir: string): Promise<PrefixRule[]> {
 export async function loadRules(projectRoot?: string): Promise<PrefixRule[]> {
   const rules = await loadRulesFromDir(rulesDir());
   if (projectRoot) {
-    rules.push(...await loadRulesFromDir(path.join(projectRoot, '.auraxis', 'rules')));
+    rules.push(...(await loadRulesFromDir(path.join(projectRoot, '.auraxis', 'rules'))));
   }
   return rules;
 }
@@ -101,7 +101,10 @@ export function matchRule(command: string, rules: PrefixRule[]): PrefixRule | nu
     if (rule.pattern.length > tokens.length) continue;
     let hit = true;
     for (let i = 0; i < rule.pattern.length; i++) {
-      if (tokens[i] !== rule.pattern[i]) { hit = false; break; }
+      if (tokens[i] !== rule.pattern[i]) {
+        hit = false;
+        break;
+      }
     }
     if (hit) return rule;
   }

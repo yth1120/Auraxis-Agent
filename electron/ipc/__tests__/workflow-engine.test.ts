@@ -3,7 +3,12 @@ import { promises as fs } from 'fs';
 import os from 'os';
 import path from 'path';
 import {
-  topoOrder, renderTemplate, listWorkflows, getWorkflowRun, startWorkflow, parseMarkdownWorkflow,
+  topoOrder,
+  renderTemplate,
+  listWorkflows,
+  getWorkflowRun,
+  startWorkflow,
+  parseMarkdownWorkflow,
   type WorkflowDef,
 } from '../../workflow-engine';
 
@@ -32,7 +37,13 @@ const def: WorkflowDef = {
   name: '测试工作流',
   steps: [
     { id: 'explore', name: '探索', agentType: 'Explore', prompt: '先探索' },
-    { id: 'build', name: '实现', agentType: 'general-purpose', prompt: '根据 {{explore.result}} 实现', dependsOn: ['explore'] },
+    {
+      id: 'build',
+      name: '实现',
+      agentType: 'general-purpose',
+      prompt: '根据 {{explore.result}} 实现',
+      dependsOn: ['explore'],
+    },
   ],
 };
 
@@ -79,17 +90,27 @@ describe('workflow-engine', () => {
   });
 
   it('throws on cycles, unknown deps and duplicate ids', () => {
-    expect(() => topoOrder({ ...def, steps: [
-      { id: 'a', name: 'A', prompt: '', dependsOn: ['b'] },
-      { id: 'b', name: 'B', prompt: '', dependsOn: ['a'] },
-    ] })).toThrow(/循环依赖/);
-    expect(() => topoOrder({ ...def, steps: [
-      { id: 'a', name: 'A', prompt: '', dependsOn: ['missing'] },
-    ] })).toThrow(/未知依赖/);
-    expect(() => topoOrder({ ...def, steps: [
-      { id: 'a', name: 'A', prompt: '' },
-      { id: 'a', name: 'B', prompt: '' },
-    ] })).toThrow(/重复/);
+    expect(() =>
+      topoOrder({
+        ...def,
+        steps: [
+          { id: 'a', name: 'A', prompt: '', dependsOn: ['b'] },
+          { id: 'b', name: 'B', prompt: '', dependsOn: ['a'] },
+        ],
+      }),
+    ).toThrow(/循环依赖/);
+    expect(() => topoOrder({ ...def, steps: [{ id: 'a', name: 'A', prompt: '', dependsOn: ['missing'] }] })).toThrow(
+      /未知依赖/,
+    );
+    expect(() =>
+      topoOrder({
+        ...def,
+        steps: [
+          { id: 'a', name: 'A', prompt: '' },
+          { id: 'a', name: 'B', prompt: '' },
+        ],
+      }),
+    ).toThrow(/重复/);
   });
 
   it('renders step result templates', () => {
@@ -100,7 +121,11 @@ describe('workflow-engine', () => {
   it('lists workflows from user and project layers', async () => {
     await fs.writeFile(path.join(wfDir, 'user.json'), JSON.stringify(def), 'utf8');
     await fs.mkdir(path.join(projectRoot, '.auraxis', 'workflows'), { recursive: true });
-    await fs.writeFile(path.join(projectRoot, '.auraxis', 'workflows', 'proj.json'), JSON.stringify({ ...def, id: 'wf-2', name: '项目工作流' }), 'utf8');
+    await fs.writeFile(
+      path.join(projectRoot, '.auraxis', 'workflows', 'proj.json'),
+      JSON.stringify({ ...def, id: 'wf-2', name: '项目工作流' }),
+      'utf8',
+    );
     const list = await listWorkflows(projectRoot);
     expect(list.map((d) => d.id).sort()).toEqual(['wf-1', 'wf-2']);
   });
@@ -129,10 +154,13 @@ describe('workflow-engine', () => {
   });
 
   it('rejects cyclic workflows before starting', async () => {
-    const cyclic: WorkflowDef = { ...def, steps: [
-      { id: 'a', name: 'A', prompt: '', dependsOn: ['b'] },
-      { id: 'b', name: 'B', prompt: '', dependsOn: ['a'] },
-    ] };
+    const cyclic: WorkflowDef = {
+      ...def,
+      steps: [
+        { id: 'a', name: 'A', prompt: '', dependsOn: ['b'] },
+        { id: 'b', name: 'B', prompt: '', dependsOn: ['a'] },
+      ],
+    };
     await expect(startWorkflow(cyclic, projectRoot)).rejects.toThrow(/循环依赖/);
   });
 

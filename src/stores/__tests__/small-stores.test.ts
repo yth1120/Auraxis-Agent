@@ -98,7 +98,16 @@ describe('小型 Zustand Store 行为', () => {
         beliefAudit: vi.fn(async () => ({
           ok: true,
           data: {
-            belief: { id: 'a', kind: 'project', title: 't-a', text: 'c-a', status: 'active', legacy: 0, importance: 3, updated_at: 1 },
+            belief: {
+              id: 'a',
+              kind: 'project',
+              title: 't-a',
+              text: 'c-a',
+              status: 'active',
+              legacy: 0,
+              importance: 3,
+              updated_at: 1,
+            },
             evidence: [],
             revisions: [],
           },
@@ -106,13 +115,30 @@ describe('小型 Zustand Store 行为', () => {
         readForQuery: vi.fn(async () => ({
           ok: true,
           data: {
-            context: [{ beliefId: 'a', title: 't-a', text: 'c-a', evidenceIds: [], ts: 1, supportStrength: 0.5, score: 0.9, routes: ['keyword'] }],
+            context: [
+              {
+                beliefId: 'a',
+                title: 't-a',
+                text: 'c-a',
+                evidenceIds: [],
+                ts: 1,
+                supportStrength: 0.5,
+                score: 0.9,
+                routes: ['keyword'],
+              },
+            ],
             policy: { requireCitation: true, refuseOnUncertain: true, scope: '/p', maxTokens: 900, defaultRules: [] },
             facts: ['- [project] t-a：c-a'],
             diagnostics: {
-              routes: [], budget: { allocated: 900, used: 1, truncated: false },
-              missingEvidence: false, unsupportedExtraction: false, staleState: false,
-              retrievalLoss: false, modelBehaviorFlagged: false, latencyMs: 1, deterministic: true,
+              routes: [],
+              budget: { allocated: 900, used: 1, truncated: false },
+              missingEvidence: false,
+              unsupportedExtraction: false,
+              staleState: false,
+              retrievalLoss: false,
+              modelBehaviorFlagged: false,
+              latencyMs: 1,
+              deterministic: true,
             },
             readRunId: 'run-1',
           },

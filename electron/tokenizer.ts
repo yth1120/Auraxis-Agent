@@ -10,7 +10,8 @@
  * added_tokens（如 <｜tool▁calls▁begin｜>、<think>、FIM 标记）按官方定义各计 1 个 token，
  * 在文本中出现时先剥离再对剩余内容做 BPE，避免重复计费。
  */
-import { ipcMain, app } from 'electron';
+import { errorText } from './errors';
+import { app } from 'electron';
 import { secureHandle } from './ipc/trust';
 import { readFileSync, existsSync } from 'fs';
 import path from 'path';
@@ -195,7 +196,12 @@ export function countTokens(text: string): number {
 }
 
 /** 仅供测试/调试：返回已加载模型的统计信息。 */
-export function getTokenizerStats(): { vocabSize: number; mergeCount: number; splitPatterns: number; addedTokens: number } {
+export function getTokenizerStats(): {
+  vocabSize: number;
+  mergeCount: number;
+  splitPatterns: number;
+  addedTokens: number;
+} {
   const model = loadTokenizer();
   return {
     vocabSize: model.vocab.size,
@@ -210,8 +216,8 @@ export function registerTokenizerIpc(): void {
     if (typeof text !== 'string') return { ok: false, error: 'text 必须为字符串' };
     try {
       return { ok: true, data: countTokens(text) };
-    } catch (error: any) {
-      return { ok: false, error: error?.message ?? String(error) };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 }

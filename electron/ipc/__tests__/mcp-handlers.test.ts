@@ -25,7 +25,9 @@ function fakeChild() {
   child.stdout = new EventEmitter();
   child.stderr = new EventEmitter();
   child.kill = vi.fn();
-  child.removeAllListeners = vi.fn((...args: any[]) => (EventEmitter.prototype as any).removeAllListeners.apply(child, args)) as any;
+  child.removeAllListeners = vi.fn((...args: any[]) =>
+    (EventEmitter.prototype as any).removeAllListeners.apply(child, args),
+  ) as any;
   return child;
 }
 
@@ -35,7 +37,10 @@ function respond(child: any, line: unknown) {
 }
 
 const cfg = (overrides: Record<string, unknown> = {}) => ({
-  id: 'srv1', name: '测试服务器', command: 'npx', args: ['-y', '@modelcontextprotocol/server'],
+  id: 'srv1',
+  name: '测试服务器',
+  command: 'npx',
+  args: ['-y', '@modelcontextprotocol/server'],
   env: { FOO: 'bar' },
   ...overrides,
 });
@@ -71,7 +76,11 @@ describe('mcp — setServers / connect / disconnect', () => {
     await set({}, [cfg()]);
 
     respond(child, { jsonrpc: '2.0', id: 1, result: { protocolVersion: '2024-11-05' } });
-    respond(child, { jsonrpc: '2.0', id: 2, result: { tools: [{ name: 'ping', description: 'd', inputSchema: { type: 'object' } }] } });
+    respond(child, {
+      jsonrpc: '2.0',
+      id: 2,
+      result: { tools: [{ name: 'ping', description: 'd', inputSchema: { type: 'object' } }] },
+    });
     const r = await connect({}, 'srv1');
     expect(r.ok).toBe(true);
     expect(r.data).toMatchObject({ serverId: 'srv1', connected: true, toolCount: 1 });

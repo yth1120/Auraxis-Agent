@@ -1,3 +1,4 @@
+import { errorText } from '../../electron/errors';
 import { create } from 'zustand';
 import type { DirectoryEntry } from '../../electron/types';
 import type { FileActivity } from '../types/chat';
@@ -24,7 +25,7 @@ export interface FileTreeStore {
   clear: () => void;
 }
 
-export const useFileTreeStore = create<FileTreeStore>()((set, get) => ({
+export const useFileTreeStore = create<FileTreeStore>()((set) => ({
   tree: null,
   loading: false,
   error: null,
@@ -32,8 +33,7 @@ export const useFileTreeStore = create<FileTreeStore>()((set, get) => ({
   projectRoot: null,
   fileStatus: {},
 
-  setFileStatus: (filePath, activity) =>
-    set((s) => ({ fileStatus: { ...s.fileStatus, [filePath]: activity } })),
+  setFileStatus: (filePath, activity) => set((s) => ({ fileStatus: { ...s.fileStatus, [filePath]: activity } })),
 
   clearFileStatus: (filePath) =>
     set((s) => {
@@ -62,8 +62,8 @@ export const useFileTreeStore = create<FileTreeStore>()((set, get) => ({
       } else {
         set({ error: result?.error || '获取文件树失败', loading: false });
       }
-    } catch (err: any) {
-      set({ error: err.message || '获取文件树失败', loading: false });
+    } catch (err: unknown) {
+      set({ error: errorText(err) || '获取文件树失败', loading: false });
     }
   },
 
@@ -93,7 +93,8 @@ export const useFileTreeStore = create<FileTreeStore>()((set, get) => ({
       return { expandedPaths: next };
     }),
 
-  clear: () => set({ tree: null, loading: false, error: null, expandedPaths: new Set(), projectRoot: null, fileStatus: {} }),
+  clear: () =>
+    set({ tree: null, loading: false, error: null, expandedPaths: new Set(), projectRoot: null, fileStatus: {} }),
 }));
 
 // ── Auto-refetch when fileTreeVersion changes ──────────────

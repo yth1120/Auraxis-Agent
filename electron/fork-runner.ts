@@ -6,6 +6,7 @@
  * never corrupt the parent turn. Falls back cleanly when the headless entry
  * is unavailable (e.g. the dist-electron build is missing in dev).
  */
+import { errorText } from './errors';
 import { spawn } from 'child_process';
 import path from 'path';
 
@@ -33,14 +34,7 @@ export function runForkedSubagent(opts: ForkedSubagentOptions): Promise<ForkedSu
   return new Promise((resolve) => {
     const timeoutMs = opts.timeoutMs && opts.timeoutMs > 0 ? opts.timeoutMs : DEFAULT_TIMEOUT;
     const appRoot = path.join(__dirname, '..');
-    const argv = [
-      '.',
-      '--run',
-      opts.prompt,
-      '--project',
-      opts.projectRoot,
-      '--json',
-    ];
+    const argv = ['.', '--run', opts.prompt, '--project', opts.projectRoot, '--json'];
     if (opts.autoApprove === true) argv.push('--auto-approve');
 
     let child: ReturnType<typeof spawn>;
@@ -51,13 +45,13 @@ export function runForkedSubagent(opts: ForkedSubagentOptions): Promise<ForkedSu
         shell: false,
         stdio: ['ignore', 'pipe', 'pipe'],
       });
-    } catch (err: any) {
-      resolve({ ok: false, unavailable: true, error: `无法启动分叉子代理: ${err?.message ?? String(err)}` });
+    } catch (err: unknown) {
+      resolve({ ok: false, unavailable: true, error: `无法启动分叉子代理: ${errorText(err)}` });
       return;
     }
 
-    let stdout = '';
-    let stderr = '';
+    const stdout = '';
+    const stderr = '';
     let settled = false;
 
     const finish = (patch: ForkedSubagentResult) => {
@@ -69,13 +63,21 @@ export function runForkedSubagent(opts: ForkedSubagentOptions): Promise<ForkedSu
     };
 
     const onAbort = () => {
-      try { child.kill(); } catch { /* gone */ }
+      try {
+        child.kill();
+      } catch {
+        /* gone */
+      }
       finish({ ok: false, error: '分叉子代理已被中止' });
     };
     opts.signal?.addEventListener('abort', onAbort);
 
     const timer = setTimeout(() => {
-      try { child.kill(); } catch { /* gone */ }
+      try {
+        child.kill();
+      } catch {
+        /* gone */
+      }
       finish({ ok: false, error: `分叉子代理超时（${Math.round(timeoutMs / 60000)} 分钟）` });
     }, timeoutMs);
 
@@ -106,7 +108,10 @@ export function runForkedSubagent(opts: ForkedSubagentOptions): Promise<ForkedSu
 
 /** Pull the final result text out of an NDJSON event stream. */
 export function finalResultFromJsonl(stdout: string): string {
-  const lines = stdout.split('\n').map((l) => l.trim()).filter(Boolean);
+  const lines = stdout
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
   for (let i = lines.length - 1; i >= 0; i--) {
     const line = lines[i];
     try {

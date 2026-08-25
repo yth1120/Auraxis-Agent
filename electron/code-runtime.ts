@@ -32,11 +32,14 @@ const DEFAULT_TIMEOUT = 30_000;
 
 function languageBinary(language: CodeLanguage): { bin: string; file: string; args?: string[] } {
   switch (language) {
-    case 'python': return { bin: 'python3', file: 'main.py' };
-    case 'shell': return process.platform === 'win32'
-      ? { bin: process.env.ComSpec || 'cmd.exe', file: 'run.cmd', args: ['/d', '/s', '/c'] }
-      : { bin: 'bash', file: 'run.sh' };
-    default: return { bin: process.execPath, file: 'main.js' };
+    case 'python':
+      return { bin: 'python3', file: 'main.py' };
+    case 'shell':
+      return process.platform === 'win32'
+        ? { bin: process.env.ComSpec || 'cmd.exe', file: 'run.cmd', args: ['/d', '/s', '/c'] }
+        : { bin: 'bash', file: 'run.sh' };
+    default:
+      return { bin: process.execPath, file: 'main.js' };
   }
 }
 

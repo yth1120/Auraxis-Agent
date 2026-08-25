@@ -101,10 +101,7 @@ describe('hooks', () => {
 
   it('解析钩子协议响应（stdin JSON + decision envelope）', async () => {
     const fixture = path.join(__dirname, 'fixtures', 'hook-protocol.cjs');
-    const result = await runHook(
-      { command: `node ${JSON.stringify(fixture)}` },
-      { prompt: 'hi' },
-    );
+    const result = await runHook({ command: `node ${JSON.stringify(fixture)}` }, { prompt: 'hi' });
     expect(result.protocol?.decision).toBe('allow');
     expect(result.protocol?.continue).toBe(false);
     expect(result.protocol?.stopReason).toBe('用户取消');

@@ -8,9 +8,7 @@ import type { TaskPlan } from './agent-loop';
  */
 
 export function plansDir(projectRoot?: string, fallbackDir = ''): string {
-  return projectRoot
-    ? path.join(projectRoot, '.auraxis', 'plans')
-    : path.join(fallbackDir, 'plans');
+  return projectRoot ? path.join(projectRoot, '.auraxis', 'plans') : path.join(fallbackDir, 'plans');
 }
 
 function slugify(text: string): string {
@@ -31,10 +29,7 @@ export interface PlanSaveOptions {
   title?: string;
 }
 
-export async function savePlanMarkdown(
-  plan: TaskPlan,
-  opts: PlanSaveOptions = {},
-): Promise<string | null> {
+export async function savePlanMarkdown(plan: TaskPlan, opts: PlanSaveOptions = {}): Promise<string | null> {
   try {
     const dir = plansDir(opts.projectRoot, opts.fallbackDir);
     await mkdir(dir, { recursive: true });
@@ -70,10 +65,7 @@ export interface PlanFileInfo {
   createdAt: number;
 }
 
-export async function listPlanFiles(
-  projectRoot?: string,
-  fallbackDir = '',
-): Promise<PlanFileInfo[]> {
+export async function listPlanFiles(projectRoot?: string, fallbackDir = ''): Promise<PlanFileInfo[]> {
   const dir = plansDir(projectRoot, fallbackDir);
   const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
   const files = await Promise.all(

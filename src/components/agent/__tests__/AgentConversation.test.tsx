@@ -23,9 +23,25 @@ const agent: AgentInfo = {
   totalOutputTokens: 50,
   log: [
     { type: 'iteration_start', timestamp: 1, iteration: 1 },
-    { type: 'tool_start', timestamp: 2, toolCallId: 'tc1', toolName: 'Bash', input: { command: 'npm test', workdir: 'app' }, streamOutput: '' },
+    {
+      type: 'tool_start',
+      timestamp: 2,
+      toolCallId: 'tc1',
+      toolName: 'Bash',
+      input: { command: 'npm test', workdir: 'app' },
+      streamOutput: '',
+    },
     { type: 'progress', timestamp: 3, toolCallId: 'tc1', toolName: 'Bash', text: 'PASS' },
-    { type: 'tool_end', timestamp: 4, toolCallId: 'tc1', toolName: 'Bash', input: { command: 'npm test', workdir: 'app' }, output: { stdout: 'PASS', exitCode: 0 }, durationMs: 120, streamOutput: 'PASS' },
+    {
+      type: 'tool_end',
+      timestamp: 4,
+      toolCallId: 'tc1',
+      toolName: 'Bash',
+      input: { command: 'npm test', workdir: 'app' },
+      output: { stdout: 'PASS', exitCode: 0 },
+      durationMs: 120,
+      streamOutput: 'PASS',
+    },
     { type: 'text', timestamp: 5, text: '测试通过。' },
   ],
 };
@@ -49,14 +65,23 @@ describe('AgentConversation — Agent 执行视图', () => {
   it('keeps the running-only filter active while streaming', () => {
     useAppStore.setState({ agentRunningOnly: true });
     useAgentStore.setState({
-      agents: [{
-        ...agent,
-        log: [
-          { type: 'iteration_start', timestamp: 1, iteration: 1 },
-          { type: 'tool_start', timestamp: 2, toolCallId: 'tc-live', toolName: 'Bash', input: { command: 'npm run dev', workdir: 'app' }, streamOutput: '' },
-          { type: 'text', timestamp: 3, text: '测试通过。' },
-        ],
-      }],
+      agents: [
+        {
+          ...agent,
+          log: [
+            { type: 'iteration_start', timestamp: 1, iteration: 1 },
+            {
+              type: 'tool_start',
+              timestamp: 2,
+              toolCallId: 'tc-live',
+              toolName: 'Bash',
+              input: { command: 'npm run dev', workdir: 'app' },
+              streamOutput: '',
+            },
+            { type: 'text', timestamp: 3, text: '测试通过。' },
+          ],
+        },
+      ],
       currentAgentId: 'a1',
     });
     const { container } = render(<AgentConversation />);

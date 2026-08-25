@@ -4,12 +4,20 @@ import { describe, it, expect, vi } from 'vitest';
 // this offline environment, so stub the module surface used at load time.
 vi.mock('electron', () => ({
   app: { getPath: () => '', getName: () => 'auraxis' },
-  BrowserWindow: class { static fromWebContents() { return null; } },
+  BrowserWindow: class {
+    static fromWebContents() {
+      return null;
+    }
+  },
   ipcMain: { handle: vi.fn(), on: vi.fn(), removeHandler: vi.fn() },
   dialog: { showOpenDialog: vi.fn(), showMessageBox: vi.fn() },
   shell: { openExternal: vi.fn() },
   Notification: class {},
-  safeStorage: { encryptString: vi.fn((s: string) => s), decryptString: vi.fn((s: string) => s), isEncryptionAvailable: () => true },
+  safeStorage: {
+    encryptString: vi.fn((s: string) => s),
+    decryptString: vi.fn((s: string) => s),
+    isEncryptionAvailable: () => true,
+  },
 }));
 import { runToolBatch, isDeniedError, type ToolRunCallbacks, type ToolRunContext } from '../tool-runner';
 
@@ -194,9 +202,7 @@ describe('tool-runner', () => {
       ],
       mkCtx({
         executeTool: exec as any,
-        riskGate: async (name) => (name === 'Write'
-          ? { allowed: false, reason: '证据信任不足' }
-          : { allowed: true }),
+        riskGate: async (name) => (name === 'Write' ? { allowed: false, reason: '证据信任不足' } : { allowed: true }),
       }),
       mkCallbacks({ onToolResult }),
     );

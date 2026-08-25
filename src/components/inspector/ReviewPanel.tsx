@@ -27,12 +27,8 @@ interface FileReview {
 export default function ReviewPanel() {
   const t = useT();
   const currentAgentId = useAgentStore((s) => s.currentAgentId);
-  const agentStatus = useAgentStore(
-    (s) => s.agents.find((a) => a.id === s.currentAgentId)?.status,
-  );
-  const agentProjectRoot = useAgentStore(
-    (s) => s.agents.find((a) => a.id === s.currentAgentId)?.projectRoot,
-  );
+  const agentStatus = useAgentStore((s) => s.agents.find((a) => a.id === s.currentAgentId)?.status);
+  const agentProjectRoot = useAgentStore((s) => s.agents.find((a) => a.id === s.currentAgentId)?.projectRoot);
   const settingsProjectPath = useSettingsStore((s) => s.projectPath);
   const projectPath = agentProjectRoot || settingsProjectPath;
   const [diffs, setDiffs] = useState<WorkspaceFileDiff[]>([]);
@@ -61,23 +57,28 @@ export default function ReviewPanel() {
     fetchDiffs();
   }, [fetchDiffs, settled]);
 
-  const files = useMemo<FileReview[]>(() => diffs
-    .filter((d) => !d.skipped)
-    .map((d) => {
-      const { added, removed } = countDiffChanges(d.oldContent || '', d.newContent || '');
-      return { diff: d, added, removed, churn: added + removed };
-    })
-    .sort((a, b) => b.churn - a.churn), [diffs]);
+  const files = useMemo<FileReview[]>(
+    () =>
+      diffs
+        .filter((d) => !d.skipped)
+        .map((d) => {
+          const { added, removed } = countDiffChanges(d.oldContent || '', d.newContent || '');
+          return { diff: d, added, removed, churn: added + removed };
+        })
+        .sort((a, b) => b.churn - a.churn),
+    [diffs],
+  );
 
   useEffect(() => {
     if (selected >= files.length) setSelected(0);
   }, [files.length, selected]);
 
   const totals = useMemo(
-    () => files.reduce(
-      (acc, f) => ({ added: acc.added + f.added, removed: acc.removed + f.removed }),
-      { added: 0, removed: 0 },
-    ),
+    () =>
+      files.reduce((acc, f) => ({ added: acc.added + f.added, removed: acc.removed + f.removed }), {
+        added: 0,
+        removed: 0,
+      }),
     [files],
   );
   const maxChurn = Math.max(1, ...files.map((f) => f.churn));
@@ -109,16 +110,15 @@ export default function ReviewPanel() {
 
   const reviewAll = () => {
     if (!currentAgentId || files.length === 0) return;
-    const summary = files
-      .map((f) => `- ${f.diff.path}: +${f.added} / -${f.removed}`)
-      .join('\n');
+    const summary = files.map((f) => `- ${f.diff.path}: +${f.added} / -${f.removed}`).join('\n');
     backfillComposer(
       `请审查当前任务的全部变更（${files.length} 个文件，+${totals.added} / -${totals.removed} 行）：\n\n${summary}\n\n请按优先级指出问题：回归风险、缺失测试、安全问题、可读性，并给出具体修复建议（P0 问题必须先修）。`,
       currentAgentId,
     );
   };
 
-  const smallBtn = 'text-2xs text-text-muted px-1.5 py-[2px] rounded-md cursor-pointer enabled:hover:bg-[var(--color-hover)] enabled:hover:text-text-secondary disabled:opacity-40 disabled:cursor-default';
+  const smallBtn =
+    'text-2xs text-text-muted px-1.5 py-[2px] rounded-md cursor-pointer enabled:hover:bg-[var(--color-hover)] enabled:hover:text-text-secondary disabled:opacity-40 disabled:cursor-default';
 
   return (
     <div className="flex flex-col h-full w-full bg-transparent overflow-hidden">
@@ -126,7 +126,8 @@ export default function ReviewPanel() {
         <span className="flex items-center gap-1.5 font-semibold text-xs text-secondary">
           <ShieldCheck size={14} className="text-primary" />
           {t('review.title')}
-          {files.length > 0 && ` · ${t('review.fileSummary', { n: files.length, added: totals.added, removed: totals.removed })}`}
+          {files.length > 0 &&
+            ` · ${t('review.fileSummary', { n: files.length, added: totals.added, removed: totals.removed })}`}
         </span>
         <span className="flex items-center gap-1.5 shrink-0">
           <button
@@ -190,10 +191,17 @@ export default function ReviewPanel() {
                     <span className="flex-1 min-w-0 flex flex-col">
                       <span className="flex items-baseline gap-[6px] min-w-0">
                         <span className="font-mono whitespace-nowrap shrink-0 text-text-primary">{name}</span>
-                        {dir && <span className="font-mono text-2xs text-muted whitespace-nowrap overflow-hidden text-ellipsis">{dir}</span>}
+                        {dir && (
+                          <span className="font-mono text-2xs text-muted whitespace-nowrap overflow-hidden text-ellipsis">
+                            {dir}
+                          </span>
+                        )}
                       </span>
                       <span className="inline-block h-[3px] w-24 rounded-full bg-[var(--color-bg-inset)] overflow-hidden">
-                        <span className="block h-full rounded-full bg-primary" style={{ width: `${Math.max(4, Math.round((f.churn / maxChurn) * 100))}%` }} />
+                        <span
+                          className="block h-full rounded-full bg-primary"
+                          style={{ width: `${Math.max(4, Math.round((f.churn / maxChurn) * 100))}%` }}
+                        />
                       </span>
                     </span>
                     <span className="shrink-0 flex items-center gap-1.5 text-2xs tabular-nums">
@@ -220,21 +228,24 @@ export default function ReviewPanel() {
               <span className="text-2xs text-text-muted">{t('review.orderHint')}</span>
               <span className="flex items-center gap-1">
                 {settled && (
-                  <button
-                    type="button"
-                    className={smallBtn}
-                    onClick={() => void revertFile(current.diff)}
-                  >
+                  <button type="button" className={smallBtn} onClick={() => void revertFile(current.diff)}>
                     {t('diff.revert')}
                   </button>
                 )}
                 <button
                   type="button"
                   className={smallBtn}
-                  onClick={() => current && backfillComposer(
-                    buildFileFollowUpInstruction(current.diff.path, current.diff.oldContent || '', current.diff.newContent || ''),
-                    currentAgentId,
-                  )}
+                  onClick={() =>
+                    current &&
+                    backfillComposer(
+                      buildFileFollowUpInstruction(
+                        current.diff.path,
+                        current.diff.oldContent || '',
+                        current.diff.newContent || '',
+                      ),
+                      currentAgentId,
+                    )
+                  }
                 >
                   {t('review.continueFile')}
                 </button>

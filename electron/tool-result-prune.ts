@@ -25,7 +25,7 @@ function truncate(s: string, n: number): string {
 function tryParse(content: string): Record<string, unknown> | null {
   try {
     const v = JSON.parse(content);
-    return v && typeof v === 'object' ? v as Record<string, unknown> : null;
+    return v && typeof v === 'object' ? (v as Record<string, unknown>) : null;
   } catch {
     return null;
   }
@@ -35,11 +35,12 @@ function isCritical(obj: Record<string, unknown>, plan: any): boolean {
   if (!plan?.tasks || !Array.isArray(plan.tasks) || plan.tasks.length === 0) return false;
   const pathStr = typeof obj.file_path === 'string' ? obj.file_path : '';
   if (!pathStr || typeof obj.total_lines !== 'number' || obj.total_lines <= 10) return false;
-  return plan.tasks.some((t: any) => typeof t.description === 'string' && t.description.includes(pathStr.split(/[/\\]/).pop() || pathStr));
+  return plan.tasks.some(
+    (t: any) => typeof t.description === 'string' && t.description.includes(pathStr.split(/[/\\]/).pop() || pathStr),
+  );
 }
 
 function summarize(content: string, plan: any, config: PruneConfig): string {
-  const pruneAbove = config.pruneAboveChars ?? 4000;
   const maxKeep = config.maxKeepChars ?? 2000;
   const maxCritical = config.maxCriticalChars ?? 6000;
   const obj = tryParse(content);

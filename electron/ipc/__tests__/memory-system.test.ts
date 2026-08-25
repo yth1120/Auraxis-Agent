@@ -44,11 +44,18 @@ describe('Memory deduplication', () => {
   }
 
   it('完全相同标题+高相似内容不重复存储', () => {
-    const existing: Memory[] = [{
-      id: '1', title: 'React Router v6',
-      content: '项目统一使用 React Router v6，采用 createBrowserRouter',
-      type: 'decision', tags: '["react","routing"]', is_active: 1, importance: 4, timestamp: Date.now(),
-    }];
+    const existing: Memory[] = [
+      {
+        id: '1',
+        title: 'React Router v6',
+        content: '项目统一使用 React Router v6，采用 createBrowserRouter',
+        type: 'decision',
+        tags: '["react","routing"]',
+        is_active: 1,
+        importance: 4,
+        timestamp: Date.now(),
+      },
+    ];
 
     const newMem = { title: 'React Router v6', content: '项目统一使用 React Router v6，采用 createBrowserRouter API' };
     const titleSim = similarityScore(newMem.title, existing[0].title);
@@ -59,10 +66,18 @@ describe('Memory deduplication', () => {
   });
 
   it('不同标题的记忆正常存储', () => {
-    const existing: Memory[] = [{
-      id: '1', title: 'React Router v6',
-      content: '使用 React Router v6', type: 'decision', tags: '["react"]', is_active: 1, importance: 4, timestamp: Date.now(),
-    }];
+    const existing: Memory[] = [
+      {
+        id: '1',
+        title: 'React Router v6',
+        content: '使用 React Router v6',
+        type: 'decision',
+        tags: '["react"]',
+        is_active: 1,
+        importance: 4,
+        timestamp: Date.now(),
+      },
+    ];
 
     const newMem = { title: 'TypeScript strict mode', content: '启用 TypeScript strict mode' };
     const titleSim = similarityScore(newMem.title, existing[0].title);
@@ -73,9 +88,36 @@ describe('Memory deduplication', () => {
 
 describe('Memory retrieval', () => {
   const memories: Memory[] = [
-    { id: '1', title: '使用 React Router', content: '...', type: 'decision', tags: '["react","routing"]', is_active: 1, importance: 4, timestamp: 1000 },
-    { id: '2', title: '用户认证方案', content: '...', type: 'architecture', tags: '["auth","jwt"]', is_active: 1, importance: 5, timestamp: 2000 },
-    { id: '3', title: '临时调试日志', content: '...', type: 'context', tags: '["debug"]', is_active: 1, importance: 1, timestamp: 3000 },
+    {
+      id: '1',
+      title: '使用 React Router',
+      content: '...',
+      type: 'decision',
+      tags: '["react","routing"]',
+      is_active: 1,
+      importance: 4,
+      timestamp: 1000,
+    },
+    {
+      id: '2',
+      title: '用户认证方案',
+      content: '...',
+      type: 'architecture',
+      tags: '["auth","jwt"]',
+      is_active: 1,
+      importance: 5,
+      timestamp: 2000,
+    },
+    {
+      id: '3',
+      title: '临时调试日志',
+      content: '...',
+      type: 'context',
+      tags: '["debug"]',
+      is_active: 1,
+      importance: 1,
+      timestamp: 3000,
+    },
   ];
 
   it('按项目路径检索活跃记忆', () => {
@@ -104,8 +146,26 @@ describe('Memory retrieval', () => {
 
 describe('Memory archival', () => {
   const memories: Memory[] = [
-    { id: '1', title: 'Active memory', content: '...', type: 'context', tags: '[]', is_active: 1, importance: 3, timestamp: 1000 },
-    { id: '2', title: 'Archived memory', content: '...', type: 'context', tags: '[]', is_active: 0, importance: 3, timestamp: 2000 },
+    {
+      id: '1',
+      title: 'Active memory',
+      content: '...',
+      type: 'context',
+      tags: '[]',
+      is_active: 1,
+      importance: 3,
+      timestamp: 1000,
+    },
+    {
+      id: '2',
+      title: 'Archived memory',
+      content: '...',
+      type: 'context',
+      tags: '[]',
+      is_active: 0,
+      importance: 3,
+      timestamp: 2000,
+    },
   ];
 
   it('归档后不出现在活跃记忆中', () => {
@@ -123,9 +183,36 @@ describe('Memory archival', () => {
 
 describe('Memory preamble formatting', () => {
   const memories: Memory[] = [
-    { id: '1', title: 'React Router', content: '使用 React Router v6 进行路由', type: 'decision', tags: '[]', is_active: 1, importance: 4, timestamp: Date.now() },
-    { id: '2', title: 'JWT Auth', content: '使用 JWT 进行用户认证', type: 'architecture', tags: '[]', is_active: 1, importance: 5, timestamp: Date.now() },
-    { id: '3', title: '推荐 named export', content: '用户偏好使用 named export', type: 'preference', tags: '[]', is_active: 1, importance: 3, timestamp: Date.now() },
+    {
+      id: '1',
+      title: 'React Router',
+      content: '使用 React Router v6 进行路由',
+      type: 'decision',
+      tags: '[]',
+      is_active: 1,
+      importance: 4,
+      timestamp: Date.now(),
+    },
+    {
+      id: '2',
+      title: 'JWT Auth',
+      content: '使用 JWT 进行用户认证',
+      type: 'architecture',
+      tags: '[]',
+      is_active: 1,
+      importance: 5,
+      timestamp: Date.now(),
+    },
+    {
+      id: '3',
+      title: '推荐 named export',
+      content: '用户偏好使用 named export',
+      type: 'preference',
+      tags: '[]',
+      is_active: 1,
+      importance: 3,
+      timestamp: Date.now(),
+    },
   ];
 
   it('formatMemoryPreamble 输出包含类型分组标题', () => {
@@ -135,9 +222,12 @@ describe('Memory preamble formatting', () => {
     }
 
     const labels: Record<string, string> = {
-      decision: '关键决策', architecture: '架构信息',
-      preference: '用户偏好', progress: '上次进度',
-      problem: '已知问题', context: '上下文信息',
+      decision: '关键决策',
+      architecture: '架构信息',
+      preference: '用户偏好',
+      progress: '上次进度',
+      problem: '已知问题',
+      context: '上下文信息',
     };
 
     const sections: string[] = ['## 项目记忆（来自之前的会话）\n'];

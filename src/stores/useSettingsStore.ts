@@ -116,11 +116,12 @@ export const useSettingsStore = create<SettingsStore>()(
       maxOutputTokens: 8192,
 
       setNotifyOnAgentComplete: (enabled) => set({ notifyOnAgentComplete: enabled }),
-      setNotificationMode: (mode) => set({
-        notificationMode: mode,
-        // Keep the legacy boolean in sync — backend notifications use it today.
-        notifyOnAgentComplete: mode !== 'never',
-      }),
+      setNotificationMode: (mode) =>
+        set({
+          notificationMode: mode,
+          // Keep the legacy boolean in sync — backend notifications use it today.
+          notifyOnAgentComplete: mode !== 'never',
+        }),
       setPermissionNotifications: (enabled) => set({ permissionNotifications: enabled }),
       setAlwaysShowMessageActions: (enabled) => set({ alwaysShowMessageActions: enabled }),
       setCostCurrency: (currency) => set({ costCurrency: currency }),
@@ -264,11 +265,14 @@ export const useSettingsStore = create<SettingsStore>()(
       }),
       onRehydrateStorage: () => (state) => {
         if (state && window.electronAPI?.settings) {
-          window.electronAPI.settings.getApiKey('deepseek').then((result) => {
-            if (result.ok && result.data) {
-              useSettingsStore.setState({ deepseekApiKey: result.data });
-            }
-          }).catch(() => {});
+          window.electronAPI.settings
+            .getApiKey('deepseek')
+            .then((result) => {
+              if (result.ok && result.data) {
+                useSettingsStore.setState({ deepseekApiKey: result.data });
+              }
+            })
+            .catch(() => {});
           // Permission preset is the single source of truth; legacy
           // sandboxMode migrates only when the user has not already chosen a
           // preset (prevents e.g. preset=ask + sandbox=full after an upgrade).
@@ -321,57 +325,81 @@ export const useSettingsStore = create<SettingsStore>()(
               void api.set('sandboxMode', current.sandboxMode).catch(() => {});
             }
           })();
-          window.electronAPI.settings.get('webSearchProvider').then((result) => {
-            const v = result?.data;
-            if (typeof v === 'string' && v) useSettingsStore.setState({ webSearchProvider: v });
-          }).catch(() => {});
-          window.electronAPI.settings.get('maxOutputTokens').then((result) => {
-            const v = result?.data;
-            if (typeof v === 'number' && v >= 1024 && v <= 384_000) {
-              useSettingsStore.setState({ maxOutputTokens: Math.round(v) });
-            }
-          }).catch(() => {});
-          window.electronAPI.settings.get('exaApiKey').then((result) => {
-            if (typeof result?.data === 'string') useSettingsStore.setState({ exaApiKey: result.data });
-          }).catch(() => {});
-          window.electronAPI.settings.get('perplexityApiKey').then((result) => {
-            if (typeof result?.data === 'string') useSettingsStore.setState({ perplexityApiKey: result.data });
-          }).catch(() => {});
-          window.electronAPI.settings.get('sidebarGlass').then((result) => {
-            const v = Number(result?.data);
-            if (Number.isFinite(v)) {
-              useSettingsStore.setState({ sidebarGlass: Math.max(0, Math.min(100, Math.round(v))) });
-            }
-          }).catch(() => {});
-          window.electronAPI.settings.get('wallpaper').then((result) => {
-            const v = result?.data;
-            useSettingsStore.setState({ wallpaper: typeof v === 'string' && v ? v : null });
-          }).catch(() => {});
+          window.electronAPI.settings
+            .get('webSearchProvider')
+            .then((result) => {
+              const v = result?.data;
+              if (typeof v === 'string' && v) useSettingsStore.setState({ webSearchProvider: v });
+            })
+            .catch(() => {});
+          window.electronAPI.settings
+            .get('maxOutputTokens')
+            .then((result) => {
+              const v = result?.data;
+              if (typeof v === 'number' && v >= 1024 && v <= 384_000) {
+                useSettingsStore.setState({ maxOutputTokens: Math.round(v) });
+              }
+            })
+            .catch(() => {});
+          window.electronAPI.settings
+            .get('exaApiKey')
+            .then((result) => {
+              if (typeof result?.data === 'string') useSettingsStore.setState({ exaApiKey: result.data });
+            })
+            .catch(() => {});
+          window.electronAPI.settings
+            .get('perplexityApiKey')
+            .then((result) => {
+              if (typeof result?.data === 'string') useSettingsStore.setState({ perplexityApiKey: result.data });
+            })
+            .catch(() => {});
+          window.electronAPI.settings
+            .get('sidebarGlass')
+            .then((result) => {
+              const v = Number(result?.data);
+              if (Number.isFinite(v)) {
+                useSettingsStore.setState({ sidebarGlass: Math.max(0, Math.min(100, Math.round(v))) });
+              }
+            })
+            .catch(() => {});
+          window.electronAPI.settings
+            .get('wallpaper')
+            .then((result) => {
+              const v = result?.data;
+              useSettingsStore.setState({ wallpaper: typeof v === 'string' && v ? v : null });
+            })
+            .catch(() => {});
           // Ask the main process whether Acrylic is available AND the current
           // window was created with it ready (needs a restart on old builds).
           // If it is ready and the persisted value is non-zero, make sure the
           // material is active.
           if (window.electronAPI.getGlassState) {
-            window.electronAPI.getGlassState().then((r) => {
-              const supported = !!(r?.ok && r.data?.supported);
-              const ready = !!(r?.ok && r.data?.ready);
-              useSettingsStore.setState({ sidebarGlassSupported: supported, sidebarGlassReady: ready });
-              if (supported && ready && useSettingsStore.getState().sidebarGlass > 0) {
-                window.electronAPI?.setBackgroundMaterial?.(true)?.catch?.(() => {});
-              }
-            }).catch(() => {});
+            window.electronAPI
+              .getGlassState()
+              .then((r) => {
+                const supported = !!(r?.ok && r.data?.supported);
+                const ready = !!(r?.ok && r.data?.ready);
+                useSettingsStore.setState({ sidebarGlassSupported: supported, sidebarGlassReady: ready });
+                if (supported && ready && useSettingsStore.getState().sidebarGlass > 0) {
+                  window.electronAPI?.setBackgroundMaterial?.(true)?.catch?.(() => {});
+                }
+              })
+              .catch(() => {});
           } else if (window.electronAPI.backgroundMaterialSupported) {
-            window.electronAPI.backgroundMaterialSupported().then((r) => {
-              const supported = !!(r?.ok && r.data);
-              // 旧版 preload 没有 window:glassState：无法确认当前窗口是否以
-              // 透明 + Acrylic 创建，保守地视为未就绪，避免旧窗口误开透明层。
-              useSettingsStore.setState({ sidebarGlassSupported: supported, sidebarGlassReady: false });
-            }).catch(() => {});
+            window.electronAPI
+              .backgroundMaterialSupported()
+              .then((r) => {
+                const supported = !!(r?.ok && r.data);
+                // 旧版 preload 没有 window:glassState：无法确认当前窗口是否以
+                // 透明 + Acrylic 创建，保守地视为未就绪，避免旧窗口误开透明层。
+                useSettingsStore.setState({ sidebarGlassSupported: supported, sidebarGlassReady: false });
+              })
+              .catch(() => {});
           }
         }
       },
-    }
-  )
+    },
+  ),
 );
 
 export function getApiKeyFromStore(): string | null {

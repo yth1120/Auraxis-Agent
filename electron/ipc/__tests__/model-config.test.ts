@@ -152,9 +152,7 @@ describe('getAllModels', () => {
 
   it('合并 env 自定义模型（去重）', async () => {
     delete process.env.AURAXIS_MODELS;
-    process.env.AURAXIS_MODELS = JSON.stringify([
-      { id: 'env-only', name: 'Env Only' },
-    ]);
+    process.env.AURAXIS_MODELS = JSON.stringify([{ id: 'env-only', name: 'Env Only' }]);
     vi.resetModules();
     vi.doMock('electron', () => ({
       app: { getPath: () => '/fake/userData' },
@@ -180,9 +178,7 @@ describe('getAllModels', () => {
     }));
     vi.doMock('../settings-store', () => ({
       readSettings: vi.fn().mockResolvedValue({
-        customModels: [
-          { id: 'settings-only', name: 'Settings Only' },
-        ],
+        customModels: [{ id: 'settings-only', name: 'Settings Only' }],
       }),
     }));
     const { getAllModels } = await importFresh();

@@ -6,6 +6,7 @@
  *            which the renderer plugin store applies at startup.
  */
 
+import { errorText } from './errors';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { app } from 'electron';
@@ -47,7 +48,11 @@ async function walk(dir: string, depth: number, out: PluginManifestInfo[]): Prom
     if (entry.startsWith('node_modules') || entry.startsWith('.git')) continue;
     const full = path.join(dir, entry);
     let stat;
-    try { stat = await fs.stat(full); } catch { continue; }
+    try {
+      stat = await fs.stat(full);
+    } catch {
+      continue;
+    }
     if (stat.isDirectory()) {
       await walk(full, depth + 1, out);
     } else if (entry === 'plugin.json' && path.basename(path.dirname(full)) === '.auraxis-plugin') {
@@ -79,7 +84,10 @@ async function readState(): Promise<{ enabledIds: string[] }> {
 }
 
 /** Set a plugin enabled/disabled in the shared state file. */
-export async function setPluginEnabled(id: string, enabled: boolean): Promise<{ ok: boolean; enabledIds: string[]; error?: string }> {
+export async function setPluginEnabled(
+  id: string,
+  enabled: boolean,
+): Promise<{ ok: boolean; enabledIds: string[]; error?: string }> {
   if (!id || typeof id !== 'string') return { ok: false, enabledIds: [], error: '插件 ID 必填' };
   const state = await readState();
   const next = new Set(state.enabledIds);
@@ -91,8 +99,8 @@ export async function setPluginEnabled(id: string, enabled: boolean): Promise<{ 
     await fs.mkdir(path.dirname(file), { recursive: true });
     await fs.writeFile(file, JSON.stringify({ enabledIds }, null, 2), 'utf8');
     return { ok: true, enabledIds };
-  } catch (e: any) {
-    return { ok: false, enabledIds, error: e?.message ?? String(e) };
+  } catch (e: unknown) {
+    return { ok: false, enabledIds, error: errorText(e) };
   }
 }
 

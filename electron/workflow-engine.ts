@@ -7,6 +7,7 @@
  * isolated Agent task whose result feeds {{stepId.result}} templates. Run
  * state is persisted to userData/workflow-runs/<runId>.json.
  */
+import { errorText } from './errors';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { app } from 'electron';
@@ -35,7 +36,12 @@ export interface WorkflowRunOptions {
   autoApprove?: boolean;
   mode?: ApprovalPolicy;
   sandboxMode?: SandboxMode;
-  checkPermission?: (toolName: string, input: Record<string, unknown>, toolCallId?: string, agentId?: string) => Promise<boolean>;
+  checkPermission?: (
+    toolName: string,
+    input: Record<string, unknown>,
+    toolCallId?: string,
+    agentId?: string,
+  ) => Promise<boolean>;
 }
 
 export type StepRunStatus = 'pending' | 'running' | 'completed' | 'error';
@@ -68,11 +74,13 @@ function runsDir(): string {
 }
 
 function slugify(s: string): string {
-  return s
-    .toLowerCase()
-    .replace(/[^\w\u4e00-\u9fa5]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 48) || 'step';
+  return (
+    s
+      .toLowerCase()
+      .replace(/[^\w\u4e00-\u9fa5]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 48) || 'step'
+  );
 }
 
 /**
@@ -150,7 +158,11 @@ export async function listWorkflows(projectRoot?: string): Promise<WorkflowDef[]
   for (const dir of [defsDir(), projectRoot ? path.join(projectRoot, '.auraxis', 'workflows') : null]) {
     if (!dir) continue;
     let files: string[];
-    try { files = await fs.readdir(dir); } catch { continue; }
+    try {
+      files = await fs.readdir(dir);
+    } catch {
+      continue;
+    }
     for (const file of files) {
       if (!file.endsWith('.json') && !file.endsWith('.md')) continue;
       const def = await readWorkflowFile(path.join(dir, file));
@@ -184,7 +196,10 @@ export function topoOrder(def: WorkflowDef): string[] {
 }
 
 export function renderTemplate(template: string, results: Record<string, string>): string {
-  return template.replace(/\{\{\s*([A-Za-z0-9_-]+)\.result\s*\}\}/g, (_m, id: string) => results[id] ?? `（${id} 无结果）`);
+  return template.replace(
+    /\{\{\s*([A-Za-z0-9_-]+)\.result\s*\}\}/g,
+    (_m, id: string) => results[id] ?? `（${id} 无结果）`,
+  );
 }
 
 async function loadRun(runId: string): Promise<WorkflowRunState | null> {
@@ -222,7 +237,11 @@ export async function listWorkflowRuns(workflowId?: string): Promise<WorkflowRun
 }
 
 /** Start a workflow run. Returns the run id immediately; steps execute async. */
-export async function startWorkflow(def: WorkflowDef, projectRoot: string, opts: WorkflowRunOptions = {}): Promise<string> {
+export async function startWorkflow(
+  def: WorkflowDef,
+  projectRoot: string,
+  opts: WorkflowRunOptions = {},
+): Promise<string> {
   topoOrder(def); // validate before starting
   const runId = `wf-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   const state: WorkflowRunState = {
@@ -238,13 +257,21 @@ export async function startWorkflow(def: WorkflowDef, projectRoot: string, opts:
   return runId;
 }
 
-async function executeWorkflow(def: WorkflowDef, projectRoot: string, state: WorkflowRunState, opts: WorkflowRunOptions): Promise<void> {
+async function executeWorkflow(
+  def: WorkflowDef,
+  projectRoot: string,
+  state: WorkflowRunState,
+  opts: WorkflowRunOptions,
+): Promise<void> {
   try {
     const [{ scheduler, createUnattendedPermissionChecker }, { readSettings }] = await Promise.all([
       import('./ipc/agent-scheduler'),
       import('./ipc/settings-store'),
     ]);
-    const settings = await readSettings().catch(() => null) as { deepseekApiKey?: string; defaultModel?: string } | null;
+    const settings = (await readSettings().catch(() => null)) as {
+      deepseekApiKey?: string;
+      defaultModel?: string;
+    } | null;
     const apiKey = process.env.DEEPSEEK_API_KEY || settings?.deepseekApiKey || '';
     if (!apiKey) throw new Error('缺少 API Key，无法执行工作流');
 
@@ -270,7 +297,9 @@ async function executeWorkflow(def: WorkflowDef, projectRoot: string, state: Wor
     try {
       while (done.size < def.steps.length) {
         const ready = def.steps.filter(
-          (s) => state.steps[s.id].status === 'pending' && (s.dependsOn || []).every((d) => done.has(d) && state.steps[d].status === 'completed'),
+          (s) =>
+            state.steps[s.id].status === 'pending' &&
+            (s.dependsOn || []).every((d) => done.has(d) && state.steps[d].status === 'completed'),
         );
         if (ready.length === 0) {
           // No progress possible: either all pending blocked on errors or a cycle slipped through.
@@ -294,20 +323,15 @@ async function executeWorkflow(def: WorkflowDef, projectRoot: string, state: Wor
             apiKey,
             priority: 'normal' as const,
             autoApprove: unattendedAuto,
-            mode: unattendedAuto ? 'auto' as const : (opts.mode ?? 'ask'),
-            sandboxMode: unattendedAuto ? 'full' as const : (opts.sandboxMode ?? 'workspace-write'),
+            mode: unattendedAuto ? ('auto' as const) : (opts.mode ?? 'ask'),
+            sandboxMode: unattendedAuto ? ('full' as const) : (opts.sandboxMode ?? 'workspace-write'),
             maxIterations: 50,
             metadata: { workflowRunId: state.runId, stepId: step.id },
           };
-          const checker = opts.checkPermission
-            ?? (unattendedAuto
-              ? () => Promise.resolve(true)
-              : createUnattendedPermissionChecker(stepConfig, projectRoot));
-          const agentId = scheduler.startAgent(
-            stepConfig,
-            projectRoot,
-            checker,
-          );
+          const checker =
+            opts.checkPermission ??
+            (unattendedAuto ? () => Promise.resolve(true) : createUnattendedPermissionChecker(stepConfig, projectRoot));
+          const agentId = scheduler.startAgent(stepConfig, projectRoot, checker);
           state.steps[step.id].agentId = agentId;
         }
         await saveRun(state).catch(() => {});
@@ -315,7 +339,10 @@ async function executeWorkflow(def: WorkflowDef, projectRoot: string, state: Wor
         await new Promise<void>((resolve) => {
           const check = setInterval(() => {
             const waveDone = ready.every((s) => done.has(s.id));
-            if (waveDone) { clearInterval(check); resolve(); }
+            if (waveDone) {
+              clearInterval(check);
+              resolve();
+            }
           }, 300);
         });
       }
@@ -323,10 +350,13 @@ async function executeWorkflow(def: WorkflowDef, projectRoot: string, state: Wor
     } finally {
       unsub();
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     state.status = 'error';
     for (const s of Object.values(state.steps)) {
-      if (s.status === 'pending') { s.status = 'error'; s.error = err.message; }
+      if (s.status === 'pending') {
+        s.status = 'error';
+        s.error = errorText(err);
+      }
     }
   } finally {
     state.endedAt = Date.now();

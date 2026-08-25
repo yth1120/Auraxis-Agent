@@ -89,14 +89,9 @@ describe('stripModelArtifacts', () => {
   });
 
   it('多行 thinking 块跨行清除', () => {
-    const input = [
-      'Before',
-      '<thinking>',
-      'Line 1 of reasoning',
-      'Line 2 of reasoning',
-      '</thinking>',
-      'After',
-    ].join('\n');
+    const input = ['Before', '<thinking>', 'Line 1 of reasoning', 'Line 2 of reasoning', '</thinking>', 'After'].join(
+      '\n',
+    );
     const result = stripModelArtifacts(input);
     expect(result).toContain('Before');
     expect(result).toContain('After');
@@ -142,8 +137,8 @@ describe('createStreamFilter — 跨 chunk 有状态过滤', () => {
     const { createStreamFilter } = await import('../text-filter');
     const f = createStreamFilter();
     expect(f('我先创建任务清单。<function>')).toBe('我先创建任务清单。');
-    expect(f('<TodoWrite>{"tasks":[...]}\n执行假装')).toBe('');     // 全部在块内
-    expect(f('结束</function>之后是正文')).toBe('之后是正文');       // 跨块闭合
+    expect(f('<TodoWrite>{"tasks":[...]}\n执行假装')).toBe(''); // 全部在块内
+    expect(f('结束</function>之后是正文')).toBe('之后是正文'); // 跨块闭合
   });
 
   it('剥除 <FINAL_ANSWER> 停止标记', async () => {

@@ -4,12 +4,20 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 // used at load time (binary not installed offline).
 vi.mock('electron', () => ({
   app: { getPath: () => '', getName: () => 'auraxis' },
-  BrowserWindow: class { static fromWebContents() { return null; } },
+  BrowserWindow: class {
+    static fromWebContents() {
+      return null;
+    }
+  },
   ipcMain: { handle: vi.fn(), on: vi.fn(), removeHandler: vi.fn() },
   dialog: { showOpenDialog: vi.fn(), showMessageBox: vi.fn() },
   shell: { openExternal: vi.fn() },
   Notification: class {},
-  safeStorage: { encryptString: vi.fn((s: string) => s), decryptString: vi.fn((s: string) => s), isEncryptionAvailable: () => true },
+  safeStorage: {
+    encryptString: vi.fn((s: string) => s),
+    decryptString: vi.fn((s: string) => s),
+    isEncryptionAvailable: () => true,
+  },
 }));
 
 import { agentLoopRun } from '../agent-loop';
@@ -31,7 +39,9 @@ function planAssistant(rawText: string): AssistantMessage {
   return { contentTimeline: [], toolCalls: [], rawText, thinkingText: '', isFinal: false, completionStopReason: null };
 }
 
-function toolAssistant(toolCalls: Array<{ id: string; name: string; input: Record<string, unknown> }>): AssistantMessage {
+function toolAssistant(
+  toolCalls: Array<{ id: string; name: string; input: Record<string, unknown> }>,
+): AssistantMessage {
   return {
     contentTimeline: toolCalls.map((tc) => ({ type: 'tool_use' as const, id: tc.id, name: tc.name, input: tc.input })),
     toolCalls,
@@ -95,7 +105,7 @@ describe('agentLoopRun — unified step-engine loop', () => {
     });
     registerLlmAdapter('unified-test', llmMock);
     llmQueue.push(planAssistant(PLAN_JSON)); // planning phase
-    llmQueue.push(finalAssistant());         // execution step
+    llmQueue.push(finalAssistant()); // execution step
 
     const result = await agentLoopRun(cfg);
 
@@ -106,18 +116,21 @@ describe('agentLoopRun — unified step-engine loop', () => {
 
   it('injects external follow-up messages at the turn boundary', async () => {
     const { cfg, events } = makeHarness({ messageQueue: () => ['steer now'] });
-    llmQueue.push(finalAssistant());         // execution step
+    llmQueue.push(finalAssistant()); // execution step
 
     const result = await agentLoopRun(cfg);
 
     const injected = result.messages.find(
-      (m) => m.role === 'user' && typeof m.content === 'string'
-        && m.content.includes('[外部指令]') && m.content.includes('steer now'),
+      (m) =>
+        m.role === 'user' &&
+        typeof m.content === 'string' &&
+        m.content.includes('[外部指令]') &&
+        m.content.includes('steer now'),
     );
     expect(injected).toBeTruthy();
-    expect(events.some(
-      (e) => e.type === 'context_injected' && e.source === 'instructions' && e.producer === 'external',
-    )).toBe(true);
+    expect(
+      events.some((e) => e.type === 'context_injected' && e.source === 'instructions' && e.producer === 'external'),
+    ).toBe(true);
   });
 
   it('plan → tool round → final answer stops and returns the full run', async () => {
@@ -150,9 +163,9 @@ describe('agentLoopRun — unified step-engine loop', () => {
 
     expect(result.iterations).toBe(2);
     expect(result.toolCallCount).toBe(1);
-    expect(result.messages.some(
-      (m) => typeof m.content === 'string' && m.content.includes('检测到你已完成文件修改'),
-    )).toBe(false);
+    expect(
+      result.messages.some((m) => typeof m.content === 'string' && m.content.includes('检测到你已完成文件修改')),
+    ).toBe(false);
   });
 
   it('计划解析失败时回退到交互模式而不是空转', async () => {
@@ -162,9 +175,7 @@ describe('agentLoopRun — unified step-engine loop', () => {
 
     const result = await agentLoopRun(cfg);
 
-    const guide = result.messages.find(
-      (m) => typeof m.content === 'string' && m.content.includes('当前为'),
-    );
+    const guide = result.messages.find((m) => typeof m.content === 'string' && m.content.includes('当前为'));
     expect(String(guide?.content)).toContain('交互模式');
     expect(String(guide?.content)).not.toContain('计划模式');
   });
@@ -183,9 +194,7 @@ describe('agentLoopRun — unified step-engine loop', () => {
 
     expect(onPlanGenerated).toHaveBeenCalledTimes(1);
     expect(result.plan?.tasks.map((t) => t.id)).toEqual(['1']);
-    expect(result.messages.some(
-      (m) => typeof m.content === 'string' && m.content.includes('已获批准'),
-    )).toBe(true);
+    expect(result.messages.some((m) => typeof m.content === 'string' && m.content.includes('已获批准'))).toBe(true);
     expect(events.some((e) => e.type === 'plan_updated')).toBe(true);
   });
 
@@ -199,9 +208,7 @@ describe('agentLoopRun — unified step-engine loop', () => {
     const result = await agentLoopRun(cfg);
 
     expect(result.plan).toBeNull();
-    expect(result.messages.some(
-      (m) => typeof m.content === 'string' && m.content.includes('未获批准'),
-    )).toBe(true);
+    expect(result.messages.some((m) => typeof m.content === 'string' && m.content.includes('未获批准'))).toBe(true);
   });
 
   it('intercepts Replan through the step-engine seam without dispatching it as a tool', async () => {

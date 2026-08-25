@@ -16,7 +16,7 @@ function gbkTrailingPending(buf: Buffer): number {
   let i = 0;
   while (i < buf.length) {
     const b = buf[i];
-    if (b >= 0x81 && b <= 0xFE) {
+    if (b >= 0x81 && b <= 0xfe) {
       lastLeadAt = i;
       i += 2;
     } else {

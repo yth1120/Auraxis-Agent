@@ -80,9 +80,21 @@ describe('fts', () => {
   });
 
   it('rebuilds the index from chat, session and snapshot logs', async () => {
-    await fs.writeFile(path.join(chatDir, 'session-a.jsonl'), '{"seq":1,"type":"user","ts":1,"data":{"text":"登录模块需要重构"}}\n', 'utf8');
-    await fs.writeFile(path.join(sessionDir, 'agent-1.jsonl'), '{"type":"text_chunk","ts":2,"text":"修复了登录超时 bug"}\n', 'utf8');
-    await fs.writeFile(path.join(snapDir, 'agent-1.json'), JSON.stringify({ name: '修复任务', result: '登录修复完成', startTime: 3 }), 'utf8');
+    await fs.writeFile(
+      path.join(chatDir, 'session-a.jsonl'),
+      '{"seq":1,"type":"user","ts":1,"data":{"text":"登录模块需要重构"}}\n',
+      'utf8',
+    );
+    await fs.writeFile(
+      path.join(sessionDir, 'agent-1.jsonl'),
+      '{"type":"text_chunk","ts":2,"text":"修复了登录超时 bug"}\n',
+      'utf8',
+    );
+    await fs.writeFile(
+      path.join(snapDir, 'agent-1.json'),
+      JSON.stringify({ name: '修复任务', result: '登录修复完成', startTime: 3 }),
+      'utf8',
+    );
 
     const indexed = await rebuildFts();
     expect(indexed).toBeGreaterThanOrEqual(2);
@@ -91,7 +103,13 @@ describe('fts', () => {
   }, 60_000);
 
   it('sessionQuerySearch returns bounded model-facing hits', async () => {
-    await addFtsDoc({ type: 'chat', id: 's-mem', title: '登录模块讨论', text: '我们决定登录模块使用静水流深方案', ts: 5000 });
+    await addFtsDoc({
+      type: 'chat',
+      id: 's-mem',
+      title: '登录模块讨论',
+      text: '我们决定登录模块使用静水流深方案',
+      ts: 5000,
+    });
     await addFtsDoc({ type: 'agent', id: 'a-mem', title: '修复任务', text: '登录超时 bug 已修复', ts: 6000 });
     await flushFts();
     const hits = await sessionQuerySearch('登录');
@@ -116,8 +134,8 @@ describe('fts', () => {
   it('refreshSessionFts indexes one chat log without a full rebuild', async () => {
     await fs.writeFile(
       path.join(chatDir, 'session-inc.jsonl'),
-      '{"seq":1,"type":"user","ts":10,"data":{"text":"增量索引测试"}}\n'
-      + '{"seq":2,"type":"assistant_chunk","ts":11,"data":{"text":"收到，开始处理"}}\n',
+      '{"seq":1,"type":"user","ts":10,"data":{"text":"增量索引测试"}}\n' +
+        '{"seq":2,"type":"assistant_chunk","ts":11,"data":{"text":"收到，开始处理"}}\n',
       'utf8',
     );
 

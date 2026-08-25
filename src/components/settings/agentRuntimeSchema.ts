@@ -11,10 +11,7 @@ export interface ModelOption {
  * Model selects are built from the live model list so a new model only needs
  * to be registered in model-config to show up here.
  */
-export function buildAgentRuntimeFields(
-  models: ModelOption[],
-  t: (key: I18nKey) => string,
-): SchemaField[] {
+export function buildAgentRuntimeFields(models: ModelOption[], t: (key: I18nKey) => string): SchemaField[] {
   const modelOptions = models.map((m) => ({ value: m.id, label: m.name }));
   const fallbackPlan = { value: 'deepseek-v4-pro', label: 'DeepSeek V4 Pro' };
   const fallbackExecute = { value: 'deepseek-v4-flash', label: 'DeepSeek V4 Flash' };

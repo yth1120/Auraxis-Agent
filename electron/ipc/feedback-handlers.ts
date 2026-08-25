@@ -2,7 +2,8 @@
  * feedback-handlers.ts — session feedback log （会话反馈）.
  * Appends one JSONL record per submission under userData/feedback.
  */
-import { ipcMain, app } from 'electron';
+import { errorText } from '../errors';
+import { app } from 'electron';
 import { secureHandle } from './trust';
 import { promises as fs } from 'fs';
 import path from 'path';
@@ -40,8 +41,8 @@ export async function appendFeedback(text: string): Promise<{ ok: boolean; error
       'utf8',
     );
     return { ok: true };
-  } catch (e: any) {
-    return { ok: false, error: e?.message ?? String(e) };
+  } catch (e: unknown) {
+    return { ok: false, error: errorText(e) };
   } finally {
     // Feedback is the user's explicit opt-in moment — flush captured telemetry.
     void flushTelemetry(true);
@@ -61,20 +62,18 @@ export async function appendMessageFeedback(
   try {
     const file = messageFile();
     await fs.mkdir(path.dirname(file), { recursive: true });
-    await fs.appendFile(
-      file,
-      `${JSON.stringify({ ...record, ts: Date.now() })}\n`,
-      'utf8',
-    );
+    await fs.appendFile(file, `${JSON.stringify({ ...record, ts: Date.now() })}\n`, 'utf8');
     // INO：纠错即证据（best-effort，失败不影响反馈落盘）。
     if (record.projectPath && (record.rating === 'down' || record.note)) {
       try {
         captureFeedbackEvidence({ ...record, ts: Date.now() });
-      } catch { /* evidence capture is best-effort */ }
+      } catch {
+        /* evidence capture is best-effort */
+      }
     }
     return { ok: true };
-  } catch (e: any) {
-    return { ok: false, error: e?.message ?? String(e) };
+  } catch (e: unknown) {
+    return { ok: false, error: errorText(e) };
   }
 }
 
@@ -90,7 +89,9 @@ export async function listMessageFeedback(sessionId: string): Promise<MessageFee
         const r = JSON.parse(line) as MessageFeedbackRecord;
         if (r?.sessionId !== sessionId || !r?.messageId) continue;
         byMessage.set(r.messageId, r);
-      } catch { /* skip corrupt */ }
+      } catch {
+        /* skip corrupt */
+      }
     }
     return [...byMessage.values()].filter((r) => r.rating !== null);
   } catch {

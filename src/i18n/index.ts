@@ -70,22 +70,22 @@ export function slashCommandDescKey(name: string): I18nKey {
 }
 
 const KB_DESC_KEYS: Record<string, I18nKey> = {
-  '打开命令面板': 'kb.openPalette',
-  '切换侧边栏': 'kb.toggleSidebar',
-  '切换右侧面板': 'kb.toggleRightPanel',
-  '聚焦侧边栏': 'kb.focusSidebar',
-  '聚焦主内容区': 'kb.focusMain',
-  '聚焦右侧面板': 'kb.focusRight',
+  打开命令面板: 'kb.openPalette',
+  切换侧边栏: 'kb.toggleSidebar',
+  切换右侧面板: 'kb.toggleRightPanel',
+  聚焦侧边栏: 'kb.focusSidebar',
+  聚焦主内容区: 'kb.focusMain',
+  聚焦右侧面板: 'kb.focusRight',
   '右侧面板：执行详情': 'kb.rightPlan',
   '右侧面板：时间线': 'kb.rightTimeline',
   '右侧面板：审查': 'kb.rightReview',
   '右侧面板：预览': 'kb.rightPreview',
-  '打开集成终端': 'kb.openTerminal',
-  '清空对话': 'kb.clearChat',
-  '新建对话': 'kb.newChat',
-  '撤销最近操作': 'kb.undo',
-  '打开设置': 'kb.openSettings',
-  '关闭当前标签页': 'kb.closeTab',
+  打开集成终端: 'kb.openTerminal',
+  清空对话: 'kb.clearChat',
+  新建对话: 'kb.newChat',
+  撤销最近操作: 'kb.undo',
+  打开设置: 'kb.openSettings',
+  关闭当前标签页: 'kb.closeTab',
   '停止生成 / 关闭面板': 'kb.escape',
 };
 
@@ -125,8 +125,5 @@ export function agentSkillDescKey(key: string): I18nKey {
 /** Reactive translator hook — components re-render on locale change. */
 export function useT() {
   const locale = useI18nStore((s) => s.locale);
-  return useCallback(
-    (key: I18nKey, vars?: Record<string, string | number>) => translate(locale, key, vars),
-    [locale],
-  );
+  return useCallback((key: I18nKey, vars?: Record<string, string | number>) => translate(locale, key, vars), [locale]);
 }

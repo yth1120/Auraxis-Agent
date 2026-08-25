@@ -26,10 +26,10 @@ export default memo(function FirstRunHint() {
 
   return (
     <div className="flex items-center gap-2 h-8 px-4 rounded-full bg-[var(--color-bg-secondary)] border border-[var(--color-border-dim)] text-xs text-text-secondary">
-      <span className="truncate">
-        {hasKey ? t('onboarding.withKey') : t('onboarding.withoutKey')}
-      </span>
-      <Button size="small" onClick={pickProject}>{t('onboarding.chooseProject')}</Button>
+      <span className="truncate">{hasKey ? t('onboarding.withKey') : t('onboarding.withoutKey')}</span>
+      <Button size="small" onClick={pickProject}>
+        {t('onboarding.chooseProject')}
+      </Button>
       <Button size="small" onClick={() => useAppStore.getState().setShowSettings(true)}>
         {t('onboarding.openSettings')}
       </Button>

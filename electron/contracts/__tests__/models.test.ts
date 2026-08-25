@@ -31,7 +31,13 @@ describe('DeepSeek built-in model registry', () => {
     const system = { role: 'system', content: [{ type: 'text', text: '规则' }, imagePart] };
     expect(normalizeDeepSeekMessages([system], 'deepseek-v4-flash-vision-exp')[0].content).toBe('规则');
 
-    const svg = { role: 'user', content: [{ type: 'text', text: '看图' }, { type: 'image_url', image_url: { url: 'data:image/svg+xml;base64,AA==' } }] };
+    const svg = {
+      role: 'user',
+      content: [
+        { type: 'text', text: '看图' },
+        { type: 'image_url', image_url: { url: 'data:image/svg+xml;base64,AA==' } },
+      ],
+    };
     expect(normalizeDeepSeekMessages([svg], 'deepseek-v4-flash-vision-exp')[0].content).toBe('看图');
   });
 });

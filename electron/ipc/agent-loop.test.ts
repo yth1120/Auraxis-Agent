@@ -8,14 +8,11 @@ import {
   TaskPlan,
   PlanTask,
   stopPolicyEvaluate,
-  StopDecision,
   DevianceDetector,
-  DevianceResult,
   ContextManager,
   ContextConfig,
   LLMSummaryConfig,
   AssistantMessage,
-  ToolCall,
 } from './agent-loop';
 
 describe('restrictPlanToApproved — 部分批准只保留已批准步骤', () => {
@@ -157,15 +154,13 @@ describe('Planner — markCompleted (auto-matching)', () => {
     plan.tasks[0].status = 'pending';
 
     // Attempt to match Edit against task 2 (which depends on task 1)
-    const result = Planner.markCompleted(plan, 'Edit', { file_path: '/project/config.ts' }, true);
+    Planner.markCompleted(plan, 'Edit', { file_path: '/project/config.ts' }, true);
     // Task 2 depends on task 1 (pending), so it should be skipped
     expect(plan.tasks[1].status).toBe('pending');
   });
 
   it('does NOT mark task when tool failed', () => {
-    const plan = makePlan([
-      { id: '1', description: 'Read config.ts', toolMatches: ['Read', 'config.ts'] },
-    ]);
+    const plan = makePlan([{ id: '1', description: 'Read config.ts', toolMatches: ['Read', 'config.ts'] }]);
     const result = Planner.markCompleted(plan, 'Read', { file_path: '/project/config.ts' }, false);
     expect(result.updated).toBe(false);
     expect(plan.tasks[0].status).toBe('pending');
@@ -405,9 +400,7 @@ describe('DevianceDetector — checkFailures', () => {
   });
 
   it('warns on first failure with error context', () => {
-    const plan = makePlan([
-      { id: '1', description: 'Edit config.ts', toolMatches: ['Edit', 'config.ts'] },
-    ]);
+    const plan = makePlan([{ id: '1', description: 'Edit config.ts', toolMatches: ['Edit', 'config.ts'] }]);
     const result = DevianceDetector.checkFailures(plan, 'Edit', { file_path: '/project/config.ts' }, 'File not found');
     expect(result.shouldWarn).toBe(true);
     expect(result.message).toContain('第 1 次');
@@ -416,9 +409,7 @@ describe('DevianceDetector — checkFailures', () => {
   });
 
   it('blocks task after 2 consecutive failures on same task', () => {
-    const plan = makePlan([
-      { id: '1', description: 'Edit config.ts', toolMatches: ['Edit', 'config.ts'] },
-    ]);
+    const plan = makePlan([{ id: '1', description: 'Edit config.ts', toolMatches: ['Edit', 'config.ts'] }]);
     // First failure
     DevianceDetector.checkFailures(plan, 'Edit', { file_path: '/project/config.ts' }, 'Error 1');
     // Second failure
@@ -477,9 +468,7 @@ describe('ContextManager — shouldCompress', () => {
 // ══════════════════════════════════════════════════════════
 describe('ContextManager — compressHistory', () => {
   it('preserves system messages at the beginning', async () => {
-    const messages: any[] = [
-      { role: 'system', content: 'You are an agent' },
-    ];
+    const messages: any[] = [{ role: 'system', content: 'You are an agent' }];
     for (let i = 0; i < 25; i++) {
       messages.push({ role: 'user', content: `q${i}` });
       messages.push({ role: 'assistant', content: [{ type: 'text', text: `answer ${i}` }] });
@@ -496,17 +485,31 @@ describe('ContextManager — compressHistory', () => {
       messages.push({
         role: 'assistant',
         content: [
-          { type: 'text', text: `Detailed analysis of iteration ${i} with enough content to be meaningful for summarization purposes.` },
+          {
+            type: 'text',
+            text: `Detailed analysis of iteration ${i} with enough content to be meaningful for summarization purposes.`,
+          },
           { type: 'tool_use', id: `tc${i}`, name: 'Read', input: { file_path: `/project/file${i}.ts` } },
         ],
       });
-      messages.push({ role: 'user', content: [{ type: 'tool_result', tool_use_id: `tc${i}`, content: '{"file_path":"/project/file.ts","content":"ok","total_lines":5}' }] });
+      messages.push({
+        role: 'user',
+        content: [
+          {
+            type: 'tool_result',
+            tool_use_id: `tc${i}`,
+            content: '{"file_path":"/project/file.ts","content":"ok","total_lines":5}',
+          },
+        ],
+      });
     }
     const config: ContextConfig = { maxRounds: 10, compressRatio: 0.5 };
     const result = await ContextManager.compressHistory(messages, null, config);
 
     // Should have a summary message (now stored as 'system' role for LLM summaries)
-    const summaryMsg = result.find((m: any) => m.role === 'user' && typeof m.content === 'string' && m.content.startsWith('[历史上下文摘要]'));
+    const summaryMsg = result.find(
+      (m: any) => m.role === 'user' && typeof m.content === 'string' && m.content.startsWith('[历史上下文摘要]'),
+    );
     expect(summaryMsg).toBeDefined();
     expect(summaryMsg.content).toContain('阅读了文件');
   });
@@ -523,7 +526,9 @@ describe('ContextManager — compressHistory', () => {
     }
     const config: ContextConfig = { maxRounds: 10, compressRatio: 0.5 };
     const result = await ContextManager.compressHistory(messages, plan, config);
-    const summaryMsg = result.find((m: any) => typeof m.content === 'string' && m.content.startsWith('[历史上下文摘要]'));
+    const summaryMsg = result.find(
+      (m: any) => typeof m.content === 'string' && m.content.startsWith('[历史上下文摘要]'),
+    );
     expect(summaryMsg.content).toContain('Read config file');
     expect(summaryMsg.content).toContain('Edit port number');
   });
@@ -547,17 +552,21 @@ describe('ContextManager — compressHistory', () => {
     for (let i = 0; i < 25; i++) {
       messages.push({
         role: 'assistant',
-        content: [
-          { type: 'tool_use', id: `tc${i}`, name: 'Read', input: { file_path: `/project/config.ts` } },
-        ],
+        content: [{ type: 'tool_use', id: `tc${i}`, name: 'Read', input: { file_path: `/project/config.ts` } }],
       });
       messages.push({
         role: 'user',
-        content: [{
-          type: 'tool_result',
-          tool_use_id: `tc${i}`,
-          content: JSON.stringify({ file_path: '/project/config.ts', content: 'port: 3000; host: localhost; database: { url: "...", password: "..." }', total_lines: 50 }),
-        }],
+        content: [
+          {
+            type: 'tool_result',
+            tool_use_id: `tc${i}`,
+            content: JSON.stringify({
+              file_path: '/project/config.ts',
+              content: 'port: 3000; host: localhost; database: { url: "...", password: "..." }',
+              total_lines: 50,
+            }),
+          },
+        ],
       });
     }
     const config: ContextConfig = { maxRounds: 10, compressRatio: 0.5 };
@@ -567,8 +576,8 @@ describe('ContextManager — compressHistory', () => {
     const criticalResults = result.filter((m: any) => {
       if (m.role !== 'user') return false;
       const content = Array.isArray(m.content) ? m.content : [];
-      return content.some((b: any) =>
-        b.type === 'tool_result' && typeof b.content === 'string' && b.content.includes('port: 3000')
+      return content.some(
+        (b: any) => b.type === 'tool_result' && typeof b.content === 'string' && b.content.includes('port: 3000'),
       );
     });
     expect(criticalResults.length).toBeGreaterThan(0);
@@ -600,15 +609,25 @@ describe('ContextManager — 步骤级压缩（AGORA）', () => {
           { type: 'tool_use', id: 't2', name: 'Read', input: { file_path: 'src/app.ts' } },
         ],
       },
-      { role: 'user', content: [{ type: 'tool_result', tool_use_id: 't2', content: '{"file_path":"src/app.ts","content":"x","total_lines":20}' }] },
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'tool_result',
+            tool_use_id: 't2',
+            content: '{"file_path":"src/app.ts","content":"x","total_lines":20}',
+          },
+        ],
+      },
       { role: 'assistant', content: [{ type: 'text', text: '最近一轮' }] },
     ];
     const plan = makePlan([{ description: 'fix src/app.ts module' }]);
-    const result = await ContextManager.compressHistory(
-      messages,
-      plan,
-      { maxRounds: 2, compressRatio: 0.5, compressMode: 'step', stepKeepRecent: 1 },
-    );
+    const result = await ContextManager.compressHistory(messages, plan, {
+      maxRounds: 2,
+      compressRatio: 0.5,
+      compressMode: 'step',
+      stepKeepRecent: 1,
+    });
     // 摘要标记存在；关键 Read 步骤被救回；Grep 步骤被整步压缩。
     expect(result.some((m: any) => m.STEP_COMPRESSED)).toBe(true);
     expect(result.some((m: any) => JSON.stringify(m).includes('t2'))).toBe(true);
@@ -620,7 +639,8 @@ describe('ContextManager — 步骤级压缩（AGORA）', () => {
       for (const b of blocks) {
         if (b?.type === 'tool_use') {
           const hasResult = result.some(
-            (m: any) => Array.isArray(m.content) &&
+            (m: any) =>
+              Array.isArray(m.content) &&
               m.content.some((c: any) => c?.type === 'tool_result' && c.tool_use_id === b.id),
           );
           expect(hasResult).toBe(true);
@@ -673,8 +693,28 @@ describe('AssistantMessage — isFinal semantics', () => {
 // ══════════════════════════════════════════════════════════
 describe('Architecture Compliance — Module Separation', () => {
   it('StopPolicy is a pure function (no side effects)', () => {
-    const state1 = { iteration: 1, consecutiveTextOnly: 0, emptyResponseCount: 0, hasText: true, hasTools: false, isFinal: true, completionStopReason: null, signalAborted: false, plan: null };
-    const state2 = { iteration: 1, consecutiveTextOnly: 0, emptyResponseCount: 0, hasText: true, hasTools: false, isFinal: true, completionStopReason: null, signalAborted: false, plan: null };
+    const state1 = {
+      iteration: 1,
+      consecutiveTextOnly: 0,
+      emptyResponseCount: 0,
+      hasText: true,
+      hasTools: false,
+      isFinal: true,
+      completionStopReason: null,
+      signalAborted: false,
+      plan: null,
+    };
+    const state2 = {
+      iteration: 1,
+      consecutiveTextOnly: 0,
+      emptyResponseCount: 0,
+      hasText: true,
+      hasTools: false,
+      isFinal: true,
+      completionStopReason: null,
+      signalAborted: false,
+      plan: null,
+    };
     const r1 = stopPolicyEvaluate(state1);
     const r2 = stopPolicyEvaluate(state2);
     expect(r1).toEqual(r2); // Same input → same output
@@ -692,9 +732,7 @@ describe('Architecture Compliance — Module Separation', () => {
   });
 
   it('ContextManager.compressHistory does not mutate input', async () => {
-    const messages: any[] = [
-      { role: 'system', content: 'sys' },
-    ];
+    const messages: any[] = [{ role: 'system', content: 'sys' }];
     for (let i = 0; i < 25; i++) {
       messages.push({ role: 'user', content: `q${i}` });
       messages.push({ role: 'assistant', content: `a${i}` });
@@ -703,7 +741,6 @@ describe('Architecture Compliance — Module Separation', () => {
     await ContextManager.compressHistory(messages, null, { maxRounds: 10, compressRatio: 0.5 });
     expect(JSON.stringify(messages)).toBe(snapshot); // Input unchanged
   });
-
 });
 
 // ══════════════════════════════════════════════════════════
@@ -728,7 +765,12 @@ describe('Integration — Full Agent Flow Simulation', () => {
     expect(plan.tasks[0].status).toBe('completed');
 
     // 3. Execute task 2: Edit config.ts (dependency now satisfied)
-    const r2 = Planner.markCompleted(plan, 'Edit', { file_path: '/project/config.ts', old_string: 'port: 3000', new_string: 'port: 8080' }, true);
+    const r2 = Planner.markCompleted(
+      plan,
+      'Edit',
+      { file_path: '/project/config.ts', old_string: 'port: 3000', new_string: 'port: 8080' },
+      true,
+    );
     expect(r2.updated).toBe(true);
     expect(plan.tasks[1].status).toBe('completed');
 
@@ -742,9 +784,15 @@ describe('Integration — Full Agent Flow Simulation', () => {
 
     // 6. LLM sends <FINAL_ANSWER>
     const decision = stopPolicyEvaluate({
-      iteration: 5, consecutiveTextOnly: 1,
-      emptyResponseCount: 0, hasText: true, hasTools: false,
-      isFinal: true, completionStopReason: null, signalAborted: false, plan,
+      iteration: 5,
+      consecutiveTextOnly: 1,
+      emptyResponseCount: 0,
+      hasText: true,
+      hasTools: false,
+      isFinal: true,
+      completionStopReason: null,
+      signalAborted: false,
+      plan,
     });
     expect(decision.shouldStop).toBe(true);
     expect(decision.isError).toBe(false);
@@ -774,9 +822,15 @@ describe('Integration — Full Agent Flow Simulation', () => {
 
     // Plan tracking is display-only — the model's completion signal wins.
     const decision = stopPolicyEvaluate({
-      iteration: 4, consecutiveTextOnly: 1,
-      emptyResponseCount: 0, hasText: true, hasTools: false,
-      isFinal: true, completionStopReason: null, signalAborted: false, plan,
+      iteration: 4,
+      consecutiveTextOnly: 1,
+      emptyResponseCount: 0,
+      hasText: true,
+      hasTools: false,
+      isFinal: true,
+      completionStopReason: null,
+      signalAborted: false,
+      plan,
     });
     expect(decision.shouldStop).toBe(true);
     expect(decision.isError).toBe(false);
@@ -803,7 +857,13 @@ describe('Integration — Full Agent Flow Simulation', () => {
       });
       messages.push({
         role: 'user',
-        content: [{ type: 'tool_result', tool_use_id: `tc${i}`, content: '{"file_path":"/project/file.ts","content":"code","total_lines":5}' }],
+        content: [
+          {
+            type: 'tool_result',
+            tool_use_id: `tc${i}`,
+            content: '{"file_path":"/project/file.ts","content":"code","total_lines":5}',
+          },
+        ],
       });
     }
 
@@ -811,7 +871,9 @@ describe('Integration — Full Agent Flow Simulation', () => {
     const compressed = await ContextManager.compressHistory(messages, plan, config);
 
     // Summary should include plan status
-    const summary = compressed.find((m: any) => typeof m.content === 'string' && m.content.startsWith('[历史上下文摘要]'));
+    const summary = compressed.find(
+      (m: any) => typeof m.content === 'string' && m.content.startsWith('[历史上下文摘要]'),
+    );
     expect(summary).toBeDefined();
     expect(summary.content).toContain('Run npm test'); // pending
     expect(summary.content).toContain('Read config.ts'); // completed
@@ -874,9 +936,7 @@ describe('Planner — mergePlan', () => {
 
   it('extracts toolMatches for new tasks', () => {
     const original = makePlan([{ id: '1', description: 'Old task', status: 'completed' }]);
-    const newTasks = [
-      { description: 'Read and analyze server.ts', dependencies: [] },
-    ];
+    const newTasks = [{ description: 'Read and analyze server.ts', dependencies: [] }];
 
     const merged = Planner.mergePlan(original, newTasks);
     expect(merged.tasks[1].toolMatches).toBeDefined();
@@ -905,12 +965,6 @@ describe('Integration — Replan Flow', () => {
     ]);
 
     // 2. LLM calls Replan tool with context
-    const replanPrompt = {
-      currentPlanStatus: '2 completed, 2 blocked, 2 pending',
-      blockedTasks: ['2', '3'],
-      reason: 'Edit and server fix blocked - need alternative approach',
-    };
-
     // 4. Replan LLM responds with new sub-plan (simulated)
     const newPlanJson = JSON.stringify({
       tasks: [
@@ -923,21 +977,24 @@ describe('Integration — Replan Flow', () => {
     expect(newPlan.tasks).toHaveLength(3);
 
     // 5. Merge into existing plan
-    const merged = Planner.mergePlan(plan, newPlan.tasks.map((t) => ({
-      description: t.description,
-      dependencies: t.dependencies,
-    })));
+    const merged = Planner.mergePlan(
+      plan,
+      newPlan.tasks.map((t) => ({
+        description: t.description,
+        dependencies: t.dependencies,
+      })),
+    );
 
     // 6. Verify merged plan
     expect(merged.tasks).toHaveLength(8); // 5 original + 3 new
     expect(merged.tasks[0].status).toBe('completed'); // preserved
-    expect(merged.tasks[1].status).toBe('blocked');    // preserved
-    expect(merged.tasks[2].status).toBe('blocked');    // preserved
-    expect(merged.tasks[3].status).toBe('pending');    // original pending
-    expect(merged.tasks[4].status).toBe('pending');    // original pending
-    expect(merged.tasks[5].status).toBe('pending');    // new
-    expect(merged.tasks[6].status).toBe('pending');    // new
-    expect(merged.tasks[7].status).toBe('pending');    // new
+    expect(merged.tasks[1].status).toBe('blocked'); // preserved
+    expect(merged.tasks[2].status).toBe('blocked'); // preserved
+    expect(merged.tasks[3].status).toBe('pending'); // original pending
+    expect(merged.tasks[4].status).toBe('pending'); // original pending
+    expect(merged.tasks[5].status).toBe('pending'); // new
+    expect(merged.tasks[6].status).toBe('pending'); // new
+    expect(merged.tasks[7].status).toBe('pending'); // new
 
     // 7. Plan shows correct completion ratio
     expect(Planner.isAllDone(merged)).toBe(false);
@@ -961,7 +1018,12 @@ describe('Integration — Replan Flow', () => {
 
     // Execute new tasks with matching tool calls
     Planner.markCompleted(merged, 'Write', { file_path: '/project/.env', content: 'PORT=3000' }, true);
-    Planner.markCompleted(merged, 'Edit', { file_path: '/project/server.ts', old_string: 'import', new_string: 'import()' }, true);
+    Planner.markCompleted(
+      merged,
+      'Edit',
+      { file_path: '/project/server.ts', old_string: 'import', new_string: 'import()' },
+      true,
+    );
 
     // Now original task 1 (completed) + 2 new tasks = 3 completed
     const completedCount = merged.tasks.filter((t) => t.status === 'completed').length;
@@ -977,9 +1039,15 @@ describe('Integration — Replan Flow', () => {
 
     // With isFinal=true and plan.allDone → stop
     const decision = stopPolicyEvaluate({
-      iteration: 8, consecutiveTextOnly: 1,
-      emptyResponseCount: 0, hasText: true, hasTools: false,
-      isFinal: true, completionStopReason: null, signalAborted: false, plan: merged,
+      iteration: 8,
+      consecutiveTextOnly: 1,
+      emptyResponseCount: 0,
+      hasText: true,
+      hasTools: false,
+      isFinal: true,
+      completionStopReason: null,
+      signalAborted: false,
+      plan: merged,
     });
     expect(decision.shouldStop).toBe(true);
   });
@@ -1004,39 +1072,60 @@ describe('Observer Decoupling — agentLoopRun structure', () => {
   const fnBody = fnMatch ? fnMatch[1] : '';
 
   it('agentLoopRun function body is ≤ 80 lines (excluding signature)', () => {
-    if (!fnBody) { expect(true).toBe(true); return; } // skip if source not readable
+    if (!fnBody) {
+      expect(true).toBe(true);
+      return;
+    } // skip if source not readable
     const lines = fnBody.split('\n').filter((l) => l.trim().length > 0);
     expect(lines.length).toBeLessThanOrEqual(80);
   });
 
   it('agentLoopRun does NOT directly call emitEvent', () => {
-    if (!fnBody) { expect(true).toBe(true); return; }
+    if (!fnBody) {
+      expect(true).toBe(true);
+      return;
+    }
     expect(fnBody).not.toContain('emitEvent(');
   });
 
   it('agentLoopRun does NOT directly call pushLog', () => {
-    if (!fnBody) { expect(true).toBe(true); return; }
+    if (!fnBody) {
+      expect(true).toBe(true);
+      return;
+    }
     expect(fnBody).not.toContain('pushLog(');
   });
 
   it('agentLoopRun calls observer.emit for events', () => {
-    if (!fnBody) { expect(true).toBe(true); return; }
+    if (!fnBody) {
+      expect(true).toBe(true);
+      return;
+    }
     expect(fnBody).toContain('observer.emit(');
   });
 
   it('agentLoopRun calls observer.onStateChange for state sync', () => {
-    if (!fnBody) { expect(true).toBe(true); return; }
+    if (!fnBody) {
+      expect(true).toBe(true);
+      return;
+    }
     expect(fnBody).toContain('observer.onStateChange(');
   });
 
   it('agentLoopRun does NOT reference onEvent callback', () => {
-    if (!fnBody) { expect(true).toBe(true); return; }
+    if (!fnBody) {
+      expect(true).toBe(true);
+      return;
+    }
     expect(fnBody).not.toMatch(/onEvent[?(]/);
   });
 
   it('AgentLoopConfig uses observer field, not onEvent', () => {
     const configMatch = source.match(/export interface AgentLoopConfig\s*\{([^}]+)\}/);
-    if (!configMatch) { expect(true).toBe(true); return; }
+    if (!configMatch) {
+      expect(true).toBe(true);
+      return;
+    }
     const configBody = configMatch[1];
     expect(configBody).toContain('observer');
     expect(configBody).not.toContain('onEvent');
@@ -1057,13 +1146,24 @@ describe('LLM Summary — degradation and fallback', () => {
       msgs.push({
         role: 'assistant',
         content: [
-          { type: 'text', text: `Working on iteration ${i}. Detailed analysis of the code structure and findings from reading files.`.repeat(2) },
+          {
+            type: 'text',
+            text: `Working on iteration ${i}. Detailed analysis of the code structure and findings from reading files.`.repeat(
+              2,
+            ),
+          },
           { type: 'tool_use', id: `tc${i}`, name: 'Read', input: { file_path: `/project/file${i}.ts` } },
         ],
       });
       msgs.push({
         role: 'user',
-        content: [{ type: 'tool_result', tool_use_id: `tc${i}`, content: `{"file_path":"/project/file${i}.ts","content":"code content here","total_lines":50}` }],
+        content: [
+          {
+            type: 'tool_result',
+            tool_use_id: `tc${i}`,
+            content: `{"file_path":"/project/file${i}.ts","content":"code content here","total_lines":50}`,
+          },
+        ],
       });
     }
     return msgs;
@@ -1075,8 +1175,7 @@ describe('LLM Summary — degradation and fallback', () => {
     const result = await ContextManager.compressHistory(messages, null, config);
 
     // Rule-based summary has predictable structure
-    const summary = result.find((m: any) =>
-      typeof m.content === 'string' && m.content.startsWith('[历史上下文摘要]'));
+    const summary = result.find((m: any) => typeof m.content === 'string' && m.content.startsWith('[历史上下文摘要]'));
     expect(summary).toBeDefined();
     // Rule-based summaries include file/command tracking (Chinese labels)
     expect(summary.content).toMatch(/阅读了文件|关键发现/);
@@ -1090,8 +1189,7 @@ describe('LLM Summary — degradation and fallback', () => {
     // Omit llmConfig — should fall back gracefully
     const result = await ContextManager.compressHistory(messages, null, config);
     // Compression still produced a valid summary
-    const summary = result.find((m: any) =>
-      typeof m.content === 'string' && m.content.startsWith('[历史上下文摘要]'));
+    const summary = result.find((m: any) => typeof m.content === 'string' && m.content.startsWith('[历史上下文摘要]'));
     expect(summary).toBeDefined();
     // Should contain reference to files read (from rule-based extraction)
     expect(summary.content).toMatch(/阅读了文件|关键发现|已完成任务|待完成任务/);
@@ -1103,8 +1201,7 @@ describe('LLM Summary — degradation and fallback', () => {
     const config: ContextConfig = { maxRounds: 10, compressRatio: 0.5 };
     const result = await ContextManager.compressHistory(messages, null, config);
 
-    const summary = result.find((m: any) =>
-      typeof m.content === 'string' && m.content.startsWith('[历史上下文摘要]'));
+    const summary = result.find((m: any) => typeof m.content === 'string' && m.content.startsWith('[历史上下文摘要]'));
     expect(summary).toBeDefined();
     expect(summary.role).toBe('user');
     // LLM_SUMMARY marker only present when LLM was actually used (llmConfig provided)
@@ -1118,12 +1215,12 @@ describe('LLM Summary — degradation and fallback', () => {
     // and fall back to rule-based. The marker should still be absent since LLM didn't succeed.
     const llmCfg: LLMSummaryConfig = {
       model: 'deepseek-v4-pro',
-      apiKey: 'fake-key-for-test', apiBase: 'https://api.anthropic.com/v1/messages',
+      apiKey: 'fake-key-for-test',
+      apiBase: 'https://api.anthropic.com/v1/messages',
     };
     const result = await ContextManager.compressHistory(messages, null, config, llmCfg);
 
-    const summary = result.find((m: any) =>
-      typeof m.content === 'string' && m.content.startsWith('[历史上下文摘要]'));
+    const summary = result.find((m: any) => typeof m.content === 'string' && m.content.startsWith('[历史上下文摘要]'));
     expect(summary).toBeDefined();
     expect(summary.role).toBe('user');
     // LLM call will fail with fake key → fallback → no LLM_SUMMARY marker
@@ -1134,11 +1231,14 @@ describe('LLM Summary — degradation and fallback', () => {
 
   it('critical info protection still works alongside LLM summary', async () => {
     const plan = makePlan([
-      { id: '1', description: 'Modify important_file config.ts', status: 'pending', toolMatches: ['Edit', 'config.ts'] },
+      {
+        id: '1',
+        description: 'Modify important_file config.ts',
+        status: 'pending',
+        toolMatches: ['Edit', 'config.ts'],
+      },
     ]);
-    const messages: any[] = [
-      { role: 'system', content: 'You are an agent' },
-    ];
+    const messages: any[] = [{ role: 'system', content: 'You are an agent' }];
     // First 15 rounds with critical Read results
     for (let i = 0; i < 15; i++) {
       messages.push({
@@ -1150,11 +1250,17 @@ describe('LLM Summary — degradation and fallback', () => {
       });
       messages.push({
         role: 'user',
-        content: [{
-          type: 'tool_result',
-          tool_use_id: `tc${i}`,
-          content: JSON.stringify({ file_path: '/project/config.ts', content: 'PORT=3000\nHOST=localhost\nDB_URL=postgres://...', total_lines: 50 }),
-        }],
+        content: [
+          {
+            type: 'tool_result',
+            tool_use_id: `tc${i}`,
+            content: JSON.stringify({
+              file_path: '/project/config.ts',
+              content: 'PORT=3000\nHOST=localhost\nDB_URL=postgres://...',
+              total_lines: 50,
+            }),
+          },
+        ],
       });
     }
     // Then 10 more rounds (not critical)
@@ -1169,15 +1275,14 @@ describe('LLM Summary — degradation and fallback', () => {
     const criticalResults = result.filter((m: any) => {
       if (m.role !== 'user') return false;
       const content = Array.isArray(m.content) ? m.content : [];
-      return content.some((b: any) =>
-        b.type === 'tool_result' && typeof b.content === 'string' && b.content.includes('PORT=3000')
+      return content.some(
+        (b: any) => b.type === 'tool_result' && typeof b.content === 'string' && b.content.includes('PORT=3000'),
       );
     });
     expect(criticalResults.length).toBeGreaterThan(0);
 
     // Summary should still exist
-    const summary = result.find((m: any) =>
-      typeof m.content === 'string' && m.content.startsWith('[历史上下文摘要]'));
+    const summary = result.find((m: any) => typeof m.content === 'string' && m.content.startsWith('[历史上下文摘要]'));
     expect(summary).toBeDefined();
     // Summary should mention the pending task
     expect(summary.content).toContain('config.ts');

@@ -6,7 +6,6 @@
  * missing key or offline API never blocks a session.
  */
 
-import { ipcMain } from 'electron';
 import { secureHandle } from './trust';
 import { invokeLlm } from './llm-adapter';
 import { resolveModelApiBase, resolveModelApiKey } from './model-config';
@@ -53,12 +52,13 @@ export async function generateSessionTitle(
   if (!messages || messages.length === 0) return null;
   const settings = (await readSettings().catch(() => ({}))) as Record<string, any>;
   const model = opts.model || process.env.AURAXIS_TITLE_MODEL || settings.titleModel || 'deepseek-v4-flash';
-  const apiKey = opts.apiKey
-    || (await resolveModelApiKey(model))
-    || process.env.DEEPSEEK_API_KEY
-    || (await resolveCredential('DEEPSEEK_API_KEY').catch(() => undefined))?.value
-    || settings.deepseekApiKey
-    || '';
+  const apiKey =
+    opts.apiKey ||
+    (await resolveModelApiKey(model)) ||
+    process.env.DEEPSEEK_API_KEY ||
+    (await resolveCredential('DEEPSEEK_API_KEY').catch(() => undefined))?.value ||
+    settings.deepseekApiKey ||
+    '';
   if (!apiKey) return null;
   const apiBase = opts.apiBase || (await resolveModelApiBase(model));
   const { system, user } = buildTitlePrompt(messages);

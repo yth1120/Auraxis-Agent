@@ -1,7 +1,8 @@
 /**
  * terminal-handlers.ts — real integrated terminal (node-pty, pipe fallback).
  */
-import { ipcMain, BrowserWindow } from 'electron';
+import { errorText } from '../errors';
+import { BrowserWindow } from 'electron';
 import { secureHandle } from './trust';
 import { spawn, type ChildProcessWithoutNullStreams } from 'child_process';
 import { safeProcessEnv } from '../safe-env';
@@ -35,7 +36,11 @@ function agentSessionId(agentId: string): string {
 
 function sendToWin(win: BrowserWindow, channel: string, data?: unknown) {
   if (!win.isDestroyed()) {
-    try { win.webContents.send(channel, data); } catch { /* closed */ }
+    try {
+      win.webContents.send(channel, data);
+    } catch {
+      /* closed */
+    }
   }
 }
 
@@ -46,7 +51,11 @@ function defaultShell(): string {
 
 function send(win: BrowserWindow, id: string, type: string, data?: unknown) {
   if (!win.isDestroyed()) {
-    try { win.webContents.send(`terminal:event:${id}`, { type, data }); } catch { /* closed */ }
+    try {
+      win.webContents.send(`terminal:event:${id}`, { type, data });
+    } catch {
+      /* closed */
+    }
   }
 }
 
@@ -106,8 +115,8 @@ export function registerTerminalHandlers() {
         });
       }
       return { ok: true };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
@@ -131,7 +140,9 @@ export function registerTerminalHandlers() {
     try {
       if (s.kind === 'pty') s.proc.kill();
       else s.child!.kill();
-    } catch { /* best-effort */ }
+    } catch {
+      /* best-effort */
+    }
     sessions.delete(id);
     return { ok: true };
   });
@@ -204,7 +215,9 @@ export function cleanupTerminalSessions(): void {
       const s = sessions.get(id)!;
       if (s.kind === 'pty') s.proc.kill();
       else s.child!.kill();
-    } catch { /* best-effort */ }
+    } catch {
+      /* best-effort */
+    }
     sessions.delete(id);
   }
 }

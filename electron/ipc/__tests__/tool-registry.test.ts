@@ -2,15 +2,29 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 
 vi.mock('electron', () => ({
   app: { getPath: () => '', getName: () => 'auraxis' },
-  BrowserWindow: class { static fromWebContents() { return null; } },
+  BrowserWindow: class {
+    static fromWebContents() {
+      return null;
+    }
+  },
   ipcMain: { handle: vi.fn(), on: vi.fn(), removeHandler: vi.fn() },
   dialog: { showOpenDialog: vi.fn(), showMessageBox: vi.fn() },
   shell: { openExternal: vi.fn() },
   Notification: class {},
-  safeStorage: { encryptString: vi.fn((s: string) => s), decryptString: vi.fn((s: string) => s), isEncryptionAvailable: () => true },
+  safeStorage: {
+    encryptString: vi.fn((s: string) => s),
+    decryptString: vi.fn((s: string) => s),
+    isEncryptionAvailable: () => true,
+  },
 }));
 
-import { addPluginTools, removePluginTools, getPluginTools, getAllTools, registerPluginTools } from '../../tool-registry';
+import {
+  addPluginTools,
+  removePluginTools,
+  getPluginTools,
+  getAllTools,
+  registerPluginTools,
+} from '../../tool-registry';
 
 const TOOL_A = {
   name: 'PluginA',

@@ -7,8 +7,12 @@ const handlers = new Map<string, (...args: any[]) => any>();
 vi.mock('electron', () => ({
   ipcMain: { handle: (name: string, fn: (...args: any[]) => any) => handlers.set(name, fn) },
   BrowserWindow: class {
-    isDestroyed() { return false; }
-    get webContents() { return { send: () => {}, isDestroyed: () => false }; }
+    isDestroyed() {
+      return false;
+    }
+    get webContents() {
+      return { send: () => {}, isDestroyed: () => false };
+    }
   },
   app: { getPath: () => process.env.AURAXIS_TEST_USERDATA || os.tmpdir() },
   safeStorage: {
@@ -56,9 +60,7 @@ describe('permission rules persistence', () => {
 
   it('removeRule drops the rule and persists the change', async () => {
     await writeSettings({
-      permissionRules: [
-        { id: 'r1', toolName: 'Bash', action: 'allow', scope: 'always', createdAt: Date.now() },
-      ],
+      permissionRules: [{ id: 'r1', toolName: 'Bash', action: 'allow', scope: 'always', createdAt: Date.now() }],
     });
     await loadPermissionRules();
 
@@ -72,9 +74,7 @@ describe('permission rules persistence', () => {
 
   it('clearRules empties and persists', async () => {
     await writeSettings({
-      permissionRules: [
-        { id: 'r1', toolName: 'Bash', action: 'allow', scope: 'always', createdAt: Date.now() },
-      ],
+      permissionRules: [{ id: 'r1', toolName: 'Bash', action: 'allow', scope: 'always', createdAt: Date.now() }],
     });
     await loadPermissionRules();
 

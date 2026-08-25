@@ -25,7 +25,13 @@ describe('ModeTrigger', () => {
 
   it('fires onClick when clicked', () => {
     let clicked = false;
-    render(<ModeTrigger onClick={() => { clicked = true; }} />);
+    render(
+      <ModeTrigger
+        onClick={() => {
+          clicked = true;
+        }}
+      />,
+    );
     fireEvent.click(screen.getByText((content) => content.includes('DeepSeek V4 Pro')));
     expect(clicked).toBe(true);
   });

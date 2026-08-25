@@ -1,5 +1,4 @@
 import { Component, type ReactNode } from 'react';
-import EmptyState from '../common/EmptyState';
 import { t } from '../../i18n';
 
 interface Props {
@@ -43,9 +42,7 @@ export default class ErrorBoundary extends Component<Props, State> {
               <p className="text-xs text-muted m-0 mb-1 px-3 py-2 bg-danger-soft rounded-md font-mono break-all">
                 {this.state.error?.message || t('error.unknown')}
               </p>
-              <p className="text-xs text-faint mt-3 mb-6">
-                {t('error.hint')}
-              </p>
+              <p className="text-xs text-faint mt-3 mb-6">{t('error.hint')}</p>
               <button
                 className="inline-flex items-center gap-2 bg-accent text-on-accent border-none rounded-md px-5 py-2 font-body text-sm font-medium cursor-pointer transition-colors duration-normal ease-out hover:bg-accent-hover"
                 onClick={this.handleReset}

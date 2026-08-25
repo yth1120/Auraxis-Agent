@@ -24,23 +24,27 @@ export default function DeliverablesRow({
 }) {
   const t = useT();
   const unique = [...new Set(files.filter((f) => typeof f === 'string' && f.trim()))];
-  if (unique.length === 0) return null;
 
-  const shown = unique.slice(0, MAX_CHIPS);
-  const rest = unique.length - shown.length;
-
-  const open = useCallback(async (filePath: string) => {
-    try {
-      const r = await window.electronAPI?.shell?.openPath(filePath);
-      if (r && !r.ok) message.error(r.error || t('deliverables.openFailed'));
-    } catch {
-      message.error(t('deliverables.openFailed'));
-    }
-  }, [t]);
+  const open = useCallback(
+    async (filePath: string) => {
+      try {
+        const r = await window.electronAPI?.shell?.openPath(filePath);
+        if (r && !r.ok) message.error(r.error || t('deliverables.openFailed'));
+      } catch {
+        message.error(t('deliverables.openFailed'));
+      }
+    },
+    [t],
+  );
 
   const openInPanel = useCallback((filePath: string) => {
     useAppStore.getState().requestOpenFile(filePath);
   }, []);
+
+  if (unique.length === 0) return null;
+
+  const shown = unique.slice(0, MAX_CHIPS);
+  const rest = unique.length - shown.length;
 
   return (
     <div className="my-1.5 flex items-start gap-1.5 w-full max-w-[var(--content-max-width,880px)] mx-auto px-0.5">

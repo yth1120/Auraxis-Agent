@@ -55,13 +55,7 @@ describe('ThinkingDepthSelector', () => {
   it('moves to the next level with ArrowRight', async () => {
     const onChange = vi.fn();
     render(
-      <ThinkingDepthSelector
-        value="low"
-        labels={LABELS}
-        ariaLabel="思考深度"
-        title="思考深度"
-        onChange={onChange}
-      />,
+      <ThinkingDepthSelector value="low" labels={LABELS} ariaLabel="思考深度" title="思考深度" onChange={onChange} />,
     );
     const slider = screen.getByRole('slider');
     fireEvent.keyDown(slider, { key: 'ArrowRight' });
@@ -95,13 +89,7 @@ describe('ThinkingDepthSelector', () => {
   it('drags across the rail, magnetically snaps and reports the level', async () => {
     const onChange = vi.fn();
     const { container } = render(
-      <ThinkingDepthSelector
-        value="low"
-        labels={LABELS}
-        ariaLabel="思考深度"
-        title="思考深度"
-        onChange={onChange}
-      />,
+      <ThinkingDepthSelector value="low" labels={LABELS} ariaLabel="思考深度" title="思考深度" onChange={onChange} />,
     );
     const track = container.querySelector('.ax-effort-track') as HTMLElement;
     mockTrackRect(track);

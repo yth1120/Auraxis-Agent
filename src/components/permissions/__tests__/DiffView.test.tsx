@@ -9,18 +9,14 @@ describe('DiffView', () => {
   const newContent = 'function foo() {\n  return 2;\n  console.log("new");\n}\n';
 
   it('renders split mode by default with a 2-column grid', () => {
-    const { container } = render(
-      <DiffView oldContent={oldContent} newContent={newContent} fileName="foo.ts" />,
-    );
+    const { container } = render(<DiffView oldContent={oldContent} newContent={newContent} fileName="foo.ts" />);
     // Split mode renders rows with grid-cols-2
     const rows = container.querySelectorAll('[class*="grid-cols-2"]');
     expect(rows.length).toBeGreaterThan(0);
   });
 
   it('toggle button switches to unified mode', () => {
-    const { container } = render(
-      <DiffView oldContent={oldContent} newContent={newContent} fileName="foo.ts" />,
-    );
+    const { container } = render(<DiffView oldContent={oldContent} newContent={newContent} fileName="foo.ts" />);
     expect(container.querySelectorAll('[class*="grid-cols-2"]').length).toBeGreaterThan(0);
     fireEvent.click(screen.getByText('统一'));
     // Unified mode: no grid-cols-2 rows, uses bg-success-soft / bg-danger-soft lines
@@ -39,20 +35,12 @@ describe('DiffView', () => {
   });
 
   it('shows a "new file" banner when oldContent is empty', () => {
-    const { getByText } = render(
-      <DiffView oldContent="" newContent="hello\nworld" fileName="new.txt" />,
-    );
+    const { getByText } = render(<DiffView oldContent="" newContent="hello\nworld" fileName="new.txt" />);
     expect(getByText(/新建文件/)).toBeTruthy();
   });
 
   it('applies syntax highlighting for .ts files (hljs spans present)', () => {
-    const { container } = render(
-      <DiffView
-        oldContent="const x = 1;"
-        newContent="const x = 2;"
-        fileName="foo.ts"
-      />,
-    );
+    const { container } = render(<DiffView oldContent="const x = 1;" newContent="const x = 2;" fileName="foo.ts" />);
     // Look for hljs token spans rendered via dangerouslySetInnerHTML
     const html = container.innerHTML;
     expect(html).toMatch(/class="hljs-keyword"/);
@@ -76,8 +64,8 @@ describe('DiffView', () => {
       />,
     );
     const rows = Array.from(container.querySelectorAll('[class*="grid-cols-2"]'));
-    const modifyRows = rows.filter((r) =>
-      r.querySelector('[class*="bg-danger-soft"]') && r.querySelector('[class*="bg-success-soft"]'),
+    const modifyRows = rows.filter(
+      (r) => r.querySelector('[class*="bg-danger-soft"]') && r.querySelector('[class*="bg-success-soft"]'),
     );
     expect(modifyRows.length).toBe(1);
   });

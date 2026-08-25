@@ -30,19 +30,14 @@ describe('RollbackToMessage — 按消息回退', () => {
 
     fireEvent.click(dialog.querySelector('.ant-btn-dangerous')!);
     await waitFor(() => {
-      expect((window as any).electronAPI.undo.revertSessions).toHaveBeenCalledWith(
-        ['turn-1', 'turn-2'],
-        'C:/proj',
-      );
+      expect((window as any).electronAPI.undo.revertSessions).toHaveBeenCalledWith(['turn-1', 'turn-2'], 'C:/proj');
     });
     expect(useAppStore.getState().fileTreeVersion).toBeGreaterThan(0);
   });
 
   it('shows an error toast when the revert is rejected', async () => {
     (window as any).electronAPI.undo.revertSessions.mockResolvedValue({ ok: false, error: '备份不存在' });
-    const { getByRole, findByRole } = render(
-      <RollbackToMessage sessionIds={['turn-1']} projectRoot="C:/proj" />,
-    );
+    const { getByRole, findByRole } = render(<RollbackToMessage sessionIds={['turn-1']} projectRoot="C:/proj" />);
     fireEvent.click(getByRole('button', { name: '回退到此' }));
     const dialog = await findByRole('dialog');
     fireEvent.click(dialog.querySelector('.ant-btn-dangerous')!);

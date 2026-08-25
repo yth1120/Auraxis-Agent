@@ -1,4 +1,4 @@
-import { ipcMain, BrowserWindow } from 'electron';
+import { BrowserWindow } from 'electron';
 import { secureHandle } from './trust';
 import { readFile } from 'fs/promises';
 import { resolve } from 'path';
@@ -18,12 +18,15 @@ export interface PermissionContext {
 const FILE_DIFF_TOOLS = new Set(['Write', 'Edit', 'NotebookEdit']);
 
 const permissionRules: PermissionRule[] = [];
-const pendingRequests = new Map<string, {
-  resolve: (allowed: boolean) => void;
-  timer: NodeJS.Timeout;
-  toolName: string;
-  agentId?: string;
-}>();
+const pendingRequests = new Map<
+  string,
+  {
+    resolve: (allowed: boolean) => void;
+    timer: NodeJS.Timeout;
+    toolName: string;
+    agentId?: string;
+  }
+>();
 
 /** Load persisted rules (settings.json) — called at startup so "始终允许"
  *  rules survive app restarts. */
@@ -49,9 +52,14 @@ async function persistPermissionRules(): Promise<void> {
 
 /** Safe read-only tools that don't modify files or execute code. */
 const SAFE_READONLY_TOOLS = new Set([
-  'Read', 'Grep', 'Glob',
+  'Read',
+  'Grep',
+  'Glob',
   'ReadDocument',
-  'SlackListChannels', 'DriveList', 'DriveRead', 'NotionSearch',
+  'SlackListChannels',
+  'DriveList',
+  'DriveRead',
+  'NotionSearch',
 ]);
 
 /**
@@ -64,11 +72,7 @@ const SAFE_READONLY_TOOLS = new Set([
  *   non-empty approval unlocks execution without per-tool prompts. Rejection
  *   leaves the list empty and the loop falls back to ask mode.
  */
-export function shouldAutoApprove(
-  toolName: string,
-  toolCallId: string | undefined,
-  ctx: PermissionContext,
-): boolean {
+export function shouldAutoApprove(toolName: string, toolCallId: string | undefined, ctx: PermissionContext): boolean {
   if (ctx.mode === 'auto') return true;
   if (ctx.mode === 'plan') {
     if (ctx.approvedPlanSteps && ctx.approvedPlanSteps.length > 0) return true;
@@ -152,7 +156,11 @@ export async function requestPermission(
   // ── Step 0: Mode-aware auto-approval (before rule check) ──
   if (ctx && shouldAutoApprove(toolName, toolCallId, ctx)) {
     // Oversight：自动放行计入疲劳统计（不占人工注意力）。
-    try { approvalFatigue.record(ctx.agentId || 'default', toolName, 'auto'); } catch { /* best-effort */ }
+    try {
+      approvalFatigue.record(ctx.agentId || 'default', toolName, 'auto');
+    } catch {
+      /* best-effort */
+    }
     return true;
   }
 
@@ -164,7 +172,7 @@ export async function requestPermission(
   // ── Step 2: Read current file content for diff review ──
   let oldContent: string | undefined;
   if (FILE_DIFF_TOOLS.has(toolName) && input.file_path) {
-    const filePath = (input.file_path as string);
+    const filePath = input.file_path as string;
     const resolvedPath = ctx?.projectRoot ? resolve(ctx.projectRoot, filePath) : resolve(filePath);
     try {
       oldContent = await readFile(resolvedPath, 'utf-8');
@@ -189,7 +197,11 @@ export async function requestPermission(
   return new Promise((resolve) => {
     const timer = setTimeout(() => {
       pendingRequests.delete(requestId);
-      try { approvalFatigue.record(request.agentId || 'default', request.toolName, 'rejected'); } catch { /* best-effort */ }
+      try {
+        approvalFatigue.record(request.agentId || 'default', request.toolName, 'rejected');
+      } catch {
+        /* best-effort */
+      }
       resolve(false); // Timeout = deny
     }, 120000); // 2 minute timeout
 
@@ -217,12 +229,10 @@ export function registerPermissionHandlers() {
       clearTimeout(pending.timer);
       pendingRequests.delete(requestId);
       try {
-        approvalFatigue.record(
-          pending.agentId || 'default',
-          pending.toolName,
-          allowed ? 'approved' : 'rejected',
-        );
-      } catch { /* best-effort */ }
+        approvalFatigue.record(pending.agentId || 'default', pending.toolName, allowed ? 'approved' : 'rejected');
+      } catch {
+        /* best-effort */
+      }
       pending.resolve(allowed);
     }
     return { ok: true };

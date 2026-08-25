@@ -8,9 +8,17 @@
 import { llmClientInvoke } from './agent-loop';
 import { signalId, type SignalRecord, type SignalType } from './memory-db';
 import type { SignalConfig } from './signal-rules';
+import { getDeepSeekBaseUrl } from '../api-config';
 
 const VALID_TYPES: SignalType[] = [
-  'date', 'version', 'url', 'entity', 'decision', 'correction', 'approval', 'rejection',
+  'date',
+  'version',
+  'url',
+  'entity',
+  'decision',
+  'correction',
+  'approval',
+  'rejection',
 ];
 
 export async function detectLlmSignals(
@@ -30,14 +38,19 @@ export async function detectLlmSignals(
     const result = await llmClientInvoke({
       model: config.model || 'deepseek-v4-flash',
       apiKey: config.apiKey,
-      apiBase: config.apiBase || 'https://api.deepseek.com/v1/chat/completions',
+      apiBase: config.apiBase || getDeepSeekBaseUrl(),
       systemPrompt: '你是精确的信号提取器，只输出 JSON 数组。',
       messages: [{ role: 'user', content: prompt }],
       tools: [],
       signal: new AbortController().signal,
     });
     if (!result?.rawText) return [];
-    const parsed = JSON.parse(result.rawText.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '').trim());
+    const parsed = JSON.parse(
+      result.rawText
+        .replace(/^```(?:json)?\s*/, '')
+        .replace(/\s*```$/, '')
+        .trim(),
+    );
     if (!Array.isArray(parsed)) return [];
     return parsed
       .filter((x: any) => x && VALID_TYPES.includes(x.type) && typeof x.value === 'string' && x.value)

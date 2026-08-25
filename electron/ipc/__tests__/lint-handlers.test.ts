@@ -32,7 +32,11 @@ describe('lint-handlers', () => {
   it('builds eslint --fix args without installing packages', () => {
     expect(buildLintArgs()).toEqual(['--no-install', 'eslint', '--fix', '.']);
     expect(buildLintArgs(['src/a.ts', 'src/b.ts'])).toEqual([
-      '--no-install', 'eslint', '--fix', 'src/a.ts', 'src/b.ts',
+      '--no-install',
+      'eslint',
+      '--fix',
+      'src/a.ts',
+      'src/b.ts',
     ]);
   });
 

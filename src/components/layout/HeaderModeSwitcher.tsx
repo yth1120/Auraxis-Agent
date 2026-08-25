@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { ChatCircle, Code, ListChecks } from '@/components/common/icons';
 import { Tooltip } from 'antd';
 import clsx from 'clsx';
@@ -42,23 +42,17 @@ export default function HeaderModeSwitcher({ collapsed }: Props) {
 
   const selectedIndex = MODES.findIndex((m) => m.key === sidebarMode);
 
-  const measureItems = () => {
-    const widths = measureRefs.current
-      .map((el) => (el ? el.getBoundingClientRect().width : 0))
-      .filter((w) => w > 0);
+  const measureItems = useCallback(() => {
+    const widths = measureRefs.current.map((el) => (el ? el.getBoundingClientRect().width : 0)).filter((w) => w > 0);
     if (widths.length === MODES.length) {
       setItemWidth(Math.ceil(Math.max(...widths)));
     }
-  };
+  }, []);
 
-  const recalcThumb = () => {
+  const recalcThumb = useCallback(() => {
     const track = trackRef.current;
     const targetBtn =
-      sidebarMode === 'chat'
-        ? chatBtnRef.current
-        : sidebarMode === 'work'
-          ? workBtnRef.current
-          : codeBtnRef.current;
+      sidebarMode === 'chat' ? chatBtnRef.current : sidebarMode === 'work' ? workBtnRef.current : codeBtnRef.current;
     if (!track || !targetBtn) return;
     const trackRect = track.getBoundingClientRect();
     const btnRect = targetBtn.getBoundingClientRect();
@@ -67,7 +61,7 @@ export default function HeaderModeSwitcher({ collapsed }: Props) {
       left: btnRect.left - trackRect.left - THUMB_PAD,
       width: btnRect.width + THUMB_PAD * 2,
     });
-  };
+  }, [sidebarMode]);
 
   // ── Measure the widest item once fonts/labels settle ──
   useLayoutEffect(() => {
@@ -75,11 +69,11 @@ export default function HeaderModeSwitcher({ collapsed }: Props) {
     const onLoad = () => measureItems();
     window.addEventListener('load', onLoad);
     return () => window.removeEventListener('load', onLoad);
-  }, []);
+  }, [measureItems]);
 
   useLayoutEffect(() => {
     recalcThumb();
-  }, [sidebarMode, itemWidth]);
+  }, [recalcThumb, itemWidth]);
 
   // ── Re-measure on sidebar drag / window resize ──
   useLayoutEffect(() => {
@@ -91,7 +85,7 @@ export default function HeaderModeSwitcher({ collapsed }: Props) {
     });
     ro.observe(track);
     return () => ro.disconnect();
-  }, []);
+  }, [measureItems, recalcThumb]);
 
   const switchMode = (mode: ModeKey) => {
     setSidebarMode(mode);
@@ -99,8 +93,7 @@ export default function HeaderModeSwitcher({ collapsed }: Props) {
   };
 
   // 模式切换按钮上的对话模式按用户要求显示为 Chat（其余文案保持中文）。
-  const labelOf = (mode: (typeof MODES)[number]) =>
-    mode.key === 'chat' ? 'Chat' : t(mode.labelKey);
+  const labelOf = (mode: (typeof MODES)[number]) => (mode.key === 'chat' ? 'Chat' : t(mode.labelKey));
 
   // ── Collapsed: icon-only vertical stack ──
   if (collapsed) {
@@ -169,8 +162,7 @@ export default function HeaderModeSwitcher({ collapsed }: Props) {
       {MODES.map((m, index) => {
         const Icon = m.icon;
         const active = sidebarMode === m.key;
-        const btnRef =
-          m.key === 'chat' ? chatBtnRef : m.key === 'work' ? workBtnRef : codeBtnRef;
+        const btnRef = m.key === 'chat' ? chatBtnRef : m.key === 'work' ? workBtnRef : codeBtnRef;
         return (
           <Tooltip key={m.key} title={t(m.tipKey)} placement="bottom">
             <div

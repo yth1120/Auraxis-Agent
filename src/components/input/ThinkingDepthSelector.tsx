@@ -1,5 +1,10 @@
 import { memo, useCallback, useEffect, useId, useRef, useState } from 'react';
-import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from 'react';
+import type {
+  CSSProperties,
+  KeyboardEvent as ReactKeyboardEvent,
+  MouseEvent as ReactMouseEvent,
+  PointerEvent as ReactPointerEvent,
+} from 'react';
 import clsx from 'clsx';
 import { Gauge } from '@/components/common/icons';
 
@@ -14,8 +19,7 @@ const DOT_WIDTH = 22;
 const SPRING_STIFFNESS = 920;
 const SPRING_DAMPING = 42;
 
-const clamp = (value: number, min = 0, max = MAX_LEVEL): number =>
-  Math.min(max, Math.max(min, value));
+const clamp = (value: number, min = 0, max = MAX_LEVEL): number => Math.min(max, Math.max(min, value));
 
 const smoothstep = (edge0: number, edge1: number, value: number): number => {
   const t = clamp((value - edge0) / (edge1 - edge0), 0, 1);
@@ -147,25 +151,28 @@ export const ThinkingDepthSelector = memo(function ThinkingDepthSelector({
     return { left: rect.left + borderLeft, width };
   }, []);
 
-  const updateThumb = useCallback((nextValue: number) => {
-    const track = trackRef.current;
-    if (!track) return;
-    const metrics = trackRectRef.current ?? measureTrack();
-    if (!metrics) return;
-    const width = metrics.width;
-    const usable = Math.max(width - THUMB_WIDTH, 1);
-    const safe = clamp(nextValue);
-    // `center` is the thumb's center (used by the canvas leading edge);
-    // the DOM `left` is the element's left edge, so subtract half the width.
-    const center = (safe / MAX_LEVEL) * usable + THUMB_WIDTH / 2;
-    thumbXRawRef.current = center;
-    if (thumbRef.current) thumbRef.current.style.left = `${center - THUMB_WIDTH / 2}px`;
-    if (fillRef.current) {
-      fillRef.current.style.width = `${center}px`;
-      const depthScale = 0.55 + 0.45 * (safe / MAX_LEVEL);
-      fillRef.current.style.opacity = `${0.75 * igniteRef.current * depthScale}`;
-    }
-  }, [measureTrack]);
+  const updateThumb = useCallback(
+    (nextValue: number) => {
+      const track = trackRef.current;
+      if (!track) return;
+      const metrics = trackRectRef.current ?? measureTrack();
+      if (!metrics) return;
+      const width = metrics.width;
+      const usable = Math.max(width - THUMB_WIDTH, 1);
+      const safe = clamp(nextValue);
+      // `center` is the thumb's center (used by the canvas leading edge);
+      // the DOM `left` is the element's left edge, so subtract half the width.
+      const center = (safe / MAX_LEVEL) * usable + THUMB_WIDTH / 2;
+      thumbXRawRef.current = center;
+      if (thumbRef.current) thumbRef.current.style.left = `${center - THUMB_WIDTH / 2}px`;
+      if (fillRef.current) {
+        fillRef.current.style.width = `${center}px`;
+        const depthScale = 0.55 + 0.45 * (safe / MAX_LEVEL);
+        fillRef.current.style.opacity = `${0.75 * igniteRef.current * depthScale}`;
+      }
+    },
+    [measureTrack],
+  );
 
   const layoutDots = useCallback(() => {
     const metrics = trackRectRef.current ?? measureTrack();
@@ -226,10 +233,7 @@ export const ThinkingDepthSelector = memo(function ThinkingDepthSelector({
     const glow = ctx.createLinearGradient(0, 0, width, 0);
     glow.addColorStop(0, 'rgba(0,0,0,0)');
     glow.addColorStop(Math.max(0, (thumbX - 110) / width), 'rgba(0,0,0,0)');
-    glow.addColorStop(
-      thumbNorm,
-      `rgba(${vr},${vg},${vb},${(0.42 * energy * depthScale).toFixed(3)})`,
-    );
+    glow.addColorStop(thumbNorm, `rgba(${vr},${vg},${vb},${(0.42 * energy * depthScale).toFixed(3)})`);
     ctx.fillStyle = glow;
     ctx.fillRect(0, 0, width, height);
 
@@ -245,28 +249,12 @@ export const ThinkingDepthSelector = memo(function ThinkingDepthSelector({
         const nx = (x + cell * 0.5) / width;
         const ignite = smoothstep(0.04, Math.max(thumbNorm * energy, 0.0405), nx);
         if (ignite <= 0.002) continue;
-        const hash =
-          Math.abs(
-            Math.sin(column * 12.9898 + row * 78.233) * 43758.5453,
-          ) % 1;
+        const hash = Math.abs(Math.sin(column * 12.9898 + row * 78.233) * 43758.5453) % 1;
         const flick =
-          0.45 +
-          0.55 *
-            Math.pow(
-              0.5 +
-                0.5 *
-                  Math.sin(
-                    now * (1.2 + hash * 2.2) +
-                      column * 1.1 +
-                      row * 2.3 +
-                      nx * 5,
-                  ),
-              2,
-            );
+          0.45 + 0.55 * Math.pow(0.5 + 0.5 * Math.sin(now * (1.2 + hash * 2.2) + column * 1.1 + row * 2.3 + nx * 5), 2);
         const edge = Math.exp(-Math.pow((nx - thumbNorm) * 14, 2));
         const bright = clamp(0.55 + edge * 0.9 + hash * 0.25, 0, 1.6);
-        const alpha =
-          ignite * flick * energy * (0.16 + edge * 0.3) * bright * depthScale;
+        const alpha = ignite * flick * energy * (0.16 + edge * 0.3) * bright * depthScale;
         if (alpha <= 0.012) continue;
         const mixT = clamp(0.25 + edge * 0.75, 0, 1);
         const r = Math.round(vr + (lr - vr) * mixT);
@@ -280,10 +268,7 @@ export const ThinkingDepthSelector = memo(function ThinkingDepthSelector({
     /* Thumb core light — a soft halo hugging the leading edge */
     const coreRadius = 16 + 10 * depth;
     const core = ctx.createRadialGradient(thumbX, centerY, 0, thumbX, centerY, coreRadius);
-    core.addColorStop(
-      0,
-      `rgba(${lr},${lg},${lb},${(0.42 * energy * depthScale).toFixed(3)})`,
-    );
+    core.addColorStop(0, `rgba(${lr},${lg},${lb},${(0.42 * energy * depthScale).toFixed(3)})`);
     core.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = core;
     ctx.fillRect(thumbX - coreRadius, centerY - coreRadius, coreRadius * 2, coreRadius * 2);
@@ -301,10 +286,7 @@ export const ThinkingDepthSelector = memo(function ThinkingDepthSelector({
           p.bright = 0.35 + Math.random() * 0.65;
         }
         const x = p.u * lit;
-        const y =
-          centerY +
-          Math.sin(now * p.wob + p.phase) * height * 0.2 +
-          (p.jitter - 0.5) * height * 0.18;
+        const y = centerY + Math.sin(now * p.wob + p.phase) * height * 0.2 + (p.jitter - 0.5) * height * 0.18;
         const back = 1 - Math.max(0, thumbX - x) / Math.max(1, thumbX);
         const flick = Math.pow(0.5 + 0.5 * Math.sin(now * p.flick + p.phase * 7), 2.5);
         const alpha = energy * back * (0.24 + 0.68 * flick * p.bright) * depthScale;
@@ -325,9 +307,7 @@ export const ThinkingDepthSelector = memo(function ThinkingDepthSelector({
         const p = particles[(i * 17 + 3) % particles.length];
         const travel = (p.u + i * 0.13) % 1;
         const sx = lit * travel + Math.sin(now * 3 + i * 1.7) * 2;
-        const sy =
-          centerY +
-          Math.sin(now * (2 + i * 0.7) + p.phase) * height * 0.18;
+        const sy = centerY + Math.sin(now * (2 + i * 0.7) + p.phase) * height * 0.18;
         const twinkle = 0.5 + 0.5 * Math.sin(now * (5 + i) + p.phase * 3);
         const alpha = energy * twinkle * (0.5 + 0.55 * p.bright) * depthScale;
         if (alpha <= 0.02) continue;
@@ -356,9 +336,7 @@ export const ThinkingDepthSelector = memo(function ThinkingDepthSelector({
         busy = true;
       } else if (targetRef.current !== null) {
         const target = targetRef.current;
-        const acceleration =
-          -SPRING_STIFFNESS * (posRef.current - target) -
-          SPRING_DAMPING * velocityRef.current;
+        const acceleration = -SPRING_STIFFNESS * (posRef.current - target) - SPRING_DAMPING * velocityRef.current;
         velocityRef.current += acceleration * dt;
         posRef.current = clamp(posRef.current + velocityRef.current * dt);
         changeLevel(Math.round(posRef.current));
@@ -422,12 +400,15 @@ export const ThinkingDepthSelector = memo(function ThinkingDepthSelector({
     [changeLevel, ensureLoop, updateThumb],
   );
 
-  const valueFromClientX = useCallback((clientX: number) => {
-    const metrics = measureTrack();
-    if (!metrics) return posRef.current;
-    const usable = Math.max(metrics.width - THUMB_WIDTH, 1);
-    return clamp(((clientX - metrics.left - THUMB_WIDTH / 2) / usable) * MAX_LEVEL);
-  }, [measureTrack]);
+  const valueFromClientX = useCallback(
+    (clientX: number) => {
+      const metrics = measureTrack();
+      if (!metrics) return posRef.current;
+      const usable = Math.max(metrics.width - THUMB_WIDTH, 1);
+      return clamp(((clientX - metrics.left - THUMB_WIDTH / 2) / usable) * MAX_LEVEL);
+    },
+    [measureTrack],
+  );
 
   const applyMagnet = useCallback((nextValue: number) => {
     const nearest = Math.round(nextValue);
@@ -477,18 +458,13 @@ export const ThinkingDepthSelector = memo(function ThinkingDepthSelector({
   }, [setupCanvas]);
 
   useEffect(() => {
-    const observer =
-      typeof MutationObserver !== 'undefined'
-        ? new MutationObserver(() => refreshPalette())
-        : null;
+    const observer = typeof MutationObserver !== 'undefined' ? new MutationObserver(() => refreshPalette()) : null;
     observer?.observe(document.documentElement, {
       attributes: true,
       attributeFilter: ['class', 'data-theme'],
     });
     const mediaQuery =
-      typeof window.matchMedia === 'function'
-        ? window.matchMedia('(prefers-reduced-motion: reduce)')
-        : null;
+      typeof window.matchMedia === 'function' ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
     reducedMotionRef.current = mediaQuery?.matches ?? false;
     const updateReducedMotion = () => {
       reducedMotionRef.current = mediaQuery?.matches ?? false;
@@ -560,7 +536,7 @@ export const ThinkingDepthSelector = memo(function ThinkingDepthSelector({
       }
       ensureLoop();
     },
-    [ensureLoop, layoutDots, measureTrack, updateThumb, valueFromClientX],
+    [ensureLoop, layoutDots, measureTrack, updateThumb, valueFromClientX, disabled],
   );
 
   const handlePointerMove = useCallback(
@@ -619,7 +595,7 @@ export const ThinkingDepthSelector = memo(function ThinkingDepthSelector({
       }
       springTo(target, velocity);
     },
-    [disabled, changeLevel, ensureLoop, springTo, updateThumb],
+    [changeLevel, ensureLoop, springTo, updateThumb],
   );
 
   const handleKeyDown = useCallback(

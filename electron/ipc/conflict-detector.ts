@@ -4,7 +4,7 @@
  * conflicts for display in the AgentDashboard.
  */
 
-import { ipcMain } from 'electron';
+import { errorText } from '../errors';
 import { secureHandle } from './trust';
 
 // ─── Types ─────────────────────────────────────────────
@@ -138,16 +138,16 @@ export function registerConflictIpc() {
   secureHandle('conflict:getConflicts', async () => {
     try {
       return { ok: true, data: conflictDetector.getConflicts() };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
   secureHandle('conflict:getFileHistory', async (_event, filePath: string) => {
     try {
       return { ok: true, data: conflictDetector.getFileHistory(filePath) };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 }

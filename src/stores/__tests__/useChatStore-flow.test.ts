@@ -275,13 +275,33 @@ describe('useChatStore — sendMessage 统一引擎路径', () => {
     const cb = getCb();
 
     cb.onEvent!({ type: 'text_chunk', text: '片段' });
-    cb.onEvent!({ type: 'tool_start', toolName: 'Read', toolCallId: 'c1', requestId: 'r1', input: { file_path: 'a.ts' }, timestamp: 1 });
+    cb.onEvent!({
+      type: 'tool_start',
+      toolName: 'Read',
+      toolCallId: 'c1',
+      requestId: 'r1',
+      input: { file_path: 'a.ts' },
+      timestamp: 1,
+    });
     cb.onEvent!({ type: 'tool_progress', toolCallId: 'c1', progress: 'out' });
-    cb.onEvent!({ type: 'tool_end', toolName: 'Read', toolCallId: 'c1', requestId: 'r1', output: { x: 1 }, timestamp: 2 });
+    cb.onEvent!({
+      type: 'tool_end',
+      toolName: 'Read',
+      toolCallId: 'c1',
+      requestId: 'r1',
+      output: { x: 1 },
+      timestamp: 2,
+    });
     cb.onEvent!({ type: 'iteration', iteration: 2, maxIterations: 200 });
     cb.onEvent!({ type: 'thinking_chunk', chunk: '思考', isNewBlock: true });
     cb.onEvent!({ type: 'usage_update', inputTokens: 10, outputTokens: 2, reasoningTokens: 1 });
-    cb.onEvent!({ type: 'context_compressed', tokensBefore: 100, tokensAfter: 10, messagesRemoved: 2, tokensSaved: 90 });
+    cb.onEvent!({
+      type: 'context_compressed',
+      tokensBefore: 100,
+      tokensAfter: 10,
+      messagesRemoved: 2,
+      tokensSaved: 90,
+    });
     cb.onEvent!({ type: 'context_injected', source: 'instructions', producer: 'AGENTS.md', detail: '注入' });
     cb.onEvent!({ type: 'system_message', content: 'sys', level: 'info' });
     cb.onEvent!({ type: 'plan_generated', planId: 'p1', steps: [], filePath: '/p.md', agentId: null });
@@ -323,7 +343,14 @@ describe('useChatStore — sendMessage 统一引擎路径', () => {
     const cb = getCb();
 
     cb.onEvent!({ type: 'tool_start', toolName: 'Bash', toolCallId: 'c1', requestId: 'r1', input: {}, timestamp: 1 });
-    cb.onEvent!({ type: 'tool_error', toolName: 'Bash', toolCallId: 'c1', requestId: 'r1', error: 'boom', timestamp: 2 });
+    cb.onEvent!({
+      type: 'tool_error',
+      toolName: 'Bash',
+      toolCallId: 'c1',
+      requestId: 'r1',
+      error: 'boom',
+      timestamp: 2,
+    });
     cb.onDone!();
 
     const assistant = useChatStore.getState().messages.find((m) => m.role === 'assistant')!;
@@ -356,11 +383,25 @@ describe('useChatStore — 记忆与项目指令注入', () => {
       cb = callbacks;
       return { unsubscribe: vi.fn() };
     });
-    mocks.getProjectContext.mockResolvedValue({ ok: true, data: { instructionsMd: 'RULES', fileTree: '', packageJson: '' } });
+    mocks.getProjectContext.mockResolvedValue({
+      ok: true,
+      data: { instructionsMd: 'RULES', fileTree: '', packageJson: '' },
+    });
     mocks.readForQuery.mockResolvedValue({
       ok: true,
       data: {
-        context: [{ beliefId: 'm1', title: 'T', text: '使用 React', evidenceIds: [], ts: 1, supportStrength: 0.5, score: 0.9, routes: ['keyword'] }],
+        context: [
+          {
+            beliefId: 'm1',
+            title: 'T',
+            text: '使用 React',
+            evidenceIds: [],
+            ts: 1,
+            supportStrength: 0.5,
+            score: 0.9,
+            routes: ['keyword'],
+          },
+        ],
         policy: { requireCitation: true, refuseOnUncertain: true, scope: 'C:/proj', maxTokens: 900, defaultRules: [] },
         facts: ['- [project] T：使用 React'],
         diagnostics: {
@@ -384,7 +425,9 @@ describe('useChatStore — 记忆与项目指令注入', () => {
     const sentMessages = mocks.sendQuery.mock.calls[0][0].messages as any[];
     expect(sentMessages.some((m) => String(m.content).includes('RULES'))).toBe(true);
     expect(mocks.sendQuery.mock.calls[0][0].memoryContext).toContain('## 项目记忆（带证据溯源，来自之前的会话）');
-    expect(sentMessages.some((m) => String(m.content).startsWith('## 项目记忆（带证据溯源，来自之前的会话）'))).toBe(false);
+    expect(sentMessages.some((m) => String(m.content).startsWith('## 项目记忆（带证据溯源，来自之前的会话）'))).toBe(
+      false,
+    );
     expect(useChatStore.getState().messages.some((m) => (m as any).disclosure?.source === 'memory')).toBe(true);
     cb.onDone!();
   });

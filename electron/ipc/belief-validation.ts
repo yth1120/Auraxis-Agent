@@ -101,9 +101,7 @@ export function validateBeliefAnchors(
     reasons.push('纠错类信念必须引用原始陈述与纠正陈述两条 evidence');
   }
 
-  const supportStrength = anchors.length === 0
-    ? (existing.length > 0 ? 0.5 : 0)
-    : matched / anchors.length;
+  const supportStrength = anchors.length === 0 ? (existing.length > 0 ? 0.5 : 0) : matched / anchors.length;
 
   return {
     ok: reasons.length === 0,

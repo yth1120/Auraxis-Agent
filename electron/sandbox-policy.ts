@@ -32,14 +32,18 @@ const MUTATION_PATTERNS: { re: RegExp; reason: string }[] = [
   { re: /\b(rm|rmdir|mv|cp|mkdir|touch|truncate|dd|mkfs|mkswap)\b/i, reason: '检测到文件/磁盘变更命令' },
   { re: /(?:^|[;&|]\s*)[^>\n]*?(>|>>)\s*\S/, reason: '检测到输出重定向写入' },
   { re: /\b(git\s+(commit|push|reset|checkout|merge|rebase|clean|restore))\b/i, reason: '检测到 Git 变更命令' },
-  { re: /\b(npm|pnpm|yarn|bun)\s+(install|add|remove|uninstall|publish|run\s+(build|test))\b/i, reason: '检测到包管理/构建命令' },
+  {
+    re: /\b(npm|pnpm|yarn|bun)\s+(install|add|remove|uninstall|publish|run\s+(build|test))\b/i,
+    reason: '检测到包管理/构建命令',
+  },
   { re: /\b(apt|apt-get|dnf|yum|brew)\s+(install|remove|purge|update|upgrade)\b/i, reason: '检测到系统包管理命令' },
   { re: /\b(del|erase|rd|move|ren|format|diskpart|shutdown|taskkill|reg\s+add)\b/i, reason: '检测到 Windows 变更命令' },
 ];
 
-
-const READ_ONLY_COMMAND_RE = /^(?:(?:ls|cat|head|tail|find|pwd|echo|dir|type|where|which|tree|wc|sort|uniq|rg|grep|git\s+(?:status|log|diff|show|branch|rev-parse|ls-files))(?:\s|$))/i;
-const DYNAMIC_INTERPRETER_RE = /\b(?:powershell|pwsh|cmd|bash|sh|zsh|node|python|python3|pythonw|perl|ruby|php|java|dotnet|npx|npm|pnpm|yarn|deno|bun|curl|wget|ssh|scp)\b/i;
+const READ_ONLY_COMMAND_RE =
+  /^(?:(?:ls|cat|head|tail|find|pwd|echo|dir|type|where|which|tree|wc|sort|uniq|rg|grep|git\s+(?:status|log|diff|show|branch|rev-parse|ls-files))(?:\s|$))/i;
+const DYNAMIC_INTERPRETER_RE =
+  /\b(?:powershell|pwsh|cmd|bash|sh|zsh|node|python|python3|pythonw|perl|ruby|php|java|dotnet|npx|npm|pnpm|yarn|deno|bun|curl|wget|ssh|scp)\b/i;
 
 function isReadOnlyBashCommand(command: string): boolean {
   const trimmed = command.trim();
@@ -51,18 +55,18 @@ function isReadOnlyBashCommand(command: string): boolean {
 export function commandMutates(command: string): { mutates: boolean; reason?: string } {
   if (!command.trim()) return { mutates: false };
   if (isReadOnlyBashCommand(command)) return { mutates: false };
-  if (DYNAMIC_INTERPRETER_RE.test(command)) return { mutates: true, reason: '检测到解释器/网络命令，可能执行任意代码或访问网络' };
+  if (DYNAMIC_INTERPRETER_RE.test(command))
+    return { mutates: true, reason: '检测到解释器/网络命令，可能执行任意代码或访问网络' };
   for (const { re, reason } of MUTATION_PATTERNS) {
     if (re.test(command)) return { mutates: true, reason };
   }
   return { mutates: false };
 }
 
-export function enforceSandbox(args: {
-  sandboxMode: SandboxMode;
-  toolName: string;
-  input: Record<string, unknown>;
-}): { allowed: boolean; reason?: string } {
+export function enforceSandbox(args: { sandboxMode: SandboxMode; toolName: string; input: Record<string, unknown> }): {
+  allowed: boolean;
+  reason?: string;
+} {
   if (args.sandboxMode === 'full') return { allowed: true };
 
   if (args.sandboxMode === 'read') {

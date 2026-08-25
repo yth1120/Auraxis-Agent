@@ -285,7 +285,8 @@ export const zhCN = {
   'access.profile': '当前档案：{name}',
   'access.applyNext': '切换后对下一个任务生效',
   'access.full.confirmTitle': '切换到「完全访问」？',
-  'access.full.confirmBody': 'Agent 将可以读写任意文件、执行任意命令，不再受沙箱边界限制。请仅在完全信任当前任务时继续。',
+  'access.full.confirmBody':
+    'Agent 将可以读写任意文件、执行任意命令，不再受沙箱边界限制。请仅在完全信任当前任务时继续。',
   'access.full.ack': '我已了解风险，继续',
   'common.confirm': '确认',
   'common.cancel': '取消',
@@ -470,7 +471,8 @@ export const zhCN = {
   'settings.section.sidebar': '侧边栏',
   'settings.section.aqua': 'Aqua 玻璃',
   'settings.aquaGlass': 'Aqua 玻璃模式',
-  'settings.aquaGlass.desc': '将聊天区、右侧面板与输入框变为磨砂玻璃卡片，拖动滑块调节模糊与透明度。Windows 11 优先透出桌面 Acrylic，其余环境使用内置氛围底色（无壁纸）。',
+  'settings.aquaGlass.desc':
+    '将聊天区、右侧面板与输入框变为磨砂玻璃卡片，拖动滑块调节模糊与透明度。Windows 11 优先透出桌面 Acrylic，其余环境使用内置氛围底色（无壁纸）。',
   'settings.aquaGlass.off': '关闭',
   'settings.aquaGlass.max': '最玻璃',
   'settings.aquaWallpaper': '壁纸',
@@ -539,7 +541,8 @@ export const zhCN = {
   'settings.sourceProjectEnv': '项目 .env',
   'settings.webSearchSection': '联网搜索',
   'settings.searchService': '搜索服务',
-  'settings.searchServiceDesc': 'Agent 与对话模式联网搜索使用的服务商（默认 DeepSeek 官方搜索，失败自动降级 DuckDuckGo）',
+  'settings.searchServiceDesc':
+    'Agent 与对话模式联网搜索使用的服务商（默认 DeepSeek 官方搜索，失败自动降级 DuckDuckGo）',
   'settings.duckduckgo': 'DuckDuckGo（降级备用，无需 Key）',
   'settings.deepseekSearch': 'DeepSeek 官方搜索（默认，复用 DeepSeek API Key）',
   'settings.exaKey': 'Exa API Key',
@@ -596,7 +599,8 @@ export const zhCN = {
   'settings.startFailed': '启动失败',
   'settings.run': '运行',
   'settings.recentRuns': '最近运行',
-  'settings.workflowFormat': '定义格式：JSON（steps 数组：id/name/agentType/prompt/dependsOn，按依赖拓扑执行，结果以 {ref} 注入后续步骤），或 Markdown 模板（frontmatter 写 name/description，每个 ## 小节为一个顺序步骤）。',
+  'settings.workflowFormat':
+    '定义格式：JSON（steps 数组：id/name/agentType/prompt/dependsOn，按依赖拓扑执行，结果以 {ref} 注入后续步骤），或 Markdown 模板（frontmatter 写 name/description，每个 ## 小节为一个顺序步骤）。',
   'settings.connectionsDesc': 'SSH 远程主机（仅密钥 / SSH Agent 认证，密码永不落盘）。',
   'settings.sshName': '名称',
   'settings.sshHost': '主机地址',
@@ -621,7 +625,8 @@ export const zhCN = {
   'settings.connectors.notion.desc': '搜索页面并在父页面下创建新页（Integration Token）',
   'settings.connectors.configured': '已配置',
   'settings.connectors.notConfigured': '未配置',
-  'settings.connectors.hint': 'Token 只保存在本机（safeStorage 加密）。模型通过 SlackListChannels / SlackPostMessage、DriveList / DriveRead、NotionSearch / NotionCreatePage 工具使用这些连接。',
+  'settings.connectors.hint':
+    'Token 只保存在本机（safeStorage 加密）。模型通过 SlackListChannels / SlackPostMessage、DriveList / DriveRead、NotionSearch / NotionCreatePage 工具使用这些连接。',
   'settings.rulesDesc': '用户规则目录或项目 .auraxis/rules/ 下的前缀规则。',
   'settings.noRulesFiles': '暂无规则。规则文件位于用户 rules 目录或项目 .auraxis/rules/ 下。',
   'settings.ruleAllow': '放行',
@@ -636,7 +641,8 @@ export const zhCN = {
   'settings.runtime.executeModel': '执行模型',
   'settings.runtime.executeModel.desc': '计划批准后执行步骤使用的模型（快 / 便宜优先）。',
   'settings.runtime.clarifyBeforeWork': '开工前先澄清',
-  'settings.runtime.clarifyBeforeWork.desc': 'Work 模式开始多步骤任务前，若目标/范围/交付物存在歧义，先用提问澄清再动手（自主研发的澄清流程）。',
+  'settings.runtime.clarifyBeforeWork.desc':
+    'Work 模式开始多步骤任务前，若目标/范围/交付物存在歧义，先用提问澄清再动手（自主研发的澄清流程）。',
   'skill.codeReview.name': '代码审查',
   'skill.codeReview.desc': '审查代码质量和潜在问题',
   'skill.bugFix.name': 'Bug 修复',
@@ -1308,6 +1314,7 @@ export const zhCN = {
   'tl.searchTrajectory': '搜索轨迹…',
   'code.copied': '代码已复制到剪贴板',
   'code.copyFailed': '复制失败',
+  'code.apply': '应用',
   'code.applied': '代码已应用',
   'code.noProject': '请先在设置中选择项目目录',
   'code.appliedAction': '代码已{action}: {file}',
@@ -1467,7 +1474,8 @@ export const zhCN = {
   'skills.copyTip': '复制技能提及',
   'skills.copy': '复制',
   'skills.whenToUse': '适用：{text}',
-  'skills.hint': '技能目录位于应用用户数据目录下的 skills/ 文件夹。放入 SKILL.md 后，Agent 可通过 ListSkills / ReadSkill 使用。',
+  'skills.hint':
+    '技能目录位于应用用户数据目录下的 skills/ 文件夹。放入 SKILL.md 后，Agent 可通过 ListSkills / ReadSkill 使用。',
 
   // ── Diff panel ──
   'diff.mergeFailed': '合并失败',

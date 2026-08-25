@@ -21,11 +21,7 @@ vi.mock('../../connectors', () => ({
 }));
 
 import { registerConnectorHandlers } from '../connector-handlers';
-import {
-  getConnectorStatuses,
-  setConnectorToken,
-  testConnector,
-} from '../../connectors';
+import { getConnectorStatuses, setConnectorToken, testConnector } from '../../connectors';
 
 type Handler = (event: unknown, ...args: unknown[]) => Promise<any>;
 

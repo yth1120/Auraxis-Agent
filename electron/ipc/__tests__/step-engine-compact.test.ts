@@ -24,20 +24,26 @@ vi.mock('../llm-adapter', () => ({
   isDeepSeekVisionModel: vi.fn(() => false),
 }));
 vi.mock('../tool-runner', () => ({
-  runToolBatch: vi.fn(async () => [{
-    index: 0,
-    toolUseId: 'tc1',
-    toolName: 'Read',
-    input: { file_path: 'a.ts' },
-    output: { file_path: 'a.ts', content: 'c', total_lines: 1 },
-    error: undefined,
-    durationMs: 1,
-  }]),
+  runToolBatch: vi.fn(async () => [
+    {
+      index: 0,
+      toolUseId: 'tc1',
+      toolName: 'Read',
+      input: { file_path: 'a.ts' },
+      output: { file_path: 'a.ts', content: 'c', total_lines: 1 },
+      error: undefined,
+      durationMs: 1,
+    },
+  ]),
   isDeniedError: () => false,
 }));
 vi.mock('electron', () => ({
   app: { getPath: () => '', getName: () => 'auraxis' },
-  BrowserWindow: class { static fromWebContents() { return null; } },
+  BrowserWindow: class {
+    static fromWebContents() {
+      return null;
+    }
+  },
   ipcMain: { handle: vi.fn(), on: vi.fn(), removeHandler: vi.fn() },
   dialog: { showOpenDialog: vi.fn(), showMessageBox: vi.fn() },
   shell: { openExternal: vi.fn() },
@@ -68,28 +74,34 @@ describe('runStep → context-manager 联动（压缩策略传递）', () => {
     const state = createStepState([{ role: 'system', content: 'sys' }]);
     state.iteration = 1;
     const events: any[] = [];
-    const outcome = await runStep({
-      requestId: 'r1',
-      sessionId: 's1',
-      model: 'm',
-      apiKey: 'k',
-      apiBase: 'a',
-      systemPrompt: 'sys',
-      projectRoot: 'C:/proj',
-      mode: 'ask',
-      tools: [],
-      emit: (e) => events.push(e),
-      signal: new AbortController().signal,
-      compressMode: 'step',
-      stepKeepRecent: 3,
-    }, state, 'g1');
+    const outcome = await runStep(
+      {
+        requestId: 'r1',
+        sessionId: 's1',
+        model: 'm',
+        apiKey: 'k',
+        apiBase: 'a',
+        systemPrompt: 'sys',
+        projectRoot: 'C:/proj',
+        mode: 'ask',
+        tools: [],
+        emit: (e) => events.push(e),
+        signal: new AbortController().signal,
+        compressMode: 'step',
+        stepKeepRecent: 3,
+      },
+      state,
+      'g1',
+    );
 
     expect(h.compactHistory).toHaveBeenCalledTimes(1);
-    expect(h.compactHistory).toHaveBeenCalledWith(expect.objectContaining({
-      compressMode: 'step',
-      stepKeepRecent: 3,
-      plan: null,
-    }));
+    expect(h.compactHistory).toHaveBeenCalledWith(
+      expect.objectContaining({
+        compressMode: 'step',
+        stepKeepRecent: 3,
+        plan: null,
+      }),
+    );
     expect(outcome.status).toBe('continue');
   });
 });

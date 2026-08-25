@@ -1,11 +1,7 @@
 import { BrowserWindow, ipcMain } from 'electron';
 import type { IpcMainInvokeEvent } from 'electron';
 
-const DEV_ORIGINS = new Set([
-  'http://localhost:5173',
-  'http://127.0.0.1:5173',
-  'http://[::1]:5173',
-]);
+const DEV_ORIGINS = new Set(['http://localhost:5173', 'http://127.0.0.1:5173', 'http://[::1]:5173']);
 
 function isTesting(): boolean {
   return process.env.NODE_ENV === 'test' || process.env.VITEST === 'true';
@@ -45,12 +41,17 @@ export function assertTrustedIpcSender(event: unknown): void {
   }
 }
 
-export function secureHandle<T extends unknown>(
+export type IpcHandler<TPayload extends unknown[] = unknown[], TResult = unknown> = (
+  event: IpcMainInvokeEvent,
+  ...payload: TPayload
+) => Promise<TResult> | TResult;
+
+export function secureHandle<TPayload extends unknown[] = unknown[], TResult = unknown>(
   channel: string,
-  handler: (event: IpcMainInvokeEvent, ...args: any[]) => Promise<T> | T,
+  handler: IpcHandler<TPayload, TResult>,
 ): void {
-  ipcMain.handle(channel, (event, ...args: any[]) => {
+  ipcMain.handle(channel, (event, ...args: unknown[]) => {
     assertTrustedIpcSender(event);
-    return handler(event, ...args);
+    return handler(event, ...(args as TPayload));
   });
 }

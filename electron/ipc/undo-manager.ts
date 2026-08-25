@@ -3,9 +3,9 @@
  * Uses async I/O (fs.promises) to avoid blocking the main process.
  */
 
+import { errorText } from '../errors';
 import path from 'path';
 import { promises as fs } from 'fs';
-import { ipcMain } from 'electron';
 import { secureHandle } from './trust';
 import type { WorkspaceFileDiff } from '../types';
 
@@ -36,16 +36,15 @@ class UndoManager {
   }
 
   private async ensureDir(dir: string) {
-    try { await fs.mkdir(dir, { recursive: true }); } catch { /* exists */ }
+    try {
+      await fs.mkdir(dir, { recursive: true });
+    } catch {
+      /* exists */
+    }
   }
 
   /** Backup a file before modification. Returns backup ID. */
-  async backupFile(
-    filePath: string,
-    projectRoot: string,
-    toolName: string,
-    sessionId: string,
-  ): Promise<string | null> {
+  async backupFile(filePath: string, projectRoot: string, toolName: string, sessionId: string): Promise<string | null> {
     const id = `undo-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     const snapDir = this.getSnapshotDir(projectRoot);
     await this.ensureDir(snapDir);
@@ -69,10 +68,19 @@ class UndoManager {
     }
 
     let size = 0;
-    try { size = (await fs.stat(filePath)).size; } catch { /* created-but-removed race */ }
+    try {
+      size = (await fs.stat(filePath)).size;
+    } catch {
+      /* created-but-removed race */
+    }
     const entry: UndoEntry = {
-      id, filePath, toolName,
-      timestamp: Date.now(), sessionId, size, created: created || undefined,
+      id,
+      filePath,
+      toolName,
+      timestamp: Date.now(),
+      sessionId,
+      size,
+      created: created || undefined,
     };
 
     this.history.push(entry);
@@ -87,7 +95,11 @@ class UndoManager {
     if (!entry) return false;
 
     if (entry.created) {
-      try { await fs.rm(entry.filePath, { force: true }); } catch { /* already gone */ }
+      try {
+        await fs.rm(entry.filePath, { force: true });
+      } catch {
+        /* already gone */
+      }
       this.history = this.history.filter((e) => e.id !== fileId);
       await this.saveHistory(this.getSnapshotDir(projectRoot));
       return true;
@@ -114,7 +126,11 @@ class UndoManager {
       await this.saveHistory(snapDir);
     }
 
-    try { await fs.unlink(backupPath); } catch { /* ignore */ }
+    try {
+      await fs.unlink(backupPath);
+    } catch {
+      /* ignore */
+    }
     return true;
   }
 
@@ -124,7 +140,11 @@ class UndoManager {
     if (!entry) return false;
 
     if (entry.created) {
-      try { await fs.rm(entry.filePath, { force: true }); } catch { /* already gone */ }
+      try {
+        await fs.rm(entry.filePath, { force: true });
+      } catch {
+        /* already gone */
+      }
       this.history = this.history.filter((e) => e.id !== fileId);
       await this.saveHistory(this.getSnapshotDir(projectRoot));
       return true;
@@ -145,7 +165,11 @@ class UndoManager {
 
     this.history = this.history.filter((e) => e.id !== fileId);
     await this.saveHistory(snapDir);
-    try { await fs.unlink(backupPath); } catch { /* ignore */ }
+    try {
+      await fs.unlink(backupPath);
+    } catch {
+      /* ignore */
+    }
     return true;
   }
 
@@ -153,12 +177,7 @@ class UndoManager {
    * Coherence Collapse：把"该文件+会话 最近一次编辑前的备份"标记为最佳补丁。
    * 语义：agent 已跑到正确代码、即将做破坏性编辑前，把当前状态存为最优检查点。
    */
-  async markBest(
-    projectRoot: string,
-    sessionId: string,
-    filePath: string,
-    label?: string,
-  ): Promise<string | null> {
+  async markBest(projectRoot: string, sessionId: string, filePath: string, label?: string): Promise<string | null> {
     const file = path.resolve(filePath);
     const matches = this.history.filter((e) => e.sessionId === sessionId && path.resolve(e.filePath) === file);
     if (matches.length === 0) return null;
@@ -180,9 +199,9 @@ class UndoManager {
     filePath: string,
   ): Promise<{ ok: boolean; restoredId?: string }> {
     const file = path.resolve(filePath);
-    const entry = [...this.history].reverse().find(
-      (e) => e.sessionId === sessionId && path.resolve(e.filePath) === file && e.best,
-    );
+    const entry = [...this.history]
+      .reverse()
+      .find((e) => e.sessionId === sessionId && path.resolve(e.filePath) === file && e.best);
     if (!entry) return { ok: false };
     const ok = await this.restoreEntry(entry.id, projectRoot);
     return ok ? { ok: true, restoredId: entry.id } : { ok: false };
@@ -219,8 +238,10 @@ class UndoManager {
   }
 
   getUndoHistory(sessionId?: string): UndoEntry[] {
-    return (sessionId ? this.history.filter((e) => e.sessionId === sessionId) : this.history)
-      .map((e) => ({ ...e, filePath: e.filePath.replace(/\\/g, '/') }));
+    return (sessionId ? this.history.filter((e) => e.sessionId === sessionId) : this.history).map((e) => ({
+      ...e,
+      filePath: e.filePath.replace(/\\/g, '/'),
+    }));
   }
 
   /** Original → current diff for every file a session touched (review surface). */
@@ -284,15 +305,17 @@ class UndoManager {
   async revertSessionFile(sessionId: string, relPath: string, projectRoot: string): Promise<{ reverted: number }> {
     const filePath = path.resolve(projectRoot, relPath);
     const normalized = path.resolve(filePath);
-    const entries = this.history.filter((e) =>
-      e.sessionId === sessionId && path.resolve(e.filePath) === normalized,
-    );
+    const entries = this.history.filter((e) => e.sessionId === sessionId && path.resolve(e.filePath) === normalized);
     if (entries.length === 0) return { reverted: 0 };
 
     const earliest = entries[0];
     const snapDir = this.getSnapshotDir(projectRoot);
     if (earliest.created) {
-      try { await fs.rm(earliest.filePath, { force: true }); } catch { /* already gone */ }
+      try {
+        await fs.rm(earliest.filePath, { force: true });
+      } catch {
+        /* already gone */
+      }
     } else {
       const backupPath = path.join(snapDir, earliest.id);
       try {
@@ -308,7 +331,11 @@ class UndoManager {
     this.history = this.history.filter((e) => !ids.has(e.id));
     for (const entry of entries) {
       if (entry.created) continue;
-      try { await fs.unlink(path.join(snapDir, entry.id)); } catch { /* ignore */ }
+      try {
+        await fs.unlink(path.join(snapDir, entry.id));
+      } catch {
+        /* ignore */
+      }
     }
     await this.saveHistory(snapDir);
     return { reverted: entries.length };
@@ -320,14 +347,18 @@ class UndoManager {
       await fs.access(metaPath);
       const raw = await fs.readFile(metaPath, 'utf-8');
       this.history = JSON.parse(raw);
-    } catch { /* fresh start */ }
+    } catch {
+      /* fresh start */
+    }
   }
 
   private async saveHistory(snapDir: string) {
     const metaPath = path.join(snapDir, '.undo-history.json');
     try {
       await fs.writeFile(metaPath, JSON.stringify(this.history), 'utf-8');
-    } catch { /* non-critical */ }
+    } catch {
+      /* non-critical */
+    }
   }
 
   async init(projectRoot: string) {
@@ -347,35 +378,48 @@ export function registerUndoIpc() {
   secureHandle('undo:getHistory', async (_event, sessionId?: string) => {
     try {
       return { ok: true, data: undoManager.getUndoHistory(sessionId) };
-    } catch (error: any) { return { ok: false, error: error.message }; }
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
+    }
   });
 
   secureHandle('undo:getList', async () => {
     try {
       return { ok: true, data: undoManager.getUndoHistory() };
-    } catch (error: any) { return { ok: false, error: error.message }; }
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
+    }
   });
 
   secureHandle('undo:getSessionDiffs', async (_event, sessionId: string, projectRoot: string) => {
     try {
       const diffs = await undoManager.getSessionDiffs(sessionId, projectRoot);
       return { ok: true, data: diffs };
-    } catch (error: any) { return { ok: false, error: error.message }; }
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
+    }
   });
 
-  secureHandle('undo:revertSessionFile', async (_event, params: { sessionId: string; relPath: string; projectRoot: string }) => {
-    try {
-      const result = await undoManager.revertSessionFile(params.sessionId, params.relPath, params.projectRoot);
-      return { ok: true, data: result };
-    } catch (error: any) { return { ok: false, error: error.message }; }
-  });
+  secureHandle(
+    'undo:revertSessionFile',
+    async (_event, params: { sessionId: string; relPath: string; projectRoot: string }) => {
+      try {
+        const result = await undoManager.revertSessionFile(params.sessionId, params.relPath, params.projectRoot);
+        return { ok: true, data: result };
+      } catch (error: unknown) {
+        return { ok: false, error: errorText(error) };
+      }
+    },
+  );
 
   secureHandle('undo:execute', async (_event, fileId: string, projectRoot: string) => {
     try {
       const ok = await undoManager.undoFile(fileId, projectRoot);
       if (!ok) return { ok: false, error: '备份不存在或恢复失败' };
       return { ok: true };
-    } catch (error: any) { return { ok: false, error: error.message }; }
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
+    }
   });
 
   secureHandle('undo:revertLast', async (_event, projectRoot: string) => {
@@ -385,14 +429,18 @@ export function registerUndoIpc() {
       const last = history[history.length - 1];
       const ok = await undoManager.undoFile(last.id, projectRoot);
       return { ok };
-    } catch (error: any) { return { ok: false, error: error.message }; }
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
+    }
   });
 
   secureHandle('undo:revertSessions', async (_event, params: { sessionIds: string[]; projectRoot: string }) => {
     try {
       const result = await undoManager.revertSessions(params.sessionIds, params.projectRoot);
       return { ok: true, data: result };
-    } catch (error: any) { return { ok: false, error: error.message }; }
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
+    }
   });
 
   secureHandle('undo:revert', async (_event, fileId: string, projectRoot: string) => {
@@ -400,41 +448,57 @@ export function registerUndoIpc() {
       const ok = await undoManager.undoFile(fileId, projectRoot);
       if (!ok) return { ok: false, error: '备份不存在或恢复失败' };
       return { ok: true };
-    } catch (error: any) { return { ok: false, error: error.message }; }
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
+    }
   });
 
-  secureHandle('undo:markBest', async (_event, params: {
-    projectRoot: string; sessionId: string; filePath: string; label?: string;
-  }) => {
-    try {
-      const id = await undoManager.markBest(
-        params.projectRoot,
-        params.sessionId,
-        params.filePath,
-        params.label,
-      );
-      if (!id) return { ok: false, error: '未找到该会话的文件备份' };
-      return { ok: true, data: { id } };
-    } catch (error: any) { return { ok: false, error: error.message }; }
-  });
+  secureHandle(
+    'undo:markBest',
+    async (
+      _event,
+      params: {
+        projectRoot: string;
+        sessionId: string;
+        filePath: string;
+        label?: string;
+      },
+    ) => {
+      try {
+        const id = await undoManager.markBest(params.projectRoot, params.sessionId, params.filePath, params.label);
+        if (!id) return { ok: false, error: '未找到该会话的文件备份' };
+        return { ok: true, data: { id } };
+      } catch (error: unknown) {
+        return { ok: false, error: errorText(error) };
+      }
+    },
+  );
 
-  secureHandle('undo:restoreBest', async (_event, params: {
-    projectRoot: string; sessionId: string; filePath: string;
-  }) => {
-    try {
-      const result = await undoManager.restoreBest(
-        params.projectRoot,
-        params.sessionId,
-        params.filePath,
-      );
-      if (!result.ok) return { ok: false, error: '未找到最佳补丁检查点' };
-      return { ok: true, data: result };
-    } catch (error: any) { return { ok: false, error: error.message }; }
-  });
+  secureHandle(
+    'undo:restoreBest',
+    async (
+      _event,
+      params: {
+        projectRoot: string;
+        sessionId: string;
+        filePath: string;
+      },
+    ) => {
+      try {
+        const result = await undoManager.restoreBest(params.projectRoot, params.sessionId, params.filePath);
+        if (!result.ok) return { ok: false, error: '未找到最佳补丁检查点' };
+        return { ok: true, data: result };
+      } catch (error: unknown) {
+        return { ok: false, error: errorText(error) };
+      }
+    },
+  );
 
   secureHandle('undo:listBest', async (_event, params: { projectRoot: string; sessionId?: string }) => {
     try {
       return { ok: true, data: undoManager.listBest(params.projectRoot, params.sessionId) };
-    } catch (error: any) { return { ok: false, error: error.message }; }
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
+    }
   });
 }

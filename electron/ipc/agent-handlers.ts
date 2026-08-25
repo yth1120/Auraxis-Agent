@@ -1,4 +1,4 @@
-import { ipcMain, BrowserWindow } from 'electron';
+import { BrowserWindow } from 'electron';
 import { secureHandle } from './trust';
 import type { AgentInfo, AgentLogEntry } from '../advanced-defs';
 import { waitForPlanApproval } from './plan-handlers';
@@ -9,6 +9,7 @@ import { resolveModelApiBase, resolveModelApiKey } from './model-config';
 import { agentLoopRun, AgentObserver, AgentStateSnapshot } from './agent-loop';
 import { appendAgentLog } from '../session-log';
 import { appendWorkDocsSystemRule, type WorkSurface } from '../work-docs-policy';
+import { errorRecord, errorText } from '../errors';
 
 const agents = new Map<string, AgentInfo>();
 const agentAborts = new Map<string, AbortController>();
@@ -30,10 +31,14 @@ export function genAgentId(): string {
 function pruneSubAgents(olderThanMs = 3600_000, maxKeep = 50): void {
   const now = Date.now();
   const isTerminal = (s?: string) => s === 'completed' || s === 'error' || s === 'stopped';
-  const drop = (id: string) => { agentAborts.get(id)?.abort(); agents.delete(id); agentAborts.delete(id); };
+  const drop = (id: string) => {
+    agentAborts.get(id)?.abort();
+    agents.delete(id);
+    agentAborts.delete(id);
+  };
 
   for (const [id, a] of agents) {
-    if (isTerminal(a.status) && a.endTime && (now - a.endTime) > olderThanMs) drop(id);
+    if (isTerminal(a.status) && a.endTime && now - a.endTime > olderThanMs) drop(id);
   }
   const terminals = [...agents.entries()]
     .filter(([, a]) => isTerminal(a.status))
@@ -60,7 +65,8 @@ const BUILTIN_AGENTS: Record<string, AgentTypeDef> = {
   // EN: "Fast read-only agent for exploring codebases..."
   Explore: {
     type: 'Explore',
-    whenToUse: 'Fast read-only agent for exploring codebases. Use for finding files by patterns (Glob), searching code (Grep), or answering questions about the codebase. Specify thoroughness: "quick", "medium", or "very thorough".',
+    whenToUse:
+      'Fast read-only agent for exploring codebases. Use for finding files by patterns (Glob), searching code (Grep), or answering questions about the codebase. Specify thoroughness: "quick", "medium", or "very thorough".',
     disallowedTools: ['Write', 'Edit', 'Agent'],
     getSystemPrompt: (task, platform, shellHint, projectRoot) => `你是文件搜索专家，负责全面探索和分析代码库。
 
@@ -102,9 +108,15 @@ Shell：${shellHint}
   // EN: "Software architect agent for designing implementation plans..."
   Plan: {
     type: 'Plan',
-    whenToUse: 'Software architect agent for designing implementation plans. Use when you need to plan how to implement a feature, refactor code, or design architecture before writing code.',
+    whenToUse:
+      'Software architect agent for designing implementation plans. Use when you need to plan how to implement a feature, refactor code, or design architecture before writing code.',
     disallowedTools: ['Write', 'Edit', 'Agent'],
-    getSystemPrompt: (task, platform, shellHint, projectRoot) => `你是软件架构专家，负责设计实现方案。你可以探索和分析代码，但不能做任何修改；你的职责是规划，不是执行。
+    getSystemPrompt: (
+      task,
+      platform,
+      shellHint,
+      projectRoot,
+    ) => `你是软件架构专家，负责设计实现方案。你可以探索和分析代码，但不能做任何修改；你的职责是规划，不是执行。
 
 ## 工作方式（由你自主决定）
 - 用 Glob 和 Grep 了解项目结构，阅读相关文件理解现有模式和架构
@@ -131,8 +143,14 @@ Shell：${shellHint}
   // EN: "General-purpose agent for complex multi-step coding tasks..."
   'general-purpose': {
     type: 'general-purpose',
-    whenToUse: 'General-purpose agent for complex multi-step coding tasks. Full tool access. Use for implementing features, fixing bugs, refactoring, or any task that requires multiple steps and tools.',
-    getSystemPrompt: (task, platform, shellHint, projectRoot) => `你是 Auraxis，一个桌面端 AI 智能体工作台。你的职责是完整、清晰地完成用户的任务。
+    whenToUse:
+      'General-purpose agent for complex multi-step coding tasks. Full tool access. Use for implementing features, fixing bugs, refactoring, or any task that requires multiple steps and tools.',
+    getSystemPrompt: (
+      task,
+      platform,
+      shellHint,
+      projectRoot,
+    ) => `你是 Auraxis，一个桌面端 AI 智能体工作台。你的职责是完整、清晰地完成用户的任务。
 
 ## 工作方式（由你自主决定）
 
@@ -200,7 +218,12 @@ function createAgentObserver(
           emitEvent(win, agent.id, { type: 'text_chunk', requestId: agent.id, text: event.text });
           break;
         case 'thinking_chunk':
-          emitEvent(win, agent.id, { type: 'thinking_chunk', requestId: agent.id, chunk: event.chunk, isNewBlock: event.isNewBlock });
+          emitEvent(win, agent.id, {
+            type: 'thinking_chunk',
+            requestId: agent.id,
+            chunk: event.chunk,
+            isNewBlock: event.isNewBlock,
+          });
           break;
         case 'iteration_start':
           // Emit to frontend so AgentPanel can render the iteration marker.
@@ -231,16 +254,63 @@ function createAgentObserver(
         case 'tool_start':
           // stepGroupId carried through so the renderer can group parallel
           // tool dispatches into one visual block.
-          emitEvent(win, agent.id, { type: 'tool_start', requestId: agent.id, toolCallId: event.toolCallId, toolName: event.toolName, input: event.input, stepGroupId: event.stepGroupId });
-          logEntry({ type: 'tool_start', timestamp: Date.now(), toolCallId: event.toolCallId, toolName: event.toolName, input: event.input, stepGroupId: event.stepGroupId });
+          emitEvent(win, agent.id, {
+            type: 'tool_start',
+            requestId: agent.id,
+            toolCallId: event.toolCallId,
+            toolName: event.toolName,
+            input: event.input,
+            stepGroupId: event.stepGroupId,
+          });
+          logEntry({
+            type: 'tool_start',
+            timestamp: Date.now(),
+            toolCallId: event.toolCallId,
+            toolName: event.toolName,
+            input: event.input,
+            stepGroupId: event.stepGroupId,
+          });
           break;
         case 'tool_end':
-          emitEvent(win, agent.id, { type: 'tool_end', requestId: agent.id, toolCallId: event.toolCallId, toolName: event.toolName, output: event.output, durationMs: event.durationMs, stepGroupId: event.stepGroupId, summary: (event as any).summary });
-          logEntry({ type: 'tool_end', timestamp: Date.now(), toolCallId: event.toolCallId, toolName: event.toolName, output: event.output, durationMs: event.durationMs, stepGroupId: event.stepGroupId });
+          emitEvent(win, agent.id, {
+            type: 'tool_end',
+            requestId: agent.id,
+            toolCallId: event.toolCallId,
+            toolName: event.toolName,
+            output: event.output,
+            durationMs: event.durationMs,
+            stepGroupId: event.stepGroupId,
+            summary: (event as any).summary,
+          });
+          logEntry({
+            type: 'tool_end',
+            timestamp: Date.now(),
+            toolCallId: event.toolCallId,
+            toolName: event.toolName,
+            output: event.output,
+            durationMs: event.durationMs,
+            stepGroupId: event.stepGroupId,
+          });
           break;
         case 'tool_error':
-          emitEvent(win, agent.id, { type: 'tool_error', requestId: agent.id, toolCallId: event.toolCallId, toolName: event.toolName, input: event.input, error: event.error, stepGroupId: event.stepGroupId });
-          logEntry({ type: 'tool_error', timestamp: Date.now(), toolCallId: event.toolCallId, toolName: event.toolName, input: event.input, error: event.error, stepGroupId: event.stepGroupId });
+          emitEvent(win, agent.id, {
+            type: 'tool_error',
+            requestId: agent.id,
+            toolCallId: event.toolCallId,
+            toolName: event.toolName,
+            input: event.input,
+            error: event.error,
+            stepGroupId: event.stepGroupId,
+          });
+          logEntry({
+            type: 'tool_error',
+            timestamp: Date.now(),
+            toolCallId: event.toolCallId,
+            toolName: event.toolName,
+            input: event.input,
+            error: event.error,
+            stepGroupId: event.stepGroupId,
+          });
           break;
         case 'error':
           emitEvent(win, agent.id, { type: 'error', requestId: agent.id, error: event.error });
@@ -248,13 +318,22 @@ function createAgentObserver(
           break;
         case 'plan_created':
         case 'plan_updated': {
-          const todos = event.plan.tasks.map((t) => ({ content: t.description, status: t.status, activeForm: `执行: ${t.description}` }));
+          const todos = event.plan.tasks.map((t) => ({
+            content: t.description,
+            status: t.status,
+            activeForm: `执行: ${t.description}`,
+          }));
           emitEvent(win, agent.id, { type: 'plan', requestId: agent.id, todos });
           logEntry({ type: 'plan', timestamp: Date.now(), todos });
           break;
         }
         case 'deviance_warning':
-          emitEvent(win, agent.id, { type: 'system_message', requestId: agent.id, level: 'warning', content: event.message });
+          emitEvent(win, agent.id, {
+            type: 'system_message',
+            requestId: agent.id,
+            level: 'warning',
+            content: event.message,
+          });
           logEntry({ type: 'error', timestamp: Date.now(), error: event.message });
           break;
         case 'context_injected':
@@ -327,10 +406,11 @@ export async function runSubAgent(params: {
   background?: boolean;
 }): Promise<{ output: unknown; error?: string }> {
   const depth = params.depth ?? 0;
-  if (depth > 3) return { output: null, error: '子 Agent 递归深度超过最大限制(3层)，请直接在父级 continuation 中完成任务' };
+  if (depth > 3)
+    return { output: null, error: '子 Agent 递归深度超过最大限制(3层)，请直接在父级 continuation 中完成任务' };
   const { readSettings } = await import('./settings-store');
   const agentDef = getAgentDef(params.subagentType);
-  let tools = getToolsForAgent(params.subagentType);
+  const tools = getToolsForAgent(params.subagentType);
   const settings: Record<string, any> = await readSettings();
   const model: string = settings.executeModel || settings.selectedModel || 'deepseek-v4-pro';
   const planModel: string = settings.planModel || model;
@@ -348,10 +428,13 @@ export async function runSubAgent(params: {
   if (!apiKey) return { output: null, error: '未配置 DeepSeek API Key' };
 
   const platform = process.platform === 'win32' ? 'Windows' : process.platform === 'darwin' ? 'macOS' : 'Linux';
-  const shellHint = process.platform === 'win32' ? 'On Windows, the shell is Git Bash — standard Unix commands work natively. Use them freely.' : 'Use standard Unix shell commands.';
+  const shellHint =
+    process.platform === 'win32'
+      ? 'On Windows, the shell is Git Bash — standard Unix commands work natively. Use them freely.'
+      : 'Use standard Unix shell commands.';
   let systemPrompt = agentDef.getSystemPrompt(params.prompt, platform, shellHint, params.projectRoot);
   systemPrompt = appendWorkDocsSystemRule(systemPrompt, params.surface);
-  let mode = 'ask' as const;
+  const mode = 'ask' as const;
 
   const agentId = params.agentId || `sub-${genAgentId()}`;
   const agent: AgentInfo = {
@@ -407,7 +490,9 @@ export async function runSubAgent(params: {
     const observer = createAgentObserver(agent, win, onUpdate);
     subAgentObservers.set(agentId, observer);
     return agentLoopRun({
-      model, apiKey, apiBase,
+      model,
+      apiKey,
+      apiBase,
       fallbackModel,
       systemPrompt,
       projectRoot: params.projectRoot,
@@ -428,8 +513,7 @@ export async function runSubAgent(params: {
       planModel,
       sessionId: agentId,
       messageQueue: () => drainSubAgentInbox(agentId),
-      onPlanGenerated: (plan) =>
-        waitForPlanApproval(plan, win, { projectRoot: params.projectRoot, title: agent.name }),
+      onPlanGenerated: (plan) => waitForPlanApproval(plan, win, { projectRoot: params.projectRoot, title: agent.name }),
       depth,
       surface: params.surface,
     });
@@ -472,22 +556,30 @@ export async function runSubAgent(params: {
       .then(async (result) => {
         finishOk(result);
         const { cacheTaskResult } = await import('./tool-handlers');
-        cacheTaskResult(agentId, {
-          status: controller.signal.aborted ? 'stopped' : 'completed',
-          agentType: params.subagentType,
-          description: params.description,
-          result: result.allText || '任务完成',
-          toolCallCount: result.toolCallCount,
-          iterations: result.iterations,
-        }, controller.signal.aborted ? 'stopped' : 'completed');
+        cacheTaskResult(
+          agentId,
+          {
+            status: controller.signal.aborted ? 'stopped' : 'completed',
+            agentType: params.subagentType,
+            description: params.description,
+            result: result.allText || '任务完成',
+            toolCallCount: result.toolCallCount,
+            iterations: result.iterations,
+          },
+          controller.signal.aborted ? 'stopped' : 'completed',
+        );
       })
       .catch(async (err: any) => {
         finishErr(err);
         const { cacheTaskResult } = await import('./tool-handlers');
-        cacheTaskResult(agentId, {
-          status: err.name === 'AbortError' ? 'stopped' : 'error',
-          error: err.name === 'AbortError' ? 'Agent 被取消' : err.message,
-        }, err.name === 'AbortError' ? 'stopped' : 'error');
+        cacheTaskResult(
+          agentId,
+          {
+            status: err.name === 'AbortError' ? 'stopped' : 'error',
+            error: err.name === 'AbortError' ? 'Agent 被取消' : err.message,
+          },
+          err.name === 'AbortError' ? 'stopped' : 'error',
+        );
       });
     return {
       output: {
@@ -495,7 +587,8 @@ export async function runSubAgent(params: {
         background: true,
         status: 'running',
         description: params.description,
-        message: '子代理已在后台启动。可用 ListAgents 查看状态、SendMessage 追加指令、InterruptAgent 打断，完成后用 TaskOutput 读取结果。',
+        message:
+          '子代理已在后台启动。可用 ListAgents 查看状态、SendMessage 追加指令、InterruptAgent 打断，完成后用 TaskOutput 读取结果。',
       },
     };
   }
@@ -504,11 +597,19 @@ export async function runSubAgent(params: {
     const result = await runLoop();
     finishOk(result);
     if (controller.signal.aborted) return { output: null, error: 'Agent 被取消' };
-    return { output: { agentType: params.subagentType, description: params.description, result: result.allText || '任务完成', toolCallCount: agent.toolCallCount, iterations: agent.iterations } };
-  } catch (err: any) {
+    return {
+      output: {
+        agentType: params.subagentType,
+        description: params.description,
+        result: result.allText || '任务完成',
+        toolCallCount: agent.toolCallCount,
+        iterations: agent.iterations,
+      },
+    };
+  } catch (err: unknown) {
     finishErr(err);
-    if (err.name === 'AbortError') return { output: null, error: 'Agent 被取消' };
-    return { output: null, error: err.message };
+    if (errorRecord(err).name === 'AbortError') return { output: null, error: 'Agent 被取消' };
+    return { output: null, error: errorText(err) };
   }
 }
 
@@ -552,7 +653,10 @@ export function interruptSubAgent(agentId: string): boolean {
 }
 
 /** Record a progress report from a sub-agent and surface it in its log + UI. */
-export function reportFromSubAgent(agentId: string, content: string): { ok: boolean; error?: string; report?: { id: string; text: string; ts: number } } {
+export function reportFromSubAgent(
+  agentId: string,
+  content: string,
+): { ok: boolean; error?: string; report?: { id: string; text: string; ts: number } } {
   const target = agents.get(agentId);
   if (!target) return { ok: false, error: `子代理身份无效（${agentId}）` };
   const text = String(content ?? '').trim();
@@ -588,11 +692,14 @@ export function registerAgentHandlers() {
   secureHandle('agent:remove', async (_e, agentId: string) => {
     try {
       const c = agentAborts.get(agentId);
-      if (c) { c.abort(); agentAborts.delete(agentId); }
+      if (c) {
+        c.abort();
+        agentAborts.delete(agentId);
+      }
       agents.delete(agentId);
       return { ok: true };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
@@ -602,8 +709,8 @@ export function registerAgentHandlers() {
       agentAborts.clear();
       agents.clear();
       return { ok: true };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 }

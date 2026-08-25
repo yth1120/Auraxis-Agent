@@ -6,12 +6,18 @@ import { createDebouncedStorage } from '../useChatStore';
 // Node test env has no localStorage — provide a tiny in-memory shim.
 const memory = new Map<string, string>();
 const localStorageShim: Storage = {
-  get length() { return memory.size; },
+  get length() {
+    return memory.size;
+  },
   clear: () => memory.clear(),
   getItem: (k: string) => memory.get(k) ?? null,
   key: (i: number) => [...memory.keys()][i] ?? null,
-  removeItem: (k: string) => { memory.delete(k); },
-  setItem: (k: string, v: string) => { memory.set(k, v); },
+  removeItem: (k: string) => {
+    memory.delete(k);
+  },
+  setItem: (k: string, v: string) => {
+    memory.set(k, v);
+  },
 };
 vi.stubGlobal('localStorage', localStorageShim);
 
@@ -44,9 +50,7 @@ describe('createDebouncedStorage + createJSONStorage (persist round-trip)', () =
     vi.useFakeTimers();
     const write = vi.spyOn(localStorageShim, 'setItem');
     const storage = createJSONStorage(() => createDebouncedStorage(50));
-    const useA = create<{ n: number }>()(
-      persist((): { n: number } => ({ n: 0 }), { name: 'debounce-write', storage }),
-    );
+    const useA = create<{ n: number }>()(persist((): { n: number } => ({ n: 0 }), { name: 'debounce-write', storage }));
     for (let i = 1; i <= 10; i++) useA.setState({ n: i });
     expect(write).toHaveBeenCalledTimes(0); // not yet flushed
     await vi.advanceTimersByTimeAsync(60);

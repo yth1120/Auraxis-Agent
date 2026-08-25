@@ -3,8 +3,12 @@ import { promises as fs } from 'fs';
 import os from 'os';
 import path from 'path';
 import {
-  ensureSkillsDirectory, listSkills, readSkill, writeSkill,
-  seedBuiltinSkills, BUILTIN_SKILLS,
+  ensureSkillsDirectory,
+  listSkills,
+  readSkill,
+  writeSkill,
+  seedBuiltinSkills,
+  BUILTIN_SKILLS,
 } from '../../skill-store';
 
 let root: string;

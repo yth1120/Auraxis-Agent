@@ -127,7 +127,9 @@ export default function ProjectRulesPane() {
   return (
     <div className="flex flex-col gap-3">
       <div>
-        <h2 className="m-0 text-lg font-semibold text-text-primary tracking-[-0.01em]">{t('settings.projectRules.title')}</h2>
+        <h2 className="m-0 text-lg font-semibold text-text-primary tracking-[-0.01em]">
+          {t('settings.projectRules.title')}
+        </h2>
         <p className="m-0 mt-1 text-xs text-text-muted leading-[1.6]">{t('settings.projectRules.desc')}</p>
       </div>
 

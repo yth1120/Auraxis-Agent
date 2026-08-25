@@ -10,8 +10,9 @@ export default memo(function WorkHomeOverview() {
   const agentPermissions = useAgentStore((s) => s.agentPermissions);
 
   const active = agents.filter((a) => a.status === 'running' || a.status === 'queued' || a.status === 'paused').length;
-  const pending = agents.reduce((sum, a) => sum + (agentPermissions[a.id]?.length ?? 0), 0)
-    + agents.filter((a) => a.status === 'review').length;
+  const pending =
+    agents.reduce((sum, a) => sum + (agentPermissions[a.id]?.length ?? 0), 0) +
+    agents.filter((a) => a.status === 'review').length;
   const completed = agents.filter((a) => a.status === 'completed').length;
   const deliverables = agents.reduce((sum, a) => sum + workDeliverables(a).length, 0);
 

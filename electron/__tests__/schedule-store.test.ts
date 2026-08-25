@@ -1,10 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import {
-  createSchedule,
-  deleteSchedule,
-  listSchedules,
-  setScheduleFireHandler,
-} from '../schedule-store';
+import { createSchedule, deleteSchedule, listSchedules, setScheduleFireHandler } from '../schedule-store';
 
 describe('schedule-store — 会话内跟进任务', () => {
   beforeEach(() => {

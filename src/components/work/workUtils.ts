@@ -3,8 +3,7 @@ import type { I18nKey } from '../../i18n';
 
 /** Plan checklist (todos) for a work item. */
 export function workTodos(agent: AgentInfo): { content: string; status: string }[] {
-  const todos = (agent.plan as { todos?: { content: string; status: string }[] } | null | undefined)
-    ?.todos;
+  const todos = (agent.plan as { todos?: { content: string; status: string }[] } | null | undefined)?.todos;
   return Array.isArray(todos) ? todos : [];
 }
 
@@ -221,14 +220,22 @@ export function workTurns(agent: AgentInfo): WorkTurn[] {
 
 export function workStatusLabelKey(status: AgentInfo['status']): I18nKey {
   switch (status) {
-    case 'running': return 'work.status.running';
-    case 'queued': return 'work.status.queued';
-    case 'paused': return 'work.status.paused';
-    case 'completed': return 'work.status.completed';
-    case 'error': return 'work.status.error';
-    case 'stopped': return 'work.status.stopped';
-    case 'review': return 'work.status.review';
-    default: return 'work.status.running';
+    case 'running':
+      return 'work.status.running';
+    case 'queued':
+      return 'work.status.queued';
+    case 'paused':
+      return 'work.status.paused';
+    case 'completed':
+      return 'work.status.completed';
+    case 'error':
+      return 'work.status.error';
+    case 'stopped':
+      return 'work.status.stopped';
+    case 'review':
+      return 'work.status.review';
+    default:
+      return 'work.status.running';
   }
 }
 

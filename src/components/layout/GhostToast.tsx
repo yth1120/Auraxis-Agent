@@ -32,12 +32,14 @@ export default function GhostToast({ message, visible, duration = 2500, onHide }
   if (!visible && !show) return null;
 
   return (
-    <div className={clsx(
-      'absolute -top-[38px] left-1/2 -translate-x-1/2 translate-y-2 text-accent text-sm italic',
-      'opacity-0 transition-all duration-[200ms] ease-out pointer-events-none',
-      'tracking-[0.04em] font-body whitespace-nowrap z-10',
-      show && '!opacity-100 !translate-y-0',
-    )}>
+    <div
+      className={clsx(
+        'absolute -top-[38px] left-1/2 -translate-x-1/2 translate-y-2 text-accent text-sm italic',
+        'opacity-0 transition-all duration-[200ms] ease-out pointer-events-none',
+        'tracking-[0.04em] font-body whitespace-nowrap z-10',
+        show && '!opacity-100 !translate-y-0',
+      )}
+    >
       {message}
     </div>
   );

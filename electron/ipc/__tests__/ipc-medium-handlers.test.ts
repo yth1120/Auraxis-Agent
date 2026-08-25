@@ -43,9 +43,15 @@ const sshMock = (() => {
   let failConnect = false;
   class FakeStream extends EventEmitter {
     stderr = new EventEmitter();
-    emitData(d: string) { this.emit('data', Buffer.from(d)); }
-    emitStderr(d: string) { this.stderr.emit('data', Buffer.from(d)); }
-    emitClose(code: number | null) { this.emit('close', code); }
+    emitData(d: string) {
+      this.emit('data', Buffer.from(d));
+    }
+    emitStderr(d: string) {
+      this.stderr.emit('data', Buffer.from(d));
+    }
+    emitClose(code: number | null) {
+      this.emit('close', code);
+    }
   }
   class FakeClient extends EventEmitter {
     cfg: any = null;
@@ -60,7 +66,9 @@ const sshMock = (() => {
       }
       return this;
     }
-    end() { this.ended = true; }
+    end() {
+      this.ended = true;
+    }
     exec(cmd: string, opts: unknown, cb?: (err: Error | null, s: any) => void) {
       if (typeof opts === 'function') {
         cb = opts as any;
@@ -74,12 +82,20 @@ const sshMock = (() => {
   }
   return {
     Client: FakeClient,
-    setExecImpl(fn: typeof execImpl) { execImpl = fn; },
-    setFailConnect(v: boolean) { failConnect = v; },
+    setExecImpl(fn: typeof execImpl) {
+      execImpl = fn;
+    },
+    setFailConnect(v: boolean) {
+      failConnect = v;
+    },
   };
 })();
 
-vi.mock('ssh2', () => ({ get Client() { return sshMock.Client; } }));
+vi.mock('ssh2', () => ({
+  get Client() {
+    return sshMock.Client;
+  },
+}));
 
 import { registerProjectHandlers } from '../project-handlers';
 import { registerFileHandlers } from '../file-handlers';
@@ -88,11 +104,9 @@ import { registerSshHandlers } from '../ssh-handlers';
 import { registerStatsHandlers } from '../stats-handlers';
 import { readSettings } from '../settings-store';
 import { resolveModelApiBase } from '../model-config';
-import { compactHistory, estimateTokens } from '../context-manager';
+import { compactHistory } from '../context-manager';
 import { listSshConnections, saveSshConnection, removeSshConnection } from '../../ssh-store';
-import {
-  trackSession, trackMessage, trackTokens, trackToolCall, trackLinesGenerated,
-} from '../stats-handlers';
+import { trackSession, trackMessage, trackTokens, trackToolCall, trackLinesGenerated } from '../stats-handlers';
 
 type Handler = (event: unknown, ...args: unknown[]) => Promise<any>;
 
@@ -147,15 +161,25 @@ describe('IPC 中型处理器（project/file/context/ssh/stats）', () => {
 
     it('applyCode 创建/覆写/越权/类型拒绝', async () => {
       const h = await capture(registerProjectHandlers);
-      const created = await h.get('project:applyCode')!({}, { filePath: 'src/new.ts', code: 'export {}', projectRoot: root });
+      const created = await h.get('project:applyCode')!(
+        {},
+        { filePath: 'src/new.ts', code: 'export {}', projectRoot: root },
+      );
       expect(created).toMatchObject({ ok: true, action: 'created' });
       expect(await fs.readFile(path.join(root, 'src', 'new.ts'), 'utf-8')).toBe('export {}');
 
-      const overwritten = await h.get('project:applyCode')!({}, { filePath: 'src/new.ts', code: '// v2', projectRoot: root });
+      const overwritten = await h.get('project:applyCode')!(
+        {},
+        { filePath: 'src/new.ts', code: '// v2', projectRoot: root },
+      );
       expect(overwritten).toMatchObject({ ok: true, action: 'overwritten' });
 
-      await expect(h.get('project:applyCode')!({}, { filePath: '../evil.ts', code: 'x', projectRoot: root })).resolves.toMatchObject({ ok: false });
-      await expect(h.get('project:applyCode')!({}, { filePath: 'app.exe', code: 'x', projectRoot: root })).resolves.toMatchObject({ ok: false });
+      await expect(
+        h.get('project:applyCode')!({}, { filePath: '../evil.ts', code: 'x', projectRoot: root }),
+      ).resolves.toMatchObject({ ok: false });
+      await expect(
+        h.get('project:applyCode')!({}, { filePath: 'app.exe', code: 'x', projectRoot: root }),
+      ).resolves.toMatchObject({ ok: false });
     });
 
     it('previewCode 仅支持可预览类型并写入临时文件', async () => {
@@ -165,7 +189,9 @@ describe('IPC 中型处理器（project/file/context/ssh/stats）', () => {
       expect(res.url).toMatch(/^file:\/\//);
       await expect(fs.readFile(res.filePath, 'utf-8')).resolves.toBe('<h1>x</h1>');
 
-      await expect(h.get('project:previewCode')!({}, { filePath: 'main.ts', code: 'x' })).resolves.toMatchObject({ ok: false });
+      await expect(h.get('project:previewCode')!({}, { filePath: 'main.ts', code: 'x' })).resolves.toMatchObject({
+        ok: false,
+      });
     });
   });
 
@@ -245,11 +271,15 @@ describe('IPC 中型处理器（project/file/context/ssh/stats）', () => {
 
       const dir = path.join(root, 'sub');
       await expect(h.get('file:createFolder')!({}, dir, root)).resolves.toEqual({ ok: true });
-      await expect(h.get('file:createFolder')!({}, path.join(outside, 'sub'), root)).resolves.toMatchObject({ ok: false });
+      await expect(h.get('file:createFolder')!({}, path.join(outside, 'sub'), root)).resolves.toMatchObject({
+        ok: false,
+      });
 
       const nf = path.join(root, 'new.ts');
       await expect(h.get('file:createFile')!({}, nf, root)).resolves.toEqual({ ok: true });
-      await expect(h.get('file:createFile')!({}, path.join(root, 'new.exe'), root)).resolves.toMatchObject({ ok: false });
+      await expect(h.get('file:createFile')!({}, path.join(root, 'new.exe'), root)).resolves.toMatchObject({
+        ok: false,
+      });
     });
 
     it('search — 关键字匹配与空关键字', async () => {
@@ -277,10 +307,13 @@ describe('IPC 中型处理器（project/file/context/ssh/stats）', () => {
         roundsRemoved: 2,
         summaryInjected: true,
       });
-      const res = await h.get('context:compact')!({}, {
-        projectRoot: root,
-        messages: [{ role: 'user', content: 'long text' }],
-      });
+      const res = await h.get('context:compact')!(
+        {},
+        {
+          projectRoot: root,
+          messages: [{ role: 'user', content: 'long text' }],
+        },
+      );
       expect(res.ok).toBe(true);
       expect(res.data).toMatchObject({ messagesRemoved: 2, tokensSaved: 50, tokensBefore: 10 });
 
@@ -292,7 +325,10 @@ describe('IPC 中型处理器（project/file/context/ssh/stats）', () => {
       const h = await capture(registerContextHandlers);
       await fs.mkdir(path.join(root, 'src'));
       await fs.writeFile(path.join(root, 'AGENTS.md'), '# 项目规范');
-      await fs.writeFile(path.join(root, 'package.json'), JSON.stringify({ name: 'demo', scripts: { test: 'vitest' } }));
+      await fs.writeFile(
+        path.join(root, 'package.json'),
+        JSON.stringify({ name: 'demo', scripts: { test: 'vitest' } }),
+      );
       await fs.writeFile(path.join(root, 'src', 'a.ts'), 'x');
       const res = await h.get('context:getProjectContext')!({}, root);
       expect(res.ok).toBe(true);
@@ -308,9 +344,14 @@ describe('IPC 中型处理器（project/file/context/ssh/stats）', () => {
       expect(tree.ok).toBe(true);
       expect(tree.data).toContain('x.ts');
 
-      await expect(h.get('context:readFile')!({}, path.join(root, 'x.ts'), root)).resolves.toEqual({ ok: true, data: 'code' });
+      await expect(h.get('context:readFile')!({}, path.join(root, 'x.ts'), root)).resolves.toEqual({
+        ok: true,
+        data: 'code',
+      });
       await expect(h.get('context:readFile')!({}, path.join(root, 'x.ts'))).resolves.toMatchObject({ ok: false });
-      await expect(h.get('context:readFile')!({}, path.join(outside, 'x.ts'), root)).resolves.toMatchObject({ ok: false });
+      await expect(h.get('context:readFile')!({}, path.join(outside, 'x.ts'), root)).resolves.toMatchObject({
+        ok: false,
+      });
     });
   });
 
@@ -322,11 +363,13 @@ describe('IPC 中型处理器（project/file/context/ssh/stats）', () => {
 
       vi.mocked(saveSshConnection).mockResolvedValue([]);
       await expect(h.get('ssh:save')!({}, { host: 'example.com', port: 2222 })).resolves.toMatchObject({ ok: true });
-      expect(saveSshConnection).toHaveBeenCalledWith(expect.objectContaining({
-        host: 'example.com',
-        port: 2222,
-        username: 'root',
-      }));
+      expect(saveSshConnection).toHaveBeenCalledWith(
+        expect.objectContaining({
+          host: 'example.com',
+          port: 2222,
+          username: 'root',
+        }),
+      );
       await expect(h.get('ssh:save')!({}, { host: '  ' })).resolves.toEqual({ ok: false, error: '主机地址无效' });
 
       vi.mocked(removeSshConnection).mockResolvedValue([]);

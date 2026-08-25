@@ -26,16 +26,25 @@ describe('cli-args', () => {
 
   it('parses task options', () => {
     const args = parseCliArgs([
-      '--run', '修复 bug',
-      '--project', 'C:/proj',
-      '--model', 'deepseek-v4-flash',
-      '--api-key', 'sk-test',
-      '--api-base', 'http://127.0.0.1:9999/v1/chat/completions',
-      '--mode', 'plan',
-      '--sandbox', 'read',
+      '--run',
+      '修复 bug',
+      '--project',
+      'C:/proj',
+      '--model',
+      'deepseek-v4-flash',
+      '--api-key',
+      'sk-test',
+      '--api-base',
+      'http://127.0.0.1:9999/v1/chat/completions',
+      '--mode',
+      'plan',
+      '--sandbox',
+      'read',
       '--deep-think',
-      '--reasoning-effort', 'max',
-      '--max-iterations', '12',
+      '--reasoning-effort',
+      'max',
+      '--max-iterations',
+      '12',
       '--json',
       '--verbose',
       '--auto-approve',
@@ -67,13 +76,7 @@ describe('cli-args', () => {
   });
 
   it('supports --flag=value syntax and rejects bad enums', () => {
-    const args = parseCliArgs([
-      '--run=hello',
-      '--project=C:/x',
-      '--max-iterations=abc',
-      '--mode=wat',
-      '--sandbox=wat',
-    ]);
+    const args = parseCliArgs(['--run=hello', '--project=C:/x', '--max-iterations=abc', '--mode=wat', '--sandbox=wat']);
     expect(args.run).toBe('hello');
     expect(args.project).toBe('C:/x');
     expect(args.maxIterations).toBeUndefined();

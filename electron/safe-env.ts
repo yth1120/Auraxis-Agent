@@ -10,7 +10,6 @@
 import { readFileSync, existsSync } from 'fs';
 import path from 'path';
 
-
 let dotEnvLoaded = false;
 function loadDotEnvOnce(): void {
   if (dotEnvLoaded) return;
@@ -26,10 +25,13 @@ function loadDotEnvOnce(): void {
       if (eq <= 0) continue;
       const key = trimmed.slice(0, eq).trim();
       let value = trimmed.slice(eq + 1).trim();
-      if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) value = value.slice(1, -1);
+      if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'")))
+        value = value.slice(1, -1);
       if (key && typeof process.env[key] === 'undefined') process.env[key] = value;
     }
-  } catch { /* best-effort */ }
+  } catch {
+    /* best-effort */
+  }
 }
 loadDotEnvOnce();
 
@@ -82,9 +84,7 @@ function isSensitiveEnvKey(key: string): boolean {
  * environment for the explicitly allowlisted keys; caller-supplied extras are
  * also filtered so a mistake cannot reintroduce `DEEPSEEK_API_KEY`.
  */
-export function safeProcessEnv(
-  extra: Record<string, string | undefined> = {},
-): Record<string, string> {
+export function safeProcessEnv(extra: Record<string, string | undefined> = {}): Record<string, string> {
   const out: Record<string, string> = {};
   for (const key of SAFE_ENV_KEYS) {
     const value = process.env[key];

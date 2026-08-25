@@ -3,9 +3,7 @@ import { splitIntoConcurrencyBatches } from '../../tool-registry';
 
 describe('splitIntoConcurrencyBatches', () => {
   it('caps safe tools at maxParallel and preserves model order', () => {
-    const names = [
-      'Read', 'Grep', 'Glob', 'WebSearch', 'ListSkills', 'Bash', 'Read', 'Glob',
-    ];
+    const names = ['Read', 'Grep', 'Glob', 'WebSearch', 'ListSkills', 'Bash', 'Read', 'Glob'];
     const calls = names.map((name) => ({ name }));
     const batches = splitIntoConcurrencyBatches(calls, 3);
 
@@ -14,11 +12,7 @@ describe('splitIntoConcurrencyBatches', () => {
   });
 
   it('keeps unsafe tools solo', () => {
-    const batches = splitIntoConcurrencyBatches([
-      { name: 'Read' },
-      { name: 'Bash' },
-      { name: 'Read' },
-    ], 3);
+    const batches = splitIntoConcurrencyBatches([{ name: 'Read' }, { name: 'Bash' }, { name: 'Read' }], 3);
     expect(batches).toEqual([[0], [1], [2]]);
   });
 

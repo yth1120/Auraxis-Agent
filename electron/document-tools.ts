@@ -98,7 +98,8 @@ function pptxSlideText(xml: string): string {
 
 function pptxSlidesFromZip(buffer: Buffer): string {
   const zip = new AdmZip(buffer);
-  const entries = zip.getEntries()
+  const entries = zip
+    .getEntries()
     .map((e) => ({ name: e.entryName, data: e.getData().toString('utf8') }))
     .filter((e) => /^ppt\/slides\/slide\d+\.xml$/i.test(e.name))
     .sort((a, b) => {
@@ -130,7 +131,7 @@ export async function readDocument(filePath: string): Promise<DocumentReadResult
       await workbook.xlsx.load(buffer as any);
       const sheets: DocumentSheet[] = workbook.worksheets.map((ws) => {
         const rows: unknown[][] = [];
-        ws.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+        ws.eachRow({ includeEmpty: false }, (_row, rowNumber) => {
           const values: unknown[] = [];
           for (let c = 1; c <= ws.columnCount; c++) {
             values.push(ws.getCell(rowNumber, c).text);
@@ -168,12 +169,18 @@ export async function readDocument(filePath: string): Promise<DocumentReadResult
 
 function headingLevel(level?: number): (typeof HeadingLevel)[keyof typeof HeadingLevel] {
   switch (level ?? 1) {
-    case 1: return HeadingLevel.HEADING_1;
-    case 2: return HeadingLevel.HEADING_2;
-    case 3: return HeadingLevel.HEADING_3;
-    case 4: return HeadingLevel.HEADING_4;
-    case 5: return HeadingLevel.HEADING_5;
-    default: return HeadingLevel.HEADING_6;
+    case 1:
+      return HeadingLevel.HEADING_1;
+    case 2:
+      return HeadingLevel.HEADING_2;
+    case 3:
+      return HeadingLevel.HEADING_3;
+    case 4:
+      return HeadingLevel.HEADING_4;
+    case 5:
+      return HeadingLevel.HEADING_5;
+    default:
+      return HeadingLevel.HEADING_6;
   }
 }
 
@@ -208,19 +215,23 @@ function buildDocx(spec: DocumentWriteSpec): DocxDocument {
   for (const block of blocks) {
     if (block.type === 'table') {
       const rows = (block.rows ?? []).map(
-        (row) => new TableRow({
-          children: row.map(
-            (cell) => new TableCell({
-              width: { size: 100 / Math.max(1, row.length), type: WidthType.PERCENTAGE },
-              children: [new Paragraph({ text: String(cell ?? '') })],
-            }),
-          ),
+        (row) =>
+          new TableRow({
+            children: row.map(
+              (cell) =>
+                new TableCell({
+                  width: { size: 100 / Math.max(1, row.length), type: WidthType.PERCENTAGE },
+                  children: [new Paragraph({ text: String(cell ?? '') })],
+                }),
+            ),
+          }),
+      );
+      children.push(
+        new DocxTable({
+          width: { size: 100, type: WidthType.PERCENTAGE },
+          rows,
         }),
       );
-      children.push(new DocxTable({
-        width: { size: 100, type: WidthType.PERCENTAGE },
-        rows,
-      }));
       children.push(new Paragraph({ text: '' }));
       continue;
     }
@@ -230,15 +241,17 @@ function buildDocx(spec: DocumentWriteSpec): DocxDocument {
     creator: spec.author || 'Auraxis',
     title: spec.title || '',
     numbering: {
-      config: [{
-        reference: 'doc-numbering',
-        levels: [0, 1, 2].map((level) => ({
-          level,
-          format: 'decimal',
-          text: `%${level + 1}.`,
-          alignment: AlignmentType.LEFT,
-        })),
-      }],
+      config: [
+        {
+          reference: 'doc-numbering',
+          levels: [0, 1, 2].map((level) => ({
+            level,
+            format: 'decimal',
+            text: `%${level + 1}.`,
+            alignment: AlignmentType.LEFT,
+          })),
+        },
+      ],
     },
     sections: [{ children }],
   });
@@ -246,10 +259,12 @@ function buildDocx(spec: DocumentWriteSpec): DocxDocument {
 
 async function buildXlsx(spec: DocumentWriteSpec): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
-  const sheets = spec.sheets && spec.sheets.length > 0
-    ? spec.sheets
-    : [{ name: 'Sheet1', rows: (spec.blocks ?? []).filter((b) => b.type === 'table').map((b) => b.rows ?? []) }]
-        .filter((s) => s.rows.length > 0);
+  const sheets =
+    spec.sheets && spec.sheets.length > 0
+      ? spec.sheets
+      : [
+          { name: 'Sheet1', rows: (spec.blocks ?? []).filter((b) => b.type === 'table').map((b) => b.rows ?? []) },
+        ].filter((s) => s.rows.length > 0);
   if (sheets.length === 0) {
     throw new Error('写入 xlsx 至少需要一个非空 sheets 数组（每张表包含 rows 二维数组）');
   }
@@ -266,11 +281,12 @@ function buildPptx(spec: DocumentWriteSpec): Promise<Buffer> {
   const pptx = new PptxGenJS();
   pptx.defineLayout({ name: 'WIDE', width: 13.333, height: 7.5 });
   pptx.layout = 'WIDE';
-  const slides = spec.slides && spec.slides.length > 0
-    ? spec.slides
-    : spec.title
-      ? [{ title: spec.title, bullets: (spec.blocks ?? []).filter((b) => b.text).map((b) => b.text as string) }]
-      : [];
+  const slides =
+    spec.slides && spec.slides.length > 0
+      ? spec.slides
+      : spec.title
+        ? [{ title: spec.title, bullets: (spec.blocks ?? []).filter((b) => b.text).map((b) => b.text as string) }]
+        : [];
   if (slides.length === 0) {
     throw new Error('写入 pptx 至少需要一个 slides 数组（每项含 title 或 bullets）');
   }
@@ -278,14 +294,23 @@ function buildPptx(spec: DocumentWriteSpec): Promise<Buffer> {
     const slide = pptx.addSlide();
     if (slideDef.title) {
       slide.addText(slideDef.title, {
-        x: 0.6, y: 0.45, w: 12.1, h: 0.9,
-        fontSize: 28, bold: true, color: '111216',
+        x: 0.6,
+        y: 0.45,
+        w: 12.1,
+        h: 0.9,
+        fontSize: 28,
+        bold: true,
+        color: '111216',
       });
     }
     if (slideDef.subtitle) {
       slide.addText(slideDef.subtitle, {
-        x: 0.6, y: 1.3, w: 12.1, h: 0.6,
-        fontSize: 16, color: '8C8AA8',
+        x: 0.6,
+        y: 1.3,
+        w: 12.1,
+        h: 0.6,
+        fontSize: 16,
+        color: '8C8AA8',
       });
     }
     const bullets = slideDef.bullets ?? [];
@@ -350,7 +375,9 @@ export async function writeDocument(
   const resolved = path.resolve(filePath);
   const format = extOf(resolved).slice(1) as DocumentFormat;
   if (!DOC_EXTENSIONS.has(extOf(resolved))) {
-    throw new Error(`不支持的目标类型：写入目标必须是文档文件（.docx/.xlsx/.pptx/.pdf），收到: ${extOf(resolved) || '(无扩展名)'}`);
+    throw new Error(
+      `不支持的目标类型：写入目标必须是文档文件（.docx/.xlsx/.pptx/.pdf），收到: ${extOf(resolved) || '(无扩展名)'}`,
+    );
   }
   await fs.mkdir(path.dirname(resolved), { recursive: true });
 

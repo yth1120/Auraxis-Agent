@@ -104,7 +104,10 @@ function relativeTime(ts: number): string {
 }
 
 const rowKey = (fn: () => void) => (e: React.KeyboardEvent) => {
-  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(); }
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    fn();
+  }
 };
 
 /* ── Memoized rows: during streaming only the touched session/task re-renders ── */
@@ -197,11 +200,22 @@ const SessionRow = memo(function SessionRow({
           <div className="flex items-center w-full">
             <span className="flex items-center gap-[3px] flex-1 min-w-0">
               {s.pinned && <MapPin weight="fill" size={9} className="text-primary shrink-0" />}
-              <span className={clsx('min-w-0 overflow-hidden text-ellipsis whitespace-nowrap', isActive && 'text-text-primary font-medium')}>{s.title}</span>
+              <span
+                className={clsx(
+                  'min-w-0 overflow-hidden text-ellipsis whitespace-nowrap',
+                  isActive && 'text-text-primary font-medium',
+                )}
+              >
+                {s.title}
+              </span>
             </span>
             <span className="ml-auto shrink-0 text-2xs text-text-muted font-normal">{relativeTime(s.updated)}</span>
           </div>
-          {preview && <div className="text-xs text-text-muted overflow-hidden text-ellipsis whitespace-nowrap leading-[1.4]">{preview}</div>}
+          {preview && (
+            <div className="text-xs text-text-muted overflow-hidden text-ellipsis whitespace-nowrap leading-[1.4]">
+              {preview}
+            </div>
+          )}
         </div>
       )}
       {!isRenaming && (
@@ -209,24 +223,42 @@ const SessionRow = memo(function SessionRow({
           <Tooltip title={s.pinned ? t('sidebar.unpin') : t('sidebar.pin')} placement="top">
             <button
               className="flex items-center justify-center w-6 h-6 border-none bg-transparent text-text-muted rounded-lg cursor-pointer hover:bg-[var(--color-hover)] hover:text-text-primary"
-              onClick={(e) => { e.stopPropagation(); useSessionStore.getState().togglePin(s.id); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                useSessionStore.getState().togglePin(s.id);
+              }}
               aria-label={s.pinned ? t('sidebar.unpin') : t('sidebar.pin')}
             >
-              <MapPin weight={s.pinned ? 'fill' : 'regular'} style={{ fontSize: 14 }} className={s.pinned ? 'text-primary' : undefined} />
+              <MapPin
+                weight={s.pinned ? 'fill' : 'regular'}
+                style={{ fontSize: 14 }}
+                className={s.pinned ? 'text-primary' : undefined}
+              />
             </button>
           </Tooltip>
           <Tooltip title={t('sidebar.rename')} placement="top">
-            <button className="flex items-center justify-center w-5 h-5 border-none bg-transparent text-text-muted rounded-lg cursor-pointer hover:bg-[var(--color-hover)] hover:text-text-primary" onClick={(e) => onStartRename(e, s.id, s.title)}>
+            <button
+              className="flex items-center justify-center w-5 h-5 border-none bg-transparent text-text-muted rounded-lg cursor-pointer hover:bg-[var(--color-hover)] hover:text-text-primary"
+              onClick={(e) => onStartRename(e, s.id, s.title)}
+            >
               <EditOutlined style={{ fontSize: 14 }} />
             </button>
           </Tooltip>
           <Tooltip title={t('sidebar.forkTip')} placement="top">
-            <button className="flex items-center justify-center w-5 h-5 border-none bg-transparent text-text-muted rounded-lg cursor-pointer hover:bg-[var(--color-hover)] hover:text-text-primary" onClick={(e) => onFork(e, s.id)} aria-label={t('sidebar.fork')}>
+            <button
+              className="flex items-center justify-center w-5 h-5 border-none bg-transparent text-text-muted rounded-lg cursor-pointer hover:bg-[var(--color-hover)] hover:text-text-primary"
+              onClick={(e) => onFork(e, s.id)}
+              aria-label={t('sidebar.fork')}
+            >
               <ForkOutlined style={{ fontSize: 14 }} />
             </button>
           </Tooltip>
           <Tooltip title={s.archived ? t('sidebar.unarchive') : t('sidebar.archive')} placement="top">
-            <button className="flex items-center justify-center w-5 h-5 border-none bg-transparent text-text-muted rounded-lg cursor-pointer hover:bg-[var(--color-hover)] hover:text-text-primary" onClick={(e) => onArchive(e, s.id)} aria-label={s.archived ? t('sidebar.unarchive') : t('sidebar.archive')}>
+            <button
+              className="flex items-center justify-center w-5 h-5 border-none bg-transparent text-text-muted rounded-lg cursor-pointer hover:bg-[var(--color-hover)] hover:text-text-primary"
+              onClick={(e) => onArchive(e, s.id)}
+              aria-label={s.archived ? t('sidebar.unarchive') : t('sidebar.archive')}
+            >
               <ArchiveOutlined style={{ fontSize: 14 }} />
             </button>
           </Tooltip>
@@ -253,13 +285,21 @@ const SessionRow = memo(function SessionRow({
           )}
           <Popconfirm
             title={t('sidebar.deleteChatConfirm')}
-            onConfirm={(e) => { e?.stopPropagation(); onDelete(e as any, s.id); }}
-            onCancel={(e) => { e?.stopPropagation(); }}
+            onConfirm={(e) => {
+              e?.stopPropagation();
+              onDelete(e as any, s.id);
+            }}
+            onCancel={(e) => {
+              e?.stopPropagation();
+            }}
             okText={t('sidebar.delete')}
             cancelText={t('common.cancel')}
             okButtonProps={{ danger: true, type: 'primary', style: { color: '#fff' } }}
           >
-            <button className="flex items-center justify-center w-5 h-5 border-none bg-transparent text-text-muted rounded-lg cursor-pointer hover:bg-[var(--color-hover)] hover:text-text-primary" onClick={(e) => e.stopPropagation()}>
+            <button
+              className="flex items-center justify-center w-5 h-5 border-none bg-transparent text-text-muted rounded-lg cursor-pointer hover:bg-[var(--color-hover)] hover:text-text-primary"
+              onClick={(e) => e.stopPropagation()}
+            >
               <DeleteOutlined style={{ fontSize: 14 }} />
             </button>
           </Popconfirm>
@@ -281,10 +321,7 @@ const AgentRow = memo(function AgentRow({ agent: a, isActive, pendingCount, onSe
   const statusColor = AGENT_STATUS_COLOR[a.status] || '';
   return (
     <div
-      className={clsx(
-        'ax-sidebar-item group w-full h-8 py-1.5',
-        isActive && 'ax-sidebar-item-active',
-      )}
+      className={clsx('ax-sidebar-item group w-full h-8 py-1.5', isActive && 'ax-sidebar-item-active')}
       data-active={isActive || undefined}
       onClick={() => onSelect(a.id)}
       role="button"
@@ -296,15 +333,29 @@ const AgentRow = memo(function AgentRow({ agent: a, isActive, pendingCount, onSe
         {AGENT_STATUS_ICON[a.status] || <ClockCircleOutlined />}
       </span>
       <span className="flex-1 min-w-0 flex items-center gap-[6px]">
-        <span className={clsx('flex-1 min-w-0 text-sm overflow-hidden text-ellipsis whitespace-nowrap', isActive ? 'text-text-primary font-medium' : 'text-text-secondary')}>{a.name}</span>
-        {pendingCount > 0 && <span className="shrink-0 text-2xs font-semibold leading-[1.5] px-[6px] rounded-full text-text-on-accent bg-warning whitespace-nowrap">{t('sidebar.pending', { n: pendingCount })}</span>}
+        <span
+          className={clsx(
+            'flex-1 min-w-0 text-sm overflow-hidden text-ellipsis whitespace-nowrap',
+            isActive ? 'text-text-primary font-medium' : 'text-text-secondary',
+          )}
+        >
+          {a.name}
+        </span>
+        {pendingCount > 0 && (
+          <span className="shrink-0 text-2xs font-semibold leading-[1.5] px-[6px] rounded-full text-text-on-accent bg-warning whitespace-nowrap">
+            {t('sidebar.pending', { n: pendingCount })}
+          </span>
+        )}
       </span>
       <span className="shrink-0 flex items-center opacity-0 group-hover:opacity-100">
         {a.status === 'running' && (
           <Tooltip title={t('sidebar.pause')} placement="top">
             <button
               className="flex items-center justify-center w-6 h-6 border-none bg-transparent text-text-muted rounded-lg cursor-pointer hover:bg-[var(--color-hover)] hover:text-text-primary"
-              onClick={(e) => { e.stopPropagation(); useAgentStore.getState().pauseAgent(a.id); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                useAgentStore.getState().pauseAgent(a.id);
+              }}
               aria-label={t('sidebar.pause')}
             >
               <PauseCircleOutlined style={{ fontSize: 14 }} />
@@ -315,7 +366,10 @@ const AgentRow = memo(function AgentRow({ agent: a, isActive, pendingCount, onSe
           <Tooltip title={t('sidebar.resume')} placement="top">
             <button
               className="flex items-center justify-center w-6 h-6 border-none bg-transparent text-text-muted rounded-lg cursor-pointer hover:bg-[var(--color-hover)] hover:text-text-primary"
-              onClick={(e) => { e.stopPropagation(); useAgentStore.getState().resumeAgent(a.id); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                useAgentStore.getState().resumeAgent(a.id);
+              }}
               aria-label={t('sidebar.resume')}
             >
               <PlayCircleOutlined style={{ fontSize: 14 }} />
@@ -326,7 +380,10 @@ const AgentRow = memo(function AgentRow({ agent: a, isActive, pendingCount, onSe
           <Tooltip title={t('sidebar.stop')} placement="top">
             <button
               className="flex items-center justify-center w-5 h-5 border-none bg-transparent text-text-muted rounded-lg cursor-pointer hover:bg-[var(--color-hover)] hover:text-text-primary"
-              onClick={(e) => { e.stopPropagation(); useAgentStore.getState().stopAgent(a.id); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                useAgentStore.getState().stopAgent(a.id);
+              }}
               aria-label={t('sidebar.stop')}
             >
               <StopOutlined style={{ fontSize: 14 }} />
@@ -335,13 +392,22 @@ const AgentRow = memo(function AgentRow({ agent: a, isActive, pendingCount, onSe
         ) : (
           <Popconfirm
             title={t('sidebar.deleteTaskConfirm')}
-            onConfirm={(e) => { e?.stopPropagation(); useAgentStore.getState().removeAgent(a.id); }}
-            onCancel={(e) => { e?.stopPropagation(); }}
+            onConfirm={(e) => {
+              e?.stopPropagation();
+              useAgentStore.getState().removeAgent(a.id);
+            }}
+            onCancel={(e) => {
+              e?.stopPropagation();
+            }}
             okText={t('sidebar.delete')}
             cancelText={t('common.cancel')}
             okButtonProps={{ danger: true, type: 'primary', style: { color: '#fff' } }}
           >
-            <button className="flex items-center justify-center w-6 h-6 border-none bg-transparent text-text-muted rounded-lg cursor-pointer hover:bg-[var(--color-hover)] hover:text-text-primary" onClick={(e) => e.stopPropagation()} aria-label={t('sidebar.deleteTask')}>
+            <button
+              className="flex items-center justify-center w-6 h-6 border-none bg-transparent text-text-muted rounded-lg cursor-pointer hover:bg-[var(--color-hover)] hover:text-text-primary"
+              onClick={(e) => e.stopPropagation()}
+              aria-label={t('sidebar.deleteTask')}
+            >
               <DeleteOutlined style={{ fontSize: 14 }} />
             </button>
           </Popconfirm>
@@ -376,9 +442,7 @@ export default function SiderNav({ collapsed }: SiderNavProps) {
   const accountEmail = useAuthStore((s) => s.email);
   const accountAvatar = useAuthStore((s) => s.avatar);
   const logout = useAuthStore((s) => s.logout);
-  const showSettings = useAppStore((s) => s.showSettings);
   const sidebarMode = useAppStore((s) => s.sidebarMode);
-  const setSidebarMode = useAppStore((s) => s.setSidebarMode);
   const sidebarCollapsed = useAppStore((s) => s.sidebarCollapsed);
   const toggleSidebar = useAppStore((s) => s.toggleSidebar);
   const activeToolView = useAppStore((s) => s.activeToolView);
@@ -410,7 +474,9 @@ export default function SiderNav({ collapsed }: SiderNavProps) {
   const [skillsDirOpen, setSkillsDirOpen] = useState(false);
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
-  const dragStateRef = useRef<{ kind: 'workspace'; id: string } | { kind: 'session'; id: string; root: string } | null>(null);
+  const dragStateRef = useRef<{ kind: 'workspace'; id: string } | { kind: 'session'; id: string; root: string } | null>(
+    null,
+  );
   const [projectProfiles, setProjectProfiles] = useState<PermissionProfile[]>([]);
   const [projectProfileOverrides, setProjectProfileOverrides] = useState<Record<string, string>>({});
   const [rootsModalProject, setRootsModalProject] = useState<Project | null>(null);
@@ -468,23 +534,26 @@ export default function SiderNav({ collapsed }: SiderNavProps) {
     };
   }, []);
 
-  const applyProjectProfile = useCallback(async (path: string, profileId: string | null) => {
-    const r = await window.electronAPI?.permissionProfile?.setProjectProfile?.(path, profileId);
-    if (!r?.ok) {
-      message.error(r?.error || t('sidebar.projectPermissionSaveFailed'));
-      return;
-    }
-    setProjectProfileOverrides((prev) => {
-      const next = { ...prev };
-      if (profileId) {
-        next[path] = profileId;
-      } else {
-        delete next[path];
+  const applyProjectProfile = useCallback(
+    async (path: string, profileId: string | null) => {
+      const r = await window.electronAPI?.permissionProfile?.setProjectProfile?.(path, profileId);
+      if (!r?.ok) {
+        message.error(r?.error || t('sidebar.projectPermissionSaveFailed'));
+        return;
       }
-      return next;
-    });
-    message.success(t('sidebar.projectPermissionSaved'));
-  }, [t]);
+      setProjectProfileOverrides((prev) => {
+        const next = { ...prev };
+        if (profileId) {
+          next[path] = profileId;
+        } else {
+          delete next[path];
+        }
+        return next;
+      });
+      message.success(t('sidebar.projectPermissionSaved'));
+    },
+    [t],
+  );
 
   const projectProfileMenu = (path: string): MenuProps['items'] => {
     const current = projectProfileOverrides[path] ?? null;
@@ -506,13 +575,7 @@ export default function SiderNav({ collapsed }: SiderNavProps) {
     return items;
   };
 
-  const labelCls = visualCollapsed
-    ? 'max-w-0 opacity-0 ml-0'
-    : 'max-w-[200px] opacity-100 ml-2';
-  const settingsLabelCls = visualCollapsed
-    ? 'max-w-0 opacity-0 ml-0'
-    : 'max-w-[120px] opacity-100 ml-2';
-
+  const labelCls = visualCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[200px] opacity-100 ml-2';
   /* ── Project workspaces （项目工作区） ── */
   useEffect(() => {
     const st = useProjectStore.getState();
@@ -545,7 +608,7 @@ export default function SiderNav({ collapsed }: SiderNavProps) {
       else next.add(id);
       return next;
     });
-  }, [currentSessionId]);
+  }, []);
 
   const toggleShowAllSessions = useCallback((id: string) => {
     setShowAllSessions((prev) => {
@@ -589,46 +652,61 @@ export default function SiderNav({ collapsed }: SiderNavProps) {
     useSessionStore.getState().newSession();
     useChatStore.getState().clearMessages();
   }, []);
-  const handleSelectThread = useCallback((threadId: string) => {
-    if (renamingThreadId) return;
-    // Clicking a conversation is an explicit "show me chat" gesture: leave
-    // Agent mode entirely so the sidebar and the main surface agree.
-    useAppStore.getState().setSidebarMode('chat');
-    useAppStore.getState().setActiveToolView('none');
-    useChatStore.getState().switchSession(threadId);
-  }, [renamingThreadId]);
-  const handleForkThread = useCallback((e: React.MouseEvent, threadId: string) => {
-    e.stopPropagation();
-    useAppStore.getState().setSidebarMode('chat');
-    useAppStore.getState().setActiveToolView('none');
-    const newId = useSessionStore.getState().forkSession(threadId);
-    if (!newId) { message.error(t('sidebar.forkFailed')); return; }
-    useChatStore.getState().switchSession(newId);
-    message.success(t('sidebar.forked'));
-  }, [t]);
-  const handleArchiveThread = useCallback((e: React.MouseEvent, threadId: string) => {
-    e.stopPropagation();
-    const wasCurrent = threadId === currentSessionId;
-    useSessionStore.getState().toggleArchive(threadId);
-    if (wasCurrent) {
-      const s = useSessionStore.getState();
-      const archived = s.sessions.some((x) => x.id === threadId && x.archived);
-      if (archived) {
-        // 归档当前会话后自动进入新会话，避免停留在已归档的旧对话。
+  const handleSelectThread = useCallback(
+    (threadId: string) => {
+      if (renamingThreadId) return;
+      // Clicking a conversation is an explicit "show me chat" gesture: leave
+      // Agent mode entirely so the sidebar and the main surface agree.
+      useAppStore.getState().setSidebarMode('chat');
+      useAppStore.getState().setActiveToolView('none');
+      useChatStore.getState().switchSession(threadId);
+    },
+    [renamingThreadId],
+  );
+  const handleForkThread = useCallback(
+    (e: React.MouseEvent, threadId: string) => {
+      e.stopPropagation();
+      useAppStore.getState().setSidebarMode('chat');
+      useAppStore.getState().setActiveToolView('none');
+      const newId = useSessionStore.getState().forkSession(threadId);
+      if (!newId) {
+        message.error(t('sidebar.forkFailed'));
+        return;
+      }
+      useChatStore.getState().switchSession(newId);
+      message.success(t('sidebar.forked'));
+    },
+    [t],
+  );
+  const handleArchiveThread = useCallback(
+    (e: React.MouseEvent, threadId: string) => {
+      e.stopPropagation();
+      const wasCurrent = threadId === currentSessionId;
+      useSessionStore.getState().toggleArchive(threadId);
+      if (wasCurrent) {
+        const s = useSessionStore.getState();
+        const archived = s.sessions.some((x) => x.id === threadId && x.archived);
+        if (archived) {
+          // 归档当前会话后自动进入新会话，避免停留在已归档的旧对话。
+          useChatStore.getState().clearMessages();
+          useSessionStore.getState().newSession();
+        }
+      }
+    },
+    [currentSessionId],
+  );
+  const handleDeleteThread = useCallback(
+    (e: React.MouseEvent, threadId: string) => {
+      e.stopPropagation();
+      useSessionStore.getState().deleteSession(threadId);
+      if (threadId === currentSessionId) {
+        // 删除当前会话后自动新建一个空会话，避免界面停留在已删除的旧对话上。
         useChatStore.getState().clearMessages();
         useSessionStore.getState().newSession();
       }
-    }
-  }, []);
-  const handleDeleteThread = useCallback((e: React.MouseEvent, threadId: string) => {
-    e.stopPropagation();
-    useSessionStore.getState().deleteSession(threadId);
-    if (threadId === currentSessionId) {
-      // 删除当前会话后自动新建一个空会话，避免界面停留在已删除的旧对话上。
-      useChatStore.getState().clearMessages();
-      useSessionStore.getState().newSession();
-    }
-  }, [currentSessionId]);
+    },
+    [currentSessionId],
+  );
   const handleStartRename = useCallback((e: React.MouseEvent, threadId: string, currentTitle: string) => {
     e.stopPropagation();
     setRenamingThreadId(threadId);
@@ -683,7 +761,10 @@ export default function SiderNav({ collapsed }: SiderNavProps) {
       onStartRename={handleStartRename}
       onChangeRename={setRenameValue}
       onFinishRename={handleFinishRename}
-      onCancelRename={() => { setRenamingThreadId(null); setRenameValue(''); }}
+      onCancelRename={() => {
+        setRenamingThreadId(null);
+        setRenameValue('');
+      }}
       onFork={handleForkThread}
       onArchive={handleArchiveThread}
       onMove={handleMoveSession}
@@ -699,11 +780,15 @@ export default function SiderNav({ collapsed }: SiderNavProps) {
   /* ── Chat panel (conversation history) ─────────────── */
   const renderChatPanel = () => {
     const activeSessions = sessions.filter((s) => !s.archived);
-    const archivedSessions = sessions.filter((s) => s.archived)
-      .sort((a, b) => b.updated - a.updated);
-    const sortedSessions = [...activeSessions]
-      .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || b.updated - a.updated);
-    const projectGroups = groupSessionsByProject(sortedSessions, (s) => s.projectRoot, (s) => s.updated);
+    const archivedSessions = sessions.filter((s) => s.archived).sort((a, b) => b.updated - a.updated);
+    const sortedSessions = [...activeSessions].sort(
+      (a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || b.updated - a.updated,
+    );
+    const projectGroups = groupSessionsByProject(
+      sortedSessions,
+      (s) => s.projectRoot,
+      (s) => s.updated,
+    );
     const timeGroups = groupSessionsByTime(sortedSessions, (s) => s.updated);
     const singleProject = projectGroups.length <= 1;
 
@@ -723,7 +808,9 @@ export default function SiderNav({ collapsed }: SiderNavProps) {
           ) : singleProject ? (
             timeGroups.map((group) => (
               <div key={group.label} className="ax-sidebar-group">
-                <div className="px-[18px] pt-2.5 pb-[6px] text-2xs font-semibold text-text-muted tracking-[0.06em]">{group.label}</div>
+                <div className="px-[18px] pt-2.5 pb-[6px] text-2xs font-semibold text-text-muted tracking-[0.06em]">
+                  {group.label}
+                </div>
                 <div className="px-0 pb-1 flex flex-col gap-1">{renderSessionRows(group.items)}</div>
               </div>
             ))
@@ -744,11 +831,20 @@ export default function SiderNav({ collapsed }: SiderNavProps) {
                     }}
                     title={pg.projectRoot ?? t('sidebar.unspecifiedProject')}
                   >
-                    <span className={clsx('flex items-center justify-center w-[14px] h-[14px] shrink-0 text-text-muted', !isCollapsed && 'rotate-90')}>
+                    <span
+                      className={clsx(
+                        'flex items-center justify-center w-[14px] h-[14px] shrink-0 text-text-muted',
+                        !isCollapsed && 'rotate-90',
+                      )}
+                    >
                       <CaretRight />
                     </span>
-                    <span className="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{pg.projectName}</span>
-                    <span className="shrink-0 min-w-4 text-2xs font-semibold text-center text-text-muted">{pg.items.length}</span>
+                    <span className="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+                      {pg.projectName}
+                    </span>
+                    <span className="shrink-0 min-w-4 text-2xs font-semibold text-center text-text-muted">
+                      {pg.items.length}
+                    </span>
                   </button>
                   {!isCollapsed && (
                     <div className="px-0 pb-1 mt-0.5 flex flex-col gap-1">{renderSessionRows(pg.items)}</div>
@@ -759,7 +855,9 @@ export default function SiderNav({ collapsed }: SiderNavProps) {
           )}
           {archivedSessions.length > 0 && (
             <div className="ax-sidebar-group">
-              <div className="px-[18px] pt-2.5 pb-[6px] text-2xs font-semibold text-text-muted tracking-[0.06em]">{t('sidebar.archived')}</div>
+              <div className="px-[18px] pt-2.5 pb-[6px] text-2xs font-semibold text-text-muted tracking-[0.06em]">
+                {t('sidebar.archived')}
+              </div>
               <div className="px-0 pb-1 flex flex-col gap-1">{renderSessionRows(archivedSessions)}</div>
             </div>
           )}
@@ -779,15 +877,43 @@ export default function SiderNav({ collapsed }: SiderNavProps) {
 
   const renderCodePanel = () => {
     const viewItems: MenuProps['items'] = [
-      { type: 'group', label: t('sidebar.groupBy'), children: [
-        { key: 'groupBy-workspace', label: t('sidebar.groupByWorkspace'), icon: projectGroupBy === 'workspace' ? <CheckOutlined size={12} className="text-primary" /> : undefined, onClick: () => useProjectStore.getState().setGroupBy('workspace') },
-        { key: 'groupBy-flat', label: t('sidebar.groupByFlat'), icon: projectGroupBy === 'flat' ? <CheckOutlined size={12} className="text-primary" /> : undefined, onClick: () => useProjectStore.getState().setGroupBy('flat') },
-      ]},
+      {
+        type: 'group',
+        label: t('sidebar.groupBy'),
+        children: [
+          {
+            key: 'groupBy-workspace',
+            label: t('sidebar.groupByWorkspace'),
+            icon: projectGroupBy === 'workspace' ? <CheckOutlined size={12} className="text-primary" /> : undefined,
+            onClick: () => useProjectStore.getState().setGroupBy('workspace'),
+          },
+          {
+            key: 'groupBy-flat',
+            label: t('sidebar.groupByFlat'),
+            icon: projectGroupBy === 'flat' ? <CheckOutlined size={12} className="text-primary" /> : undefined,
+            onClick: () => useProjectStore.getState().setGroupBy('flat'),
+          },
+        ],
+      },
       { type: 'divider' },
-      { type: 'group', label: t('sidebar.sort'), children: [
-        { key: 'orderBy-manual', label: t('sidebar.orderManual'), icon: projectOrderBy === 'manual' ? <CheckOutlined size={12} className="text-primary" /> : undefined, onClick: () => useProjectStore.getState().setOrderBy('manual') },
-        { key: 'orderBy-updated', label: t('sidebar.orderUpdated'), icon: projectOrderBy === 'updated' ? <CheckOutlined size={12} className="text-primary" /> : undefined, onClick: () => useProjectStore.getState().setOrderBy('updated') },
-      ]},
+      {
+        type: 'group',
+        label: t('sidebar.sort'),
+        children: [
+          {
+            key: 'orderBy-manual',
+            label: t('sidebar.orderManual'),
+            icon: projectOrderBy === 'manual' ? <CheckOutlined size={12} className="text-primary" /> : undefined,
+            onClick: () => useProjectStore.getState().setOrderBy('manual'),
+          },
+          {
+            key: 'orderBy-updated',
+            label: t('sidebar.orderUpdated'),
+            icon: projectOrderBy === 'updated' ? <CheckOutlined size={12} className="text-primary" /> : undefined,
+            onClick: () => useProjectStore.getState().setOrderBy('updated'),
+          },
+        ],
+      },
     ];
     const sortSessions = (list: Session[]) => {
       const pinned = list.filter((s) => s.pinned);
@@ -798,12 +924,14 @@ export default function SiderNav({ collapsed }: SiderNavProps) {
     const orderSessionsByKey = (key: string, list: Session[]) => {
       const order = sessionOrder[key] ?? [];
       const rank = new Map(order.map((id, i) => [id, i]));
-      return [...sortSessions(list)].sort((a, b) =>
-        (rank.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (rank.get(b.id) ?? Number.MAX_SAFE_INTEGER));
+      return [...sortSessions(list)].sort(
+        (a, b) => (rank.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (rank.get(b.id) ?? Number.MAX_SAFE_INTEGER),
+      );
     };
     const projectRank = new Map(workspaceOrder.map((id, i) => [id, i]));
-    const orderedProjects = [...projects].sort((a, b) =>
-      (projectRank.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (projectRank.get(b.id) ?? Number.MAX_SAFE_INTEGER));
+    const orderedProjects = [...projects].sort(
+      (a, b) => (projectRank.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (projectRank.get(b.id) ?? Number.MAX_SAFE_INTEGER),
+    );
     const taskGroupMap = new Map<string, import('../../types/agent').AgentInfo[]>();
     for (const a of agents) {
       const key = a.projectRoot || '';
@@ -834,7 +962,7 @@ export default function SiderNav({ collapsed }: SiderNavProps) {
       />
     );
     return (
-    <div className="flex flex-col px-0 sider-code-panel">
+      <div className="flex flex-col px-0 sider-code-panel">
         {/* ── 项目工作区 （工作区树 + 会话） ── */}
         <div className="shrink-0 flex items-center px-[18px] pt-2.5 pb-[6px]">
           <span className="text-2xs font-semibold text-text-muted tracking-[0.06em]">{t('sidebar.projects')}</span>
@@ -863,7 +991,9 @@ export default function SiderNav({ collapsed }: SiderNavProps) {
           <div className="flex flex-col gap-1 px-0 pb-1">
             {orderSessionsByKey('__flat__', activeSessions).length === 0 ? (
               <div className="px-[18px] py-2 text-2xs text-text-faint">{t('sidebar.noSessions')}</div>
-            ) : orderSessionsByKey('__flat__', activeSessions).map(renderSessionRow)}
+            ) : (
+              orderSessionsByKey('__flat__', activeSessions).map(renderSessionRow)
+            )}
             {taskGroups.map(([root, list]) => (
               <div key={root || '__unassigned__'} className="flex flex-col gap-1">
                 {root && (
@@ -881,11 +1011,15 @@ export default function SiderNav({ collapsed }: SiderNavProps) {
               <div className="px-[18px] py-2 text-2xs text-text-faint">{t('sidebar.noProjects')}</div>
             )}
             {orderedProjects.map((p) => {
-              const isCurrent = p.id === currentProjectId || (settingsProjectPath !== null && p.path === settingsProjectPath);
+              const isCurrent =
+                p.id === currentProjectId || (settingsProjectPath !== null && p.path === settingsProjectPath);
               const projectTasks = taskGroupMap.get(p.path) ?? [];
               const count = activeSessions.filter((s) => s.projectRoot === p.path).length + projectTasks.length;
               const expanded = expandedProjects.has(p.id);
-              const projectSessions = orderSessionsByKey(p.path, activeSessions.filter((s) => s.projectRoot === p.path));
+              const projectSessions = orderSessionsByKey(
+                p.path,
+                activeSessions.filter((s) => s.projectRoot === p.path),
+              );
               const showAll = showAllSessions.has(p.id);
               const visibleSessions = showAll ? projectSessions : projectSessions.slice(0, 5);
               const renaming = renamingProjectId === p.id;
@@ -898,8 +1032,16 @@ export default function SiderNav({ collapsed }: SiderNavProps) {
                     )}
                     data-active={isCurrent || undefined}
                     draggable
-                    onDragStart={(e) => { e.stopPropagation(); dragStateRef.current = { kind: 'workspace', id: p.id }; }}
-                    onDragOver={(e) => { if (dragStateRef.current?.kind === 'workspace') { e.preventDefault(); setDragOverKey(`ws-${p.id}`); } }}
+                    onDragStart={(e) => {
+                      e.stopPropagation();
+                      dragStateRef.current = { kind: 'workspace', id: p.id };
+                    }}
+                    onDragOver={(e) => {
+                      if (dragStateRef.current?.kind === 'workspace') {
+                        e.preventDefault();
+                        setDragOverKey(`ws-${p.id}`);
+                      }
+                    }}
                     onDrop={(e) => {
                       e.preventDefault();
                       const dragged = dragStateRef.current;
@@ -909,7 +1051,10 @@ export default function SiderNav({ collapsed }: SiderNavProps) {
                       dragStateRef.current = null;
                       setDragOverKey(null);
                     }}
-                    onDragEnd={() => { dragStateRef.current = null; setDragOverKey(null); }}
+                    onDragEnd={() => {
+                      dragStateRef.current = null;
+                      setDragOverKey(null);
+                    }}
                     data-drop-active={dragOverKey === `ws-${p.id}` || undefined}
                     onClick={() => {
                       toggleProjectExpanded(p.id);
@@ -934,9 +1079,7 @@ export default function SiderNav({ collapsed }: SiderNavProps) {
                     title={p.path}
                   >
                     <span className="ax-sidebar-icon">
-                      {expanded
-                        ? <FolderOpenOutlined size={16} />
-                        : <FolderOutlined size={16} />}
+                      {expanded ? <FolderOpenOutlined size={16} /> : <FolderOutlined size={16} />}
                     </span>
                     {renaming ? (
                       <Input
@@ -944,13 +1087,15 @@ export default function SiderNav({ collapsed }: SiderNavProps) {
                         value={renameProjectValue}
                         onChange={(e) => setRenameProjectValue(e.target.value)}
                         onBlur={() => {
-                          if (renameProjectValue.trim()) useProjectStore.getState().renameProject(p.id, renameProjectValue.trim());
+                          if (renameProjectValue.trim())
+                            useProjectStore.getState().renameProject(p.id, renameProjectValue.trim());
                           setRenamingProjectId(null);
                           setRenameProjectValue('');
                         }}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
-                            if (renameProjectValue.trim()) useProjectStore.getState().renameProject(p.id, renameProjectValue.trim());
+                            if (renameProjectValue.trim())
+                              useProjectStore.getState().renameProject(p.id, renameProjectValue.trim());
                             setRenamingProjectId(null);
                             setRenameProjectValue('');
                           }
@@ -971,7 +1116,10 @@ export default function SiderNav({ collapsed }: SiderNavProps) {
                           <Tooltip title={t('sidebar.newSessionInProject')} placement="top">
                             <button
                               className="flex items-center justify-center w-5 h-5 border-none bg-transparent text-text-muted rounded-lg cursor-pointer hover:bg-[var(--color-hover)] hover:text-text-primary"
-                              onClick={(e) => { e.stopPropagation(); startSessionInProject(p.path); }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                startSessionInProject(p.path);
+                              }}
                               aria-label={t('sidebar.newSessionInProject')}
                             >
                               <PlusOutlined style={{ fontSize: 14 }} />
@@ -980,7 +1128,11 @@ export default function SiderNav({ collapsed }: SiderNavProps) {
                           <Tooltip title={t('sidebar.renameProject')} placement="top">
                             <button
                               className="flex items-center justify-center w-5 h-5 border-none bg-transparent text-text-muted rounded-lg cursor-pointer hover:bg-[var(--color-hover)] hover:text-text-primary"
-                              onClick={(e) => { e.stopPropagation(); setRenamingProjectId(p.id); setRenameProjectValue(p.name); }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setRenamingProjectId(p.id);
+                                setRenameProjectValue(p.name);
+                              }}
                               aria-label={t('sidebar.renameProject')}
                             >
                               <EditOutlined style={{ fontSize: 14 }} />
@@ -989,7 +1141,10 @@ export default function SiderNav({ collapsed }: SiderNavProps) {
                           <Tooltip title={t('sidebar.projectRootsTip')} placement="top">
                             <button
                               className="flex items-center justify-center w-5 h-5 border-none bg-transparent text-text-muted rounded-lg cursor-pointer hover:bg-[var(--color-hover)] hover:text-text-primary"
-                              onClick={(e) => { e.stopPropagation(); openRootsModal(p); }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openRootsModal(p);
+                              }}
                               aria-label={t('sidebar.projectRoots')}
                             >
                               <FolderOpenOutlined style={{ fontSize: 14 }} />
@@ -1017,8 +1172,13 @@ export default function SiderNav({ collapsed }: SiderNavProps) {
                           </Dropdown>
                           <Popconfirm
                             title={t('sidebar.removeProjectConfirm')}
-                            onConfirm={(e) => { e?.stopPropagation(); useProjectStore.getState().removeProject(p.id); }}
-                            onCancel={(e) => { e?.stopPropagation(); }}
+                            onConfirm={(e) => {
+                              e?.stopPropagation();
+                              useProjectStore.getState().removeProject(p.id);
+                            }}
+                            onCancel={(e) => {
+                              e?.stopPropagation();
+                            }}
                             okText={t('sidebar.remove')}
                             cancelText={t('common.cancel')}
                             okButtonProps={{ danger: true, type: 'primary', style: { color: '#fff' } }}
@@ -1038,8 +1198,12 @@ export default function SiderNav({ collapsed }: SiderNavProps) {
                   {expanded && (
                     <div className="px-0 pb-1 mt-1 flex flex-col gap-1 sider-children opacity-0 animate-[projectExpandIn_0.18s_ease-out_forwards]">
                       {projectSessions.length === 0 ? (
-                        <div className="pl-[10px] pr-[18px] py-2 text-2xs text-text-faint">{t('sidebar.noProjectSessions')}</div>
-                      ) : visibleSessions.map(renderSessionRow)}
+                        <div className="pl-[10px] pr-[18px] py-2 text-2xs text-text-faint">
+                          {t('sidebar.noProjectSessions')}
+                        </div>
+                      ) : (
+                        visibleSessions.map(renderSessionRow)
+                      )}
                       {projectSessions.length > 5 && (
                         <button
                           type="button"
@@ -1062,29 +1226,31 @@ export default function SiderNav({ collapsed }: SiderNavProps) {
           </div>
         )}
 
-      {projectGroupBy === 'workspace' && (taskGroupMap.get('') ?? []).length > 0 && (
-        <div className="ax-sidebar-group">
-          <div className="px-[18px] pt-2.5 pb-[6px] text-2xs font-semibold text-text-muted tracking-[0.06em]">{t('sidebar.unassignedTasks')}</div>
-          <div className="px-0 pb-1 flex flex-col gap-1">{(taskGroupMap.get('') ?? []).map(renderAgentRow)}</div>
-        </div>
-      )}
-      {unassignedSessions.length > 0 && (
-        <div className="ax-sidebar-group">
-          <div className="px-[18px] pt-2.5 pb-[6px] text-2xs font-semibold text-text-muted tracking-[0.06em]">{t('sidebar.unassignedSessions')}</div>
-          <div className="px-0 pb-1 flex flex-col gap-1">
-            {unassignedSessions.map(renderSessionRow)}
+        {projectGroupBy === 'workspace' && (taskGroupMap.get('') ?? []).length > 0 && (
+          <div className="ax-sidebar-group">
+            <div className="px-[18px] pt-2.5 pb-[6px] text-2xs font-semibold text-text-muted tracking-[0.06em]">
+              {t('sidebar.unassignedTasks')}
+            </div>
+            <div className="px-0 pb-1 flex flex-col gap-1">{(taskGroupMap.get('') ?? []).map(renderAgentRow)}</div>
           </div>
-        </div>
-      )}
-      {archivedSessions.length > 0 && (
-        <div className="ax-sidebar-group">
-          <div className="px-[18px] pt-2.5 pb-[6px] text-2xs font-semibold text-text-muted tracking-[0.06em]">{t('sidebar.archived')}</div>
-          <div className="px-0 pb-1 flex flex-col gap-1">
-            {archivedSessions.map(renderSessionRow)}
+        )}
+        {unassignedSessions.length > 0 && (
+          <div className="ax-sidebar-group">
+            <div className="px-[18px] pt-2.5 pb-[6px] text-2xs font-semibold text-text-muted tracking-[0.06em]">
+              {t('sidebar.unassignedSessions')}
+            </div>
+            <div className="px-0 pb-1 flex flex-col gap-1">{unassignedSessions.map(renderSessionRow)}</div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+        {archivedSessions.length > 0 && (
+          <div className="ax-sidebar-group">
+            <div className="px-[18px] pt-2.5 pb-[6px] text-2xs font-semibold text-text-muted tracking-[0.06em]">
+              {t('sidebar.archived')}
+            </div>
+            <div className="px-0 pb-1 flex flex-col gap-1">{archivedSessions.map(renderSessionRow)}</div>
+          </div>
+        )}
+      </div>
     );
   };
 
@@ -1094,8 +1260,7 @@ export default function SiderNav({ collapsed }: SiderNavProps) {
       if (f.key === 'new') {
         if (sidebarMode !== 'chat') handleNewTask();
         else handleNewSession();
-      }
-      else if (f.key === 'skills') setSkillsDirOpen(true);
+      } else if (f.key === 'skills') setSkillsDirOpen(true);
       else openToolView(f.key);
     };
     return (
@@ -1122,18 +1287,27 @@ export default function SiderNav({ collapsed }: SiderNavProps) {
       okText: t('auth.logout'),
       cancelText: t('common.cancel'),
       okButtonProps: { danger: true },
-      onOk: () => { void logout(); },
+      onOk: () => {
+        void logout();
+      },
     });
   };
 
   return (
-    <nav className={clsx(
-      'sider-nav ax-sidebar flex flex-col h-full shrink-0 min-w-[260px] p-1 pb-2 overflow-hidden',
-      visualCollapsed && 'sider-nav-collapsed',
-      collapsed && 'sider-nav-hidden',
-      sidebarMode !== 'chat' && 'code-mode',
-    )}>
-      <div className={clsx('ax-logo w-full shrink-0', visualCollapsed ? 'justify-center px-0 pb-2' : 'px-[10px] pb-3 pt-1')}>
+    <nav
+      className={clsx(
+        'sider-nav ax-sidebar flex flex-col h-full shrink-0 min-w-[260px] p-1 pb-2 overflow-hidden',
+        visualCollapsed && 'sider-nav-collapsed',
+        collapsed && 'sider-nav-hidden',
+        sidebarMode !== 'chat' && 'code-mode',
+      )}
+    >
+      <div
+        className={clsx(
+          'ax-logo w-full shrink-0',
+          visualCollapsed ? 'justify-center px-0 pb-2' : 'px-[10px] pb-3 pt-1',
+        )}
+      >
         <img src={logoPng} alt="Auraxis" />
         {!visualCollapsed && <span className="ax-wordmark">Auraxis</span>}
         <div className="ml-auto flex items-center gap-1">
@@ -1158,18 +1332,20 @@ export default function SiderNav({ collapsed }: SiderNavProps) {
         </div>
       </div>
 
-      <div className={clsx(
-        'scroll-thin flex flex-col flex-1 sider-scroll-area-inner mt-1 overflow-y-auto overflow-x-hidden',
-      )}>
+      <div
+        className={clsx(
+          'scroll-thin flex flex-col flex-1 sider-scroll-area-inner mt-1 overflow-y-auto overflow-x-hidden',
+        )}
+      >
         {/* ── Top functions: normal in-flow items, scroll with the sidebar ── */}
         <div className={clsx('shrink-0 flex flex-col gap-0.5', visualCollapsed ? 'px-0 pb-1' : 'px-0 pb-2.5')}>
           {/* 「工具」按钮已移除：技能 / 插件中心 / 定时任务直接常驻显示。 */}
           {SIDEBAR_TOP_NAV.filter((f) => f.key === 'new' || sidebarMode !== 'chat').map(renderTopItem)}
         </div>
         {sidebarMode === 'work'
-          ? (!visualCollapsed && <WorkSidebarPanel />)
+          ? !visualCollapsed && <WorkSidebarPanel />
           : sidebarMode !== 'chat'
-            ? (!visualCollapsed && renderCodePanel())
+            ? !visualCollapsed && renderCodePanel()
             : renderChatPanel()}
       </div>
 
@@ -1212,7 +1388,9 @@ export default function SiderNav({ collapsed }: SiderNavProps) {
                   setShowSettings(true);
                 }}
               >
-                <span className="flex flex-none w-5 items-center justify-center text-text-muted"><GearSix size={16} /></span>
+                <span className="flex flex-none w-5 items-center justify-center text-text-muted">
+                  <GearSix size={16} />
+                </span>
                 <span className="flex-1 min-w-0 text-sm leading-[20px] text-text-primary">{t('auth.account')}</span>
               </button>
               <button
@@ -1224,7 +1402,9 @@ export default function SiderNav({ collapsed }: SiderNavProps) {
                   setShowSettings(true);
                 }}
               >
-                <span className="flex flex-none w-5 items-center justify-center text-text-muted"><GearSix size={16} /></span>
+                <span className="flex flex-none w-5 items-center justify-center text-text-muted">
+                  <GearSix size={16} />
+                </span>
                 <span className="flex-1 min-w-0 text-sm leading-[20px] text-text-primary">{t('nav.settings')}</span>
               </button>
               <div className="mx-2 my-1 h-px bg-[var(--color-border-dim)]" />
@@ -1236,7 +1416,9 @@ export default function SiderNav({ collapsed }: SiderNavProps) {
                   confirmLogout();
                 }}
               >
-                <span className="flex flex-none w-5 items-center justify-center"><SignOut size={16} /></span>
+                <span className="flex flex-none w-5 items-center justify-center">
+                  <SignOut size={16} />
+                </span>
                 <span className="flex-1 min-w-0 text-sm leading-[20px]">{t('auth.logout')}</span>
               </button>
             </div>
@@ -1292,9 +1474,7 @@ export default function SiderNav({ collapsed }: SiderNavProps) {
                 onChange={(e) => {
                   const writable = e.target.checked;
                   setRootsModalWritable((prev) =>
-                    writable
-                      ? prev.includes(root) ? prev : [...prev, root]
-                      : prev.filter((r) => r !== root),
+                    writable ? (prev.includes(root) ? prev : [...prev, root]) : prev.filter((r) => r !== root),
                   );
                 }}
               >

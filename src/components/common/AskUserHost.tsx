@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button, Input, Modal } from 'antd';
+import { Input, Modal } from 'antd';
 import clsx from 'clsx';
 import type { AskRequest } from '../../types/electron-api';
 import { useT } from '../../i18n';
@@ -29,7 +29,9 @@ export default function AskUserHost() {
     setSubmitting(true);
     window.electronAPI?.ask
       ?.respond(current.askId, value)
-      .catch(() => { /* backend timeout/cleanup already resolves */ })
+      .catch(() => {
+        /* backend timeout/cleanup already resolves */
+      })
       .finally(() => {
         setSubmitting(false);
         setQueue((q) => q.slice(1));
@@ -69,7 +71,10 @@ export default function AskUserHost() {
                       ? 'border-[var(--color-primary)] bg-primary-soft text-text-primary'
                       : 'border-[var(--color-border-default)] bg-transparent text-text-secondary hover:bg-[var(--color-hover)]',
                   )}
-                  onClick={() => { setSelected(opt); setAnswer(''); }}
+                  onClick={() => {
+                    setSelected(opt);
+                    setAnswer('');
+                  }}
                 >
                   {opt}
                 </button>
@@ -78,7 +83,10 @@ export default function AskUserHost() {
           )}
           <Input.TextArea
             value={answer}
-            onChange={(e) => { setAnswer(e.target.value); setSelected(null); }}
+            onChange={(e) => {
+              setAnswer(e.target.value);
+              setSelected(null);
+            }}
             placeholder={current.options.length > 0 ? t('ask.optionsHint') : t('ask.inputHint')}
             autoSize={{ minRows: 2, maxRows: 5 }}
             onPressEnter={(e) => {

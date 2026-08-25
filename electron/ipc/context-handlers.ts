@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron';
+import { errorText } from '../errors';
 import { secureHandle } from './trust';
 import { readFile, readdir, stat } from 'fs/promises';
 import path from 'path';
@@ -32,11 +32,7 @@ async function getFileTreeText(dirPath: string, prefix = '', depth = 0): Promise
 
       if (entry.isDirectory()) {
         result += `${prefix}${connector}${entry.name}/\n`;
-        result += await getFileTreeText(
-          path.join(dirPath, entry.name),
-          nextPrefix,
-          depth + 1,
-        );
+        result += await getFileTreeText(path.join(dirPath, entry.name), nextPrefix, depth + 1);
       } else if (SAFE_EXTENSIONS.has(path.extname(entry.name).toLowerCase())) {
         result += `${prefix}${connector}${entry.name}\n`;
       }
@@ -49,42 +45,49 @@ async function getFileTreeText(dirPath: string, prefix = '', depth = 0): Promise
 }
 
 export function registerContextHandlers() {
-  secureHandle('context:compact', async (event, params: {
-    projectRoot?: string;
-    messages: { role: string; content: string }[];
-  }) => {
-    assertTrustedIpcSender(event);
-    try {
-      const settings: Record<string, any> = await readSettings();
-      const model = settings.selectedModel || 'deepseek-v4-pro';
-      const apiBase = await resolveModelApiBase(model);
-      const apiKey = (await resolveModelApiKey(model)) || settings.deepseekApiKey || process.env.DEEPSEEK_API_KEY || '';
+  secureHandle(
+    'context:compact',
+    async (
+      event,
+      params: {
+        projectRoot?: string;
+        messages: { role: string; content: string }[];
+      },
+    ) => {
+      assertTrustedIpcSender(event);
+      try {
+        const settings: Record<string, any> = await readSettings();
+        const model = settings.selectedModel || 'deepseek-v4-pro';
+        const apiBase = await resolveModelApiBase(model);
+        const apiKey =
+          (await resolveModelApiKey(model)) || settings.deepseekApiKey || process.env.DEEPSEEK_API_KEY || '';
 
-      const normalized = (params.messages ?? []).map((m) => ({
-        role: m.role,
-        content: typeof m.content === 'string' ? m.content : String(m.content),
-      }));
-      const tokensBefore = estimateTokens(normalized);
-      const result = await compactHistory({
-        messages: normalized,
-        plan: null,
-        llmConfig: apiKey ? { model, apiKey, apiBase } : undefined,
-      });
+        const normalized = (params.messages ?? []).map((m) => ({
+          role: m.role,
+          content: typeof m.content === 'string' ? m.content : String(m.content),
+        }));
+        const tokensBefore = estimateTokens(normalized);
+        const result = await compactHistory({
+          messages: normalized,
+          plan: null,
+          llmConfig: apiKey ? { model, apiKey, apiBase } : undefined,
+        });
 
-      return {
-        ok: true,
-        data: {
-          messages: result.messages,
-          messagesRemoved: result.messagesRemoved,
-          tokensSaved: result.tokensSaved,
-          tokensBefore,
-          tokensAfter: estimateTokens(result.messages),
-        },
-      };
-    } catch (error: any) {
-      return { ok: false, error: error?.message ?? String(error) };
-    }
-  });
+        return {
+          ok: true,
+          data: {
+            messages: result.messages,
+            messagesRemoved: result.messagesRemoved,
+            tokensSaved: result.tokensSaved,
+            tokensBefore,
+            tokensAfter: estimateTokens(result.messages),
+          },
+        };
+      } catch (error: unknown) {
+        return { ok: false, error: errorText(error) };
+      }
+    },
+  );
 
   secureHandle('context:getProjectContext', async (event, projectRoot: string) => {
     assertTrustedIpcSender(event);
@@ -116,13 +119,17 @@ export function registerContextHandlers() {
         await stat(pkgPath);
         const raw = await readFile(pkgPath, 'utf-8');
         const pkg = JSON.parse(raw);
-        packageJson = JSON.stringify({
-          name: pkg.name,
-          description: pkg.description,
-          scripts: pkg.scripts,
-          dependencies: pkg.dependencies,
-          devDependencies: pkg.devDependencies,
-        }, null, 2);
+        packageJson = JSON.stringify(
+          {
+            name: pkg.name,
+            description: pkg.description,
+            scripts: pkg.scripts,
+            dependencies: pkg.dependencies,
+            devDependencies: pkg.devDependencies,
+          },
+          null,
+          2,
+        );
       } catch {
         // No package.json
       }
@@ -135,8 +142,8 @@ export function registerContextHandlers() {
           packageJson,
         },
       };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
@@ -146,11 +153,10 @@ export function registerContextHandlers() {
       const root = await resolveTrustedProjectRoot(projectRoot);
       const treeText = await getFileTreeText(root);
       return { ok: true, data: treeText };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
-
 
   secureHandle('context:readFile', async (event, filePath: string, projectRoot?: string) => {
     assertTrustedIpcSender(event);
@@ -162,8 +168,8 @@ export function registerContextHandlers() {
       }
       const content = await readFile(resolved, 'utf-8');
       return { ok: true, data: content };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 }

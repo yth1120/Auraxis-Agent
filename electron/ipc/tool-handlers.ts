@@ -18,6 +18,7 @@ import { ensureSkillsDirectory, listSkills, readSkill, seedBuiltinSkills } from 
 import { sessionQuerySearch } from '../fts';
 import { readSpill } from '../spill';
 import { queryLsp } from '../lsp-client';
+import { errorRecord, errorText } from '../errors';
 import { askUser } from './ask-handlers';
 import { runPtyTool } from './pty-tool';
 import { runBashPersistent } from './bash-session';
@@ -31,17 +32,33 @@ import { runHooksFor } from '../hooks';
 import { safeProcessEnv } from '../safe-env';
 import { startBashTask, finishBashTask, setTaskStopper } from './task-monitor';
 import type { SessionEvent } from '../contracts/session-types';
-import {
-  getGoal, createGoal, editGoal, pauseGoal, resumeGoal,
-  completeGoal, blockGoal,
-} from '../goal-store';
+import { getGoal, createGoal, editGoal, pauseGoal, resumeGoal, completeGoal, blockGoal } from '../goal-store';
 
 // Windows reserved filenames that can't be created as regular files
 // (nul, con, prn, aux, com1-com9, lpt1-lpt9)
 const WIN_RESERVED_NAMES = new Set([
-  'nul', 'con', 'prn', 'aux',
-  'com1', 'com2', 'com3', 'com4', 'com5', 'com6', 'com7', 'com8', 'com9',
-  'lpt1', 'lpt2', 'lpt3', 'lpt4', 'lpt5', 'lpt6', 'lpt7', 'lpt8', 'lpt9',
+  'nul',
+  'con',
+  'prn',
+  'aux',
+  'com1',
+  'com2',
+  'com3',
+  'com4',
+  'com5',
+  'com6',
+  'com7',
+  'com8',
+  'com9',
+  'lpt1',
+  'lpt2',
+  'lpt3',
+  'lpt4',
+  'lpt5',
+  'lpt6',
+  'lpt7',
+  'lpt8',
+  'lpt9',
 ]);
 
 function hasReservedFileName(filePath: string): boolean {
@@ -66,7 +83,6 @@ function fixWindowsNullRedirect(cmd: string): string {
   });
 }
 
-
 function resolvePath(filePath: string, projectRoot: string): string {
   const normalized = normalizeWinPath(filePath);
   if (path.isAbsolute(normalized)) {
@@ -82,9 +98,8 @@ function resolvePath(filePath: string, projectRoot: string): string {
  */
 function ensureSafePath(filePath: string, projectRoot: string, allowedRoots?: string[]): string {
   const resolved = resolvePath(filePath, projectRoot);
-  const roots = allowedRoots && allowedRoots.length > 0
-    ? allowedRoots.map((r) => path.resolve(r))
-    : [path.resolve(projectRoot)];
+  const roots =
+    allowedRoots && allowedRoots.length > 0 ? allowedRoots.map((r) => path.resolve(r)) : [path.resolve(projectRoot)];
   if (!roots.some((root) => resolved === root || resolved.startsWith(root + path.sep))) {
     throw new Error(`路径越界: "${filePath}" 不在项目工作区目录内`);
   }
@@ -114,9 +129,7 @@ function workspaceRootsOf(ctx: ToolContext): string[] {
 
 /** 项目可写根目录（默认 = 全部工作区根）。 */
 function writableRootsOf(ctx: ToolContext): string[] {
-  const roots = (ctx.writableRoots && ctx.writableRoots.length > 0
-    ? ctx.writableRoots
-    : ctx.workspaceRoots ?? [])
+  const roots = (ctx.writableRoots && ctx.writableRoots.length > 0 ? ctx.writableRoots : (ctx.workspaceRoots ?? []))
     .map((r) => (r ? path.resolve(r) : ''))
     .filter((r): r is string => !!r)
     .filter((r, i, arr) => arr.indexOf(r) === i);
@@ -208,7 +221,9 @@ function markFileObserved(ctx: ToolContext, filePath: string): void {
   set.add(path.resolve(filePath));
   // SWE-Touch：登记工作区漂移基线（以项目根为 scope，供 agent 循环检测）。
   const driftScope = ctx.projectRoot || scope;
-  void workspaceDrift.observe(driftScope, filePath).catch(() => { /* best-effort */ });
+  void workspaceDrift.observe(driftScope, filePath).catch(() => {
+    /* best-effort */
+  });
   if (observedFiles.size > 500) {
     const oldest = observedFiles.keys().next().value;
     if (oldest) observedFiles.delete(oldest);
@@ -235,10 +250,27 @@ export interface ToolResult {
 
 // Minimal safe environment — no API keys, no secrets
 function getSafeEnv(): Record<string, string> {
-  const safe = ['PATH', 'HOME', 'USERPROFILE', 'SYSTEMROOT', 'SYSTEMDRIVE',
-    'TEMP', 'TMP', 'TMPDIR', 'SHELL', 'LANG', 'LC_ALL', 'TERM',
-    'NODE_PATH', 'PYTHONPATH', 'GOPATH', 'JAVA_HOME', 'CARGO_HOME',
-    'DISPLAY', 'WAYLAND_DISPLAY', 'XDG_SESSION_TYPE',
+  const safe = [
+    'PATH',
+    'HOME',
+    'USERPROFILE',
+    'SYSTEMROOT',
+    'SYSTEMDRIVE',
+    'TEMP',
+    'TMP',
+    'TMPDIR',
+    'SHELL',
+    'LANG',
+    'LC_ALL',
+    'TERM',
+    'NODE_PATH',
+    'PYTHONPATH',
+    'GOPATH',
+    'JAVA_HOME',
+    'CARGO_HOME',
+    'DISPLAY',
+    'WAYLAND_DISPLAY',
+    'XDG_SESSION_TYPE',
   ];
   const env: Record<string, string> = {};
   for (const key of safe) {
@@ -251,19 +283,20 @@ function getSafeEnv(): Record<string, string> {
 // ─── Resolve best shell on Windows ──────────────────────
 let _winShell: { bin: string; args: string[] } | null | undefined;
 // Track which shells have already failed at spawn time so we can fall back
-let _failedShells = new Set<string>();
+const _failedShells = new Set<string>();
 
 function getWinShell(): { bin: string; args: string[] } | null {
   if (_winShell !== undefined && !_failedShells.has(_winShell?.bin || '')) return _winShell;
 
   // Git Bash: supports Unix commands natively, best DX
-  const gitBashPaths = [
-    'C:\\Program Files\\Git\\bin\\bash.exe',
-    'C:\\Program Files (x86)\\Git\\bin\\bash.exe',
-  ];
+  const gitBashPaths = ['C:\\Program Files\\Git\\bin\\bash.exe', 'C:\\Program Files (x86)\\Git\\bin\\bash.exe'];
   for (const p of gitBashPaths) {
     if (_failedShells.has(p)) continue;
-    try { statSync(p); _winShell = { bin: p, args: ['-c'] }; return _winShell!; } catch {}
+    try {
+      statSync(p);
+      _winShell = { bin: p, args: ['-c'] };
+      return _winShell!;
+    } catch {}
   }
   // Try bash in PATH
   if (!_failedShells.has('bash.exe')) {
@@ -295,8 +328,12 @@ function markShellFailed(bin: string) {
 
 // ─── Bash ──────────────────────────────────────────────
 function spawnBashChild(
-  shellBin: string, shellArgs: string[], finalCmd: string,
-  workdir: string, timeout: number, ctx: ToolContext,
+  shellBin: string,
+  shellArgs: string[],
+  finalCmd: string,
+  workdir: string,
+  timeout: number,
+  ctx: ToolContext,
   resolve: (result: ToolResult) => void,
 ) {
   const isWin = process.platform === 'win32';
@@ -364,7 +401,9 @@ function spawnBashChild(
       } else {
         child.kill('SIGKILL');
       }
-    } catch { /* best effort */ }
+    } catch {
+      /* best effort */
+    }
   }
 
   if (ctx.toolCallId) {
@@ -379,8 +418,14 @@ function spawnBashChild(
 
   const cleanup = () => {
     clearTimeout(killTimer);
-    if (progressTimer !== null) { clearTimeout(progressTimer); flushProgress(); }
-    if (forceKillTimer !== null) { clearTimeout(forceKillTimer); forceKillTimer = null; }
+    if (progressTimer !== null) {
+      clearTimeout(progressTimer);
+      flushProgress();
+    }
+    if (forceKillTimer !== null) {
+      clearTimeout(forceKillTimer);
+      forceKillTimer = null;
+    }
     abortRegistry.delete(ctx.toolCallId || '');
   };
 
@@ -390,14 +435,21 @@ function spawnBashChild(
     stdout += stdoutDecoder.flush();
     stderr += stderrDecoder.flush();
     // Flush any remaining buffered progress before resolving
-    if (progressTimer !== null) { clearTimeout(progressTimer); flushProgress(); }
+    if (progressTimer !== null) {
+      clearTimeout(progressTimer);
+      flushProgress();
+    }
     cleanup();
     const durationMs = Date.now() - startTime;
     const cmdPreview = finalCmd.slice(0, 120);
     if (error || exitCode !== 0) {
-      console.error(`[AURAXIS] [Bash:ERR] cmd="${cmdPreview}" exitCode=${exitCode} stderrLen=${stderr.length} error=${error || ''} duration=${durationMs}ms`);
+      console.error(
+        `[AURAXIS] [Bash:ERR] cmd="${cmdPreview}" exitCode=${exitCode} stderrLen=${stderr.length} error=${error || ''} duration=${durationMs}ms`,
+      );
     } else {
-      devLog(`[AURAXIS] [Bash:OK] cmd="${cmdPreview}" exitCode=${exitCode} stdoutLen=${stdout.length} duration=${durationMs}ms`);
+      devLog(
+        `[AURAXIS] [Bash:OK] cmd="${cmdPreview}" exitCode=${exitCode} stdoutLen=${stdout.length} duration=${durationMs}ms`,
+      );
     }
     finishBashTask(taskId, { exitCode, error, userAborted, timedOut: wasTimedOut });
     resolve({
@@ -426,7 +478,10 @@ function spawnBashChild(
 
   child.on('close', (code) => {
     clearTimeout(killTimer);
-    if (forceKillTimer !== null) { clearTimeout(forceKillTimer); forceKillTimer = null; }
+    if (forceKillTimer !== null) {
+      clearTimeout(forceKillTimer);
+      forceKillTimer = null;
+    }
     finish(code ?? null, undefined, timedOut);
   });
   child.on('error', (err) => finish(-1, err.message));
@@ -447,9 +502,10 @@ function runBashBackground(command: string, workdir: string, ctx: ToolContext): 
   const resolved = isWin ? getWinShell() : null;
   const shellBin = isWin ? (resolved?.bin ?? 'powershell.exe') : '/bin/bash';
   const shellArgs = isWin ? (resolved?.args ?? ['-NoProfile']) : ['-c'];
-  const finalCmd = isWin && !resolved
-    ? `[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; $OutputEncoding=[System.Text.Encoding]::UTF8; ${command}`
-    : command;
+  const finalCmd =
+    isWin && !resolved
+      ? `[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; $OutputEncoding=[System.Text.Encoding]::UTF8; ${command}`
+      : command;
   const taskId = startBashTask({
     command: finalCmd,
     cwd: workdir,
@@ -472,7 +528,9 @@ function runBashBackground(command: string, workdir: string, ctx: ToolContext): 
       } else {
         child.kill('SIGTERM');
       }
-    } catch { /* best effort */ }
+    } catch {
+      /* best effort */
+    }
   };
   // Register under both the returned task id (TaskStop) and the tool call id
   // (terminal panel stopTask → abortTool) so either path can stop it.
@@ -556,7 +614,7 @@ async function runBash(
   // 命令应运行到自然结束或用户主动停止.
   // The 10-minute ceiling still protects against truly hung processes, but
   // long builds/tests no longer die at the old 2-minute default.
-  const timeout = (params.timeout && params.timeout > 0) ? Math.min(params.timeout, 600000) : 600000;
+  const timeout = params.timeout && params.timeout > 0 ? Math.min(params.timeout, 600000) : 600000;
   const isWin = process.platform === 'win32';
 
   if (params.run_in_background === true) {
@@ -696,14 +754,20 @@ async function spawnBashSandboxed(
     if (progressTimer === null) progressTimer = setTimeout(flushProgress, 50);
   };
   const cleanup = () => {
-    if (progressTimer !== null) { clearTimeout(progressTimer); flushProgress(); }
+    if (progressTimer !== null) {
+      clearTimeout(progressTimer);
+      flushProgress();
+    }
     abortRegistry.delete(ctx.toolCallId || '');
   };
 
   const finish = (exitCode: number | null, error?: string, wasTimedOut = false) => {
     if (settled) return;
     settled = true;
-    if (progressTimer !== null) { clearTimeout(progressTimer); flushProgress(); }
+    if (progressTimer !== null) {
+      clearTimeout(progressTimer);
+      flushProgress();
+    }
     cleanup();
     const durationMs = Date.now() - startTime;
     finishBashTask(taskId, { exitCode, error, userAborted, timedOut: wasTimedOut });
@@ -753,7 +817,10 @@ async function spawnBashSandboxed(
 }
 
 // ─── Read ──────────────────────────────────────────────
-async function runRead(params: { file_path: string; offset?: number; limit?: number }, ctx: ToolContext): Promise<ToolResult> {
+async function runRead(
+  params: { file_path: string; offset?: number; limit?: number },
+  ctx: ToolContext,
+): Promise<ToolResult> {
   if (ctx.abortSignal?.aborted) return { output: null, error: '操作已取消' };
   const resolved = resolveToolPath(params.file_path, ctx.projectRoot, ctx.sandboxMode, workspaceRootsOf(ctx));
 
@@ -782,9 +849,9 @@ async function runRead(params: { file_path: string; offset?: number; limit?: num
     markFileObserved(ctx, resolved);
     devLog(`[AURAXIS] [Read] ${resolved} lines=${lines.length} offset=${offset} limit=${limit}`);
     return result;
-  } catch (err: any) {
-    console.error(`[AURAXIS] [Read:ERR] ${resolved}: ${err.message}`);
-    return { output: null, error: `读取文件失败: ${err.message}` };
+  } catch (err: unknown) {
+    console.error(`[AURAXIS] [Read:ERR] ${resolved}: ${errorText(err)}`);
+    return { output: null, error: `读取文件失败: ${errorText(err)}` };
   }
 }
 
@@ -799,7 +866,8 @@ async function runReadImage(params: { file_path: string }, ctx: ToolContext): Pr
   }
 
   try {
-    const { attachmentMimeFor, storeAttachment, attachmentDataUrl, MAX_ATTACHMENT_BYTES } = await import('../attachments');
+    const { attachmentMimeFor, storeAttachment, attachmentDataUrl, MAX_ATTACHMENT_BYTES } =
+      await import('../attachments');
     const mime = attachmentMimeFor(resolved);
     if (!mime) {
       return { output: null, error: '不支持的文件类型：ReadImage 仅接受 png/jpg/jpeg/gif/webp/bmp/svg' };
@@ -822,14 +890,17 @@ async function runReadImage(params: { file_path: string }, ctx: ToolContext): Pr
         image: attachmentDataUrl(buf, mime),
       },
     };
-  } catch (err: any) {
-    console.error(`[AURAXIS] [ReadImage:ERR] ${resolved}: ${err.message}`);
-    return { output: null, error: `读取图片失败: ${err.message}` };
+  } catch (err: unknown) {
+    console.error(`[AURAXIS] [ReadImage:ERR] ${resolved}: ${errorText(err)}`);
+    return { output: null, error: `读取图片失败: ${errorText(err)}` };
   }
 }
 
 // ─── Write ─────────────────────────────────────────────
-async function runWrite(params: { file_path: string; content: string; version?: string }, ctx: ToolContext): Promise<ToolResult> {
+async function runWrite(
+  params: { file_path: string; content: string; version?: string },
+  ctx: ToolContext,
+): Promise<ToolResult> {
   if (ctx.abortSignal?.aborted) return { output: null, error: '操作已取消' };
   const resolved = resolveToolPath(params.file_path, ctx.projectRoot, ctx.sandboxMode, workspaceRootsOf(ctx));
 
@@ -852,8 +923,11 @@ async function runWrite(params: { file_path: string; content: string; version?: 
   const guard = await verifyVersionGuard(params.file_path, params.version, ctx.projectRoot);
   if (!guard.ok) return { output: null, error: guard.error };
 
-  if (!ctx.autoApprove && !isFileObserved(ctx, resolved) && !params.version && await fileExists(resolved)) {
-    return { output: null, error: '文件已存在但本会话尚未读取：请先 Read 此文件（或传入其 version）再写入（read-before-write 策略）' };
+  if (!ctx.autoApprove && !isFileObserved(ctx, resolved) && !params.version && (await fileExists(resolved))) {
+    return {
+      output: null,
+      error: '文件已存在但本会话尚未读取：请先 Read 此文件（或传入其 version）再写入（read-before-write 策略）',
+    };
   }
 
   try {
@@ -871,15 +945,20 @@ async function runWrite(params: { file_path: string; content: string; version?: 
     markFileObserved(ctx, resolved);
 
     devLog(`[AURAXIS] [Write] ${action} ${resolved} (${params.content.length} bytes) project=${ctx.projectRoot}`);
-    return { output: { file_path: resolved, action, size: params.content.length, oldContent, newContent: params.content } };
-  } catch (err: any) {
-    console.error(`[AURAXIS] [Write] FAILED ${resolved}: ${err.message}`);
-    return { output: null, error: `写入文件失败: ${err.message}` };
+    return {
+      output: { file_path: resolved, action, size: params.content.length, oldContent, newContent: params.content },
+    };
+  } catch (err: unknown) {
+    console.error(`[AURAXIS] [Write] FAILED ${resolved}: ${errorText(err)}`);
+    return { output: null, error: `写入文件失败: ${errorText(err)}` };
   }
 }
 
 // ─── Edit ──────────────────────────────────────────────
-async function runEdit(params: { file_path: string; old_string: string; new_string: string; version?: string }, ctx: ToolContext): Promise<ToolResult> {
+async function runEdit(
+  params: { file_path: string; old_string: string; new_string: string; version?: string },
+  ctx: ToolContext,
+): Promise<ToolResult> {
   if (ctx.abortSignal?.aborted) return { output: null, error: '操作已取消' };
   const resolved = resolveToolPath(params.file_path, ctx.projectRoot, ctx.sandboxMode, workspaceRootsOf(ctx));
 
@@ -897,8 +976,11 @@ async function runEdit(params: { file_path: string; old_string: string; new_stri
   const guard = await verifyVersionGuard(params.file_path, params.version, ctx.projectRoot);
   if (!guard.ok) return { output: null, error: guard.error };
 
-  if (!ctx.autoApprove && !isFileObserved(ctx, resolved) && !params.version && await fileExists(resolved)) {
-    return { output: null, error: '文件尚未读取：请先 Read 此文件（或传入其 version）再编辑（read-before-write 策略）' };
+  if (!ctx.autoApprove && !isFileObserved(ctx, resolved) && !params.version && (await fileExists(resolved))) {
+    return {
+      output: null,
+      error: '文件尚未读取：请先 Read 此文件（或传入其 version）再编辑（read-before-write 策略）',
+    };
   }
 
   try {
@@ -931,9 +1013,9 @@ async function runEdit(params: { file_path: string; old_string: string; new_stri
         newContent,
       },
     };
-  } catch (err: any) {
-    console.error(`[AURAXIS] [Edit:ERR] ${resolved}: ${err.message}`);
-    return { output: null, error: `编辑文件失败: ${err.message}` };
+  } catch (err: unknown) {
+    console.error(`[AURAXIS] [Edit:ERR] ${resolved}: ${errorText(err)}`);
+    return { output: null, error: `编辑文件失败: ${errorText(err)}` };
   }
 }
 
@@ -979,20 +1061,21 @@ async function runStrReplaceEditor(
             end_line: end,
           },
         };
-      } catch (err: any) {
-        return { output: null, error: `view 失败: ${err.message}` };
+      } catch (err: unknown) {
+        return { output: null, error: `view 失败: ${errorText(err)}` };
       }
     }
     case 'create': {
       if (typeof params.file_text !== 'string') return { output: null, error: 'create 需要 file_text' };
-      if (await fileExists(resolved)) return { output: null, error: '文件已存在，create 会拒绝覆盖；请使用 str_replace 或 insert' };
+      if (await fileExists(resolved))
+        return { output: null, error: '文件已存在，create 会拒绝覆盖；请使用 str_replace 或 insert' };
       try {
         await mkdir(path.dirname(resolved), { recursive: true });
         await writeFile(resolved, params.file_text, 'utf-8');
         markFileObserved(ctx, resolved);
         return { output: { file_path: resolved, action: 'created', size: params.file_text.length } };
-      } catch (err: any) {
-        return { output: null, error: `create 失败: ${err.message}` };
+      } catch (err: unknown) {
+        return { output: null, error: `create 失败: ${errorText(err)}` };
       }
     }
     case 'str_replace': {
@@ -1008,8 +1091,8 @@ async function runStrReplaceEditor(
         await writeFile(resolved, newContent, 'utf-8');
         markFileObserved(ctx, resolved);
         return { output: { file_path: resolved, replaced: true, occurrences: 1 } };
-      } catch (err: any) {
-        return { output: null, error: `str_replace 失败: ${err.message}` };
+      } catch (err: unknown) {
+        return { output: null, error: `str_replace 失败: ${errorText(err)}` };
       }
     }
     case 'insert': {
@@ -1018,19 +1101,24 @@ async function runStrReplaceEditor(
       try {
         const content = await readFile(resolved, 'utf-8');
         const lines = content.split('\n');
-        if (insertLine > lines.length) return { output: null, error: `insert_line ${insertLine} 超出文件行数 ${lines.length}` };
-        const next = insertLine === 0
-          ? `${params.new_str}\n${content}`
-          : [...lines.slice(0, insertLine), params.new_str, ...lines.slice(insertLine)].join('\n');
+        if (insertLine > lines.length)
+          return { output: null, error: `insert_line ${insertLine} 超出文件行数 ${lines.length}` };
+        const next =
+          insertLine === 0
+            ? `${params.new_str}\n${content}`
+            : [...lines.slice(0, insertLine), params.new_str, ...lines.slice(insertLine)].join('\n');
         await writeFile(resolved, next, 'utf-8');
         markFileObserved(ctx, resolved);
         return { output: { file_path: resolved, inserted: true, after_line: insertLine } };
-      } catch (err: any) {
-        return { output: null, error: `insert 失败: ${err.message}` };
+      } catch (err: unknown) {
+        return { output: null, error: `insert 失败: ${errorText(err)}` };
       }
     }
     default:
-      return { output: null, error: `不支持的编辑器命令: ${params.command ?? '（空）'}（支持 view/create/str_replace/insert）` };
+      return {
+        output: null,
+        error: `不支持的编辑器命令: ${params.command ?? '（空）'}（支持 view/create/str_replace/insert）`,
+      };
   }
 }
 
@@ -1039,7 +1127,12 @@ async function runDelete(params: { file_path: string; recursive?: boolean }, ctx
   if (ctx.abortSignal?.aborted) return { output: null, error: '操作已取消' };
   const { file_path, recursive } = params;
   if (!file_path) return { output: null, error: '缺少 file_path 参数' };
-  const resolved = resolveToolPath(normalizeWinPath(file_path), ctx.projectRoot, ctx.sandboxMode, workspaceRootsOf(ctx));
+  const resolved = resolveToolPath(
+    normalizeWinPath(file_path),
+    ctx.projectRoot,
+    ctx.sandboxMode,
+    workspaceRootsOf(ctx),
+  );
   // 删除永远不能逃出工作区根（full/autoApprove 也不例外），
   // 防止误删项目目录之外的文件。
   if (!isInsideAnyRoot(resolved, workspaceRootsOf(ctx))) {
@@ -1056,13 +1149,17 @@ async function runDelete(params: { file_path: string; recursive?: boolean }, ctx
     }
     // Backup before deletion for undo support
     if (ctx.projectRoot) {
-      try { await backupBeforeModify(resolved, 'Delete', ctx); } catch { /* best-effort */ }
+      try {
+        await backupBeforeModify(resolved, 'Delete', ctx);
+      } catch {
+        /* best-effort */
+      }
     }
     await rm(resolved, { recursive: s.isDirectory() && !!recursive, force: true });
     return { output: { deleted: resolved, isDirectory: s.isDirectory() } };
-  } catch (err: any) {
-    if (err.code === 'ENOENT') return { output: null, error: `文件不存在: ${resolved}` };
-    return { output: null, error: err.message };
+  } catch (err: unknown) {
+    if (errorRecord(err).code === 'ENOENT') return { output: null, error: `文件不存在: ${resolved}` };
+    return { output: null, error: errorText(err) };
   }
 }
 
@@ -1080,7 +1177,12 @@ async function runGitCommit(params: { message: string }, ctx: ToolContext): Prom
     if (add.status !== 0) {
       throw new Error((add.stderr || add.error?.message || 'git add 失败').trim());
     }
-    const commit = spawnSync('git', ['commit', '-m', message], { cwd, encoding: 'utf-8', timeout: 10000, windowsHide: true });
+    const commit = spawnSync('git', ['commit', '-m', message], {
+      cwd,
+      encoding: 'utf-8',
+      timeout: 10000,
+      windowsHide: true,
+    });
     if (commit.status !== 0) {
       throw new Error((commit.stderr || commit.error?.message || 'git commit 失败').trim());
     }
@@ -1088,8 +1190,9 @@ async function runGitCommit(params: { message: string }, ctx: ToolContext): Prom
     // Extract short hash from commit output
     const shortHash = hash.match(/\[[\w-]+ ([a-f0-9]+)\]/)?.[1] || hash.slice(0, 7);
     return { output: { committed: true, hash: shortHash, message } };
-  } catch (err: any) {
-    const stderr = err.stderr || err.message || '';
+  } catch (err: unknown) {
+    const rawStderr = errorRecord(err).stderr;
+    const stderr = typeof rawStderr === 'string' ? rawStderr : errorText(err);
     if (stderr.includes('nothing to commit')) {
       return { output: { committed: false, message: '没有可提交的变更' } };
     }
@@ -1098,7 +1201,10 @@ async function runGitCommit(params: { message: string }, ctx: ToolContext): Prom
 }
 
 // ─── Grep ──────────────────────────────────────────────
-async function runGrep(params: { pattern: string; path?: string; include?: string }, ctx: ToolContext): Promise<ToolResult> {
+async function runGrep(
+  params: { pattern: string; path?: string; include?: string },
+  ctx: ToolContext,
+): Promise<ToolResult> {
   if (ctx.abortSignal?.aborted) return { output: null, error: '操作已取消' };
   const searchRoot = params.path ? resolvePath(params.path, ctx.projectRoot) : ctx.projectRoot;
 
@@ -1131,7 +1237,6 @@ async function runGrep(params: { pattern: string; path?: string; include?: strin
           await searchDir(fullPath, depth + 1);
         } else if (ctx.autoApprove || isSafeExtension(entry.name)) {
           if (params.include) {
-            const ext = path.extname(entry.name);
             const matchGlob = params.include.replace(/\*/g, '.*');
             if (!new RegExp(matchGlob, 'i').test(entry.name)) continue;
           }
@@ -1144,13 +1249,13 @@ async function runGrep(params: { pattern: string; path?: string; include?: strin
                 regex.lastIndex = 0; // Reset regex state
               }
             }
-          } catch (err: any) {
-            console.debug(`[Grep] 无法读取文件 ${fullPath}: ${err.message}`);
+          } catch (err: unknown) {
+            console.debug(`[Grep] 无法读取文件 ${fullPath}: ${errorText(err)}`);
           }
         }
       }
-    } catch (err: any) {
-      console.debug(`[Grep] 无法访问目录 ${dirPath}: ${err.message}`);
+    } catch (err: unknown) {
+      console.debug(`[Grep] 无法访问目录 ${dirPath}: ${errorText(err)}`);
     }
   }
 
@@ -1168,11 +1273,13 @@ async function runGrep(params: { pattern: string; path?: string; include?: strin
     } else {
       await searchDir(searchRoot, 0);
     }
-  } catch (err: any) {
-    return { output: null, error: `搜索失败: ${err.message}` };
+  } catch (err: unknown) {
+    return { output: null, error: `搜索失败: ${errorText(err)}` };
   }
 
-  return { output: { pattern: params.pattern, match_count: results.length, results, truncated: results.length >= MAX_RESULTS } };
+  return {
+    output: { pattern: params.pattern, match_count: results.length, results, truncated: results.length >= MAX_RESULTS },
+  };
 }
 
 // ─── Glob ──────────────────────────────────────────────
@@ -1220,8 +1327,8 @@ async function runGlob(params: { pattern: string; path?: string }, ctx: ToolCont
           }
         }
       }
-    } catch (err: any) {
-      console.debug(`[Glob] 无法访问目录 ${dirPath}: ${err.message}`);
+    } catch (err: unknown) {
+      console.debug(`[Glob] 无法访问目录 ${dirPath}: ${errorText(err)}`);
     }
   }
 
@@ -1252,8 +1359,13 @@ function isPrivateIp(ip: string): boolean {
   if (normalized.includes(':')) {
     // IPv6 loopback / ULA (fc00::/7) / link-local (fe80::/10)
     if (normalized.startsWith('fc') || normalized.startsWith('fd')) return true;
-    if (normalized.startsWith('fe8') || normalized.startsWith('fe9')
-      || normalized.startsWith('fea') || normalized.startsWith('feb')) return true;
+    if (
+      normalized.startsWith('fe8') ||
+      normalized.startsWith('fe9') ||
+      normalized.startsWith('fea') ||
+      normalized.startsWith('feb')
+    )
+      return true;
     return false;
   }
   return isPrivateIpv4(normalized);
@@ -1280,8 +1392,17 @@ async function runWebFetch(params: { url: string; prompt?: string }, _ctx: ToolC
 
   // 内网/环回地址永远禁止访问——autoApprove 也不能绕过（防 SSRF 重定向/内网探测）。
   if (isBlockedUrl(url)) {
-    const hostname = (() => { try { return new URL(url).hostname; } catch { return url; } })();
-    return { output: null, error: `禁止访问内部/本地网络地址 (${hostname})。仅允许访问公网 URL。如需获取本地文件，请使用 Read 工具。` };
+    const hostname = (() => {
+      try {
+        return new URL(url).hostname;
+      } catch {
+        return url;
+      }
+    })();
+    return {
+      output: null,
+      error: `禁止访问内部/本地网络地址 (${hostname})。仅允许访问公网 URL。如需获取本地文件，请使用 Read 工具。`,
+    };
   }
 
   try {
@@ -1309,8 +1430,13 @@ async function runWebFetch(params: { url: string; prompt?: string }, _ctx: ToolC
           headers: { 'User-Agent': 'Auraxis/2.0' },
         });
 
-        if (response.status === 301 || response.status === 302
-          || response.status === 303 || response.status === 307 || response.status === 308) {
+        if (
+          response.status === 301 ||
+          response.status === 302 ||
+          response.status === 303 ||
+          response.status === 307 ||
+          response.status === 308
+        ) {
           const location = response.headers.get('location');
           if (!location) {
             return { output: null, error: `HTTP ${response.status}: 缺少重定向地址` };
@@ -1350,8 +1476,8 @@ async function runWebFetch(params: { url: string; prompt?: string }, _ctx: ToolC
     } finally {
       clearTimeout(timeout);
     }
-  } catch (err: any) {
-    return { output: null, error: `请求失败: ${err.message}` };
+  } catch (err: unknown) {
+    return { output: null, error: `请求失败: ${errorText(err)}` };
   }
 }
 
@@ -1383,15 +1509,18 @@ async function runWebSearch(params: { query: string }): Promise<ToolResult> {
         results,
       },
     };
-  } catch (err: any) {
-    return { output: null, error: `搜索失败: ${err.message}` };
+  } catch (err: unknown) {
+    return { output: null, error: `搜索失败: ${errorText(err)}` };
   }
 }
 
 // ─── TodoWrite ─────────────────────────────────────────
 const todoStore = new Map<string, { content: string; status: string; activeForm: string }[]>();
 
-async function runTodoWrite(params: { todos: { content: string; status: string; activeForm: string }[] }, ctx: ToolContext): Promise<ToolResult> {
+async function runTodoWrite(
+  params: { todos: { content: string; status: string; activeForm: string }[] },
+  ctx: ToolContext,
+): Promise<ToolResult> {
   todoStore.set(ctx.requestId, params.todos);
   const stats = { total: params.todos.length, pending: 0, in_progress: 0, completed: 0 };
   for (const t of params.todos) {
@@ -1399,7 +1528,13 @@ async function runTodoWrite(params: { todos: { content: string; status: string; 
     else if (t.status === 'in_progress') stats.in_progress++;
     else if (t.status === 'completed') stats.completed++;
   }
-  return { output: { message: `任务列表已更新: ${stats.total} 项 (${stats.pending} 待办, ${stats.in_progress} 进行中, ${stats.completed} 已完成)`, stats, todos: params.todos } };
+  return {
+    output: {
+      message: `任务列表已更新: ${stats.total} 项 (${stats.pending} 待办, ${stats.in_progress} 进行中, ${stats.completed} 已完成)`,
+      stats,
+      todos: params.todos,
+    },
+  };
 }
 
 // ─── Agent ─────────────────────────────────────────────
@@ -1452,17 +1587,28 @@ async function runAgentTool(
       background: params.background === true,
     });
     return result;
-  } catch (err: any) {
-    return { output: null, error: `Agent 执行失败: ${err.message}` };
+  } catch (err: unknown) {
+    return { output: null, error: `Agent 执行失败: ${errorText(err)}` };
   }
 }
 
 // ─── Cron ───────────────────────────────────────────────
-async function runCronCreate(params: { name: string; prompt: string; cron: string; recurring: boolean }): Promise<ToolResult> {
+async function runCronCreate(params: {
+  name: string;
+  prompt: string;
+  cron: string;
+  recurring: boolean;
+}): Promise<ToolResult> {
   const { createCronJob } = await import('./cron-handlers');
   const result = createCronJob(params);
   if (!result.ok) return { output: null, error: result.error };
-  return { output: { message: `Cron 任务已创建: ${params.name}`, jobId: result.data!.jobId, nextFireAt: new Date(result.data!.nextFireAt).toISOString() } };
+  return {
+    output: {
+      message: `Cron 任务已创建: ${params.name}`,
+      jobId: result.data!.jobId,
+      nextFireAt: new Date(result.data!.nextFireAt).toISOString(),
+    },
+  };
 }
 
 async function runCronDelete(params: { jobId: string }): Promise<ToolResult> {
@@ -1507,9 +1653,7 @@ async function runScheduleDelete(params: { id?: unknown }): Promise<ToolResult> 
   if (!id) return { output: null, error: 'id 不能为空' };
   const { deleteSchedule } = await import('../schedule-store');
   const ok = deleteSchedule(id);
-  return ok
-    ? { output: { deleted: true, id } }
-    : { output: null, error: `未找到跟进任务 ${id}` };
+  return ok ? { output: { deleted: true, id } } : { output: null, error: `未找到跟进任务 ${id}` };
 }
 
 async function runScheduleList(): Promise<ToolResult> {
@@ -1547,7 +1691,14 @@ export function cacheTaskResult(taskId: string, output: unknown, status: string)
 
 async function runTaskOutput(params: { taskId: string }): Promise<ToolResult> {
   const entry = taskResultCache.get(params.taskId);
-  if (!entry) return { output: { status: 'unknown', output: null, message: `未找到任务 ${params.taskId} 的输出。任务可能尚未开始或已被清理。` } };
+  if (!entry)
+    return {
+      output: {
+        status: 'unknown',
+        output: null,
+        message: `未找到任务 ${params.taskId} 的输出。任务可能尚未开始或已被清理。`,
+      },
+    };
   return { output: { status: entry.status, output: entry.output, updatedAt: new Date(entry.updatedAt).toISOString() } };
 }
 
@@ -1559,17 +1710,23 @@ async function runTaskStop(params: { taskId: string }): Promise<ToolResult> {
   try {
     const { stopTask } = await import('./task-monitor');
     taskStopped = stopTask(params.taskId);
-  } catch { /* best-effort */ }
+  } catch {
+    /* best-effort */
+  }
   // Also try aborting as an agent via scheduler (lazy import to avoid circular dep)
   let agentAborted = false;
   try {
     const { scheduler } = await import('./agent-scheduler');
     agentAborted = scheduler.stopAgent(params.taskId);
-  } catch { /* agent abort is best-effort */ }
+  } catch {
+    /* agent abort is best-effort */
+  }
   try {
     const { interruptSubAgent } = await import('./agent-handlers');
     agentAborted = interruptSubAgent(params.taskId) || agentAborted;
-  } catch { /* sub-agent abort is best-effort */ }
+  } catch {
+    /* sub-agent abort is best-effort */
+  }
 
   if (toolAborted || taskStopped || agentAborted) {
     return { output: { stopped: true, taskId: params.taskId, toolAborted, taskStopped, agentAborted } };
@@ -1667,7 +1824,9 @@ ${params.context ? `上下文信息:\n${params.context}\n\n` : ''}
 }`;
 
     const planResult = await llmClientInvoke({
-      model, apiKey, apiBase,
+      model,
+      apiKey,
+      apiBase,
       systemPrompt: '你是任务规划器。仅输出 JSON，不要额外文字。',
       messages: [{ role: 'user', content: planPrompt }],
       tools: [],
@@ -1683,7 +1842,13 @@ ${params.context ? `上下文信息:\n${params.context}\n\n` : ''}
     const plan = parsePlanFromLLMText(planResult.rawText);
 
     if (!plan || plan.tasks.length === 0) {
-      return { output: { planGenerated: false, rawText: planResult.rawText, message: 'LLM 未生成有效的任务计划，将直接执行。' } };
+      return {
+        output: {
+          planGenerated: false,
+          rawText: planResult.rawText,
+          message: 'LLM 未生成有效的任务计划，将直接执行。',
+        },
+      };
     }
 
     // Wait for user approval
@@ -1700,7 +1865,11 @@ ${params.context ? `上下文信息:\n${params.context}\n\n` : ''}
         output: {
           planApproved: true,
           planId: `plan-${Date.now()}`,
-          tasks: plan.tasks.map((t) => ({ id: t.id, description: t.description, approved: approvedStepIds.includes(t.id) })),
+          tasks: plan.tasks.map((t) => ({
+            id: t.id,
+            description: t.description,
+            approved: approvedStepIds.includes(t.id),
+          })),
           message: `计划已批准 (${approvedStepIds.length}/${plan.tasks.length} 个步骤)。可以开始实施。`,
         },
       };
@@ -1712,8 +1881,8 @@ ${params.context ? `上下文信息:\n${params.context}\n\n` : ''}
         message: '计划未被批准或用户超时未响应。请直接说明方案后执行。',
       },
     };
-  } catch (err: any) {
-    return { output: null, error: `规划模式失败: ${err.message}` };
+  } catch (err: unknown) {
+    return { output: null, error: `规划模式失败: ${errorText(err)}` };
   }
 }
 
@@ -1722,20 +1891,23 @@ async function runExitPlanMode(params: { planId?: string }): Promise<ToolResult>
     // Signal plan approval — this resolves any pending waitForPlanApproval
     // In the query path, entering/exiting plan mode is informational
     return { output: { exited: true, planId: params.planId || 'current', message: '已退出规划模式，开始实施。' } };
-  } catch (err: any) {
-    return { output: null, error: `退出规划模式失败: ${err.message}` };
+  } catch (err: unknown) {
+    return { output: null, error: `退出规划模式失败: ${errorText(err)}` };
   }
 }
 
 // ─── NotebookEdit ───────────────────────────────────────
-async function runNotebookEdit(params: {
-  file_path: string;
-  version?: string;
-  cell_index?: number;
-  action?: 'read' | 'write' | 'insert' | 'delete';
-  source?: string;
-  cell_type?: 'code' | 'markdown';
-}, ctx: ToolContext): Promise<ToolResult> {
+async function runNotebookEdit(
+  params: {
+    file_path: string;
+    version?: string;
+    cell_index?: number;
+    action?: 'read' | 'write' | 'insert' | 'delete';
+    source?: string;
+    cell_type?: 'code' | 'markdown';
+  },
+  ctx: ToolContext,
+): Promise<ToolResult> {
   const resolved = resolveToolPath(params.file_path, ctx.projectRoot, ctx.sandboxMode, workspaceRootsOf(ctx));
 
   const boundary = outsideWorkspace(resolved, ctx, (params.action ?? 'read') !== 'read');
@@ -1810,9 +1982,9 @@ async function runNotebookEdit(params: {
       default:
         return { output: null, error: `未知操作: ${action}` };
     }
-  } catch (err: any) {
-    if (err.code === 'ENOENT') return { output: null, error: `文件不存在: ${params.file_path}` };
-    return { output: null, error: `NotebookEdit 失败: ${err.message}` };
+  } catch (err: unknown) {
+    if (errorRecord(err).code === 'ENOENT') return { output: null, error: `文件不存在: ${params.file_path}` };
+    return { output: null, error: `NotebookEdit 失败: ${errorText(err)}` };
   }
 }
 
@@ -1829,7 +2001,9 @@ function broadcastWorktreeChange(active: boolean, sandboxPath?: string, taskId?:
   if (!win) return;
   try {
     win.webContents.send('worktree:changed', { active, sandboxPath, taskId });
-  } catch { /* window may be destroyed */ }
+  } catch {
+    /* window may be destroyed */
+  }
 }
 
 export function getActiveWorktree(sessionKey: string): string | undefined {
@@ -1844,7 +2018,10 @@ export function restoreWorktreeSession(sessionKey: string, sandboxPath: string):
 export function clearWorktreeSession(sessionKey: string): void {
   worktreeSessions.delete(sessionKey);
   // Extract task_id from session key or path
-  const taskId = sessionKey.replace(/^agent-/, '').replace(/^req-/, '').slice(0, 12);
+  const taskId = sessionKey
+    .replace(/^agent-/, '')
+    .replace(/^req-/, '')
+    .slice(0, 12);
   broadcastWorktreeChange(false, undefined, taskId);
 }
 
@@ -1894,16 +2071,24 @@ async function runEnterWorktree(
       if (existingStat.isDirectory()) {
         // Prune the worktree from git (array args — never a shell string)
         spawnSync('git', ['worktree', 'remove', '--force', sandboxPath], {
-          cwd: effectiveRoot, timeout: 15000, stdio: 'pipe', windowsHide: true,
+          cwd: effectiveRoot,
+          timeout: 15000,
+          stdio: 'pipe',
+          windowsHide: true,
         });
         // Force remove the directory
         await rm(sandboxPath, { recursive: true, force: true });
       }
-    } catch { /* does not exist, ok */ }
+    } catch {
+      /* does not exist, ok */
+    }
 
     // Check if branch already exists — if so, use it; otherwise create new
     const verify = spawnSync('git', ['rev-parse', '--verify', branchName], {
-      cwd: effectiveRoot, timeout: 10000, stdio: 'pipe', windowsHide: true,
+      cwd: effectiveRoot,
+      timeout: 10000,
+      stdio: 'pipe',
+      windowsHide: true,
     });
     const branchExists = verify.status === 0;
 
@@ -1912,7 +2097,10 @@ async function runEnterWorktree(
       ? ['worktree', 'add', sandboxPath, branchName, '--detach']
       : ['worktree', 'add', sandboxPath, '-b', branchName];
     const addResult = spawnSync('git', addArgs, {
-      cwd: effectiveRoot, timeout: 30000, stdio: 'pipe', windowsHide: true,
+      cwd: effectiveRoot,
+      timeout: 30000,
+      stdio: 'pipe',
+      windowsHide: true,
     });
     if (addResult.status !== 0) {
       const stderr = addResult.stderr?.toString() || addResult.error?.message || '未知错误';
@@ -1948,12 +2136,13 @@ async function runEnterWorktree(
         instructions: '所有后续工具调用已重定向到沙箱路径。',
       },
     };
-  } catch (err: any) {
-    if (err.stderr) {
-      const stderr = typeof err.stderr === 'string' ? err.stderr : err.stderr?.toString() || '';
-      return { output: null, error: `工作树创建失败: ${stderr.slice(0, 500) || err.message}` };
+  } catch (err: unknown) {
+    const stderr = errorRecord(err).stderr;
+    if (typeof stderr === 'string' || stderr !== undefined) {
+      const text = typeof stderr === 'string' ? stderr : String(stderr);
+      return { output: null, error: `工作树创建失败: ${text.slice(0, 500) || errorText(err)}` };
     }
-    return { output: null, error: `工作树创建失败: ${err.message}` };
+    return { output: null, error: `工作树创建失败: ${errorText(err)}` };
   }
 }
 
@@ -2055,12 +2244,18 @@ async function fallbackDefinition(
     for (const pattern of patterns) {
       const grepArgs = [
         '-rn',
-        '--include=*.ts', '--include=*.tsx', '--include=*.js', '--include=*.jsx',
-        '-E', pattern,
+        '--include=*.ts',
+        '--include=*.tsx',
+        '--include=*.js',
+        '--include=*.jsx',
+        '-E',
+        pattern,
         searchDir,
       ];
       const grepResult = spawnSync('grep', grepArgs, {
-        cwd: ctx.projectRoot, timeout: 15000, maxBuffer: 1024 * 1024,
+        cwd: ctx.projectRoot,
+        timeout: 15000,
+        maxBuffer: 1024 * 1024,
       });
       const output = (grepResult.stdout || '').toString().trim();
 
@@ -2092,8 +2287,8 @@ async function fallbackDefinition(
         hint: results.length > 20 ? `结果已截断，显示前 20 条。请使用 references 操作查找所有引用。` : undefined,
       },
     };
-  } catch (err: any) {
-    return { output: null, error: `定义查找失败: ${err.message}` };
+  } catch (err: unknown) {
+    return { output: null, error: `定义查找失败: ${errorText(err)}` };
   }
 }
 
@@ -2121,8 +2316,8 @@ async function fallbackHover(
         source: 'fallback',
       },
     };
-  } catch (err: any) {
-    return { output: null, error: `hover 失败: ${err.message}` };
+  } catch (err: unknown) {
+    return { output: null, error: `hover 失败: ${errorText(err)}` };
   }
 }
 
@@ -2162,13 +2357,20 @@ async function runLSPTool(
         // The symbol is passed as a literal argument — shell metacharacters are inert.
         const grepArgs = [
           '-rn',
-          '--include=*.ts', '--include=*.tsx', '--include=*.js', '--include=*.jsx',
-          '--include=*.json', '--include=*.css',
-          '-w', symbol,
+          '--include=*.ts',
+          '--include=*.tsx',
+          '--include=*.js',
+          '--include=*.jsx',
+          '--include=*.json',
+          '--include=*.css',
+          '-w',
+          symbol,
           searchDir,
         ];
         const grepResult = spawnSync('grep', grepArgs, {
-          cwd: ctx.projectRoot, timeout: 15000, maxBuffer: 5 * 1024 * 1024,
+          cwd: ctx.projectRoot,
+          timeout: 15000,
+          maxBuffer: 5 * 1024 * 1024,
         });
         const output = (grepResult.stdout || '').toString().trim();
 
@@ -2176,7 +2378,8 @@ async function runLSPTool(
           return { output: { found: false, message: `在项目中未找到符号 "${symbol}" 的引用。` } };
         }
 
-        const refs = output.split('\n')
+        const refs = output
+          .split('\n')
           .map((line) => {
             const match = line.match(/^(.+?):(\d+):(.*)$/);
             if (!match) return null;
@@ -2198,8 +2401,8 @@ async function runLSPTool(
             hint: refs.length >= 50 ? '结果已截断，显示前 50 条' : undefined,
           },
         };
-      } catch (err: any) {
-        return { output: null, error: `引用查找失败: ${err.message}` };
+      } catch (err: unknown) {
+        return { output: null, error: `引用查找失败: ${errorText(err)}` };
       }
     }
 
@@ -2211,7 +2414,11 @@ async function runLSPTool(
         // Check if tsconfig.json exists
         const tsconfigPath = path.join(ctx.projectRoot, 'tsconfig.json');
         let tsconfigExists = false;
-        try { tsconfigExists = statSync(tsconfigPath).isFile(); } catch { /* no tsconfig */ }
+        try {
+          tsconfigExists = statSync(tsconfigPath).isFile();
+        } catch {
+          /* no tsconfig */
+        }
 
         if (!tsconfigExists) {
           // Fall back to checking individual .ts files with tsc --noEmit
@@ -2219,36 +2426,45 @@ async function runLSPTool(
           if (ext === '.ts' || ext === '.tsx') {
             // [SECURITY FIX]: Use spawnSync to prevent shell injection.
             // targetPath is passed as a literal argument — shell metacharacters are inert.
-            const result = spawnSync(npxCmd, [
-              'tsc', '--noEmit', '--pretty', 'false', '--skipLibCheck', targetPath,
-            ], { cwd: ctx.projectRoot, timeout: 60000, maxBuffer: 2 * 1024 * 1024 });
+            const result = spawnSync(npxCmd, ['tsc', '--noEmit', '--pretty', 'false', '--skipLibCheck', targetPath], {
+              cwd: ctx.projectRoot,
+              timeout: 60000,
+              maxBuffer: 2 * 1024 * 1024,
+            });
             if (result.error) {
               return { output: null, error: `诊断执行失败: ${result.error.message}` };
             }
             const output = (result.stdout || '').toString() + '\n' + (result.stderr || '').toString();
             return parseDiagnosticsOutput(output.trim(), targetPath);
           } else {
-            return { output: { message: `${targetPath} 不是 TypeScript 文件，无法进行类型检查。`, errors: [], warnings: [] } };
+            return {
+              output: { message: `${targetPath} 不是 TypeScript 文件，无法进行类型检查。`, errors: [], warnings: [] },
+            };
           }
         }
 
         // Full project typecheck
         // [SECURITY FIX]: Use spawnSync to prevent shell injection.
-        const result = spawnSync(npxCmd, [
-          'tsc', '--noEmit', '--pretty', 'false', '--skipLibCheck',
-        ], { cwd: ctx.projectRoot, timeout: 120000, maxBuffer: 5 * 1024 * 1024 });
+        const result = spawnSync(npxCmd, ['tsc', '--noEmit', '--pretty', 'false', '--skipLibCheck'], {
+          cwd: ctx.projectRoot,
+          timeout: 120000,
+          maxBuffer: 5 * 1024 * 1024,
+        });
         if (result.error) {
           return { output: null, error: `诊断执行失败: ${result.error.message}` };
         }
         const output = (result.stdout || '').toString() + '\n' + (result.stderr || '').toString();
         return parseDiagnosticsOutput(output.trim(), targetPath);
-      } catch (err: any) {
-        return { output: null, error: `诊断执行失败: ${err.message}` };
+      } catch (err: unknown) {
+        return { output: null, error: `诊断执行失败: ${errorText(err)}` };
       }
     }
 
     default:
-      return { output: null, error: `未知 LSP 操作: ${action}。支持的操作: definition, references, implementation, hover, diagnostics` };
+      return {
+        output: null,
+        error: `未知 LSP 操作: ${action}。支持的操作: definition, references, implementation, hover, diagnostics`,
+      };
   }
 }
 
@@ -2289,8 +2505,12 @@ function parseDiagnosticsOutput(output: string, targetFile?: string): ToolResult
   }
 
   // Filter to target file if specified
-  const filteredErrors = targetFile ? errors.filter((e) => e.file.includes(targetFile) || targetFile.includes(e.file)) : errors;
-  const filteredWarnings = targetFile ? warnings.filter((w) => w.file.includes(targetFile) || targetFile.includes(w.file)) : warnings;
+  const filteredErrors = targetFile
+    ? errors.filter((e) => e.file.includes(targetFile) || targetFile.includes(e.file))
+    : errors;
+  const filteredWarnings = targetFile
+    ? warnings.filter((w) => w.file.includes(targetFile) || targetFile.includes(w.file))
+    : warnings;
 
   const passed = filteredErrors.length === 0;
 
@@ -2303,9 +2523,7 @@ function parseDiagnosticsOutput(output: string, targetFile?: string): ToolResult
       totalWarnings: warnings.length,
       errors: filteredErrors.slice(0, 30),
       warnings: filteredWarnings.slice(0, 15),
-      hint: passed
-        ? '类型检查通过。'
-        : `发现 ${filteredErrors.length} 个类型错误。`,
+      hint: passed ? '类型检查通过。' : `发现 ${filteredErrors.length} 个类型错误。`,
       rawOutput: output.slice(0, 2000),
     },
   };
@@ -2339,7 +2557,10 @@ function resolveReviewCommand(
     }
     case 'lint': {
       if (scripts['lint']) return { label: 'npm run lint', args: [npmCmd, 'run', 'lint'] };
-      return { label: 'npx eslint . --ext .ts,.tsx --max-warnings 0', args: [npxCmd, 'eslint', '.', '--ext', '.ts,.tsx', '--max-warnings', '0'] };
+      return {
+        label: 'npx eslint . --ext .ts,.tsx --max-warnings 0',
+        args: [npxCmd, 'eslint', '.', '--ext', '.ts,.tsx', '--max-warnings', '0'],
+      };
     }
   }
 }
@@ -2461,15 +2682,16 @@ export type ToolExecutor = (params: any, ctx: ToolContext) => Promise<ToolResult
 async function dynamicPluginExecutor(toolName: string): Promise<ToolExecutor | null> {
   const { getDynamicTool, executeDynamicTool } = await import('./dynamic-plugin');
   if (!getDynamicTool(toolName)) return null;
-  return (input: any, c: ToolContext) => executeDynamicTool(toolName, input ?? {}, {
-    projectRoot: c.projectRoot,
-    requestId: c.requestId,
-    depth: c.depth,
-    checkPermission: c.checkPermission,
-    autoApprove: c.autoApprove,
-    abortSignal: c.abortSignal,
-    log: (line) => c.onProgress?.(`[plugin] ${line}\n`),
-  }) as Promise<ToolResult>;
+  return (input: any, c: ToolContext) =>
+    executeDynamicTool(toolName, input ?? {}, {
+      projectRoot: c.projectRoot,
+      requestId: c.requestId,
+      depth: c.depth,
+      checkPermission: c.checkPermission,
+      autoApprove: c.autoApprove,
+      abortSignal: c.abortSignal,
+      log: (line) => c.onProgress?.(`[plugin] ${line}\n`),
+    }) as Promise<ToolResult>;
 }
 
 async function runListSkills(_params: unknown, _ctx: ToolContext): Promise<ToolResult> {
@@ -2524,7 +2746,10 @@ async function runRunWorkflow(
       checkPermission: ctx.checkPermission,
       autoApprove: ctx.autoApprove,
       abortSignal: ctx.abortSignal,
-      log: (line) => { transcript.push(line); if (transcript.length > 500) transcript.shift(); },
+      log: (line) => {
+        transcript.push(line);
+        if (transcript.length > 500) transcript.shift();
+      },
     });
     if (!r.ok) return { output: null, error: r.error };
     return { output: { inline: true, transcript, result: r.output } };
@@ -2550,7 +2775,10 @@ async function runRunWorkflow(
   };
 }
 
-async function runRunCode(params: { language?: unknown; code?: unknown; description?: unknown; timeout_ms?: unknown }, ctx: ToolContext): Promise<ToolResult> {
+async function runRunCode(
+  params: { language?: unknown; code?: unknown; description?: unknown; timeout_ms?: unknown },
+  ctx: ToolContext,
+): Promise<ToolResult> {
   const language = params?.language as string | undefined;
   if (!language || !['javascript', 'python', 'shell', 'typescript'].includes(language)) {
     return { output: null, error: '不支持的运行语言，仅支持 javascript / python / shell / typescript' };
@@ -2592,12 +2820,13 @@ async function runRunCode(params: { language?: unknown; code?: unknown; descript
             output: s.output === undefined ? undefined : summarizeSubCallOutput(s.output),
           })),
         },
-        error: r.exitCode !== 0 && r.exitCode !== null
-          ? `程序退出码 ${r.exitCode}${r.timedOut ? '（超时被终止）' : r.aborted ? '（已中止）' : ''}`
-          : undefined,
+        error:
+          r.exitCode !== 0 && r.exitCode !== null
+            ? `程序退出码 ${r.exitCode}${r.timedOut ? '（超时被终止）' : r.aborted ? '（已中止）' : ''}`
+            : undefined,
       };
-    } catch (err: any) {
-      return { output: null, error: `Code Mode 执行失败: ${err?.message ?? String(err)}` };
+    } catch (err: unknown) {
+      return { output: null, error: `Code Mode 执行失败: ${errorText(err)}` };
     }
   }
 
@@ -2615,9 +2844,7 @@ async function runRunCode(params: { language?: unknown; code?: unknown; descript
       timedOut: r.timedOut,
       truncated: r.truncated,
     },
-    error: r.exitCode !== 0
-      ? `程序退出码 ${r.exitCode}${r.timedOut ? '（超时被终止）' : ''}`
-      : undefined,
+    error: r.exitCode !== 0 ? `程序退出码 ${r.exitCode}${r.timedOut ? '（超时被终止）' : ''}` : undefined,
   };
 }
 
@@ -2664,8 +2891,8 @@ async function runReadSpill(params: { path?: unknown }, _ctx: ToolContext): Prom
   try {
     const { content, bytes } = await readSpill(filePath);
     return { output: { spill_path: filePath, bytes, content } };
-  } catch (e: any) {
-    return { output: null, error: `读取 spill 失败：${e?.message ?? e}` };
+  } catch (e: unknown) {
+    return { output: null, error: `读取 spill 失败：${errorText(e)}` };
   }
 }
 
@@ -2777,8 +3004,8 @@ async function runListAgents(_params: unknown, ctx: ToolContext): Promise<ToolRe
         agents: [...schedulerAgents, ...subAgents],
       },
     };
-  } catch (err: any) {
-    return { output: null, error: `列出 Agent 失败: ${err.message}` };
+  } catch (err: unknown) {
+    return { output: null, error: `列出 Agent 失败: ${errorText(err)}` };
   }
 }
 
@@ -2796,11 +3023,13 @@ async function runSendMessage(params: { agentId?: string; message?: string }): P
     const { sendMessageToSubAgent } = await import('./agent-handlers');
     const viaSub = sendMessageToSubAgent(agentId, message);
     if (viaSub.ok) {
-      return { output: { delivered: true, agentId, queued: true, message: '指令已入队，将在该子代理下一轮执行时注入' } };
+      return {
+        output: { delivered: true, agentId, queued: true, message: '指令已入队，将在该子代理下一轮执行时注入' },
+      };
     }
     return { output: { delivered: false, agentId, error: viaSub.error } };
-  } catch (err: any) {
-    return { output: null, error: `发送消息失败: ${err.message}` };
+  } catch (err: unknown) {
+    return { output: null, error: `发送消息失败: ${errorText(err)}` };
   }
 }
 
@@ -2823,8 +3052,8 @@ async function runInterruptAgent(params: { agentId?: string; reason?: string }):
         reason: typeof params?.reason === 'string' && params.reason.trim() ? params.reason.trim() : undefined,
       },
     };
-  } catch (err: any) {
-    return { output: null, error: `中断失败: ${err.message}` };
+  } catch (err: unknown) {
+    return { output: null, error: `中断失败: ${errorText(err)}` };
   }
 }
 
@@ -2840,8 +3069,8 @@ async function runReport(params: { content?: string }, ctx: ToolContext): Promis
     const result = reportFromSubAgent(sessionId, content);
     if (!result.ok) return { output: null, error: result.error };
     return { output: { delivered: true, reportId: result.report?.id, message: '汇报已发送给父任务' } };
-  } catch (err: any) {
-    return { output: null, error: `汇报失败: ${err.message}` };
+  } catch (err: unknown) {
+    return { output: null, error: `汇报失败: ${errorText(err)}` };
   }
 }
 
@@ -2851,23 +3080,32 @@ async function runGetGoal(_params: unknown, ctx: ToolContext): Promise<ToolResul
   const sessionId = ctx.sessionId ?? ctx.agentId ?? ctx.requestId;
   try {
     const goal = await getGoal(sessionId);
-    return { output: { goal: goal ? {
-      id: goal.id,
-      text: goal.text,
-      phase: goal.phase,
-      revision: goal.revision,
-      roundsStarted: goal.roundsStarted,
-      maxRounds: goal.maxRounds,
-      reason: goal.reason,
-      createdAt: goal.createdAt,
-      updatedAt: goal.updatedAt,
-    } : null } };
-  } catch (err: any) {
-    return { output: null, error: `读取目标失败: ${err.message}` };
+    return {
+      output: {
+        goal: goal
+          ? {
+              id: goal.id,
+              text: goal.text,
+              phase: goal.phase,
+              revision: goal.revision,
+              roundsStarted: goal.roundsStarted,
+              maxRounds: goal.maxRounds,
+              reason: goal.reason,
+              createdAt: goal.createdAt,
+              updatedAt: goal.updatedAt,
+            }
+          : null,
+      },
+    };
+  } catch (err: unknown) {
+    return { output: null, error: `读取目标失败: ${errorText(err)}` };
   }
 }
 
-async function runCreateGoal(params: { objective?: string; maxRounds?: number }, ctx: ToolContext): Promise<ToolResult> {
+async function runCreateGoal(
+  params: { objective?: string; maxRounds?: number },
+  ctx: ToolContext,
+): Promise<ToolResult> {
   const objective = typeof params?.objective === 'string' ? params.objective.trim() : '';
   if (!objective) return { output: null, error: 'objective 不能为空' };
   const maxRounds = Number(params?.maxRounds) > 0 ? Math.min(Math.floor(Number(params.maxRounds)), 10000) : undefined;
@@ -2876,24 +3114,33 @@ async function runCreateGoal(params: { objective?: string; maxRounds?: number },
     const goal = await createGoal(sessionId, objective, maxRounds ?? 256);
     return {
       output: {
-        goal: goal ? {
-          id: goal.id,
-          text: goal.text,
-          phase: goal.phase,
-          revision: goal.revision,
-          roundsStarted: goal.roundsStarted,
-          maxRounds: goal.maxRounds,
-        } : null,
+        goal: goal
+          ? {
+              id: goal.id,
+              text: goal.text,
+              phase: goal.phase,
+              revision: goal.revision,
+              roundsStarted: goal.roundsStarted,
+              maxRounds: goal.maxRounds,
+            }
+          : null,
         message: goal ? '目标已创建' : '当前已有活动/已完成目标，未覆盖',
       },
     };
-  } catch (err: any) {
-    return { output: null, error: `创建目标失败: ${err.message}` };
+  } catch (err: unknown) {
+    return { output: null, error: `创建目标失败: ${errorText(err)}` };
   }
 }
 
 async function runUpdateGoal(
-  params: { goalId?: string; revision?: number; action?: string; objective?: string; maxRounds?: number; reason?: string },
+  params: {
+    goalId?: string;
+    revision?: number;
+    action?: string;
+    objective?: string;
+    maxRounds?: number;
+    reason?: string;
+  },
   ctx: ToolContext,
 ): Promise<ToolResult> {
   const action = typeof params?.action === 'string' ? params.action : '';
@@ -2919,9 +3166,15 @@ async function runUpdateGoal(
         updated = await editGoal(sessionId, objective, maxRounds);
         break;
       }
-      case 'pause': updated = await pauseGoal(sessionId); break;
-      case 'resume': updated = await resumeGoal(sessionId); break;
-      case 'complete': updated = await completeGoal(sessionId); break;
+      case 'pause':
+        updated = await pauseGoal(sessionId);
+        break;
+      case 'resume':
+        updated = await resumeGoal(sessionId);
+        break;
+      case 'complete':
+        updated = await completeGoal(sessionId);
+        break;
       case 'blocked': {
         const reason = typeof params?.reason === 'string' ? params.reason.trim() : '';
         if (!reason) return { output: null, error: 'action=blocked 需要 reason' };
@@ -2932,19 +3185,21 @@ async function runUpdateGoal(
     return {
       output: {
         updated: true,
-        goal: updated ? {
-          id: updated.id,
-          text: updated.text,
-          phase: updated.phase,
-          revision: updated.revision,
-          roundsStarted: updated.roundsStarted,
-          maxRounds: updated.maxRounds,
-          reason: updated.reason,
-        } : null,
+        goal: updated
+          ? {
+              id: updated.id,
+              text: updated.text,
+              phase: updated.phase,
+              revision: updated.revision,
+              roundsStarted: updated.roundsStarted,
+              maxRounds: updated.maxRounds,
+              reason: updated.reason,
+            }
+          : null,
       },
     };
-  } catch (err: any) {
-    return { output: null, error: `更新目标失败: ${err.message}` };
+  } catch (err: unknown) {
+    return { output: null, error: `更新目标失败: ${errorText(err)}` };
   }
 }
 
@@ -2962,7 +3217,8 @@ async function runMountPlugin(
     id: String(params?.id ?? '').trim(),
     name: String(params?.name ?? '').trim(),
     version: typeof params?.version === 'string' && params.version.trim() ? params.version.trim() : undefined,
-    description: typeof params?.description === 'string' && params.description.trim() ? params.description.trim() : undefined,
+    description:
+      typeof params?.description === 'string' && params.description.trim() ? params.description.trim() : undefined,
     tools: tools.map((t: any) => ({
       name: String(t?.name ?? '').trim(),
       description: String(t?.description ?? '').trim(),
@@ -2995,10 +3251,7 @@ async function runUnmountPlugin(params: { id?: unknown }, _ctx: ToolContext): Pr
 
 // ─── Fresh-agent iterative loop （迭代循环） ─────
 
-async function runRalph(
-  params: { objective?: unknown; maxRounds?: unknown },
-  ctx: ToolContext,
-): Promise<ToolResult> {
+async function runRalph(params: { objective?: unknown; maxRounds?: unknown }, ctx: ToolContext): Promise<ToolResult> {
   const objective = typeof params?.objective === 'string' ? params.objective.trim() : '';
   if (!objective) return { output: null, error: 'objective 不能为空' };
   const maxRounds = Math.min(Math.max(1, Number(params?.maxRounds) || 8), 30);
@@ -3017,7 +3270,9 @@ async function runRalph(
       '- 如果遇到无法解决的阻塞、必须人工介入：最后单独一行输出 `[RALPH:BLOCKED] 阻塞原因`。',
       '- 否则：正常执行并总结本轮进展，最后一行不要输出标记。',
       '',
-    ].filter(Boolean).join('\n');
+    ]
+      .filter(Boolean)
+      .join('\n');
     const r = await orchestrateRunSubAgent(ctx, {
       description: `Ralph 第 ${round} 轮`,
       prompt,
@@ -3027,7 +3282,9 @@ async function runRalph(
     const text = String((r.output as any)?.result ?? '');
     const doneMatch = text.match(/\[RALPH:DONE\]\s*([\s\S]*)$/);
     if (doneMatch) {
-      return { output: { runId, status: 'completed', rounds: round, objective, result: doneMatch[1].trim() || text.trim() } };
+      return {
+        output: { runId, status: 'completed', rounds: round, objective, result: doneMatch[1].trim() || text.trim() },
+      };
     }
     const blockedMatch = text.match(/\[RALPH:BLOCKED\]\s*([\s\S]*)$/);
     if (blockedMatch) {
@@ -3055,12 +3312,11 @@ async function runPwsh(
 ): Promise<ToolResult> {
   const command = typeof params?.command === 'string' ? params.command : '';
   if (!command.trim()) return { output: null, error: '缺少 command' };
-  const workdir = typeof params?.workdir === 'string' && params.workdir
-    ? resolvePath(params.workdir, ctx.projectRoot)
-    : ctx.projectRoot;
-  const timeout = (typeof params?.timeout === 'number' && params.timeout > 0)
-    ? Math.min(params.timeout, 600000)
-    : 120000;
+  const workdir =
+    typeof params?.workdir === 'string' && params.workdir
+      ? resolvePath(params.workdir, ctx.projectRoot)
+      : ctx.projectRoot;
+  const timeout = typeof params?.timeout === 'number' && params.timeout > 0 ? Math.min(params.timeout, 600000) : 120000;
   const isWin = process.platform === 'win32';
   let bin: string;
   const args = ['-NoProfile', '-NonInteractive', '-Command'];
@@ -3097,22 +3353,19 @@ async function readSessionEvents(sessionId: string): Promise<SessionEvent[]> {
 
 function summarizeEvent(e: SessionEvent): string {
   const d = e.data ?? {};
-  const name = typeof d.toolName === 'string'
-    ? d.toolName
-    : typeof d.event === 'string'
-      ? d.event
-      : e.type;
-  const text = typeof d.text === 'string'
-    ? d.text
-    : typeof d.chunk === 'string'
-      ? d.chunk
-      : typeof d.progress === 'string'
-        ? d.progress
-        : typeof d.error === 'string'
-          ? d.error
-          : typeof d.content === 'string'
-            ? d.content
-            : '';
+  const name = typeof d.toolName === 'string' ? d.toolName : typeof d.event === 'string' ? d.event : e.type;
+  const text =
+    typeof d.text === 'string'
+      ? d.text
+      : typeof d.chunk === 'string'
+        ? d.chunk
+        : typeof d.progress === 'string'
+          ? d.progress
+          : typeof d.error === 'string'
+            ? d.error
+            : typeof d.content === 'string'
+              ? d.content
+              : '';
   const trimmed = text.replace(/\s+/g, ' ').trim().slice(0, 120);
   return trimmed ? `${name}: ${trimmed}` : name;
 }
@@ -3143,9 +3396,7 @@ async function runSessionEventSearch(
   const query = typeof params?.query === 'string' ? params.query.trim().toLowerCase() : '';
   if (!query) return { output: null, error: 'query 不能为空' };
   const limit = Math.min(Math.max(1, Number(params?.limit) || 10), 50);
-  const sessionId = typeof params?.sessionId === 'string' && params.sessionId.trim()
-    ? params.sessionId.trim()
-    : '';
+  const sessionId = typeof params?.sessionId === 'string' && params.sessionId.trim() ? params.sessionId.trim() : '';
   const { readAgentLog, listAgentLogs } = await import('../session-log');
   const { readChatLog, listChatSessions } = await import('../chat-log');
   let targets: { id: string; title: string }[] = [];
@@ -3206,10 +3457,7 @@ async function runSessionEventRead(
   };
 }
 
-async function runSessionTrace(
-  params: { sessionId?: unknown },
-  _ctx: ToolContext,
-): Promise<ToolResult> {
+async function runSessionTrace(params: { sessionId?: unknown }, _ctx: ToolContext): Promise<ToolResult> {
   const sessionId = String(params?.sessionId ?? '').trim();
   if (!sessionId) return { output: null, error: 'sessionId 不能为空' };
   const { readAgentLog, listAgentLogs } = await import('../session-log');
@@ -3220,9 +3468,7 @@ async function runSessionTrace(
   const [agentSummaries, chatSummaries] = await Promise.all([listAgentLogs(), listChatSessions()]);
   const all = [...agentSummaries, ...chatSummaries];
   const self = all.find((s) => s.id === sessionId);
-  const parent = self?.branchedFrom
-    ? all.find((s) => s.id === self.branchedFrom!.sessionId) ?? null
-    : null;
+  const parent = self?.branchedFrom ? (all.find((s) => s.id === self.branchedFrom!.sessionId) ?? null) : null;
   const children = all.filter((s) => s.branchedFrom?.sessionId === sessionId);
   return {
     output: {
@@ -3285,7 +3531,10 @@ async function runAskUser(params: { question?: string; options?: string[] }, _ct
   const question = typeof params?.question === 'string' ? params.question.trim() : '';
   if (!question) return { output: null, error: 'question 不能为空' };
   const options = Array.isArray(params?.options)
-    ? params.options.map((o) => String(o)).filter(Boolean).slice(0, 6)
+    ? params.options
+        .map((o) => String(o))
+        .filter(Boolean)
+        .slice(0, 6)
     : undefined;
   const answer = await askUser(question, options, getMainWindowRef());
   return { output: { question, answer } };
@@ -3299,36 +3548,39 @@ async function runReadDocument(params: { file_path?: unknown }, ctx: ToolContext
   let resolved: string;
   try {
     resolved = resolveToolPath(filePath, ctx.projectRoot, ctx.sandboxMode, workspaceRootsOf(ctx));
-  } catch (e: any) {
-    return { output: null, error: e?.message ?? String(e) };
+  } catch (e: unknown) {
+    return { output: null, error: errorText(e) };
   }
   try {
     const { readDocument } = await import('../document-tools');
     const data = await readDocument(resolved);
     return { output: data };
-  } catch (e: any) {
-    return { output: null, error: `读取文档失败：${e?.message ?? e}` };
+  } catch (e: unknown) {
+    return { output: null, error: `读取文档失败：${errorText(e)}` };
   }
 }
 
-async function runWriteDocument(params: { file_path?: unknown; spec?: unknown }, ctx: ToolContext): Promise<ToolResult> {
+async function runWriteDocument(
+  params: { file_path?: unknown; spec?: unknown },
+  ctx: ToolContext,
+): Promise<ToolResult> {
   const filePath = typeof params?.file_path === 'string' && params.file_path.trim() ? params.file_path.trim() : '';
-  const spec = params?.spec && typeof params.spec === 'object' ? params.spec as Record<string, unknown> : null;
+  const spec = params?.spec && typeof params.spec === 'object' ? (params.spec as Record<string, unknown>) : null;
   if (!filePath) return { output: null, error: 'file_path 不能为空' };
   if (!spec) return { output: null, error: 'spec 不能为空' };
   let resolved: string;
   try {
     resolved = resolveToolPath(filePath, ctx.projectRoot, ctx.sandboxMode, writableRootsOf(ctx));
-  } catch (e: any) {
-    return { output: null, error: e?.message ?? String(e) };
+  } catch (e: unknown) {
+    return { output: null, error: errorText(e) };
   }
   try {
     const { writeDocument } = await import('../document-tools');
     const { format, bytes } = await writeDocument(resolved, spec as any);
     markFileObserved(ctx, resolved);
     return { output: { file_path: resolved, format, bytes } };
-  } catch (e: any) {
-    return { output: null, error: `写入文档失败：${e?.message ?? e}` };
+  } catch (e: unknown) {
+    return { output: null, error: `写入文档失败：${errorText(e)}` };
   }
 }
 
@@ -3339,12 +3591,15 @@ async function runSlackListChannels(params: { limit?: unknown }, _ctx: ToolConte
     const { slackListChannels } = await import('../connectors');
     const channels = await slackListChannels(Number(params?.limit) || 100);
     return { output: { count: channels.length, channels } };
-  } catch (e: any) {
-    return { output: null, error: e?.message ?? String(e) };
+  } catch (e: unknown) {
+    return { output: null, error: errorText(e) };
   }
 }
 
-async function runSlackPostMessage(params: { channel?: unknown; text?: unknown }, _ctx: ToolContext): Promise<ToolResult> {
+async function runSlackPostMessage(
+  params: { channel?: unknown; text?: unknown },
+  _ctx: ToolContext,
+): Promise<ToolResult> {
   const channel = typeof params?.channel === 'string' ? params.channel.trim() : '';
   const text = typeof params?.text === 'string' ? params.text : '';
   if (!channel || !text) return { output: null, error: 'SlackPostMessage 需要 channel 和 text' };
@@ -3352,8 +3607,8 @@ async function runSlackPostMessage(params: { channel?: unknown; text?: unknown }
     const { slackPostMessage } = await import('../connectors');
     const sent = await slackPostMessage(channel, text);
     return { output: { ok: true, ...sent } };
-  } catch (e: any) {
-    return { output: null, error: e?.message ?? String(e) };
+  } catch (e: unknown) {
+    return { output: null, error: errorText(e) };
   }
 }
 
@@ -3365,8 +3620,8 @@ async function runDriveList(params: { query?: unknown; page_size?: unknown }, _c
       Number(params?.page_size) || 50,
     );
     return { output: { count: files.length, files } };
-  } catch (e: any) {
-    return { output: null, error: e?.message ?? String(e) };
+  } catch (e: unknown) {
+    return { output: null, error: errorText(e) };
   }
 }
 
@@ -3377,12 +3632,15 @@ async function runDriveRead(params: { file_id?: unknown }, _ctx: ToolContext): P
     const { driveRead } = await import('../connectors');
     const data = await driveRead(fileId);
     return { output: data };
-  } catch (e: any) {
-    return { output: null, error: e?.message ?? String(e) };
+  } catch (e: unknown) {
+    return { output: null, error: errorText(e) };
   }
 }
 
-async function runNotionSearch(params: { query?: unknown; page_size?: unknown }, _ctx: ToolContext): Promise<ToolResult> {
+async function runNotionSearch(
+  params: { query?: unknown; page_size?: unknown },
+  _ctx: ToolContext,
+): Promise<ToolResult> {
   try {
     const { notionSearch } = await import('../connectors');
     const results = await notionSearch(
@@ -3390,12 +3648,15 @@ async function runNotionSearch(params: { query?: unknown; page_size?: unknown },
       Number(params?.page_size) || 10,
     );
     return { output: { count: results.length, results } };
-  } catch (e: any) {
-    return { output: null, error: e?.message ?? String(e) };
+  } catch (e: unknown) {
+    return { output: null, error: errorText(e) };
   }
 }
 
-async function runNotionCreatePage(params: { parent_page_id?: unknown; title?: unknown; markdown?: unknown }, _ctx: ToolContext): Promise<ToolResult> {
+async function runNotionCreatePage(
+  params: { parent_page_id?: unknown; title?: unknown; markdown?: unknown },
+  _ctx: ToolContext,
+): Promise<ToolResult> {
   const parent = typeof params?.parent_page_id === 'string' ? params.parent_page_id.trim() : '';
   const title = typeof params?.title === 'string' ? params.title.trim() : '';
   const markdown = typeof params?.markdown === 'string' ? params.markdown : undefined;
@@ -3404,8 +3665,8 @@ async function runNotionCreatePage(params: { parent_page_id?: unknown; title?: u
     const { notionCreatePage } = await import('../connectors');
     const page = await notionCreatePage(parent, title, markdown);
     return { output: { ok: true, ...page } };
-  } catch (e: any) {
-    return { output: null, error: e?.message ?? String(e) };
+  } catch (e: unknown) {
+    return { output: null, error: errorText(e) };
   }
 }
 
@@ -3422,7 +3683,10 @@ function terminalOwner(ctx: ToolContext): string {
   return ctx.agentId || ctx.sessionId || ctx.requestId;
 }
 
-async function runTerminalOpen(params: { command?: string; cwd?: string; session_id?: string }, ctx: ToolContext): Promise<ToolResult> {
+async function runTerminalOpen(
+  params: { command?: string; cwd?: string; session_id?: string },
+  ctx: ToolContext,
+): Promise<ToolResult> {
   const r = await runPtyTool('create', (params ?? {}) as Record<string, unknown>, terminalOwner(ctx));
   if (r.error) return { output: null, error: r.error };
   return { output: r.output };
@@ -3434,19 +3698,28 @@ async function runTerminalList(_params: unknown, ctx: ToolContext): Promise<Tool
   return { output: r.output };
 }
 
-async function runTerminalRead(params: { session_id?: string; timeout_ms?: number }, ctx: ToolContext): Promise<ToolResult> {
+async function runTerminalRead(
+  params: { session_id?: string; timeout_ms?: number },
+  ctx: ToolContext,
+): Promise<ToolResult> {
   const r = await runPtyTool('read', (params ?? {}) as Record<string, unknown>, terminalOwner(ctx));
   if (r.error) return { output: null, error: r.error };
   return { output: r.output };
 }
 
-async function runTerminalSend(params: { session_id?: string; data?: string; enter?: boolean }, ctx: ToolContext): Promise<ToolResult> {
+async function runTerminalSend(
+  params: { session_id?: string; data?: string; enter?: boolean },
+  ctx: ToolContext,
+): Promise<ToolResult> {
   const r = await runPtyTool('write', (params ?? {}) as Record<string, unknown>, terminalOwner(ctx));
   if (r.error) return { output: null, error: r.error };
   return { output: r.output };
 }
 
-async function runTerminalSignal(params: { session_id?: string; signal?: string }, ctx: ToolContext): Promise<ToolResult> {
+async function runTerminalSignal(
+  params: { session_id?: string; signal?: string },
+  ctx: ToolContext,
+): Promise<ToolResult> {
   const id = String(params?.session_id ?? '');
   const signal = String(params?.signal ?? '').toUpperCase();
   const controlChars: Record<string, string> = {
@@ -3476,8 +3749,8 @@ async function runTerminalClose(params: { session_id?: string }, ctx: ToolContex
 async function runInspectRuntime(_params: unknown, _ctx: ToolContext): Promise<ToolResult> {
   try {
     return { output: await inspectRuntime() };
-  } catch (e: any) {
-    return { output: null, error: `检视运行时失败: ${e?.message ?? e}` };
+  } catch (e: unknown) {
+    return { output: null, error: `检视运行时失败: ${errorText(e)}` };
   }
 }
 
@@ -3494,20 +3767,49 @@ async function runWriteSkill(params: { name?: string; content?: string }, _ctx: 
     const root = path.join(app.getPath('userData'), 'skills');
     const file = await writeSkill(root, name, content);
     return { output: { name, path: file, warnings: gate.warnings } };
-  } catch (e: any) {
-    return { output: null, error: `写入技能失败: ${e?.message ?? e}` };
+  } catch (e: unknown) {
+    return { output: null, error: `写入技能失败: ${errorText(e)}` };
   }
 }
 
 const DANGEROUS_TOOLS = new Set([
-  'Bash', 'Pwsh', 'RunCode', 'RunWorkflow', 'Agent', 'Ralph',
-  'Write', 'Edit', 'StrReplaceEditor', 'NotebookEdit', 'Delete',
-  'WebFetch', 'WebSearch', 'CronCreate', 'CronDelete',
-  'ScheduleCreate', 'ScheduleDelete', 'TaskStop', 'JobKill',
-  'EnterWorktree', 'ReviewArtifact', 'GitCommit', 'WriteDocument',
-  'SlackPostMessage', 'NotionCreatePage', 'MountPlugin', 'UnmountPlugin',
-  'WriteSkill', 'Pty', 'TerminalOpen', 'TerminalSend', 'TerminalSignal',
-  'TerminalClose', 'SendMessage', 'InterruptAgent', 'CreateGoal', 'UpdateGoal',
+  'Bash',
+  'Pwsh',
+  'RunCode',
+  'RunWorkflow',
+  'Agent',
+  'Ralph',
+  'Write',
+  'Edit',
+  'StrReplaceEditor',
+  'NotebookEdit',
+  'Delete',
+  'WebFetch',
+  'WebSearch',
+  'CronCreate',
+  'CronDelete',
+  'ScheduleCreate',
+  'ScheduleDelete',
+  'TaskStop',
+  'JobKill',
+  'EnterWorktree',
+  'ReviewArtifact',
+  'GitCommit',
+  'WriteDocument',
+  'SlackPostMessage',
+  'NotionCreatePage',
+  'MountPlugin',
+  'UnmountPlugin',
+  'WriteSkill',
+  'Pty',
+  'TerminalOpen',
+  'TerminalSend',
+  'TerminalSignal',
+  'TerminalClose',
+  'SendMessage',
+  'InterruptAgent',
+  'CreateGoal',
+  'UpdateGoal',
 ]);
 const FILE_MODIFY_TOOLS = new Set(['Write', 'Edit', 'NotebookEdit', 'Delete']);
 
@@ -3519,7 +3821,9 @@ async function backupBeforeModify(filePath: string, toolName: string, ctx: ToolC
     // Key by the stable session/agent identity so per-task review and
     // rollback can find the task's backups; requestId is the per-run id.
     await undoManager.backupFile(filePath, ctx.projectRoot, toolName, ctx.sessionId || ctx.requestId);
-  } catch { /* undo is best-effort */ }
+  } catch {
+    /* undo is best-effort */
+  }
 }
 
 export async function executeToolCall(
@@ -3532,10 +3836,9 @@ export async function executeToolCall(
   if (isMcpTool) {
     // MCP 工具同样要走完整权限/沙箱/工作模式门禁，不能直接放行。
     const { executeMcpTool } = await import('../tool-registry');
-    executor = async (toolInput: Record<string, unknown>) =>
-      executeMcpTool(toolName, toolInput ?? {});
+    executor = async (toolInput: Record<string, unknown>) => executeMcpTool(toolName, toolInput ?? {});
   } else {
-    executor = toolRegistry[toolName] || await dynamicPluginExecutor(toolName);
+    executor = toolRegistry[toolName] || (await dynamicPluginExecutor(toolName));
   }
   if (!executor) {
     return { output: null, error: `未知工具: ${toolName}` };
@@ -3552,9 +3855,8 @@ export async function executeToolCall(
   // paths still map to project-relative scopes. Denies block before any
   // prompt; grants fall through to the normal mode-aware flow below.
   const profileWorktreeKey = ctx.agentId || ctx.requestId;
-  const effRoot = toolName !== 'EnterWorktree'
-    ? (worktreeSessions.get(profileWorktreeKey) ?? ctx.projectRoot)
-    : ctx.projectRoot;
+  const effRoot =
+    toolName !== 'EnterWorktree' ? (worktreeSessions.get(profileWorktreeKey) ?? ctx.projectRoot) : ctx.projectRoot;
   const { evaluateToolProfileGate } = await import('../permission-profile');
   const profileGate = await evaluateToolProfileGate(
     toolName,
@@ -3571,10 +3873,12 @@ export async function executeToolCall(
   // A call the sandbox will deny must fail immediately (e.g. Write under
   // read-only) instead of asking the user for approval that can never work.
   const { enforceSandbox, commandMutates } = await import('../sandbox-policy');
-  const perCallSandbox = toolName === 'Bash' && typeof input.sandbox_permissions === 'string'
-    && ['read', 'workspace-write', 'full'].includes(input.sandbox_permissions)
-    ? input.sandbox_permissions as SandboxMode
-    : undefined;
+  const perCallSandbox =
+    toolName === 'Bash' &&
+    typeof input.sandbox_permissions === 'string' &&
+    ['read', 'workspace-write', 'full'].includes(input.sandbox_permissions)
+      ? (input.sandbox_permissions as SandboxMode)
+      : undefined;
   const effectiveSandbox = perCallSandbox ?? ctx.sandboxMode ?? 'full';
   const escalatedSandbox = !!perCallSandbox && perCallSandbox !== ctx.sandboxMode;
   if (escalatedSandbox && ctx.mode === 'auto' && !ctx.autoApprove) {
@@ -3590,7 +3894,11 @@ export async function executeToolCall(
 
   // ── Permission guard ──────────────────────────────────
   // Uses ctx.mode directly so the query-path and agent-path behave identically.
-  const permCtx: PermissionContext = { mode: ctx.mode, approvedPlanSteps: ctx.approvedPlanSteps, projectRoot: ctx.projectRoot };
+  const permCtx: PermissionContext = {
+    mode: ctx.mode,
+    approvedPlanSteps: ctx.approvedPlanSteps,
+    projectRoot: ctx.projectRoot,
+  };
   const cmdText = toolName === 'Bash' && typeof input.command === 'string' ? input.command : '';
   const bashMutates = cmdText ? commandMutates(cmdText).mutates : false;
   // Safe Bash under a confined sandbox is a read operation — it must not
@@ -3670,7 +3978,10 @@ export async function executeToolCall(
     const result = conflictDetector.lockFile(filePath, ctx.agentId);
     if (!result.success) {
       const lockedBy = (result.lockedBy || []).join(', ');
-      return { output: null, error: `文件 ${filePath} 正在被 Agent ${lockedBy} 修改，本次操作被阻止以避免冲突。请等待该 Agent 完成或手动协调。` };
+      return {
+        output: null,
+        error: `文件 ${filePath} 正在被 Agent ${lockedBy} 修改，本次操作被阻止以避免冲突。请等待该 Agent 完成或手动协调。`,
+      };
     }
     conflictLocked = true;
   }
@@ -3684,14 +3995,20 @@ export async function executeToolCall(
   // consumed tool:diff:pending) just dead-locked every Write/Edit for 5min.
   let execResult: ToolResult;
   // ── PreToolUse 钩子门 ────────────────────────────
-  const preHook = await runHooksFor('PreToolUse', { toolName, input, requestId: ctx.requestId }, ctx.projectRoot).catch(() => null);
+  const preHook = await runHooksFor('PreToolUse', { toolName, input, requestId: ctx.requestId }, ctx.projectRoot).catch(
+    () => null,
+  );
   if (preHook?.blocked) {
     const reason = preHook.outputs.join('; ') || 'Hook 拒绝';
     return { output: null, error: `PreToolUse Hook 阻止了 ${toolName}: ${reason}` };
   }
   try {
     execResult = await executor(input, ctx);
-    void runHooksFor('PostToolUse', { toolName, input, output: execResult.output, error: execResult.error }, ctx.projectRoot).catch(() => {});
+    void runHooksFor(
+      'PostToolUse',
+      { toolName, input, output: execResult.output, error: execResult.error },
+      ctx.projectRoot,
+    ).catch(() => {});
   } finally {
     if (conflictLocked) {
       const { conflictDetector } = require('./conflict-detector');

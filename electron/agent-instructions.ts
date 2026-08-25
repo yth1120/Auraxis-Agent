@@ -66,9 +66,6 @@ export async function loadProjectInstructions(projectRoot: string, cwd?: string)
 
 /** Combined layered instructions (global + project) for a session preamble. */
 export async function loadAgentInstructions(projectRoot: string, cwd?: string): Promise<string> {
-  const [global, project] = await Promise.all([
-    loadGlobalInstructions(),
-    loadProjectInstructions(projectRoot, cwd),
-  ]);
+  const [global, project] = await Promise.all([loadGlobalInstructions(), loadProjectInstructions(projectRoot, cwd)]);
   return [global, project].filter(Boolean).join('\n\n');
 }

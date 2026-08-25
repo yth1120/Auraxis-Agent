@@ -11,6 +11,7 @@
  * sees and can call them on the next request.
  */
 
+import { errorText } from '../errors';
 import vm from 'vm';
 import type { ToolDef } from '../tool-defs';
 import { createOrchestrationApi, type OrchestrationCaller } from './agent-orchestration';
@@ -40,7 +41,10 @@ export interface DynamicPluginSpec {
   }>;
 }
 
-const plugins = new Map<string, { id: string; name: string; version?: string; description?: string; tools: DynamicToolDef[] }>();
+const plugins = new Map<
+  string,
+  { id: string; name: string; version?: string; description?: string; tools: DynamicToolDef[] }
+>();
 const toolIndex = new Map<string, DynamicToolDef>();
 
 function safeId(id: string): boolean {
@@ -53,15 +57,30 @@ function safeToolName(name: string): boolean {
 
 function compileHandler(handler: string): { fn: DynamicToolDef['compiled'] } | { error: string } {
   const sandbox: Record<string, unknown> = {
-    JSON, Math, Date, Object, Array, String, Number, Boolean, Promise,
-    Map, Set, Error, RegExp, Symbol, setTimeout, clearTimeout, structuredClone,
+    JSON,
+    Math,
+    Date,
+    Object,
+    Array,
+    String,
+    Number,
+    Boolean,
+    Promise,
+    Map,
+    Set,
+    Error,
+    RegExp,
+    Symbol,
+    setTimeout,
+    clearTimeout,
+    structuredClone,
   };
   try {
     const fn = vm.runInNewContext(`(${handler})`, sandbox, { timeout: 5000 });
     if (typeof fn !== 'function') return { error: 'handler 必须是一个函数表达式' };
     return { fn: fn as DynamicToolDef['compiled'] };
-  } catch (err: any) {
-    return { error: `handler 编译失败: ${err?.message ?? err}` };
+  } catch (err: unknown) {
+    return { error: `handler 编译失败: ${errorText(err)}` };
   }
 }
 
@@ -149,7 +168,13 @@ export function getDynamicTool(toolName: string): DynamicToolDef | undefined {
 }
 
 /** Catalog of mounted dynamic plugins (for InspectRuntime / ListPlugins). */
-export function getDynamicPluginCatalog(): Array<{ id: string; name: string; version?: string; description?: string; tools: string[] }> {
+export function getDynamicPluginCatalog(): Array<{
+  id: string;
+  name: string;
+  version?: string;
+  description?: string;
+  tools: string[];
+}> {
   return [...plugins.values()].map((p) => ({
     id: p.id,
     name: p.name,
@@ -171,7 +196,7 @@ export async function executeDynamicTool(
   try {
     const result = await def.compiled(input ?? {}, sandboxCtx);
     return { output: result ?? null };
-  } catch (err: any) {
-    return { output: null, error: `插件工具 ${toolName} 执行失败: ${err?.message ?? err}` };
+  } catch (err: unknown) {
+    return { output: null, error: `插件工具 ${toolName} 执行失败: ${errorText(err)}` };
   }
 }

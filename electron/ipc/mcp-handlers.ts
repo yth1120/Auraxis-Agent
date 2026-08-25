@@ -1,7 +1,6 @@
-import { ipcMain } from 'electron';
+import { errorText } from '../errors';
 import { secureHandle } from './trust';
 import { spawn, ChildProcess } from 'child_process';
-import path from 'path';
 import type { MCPServerConfig, MCPToolDef, MCPStatus } from '../advanced-defs';
 import { invalidateMcpToolCache } from '../tool-registry';
 import { assertString } from './shared';
@@ -187,7 +186,7 @@ async function connectServer(serverId: string): Promise<MCPStatus> {
     });
 
     // Initialize handshake
-    const initResult = await sendJsonRpc(conn, 'initialize', {
+    await sendJsonRpc(conn, 'initialize', {
       protocolVersion: '2024-11-05',
       capabilities: {},
       clientInfo: { name: 'Auraxis', version: '2.0.0' },
@@ -195,14 +194,16 @@ async function connectServer(serverId: string): Promise<MCPStatus> {
 
     // Send initialized notification
     if (conn.process?.stdin) {
-      conn.process.stdin.write(JSON.stringify({
-        jsonrpc: '2.0',
-        method: 'notifications/initialized',
-      }) + '\n');
+      conn.process.stdin.write(
+        JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'notifications/initialized',
+        }) + '\n',
+      );
     }
 
     // Discover tools
-    const toolsResult = await sendJsonRpc(conn, 'tools/list') as { tools?: MCPToolDef[] };
+    const toolsResult = (await sendJsonRpc(conn, 'tools/list')) as { tools?: MCPToolDef[] };
     conn.tools = (toolsResult.tools || []).map((t: any) => ({
       name: t.name,
       description: t.description || '',
@@ -213,9 +214,9 @@ async function connectServer(serverId: string): Promise<MCPStatus> {
     conn.connected = true;
     invalidateMcpToolCache();
     return { serverId, connected: true, toolCount: conn.tools.length };
-  } catch (err: any) {
+  } catch (err: unknown) {
     conn.connected = false;
-    return { serverId, connected: false, toolCount: 0, error: err.message };
+    return { serverId, connected: false, toolCount: 0, error: errorText(err) };
   }
 }
 
@@ -251,13 +252,9 @@ export function getAllMcpTools(): MCPToolDef[] {
   return tools;
 }
 
-export async function callMcpTool(
-  serverName: string,
-  toolName: string,
-  args: Record<string, unknown>,
-): Promise<unknown> {
+export async function callMcpTool(serverId: string, toolName: string, args: Record<string, unknown>): Promise<unknown> {
   for (const conn of connections.values()) {
-    if (conn.connected) {
+    if (conn.connected && conn.config.id === serverId) {
       const tool = conn.tools.find((t) => t.name === toolName);
       if (tool) {
         return sendJsonRpc(conn, 'tools/call', { name: toolName, arguments: args });
@@ -275,7 +272,7 @@ export function registerMcpHandlers() {
 
   secureHandle('mcp:setServers', async (_event, servers: MCPServerConfig[]) => {
     // Disconnect removed servers
-    for (const [id, conn] of connections) {
+    for (const [id] of connections) {
       if (!servers.find((s) => s.id === id)) {
         disconnectServer(id);
         connections.delete(id);
@@ -324,14 +321,14 @@ export function registerMcpHandlers() {
     return { ok: true, data: conn.tools };
   });
 
-  secureHandle('mcp:callTool', async (_event, serverName: string, toolName: string, args: Record<string, unknown>) => {
+  secureHandle('mcp:callTool', async (_event, serverId: string, toolName: string, args: Record<string, unknown>) => {
     try {
-      assertString(serverName, 'serverName');
+      assertString(serverId, 'serverName');
       assertString(toolName, 'toolName');
-      const result = await callMcpTool(serverName, toolName, args);
+      const result = await callMcpTool(serverId, toolName, args);
       return { ok: true, data: result };
-    } catch (err: any) {
-      return { ok: false, error: err.message };
+    } catch (err: unknown) {
+      return { ok: false, error: errorText(err) };
     }
   });
 }

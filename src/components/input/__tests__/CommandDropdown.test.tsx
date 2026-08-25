@@ -12,9 +12,7 @@ const items = [
 describe('CommandDropdown — 斜杠命令按钮列表', () => {
   it('renders items and selects on click', () => {
     const onSelect = vi.fn();
-    const { getByText } = render(
-      <CommandDropdown items={items} selected={0} onSelect={onSelect} onHover={() => {}} />,
-    );
+    const { getByText } = render(<CommandDropdown items={items} selected={0} onSelect={onSelect} onHover={() => {}} />);
     fireEvent.mouseDown(getByText('clear'));
     expect(onSelect).toHaveBeenCalledWith(items[0]);
   });

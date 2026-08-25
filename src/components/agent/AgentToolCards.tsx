@@ -14,7 +14,10 @@ function basename(p: string): string {
 
 function copyText(text: string, setCopied: (v: boolean) => void) {
   void navigator.clipboard?.writeText(text).then(
-    () => { setCopied(true); setTimeout(() => setCopied(false), 1200); },
+    () => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1200);
+    },
     () => {},
   );
 }
@@ -26,7 +29,10 @@ function CopyButton({ text }: { text: string }) {
     <button
       type="button"
       className="inline-flex items-center gap-1 text-2xs text-text-muted border-none bg-transparent cursor-pointer hover:text-text-primary"
-      onClick={(e) => { e.stopPropagation(); copyText(text, setCopied); }}
+      onClick={(e) => {
+        e.stopPropagation();
+        copyText(text, setCopied);
+      }}
     >
       {copied ? <Check size={12} /> : <Copy size={12} />}
       {copied ? t('tool.copied') : t('tool.copy')}
@@ -65,7 +71,11 @@ export function AgentReadCard({ label, content, startLine = 1, totalLines }: Age
       <div className="flex items-center justify-between gap-3 px-3.5 py-2.5 bg-[var(--color-bg-inset)] border-b border-border-dim">
         <span className="min-w-0 truncate font-mono text-2xs text-text-primary">{label ? basename(label) : ''}</span>
         <span className="flex items-center gap-3 shrink-0">
-          {windowed && <span className="text-2xs text-text-muted">{t('tool.showLines', { shown: lines.length, total: totalLines })}</span>}
+          {windowed && (
+            <span className="text-2xs text-text-muted">
+              {t('tool.showLines', { shown: lines.length, total: totalLines })}
+            </span>
+          )}
           <CopyButton text={raw} />
         </span>
       </div>
@@ -108,11 +118,13 @@ export function AgentSearchCard({ kind, files = [], paths = [], total, truncated
   const t = useT();
   const [expanded, setExpanded] = useState(false);
   const [collapsedFiles, setCollapsedFiles] = useState<ReadonlySet<number>>(() => new Set());
-  const matchRows = useMemo(() => files.flatMap((f, fi) =>
-    collapsedFiles.has(fi)
-      ? []
-      : f.matches.map((m) => ({ type: 'match' as const, path: f.path, ...m, fi })),
-  ), [files, collapsedFiles]);
+  const matchRows = useMemo(
+    () =>
+      files.flatMap((f, fi) =>
+        collapsedFiles.has(fi) ? [] : f.matches.map((m) => ({ type: 'match' as const, path: f.path, ...m, fi })),
+      ),
+    [files, collapsedFiles],
+  );
   const pathRows = paths.map((p) => ({ type: 'path' as const, path: p }));
   const rows = kind === 'paths' ? pathRows : matchRows;
   const shown = kind === 'paths' ? paths.length : files.reduce((n, f) => n + f.matches.length, 0);
@@ -120,11 +132,16 @@ export function AgentSearchCard({ kind, files = [], paths = [], total, truncated
   const capped = hidden > 0 && !expanded;
   const head = capped ? rows.slice(0, HEAD_LINES) : rows;
   const tail = capped ? rows.slice(rows.length - TAIL_LINES) : [];
-  const raw = kind === 'paths'
-    ? paths.join('\n')
-    : files.map((f) => [f.path, ...f.matches.map((m) => `${m.lineNumber}: ${m.line}`)].join('\n')).join('\n\n');
+  const raw =
+    kind === 'paths'
+      ? paths.join('\n')
+      : files.map((f) => [f.path, ...f.matches.map((m) => `${m.lineNumber}: ${m.line}`)].join('\n')).join('\n\n');
   const summary = truncated
-    ? t('tool.searchSummaryTruncated', { shown, total: total ?? shown, kind: kind === 'paths' ? t('tool.paths') : t('tool.matches') })
+    ? t('tool.searchSummaryTruncated', {
+        shown,
+        total: total ?? shown,
+        kind: kind === 'paths' ? t('tool.paths') : t('tool.matches'),
+      })
     : `${shown} ${kind === 'paths' ? t('tool.paths') : `${t('tool.matches')} · ${files.length} ${t('tool.files')}`}`;
 
   return (
@@ -134,14 +151,18 @@ export function AgentSearchCard({ kind, files = [], paths = [], total, truncated
         <CopyButton text={raw} />
       </div>
       <div className="py-1.5 pr-3 font-mono text-xs overflow-x-auto">
-        {head.map((row, i) => row.type === 'path' ? (
-          <div key={i} className="min-h-[20px] leading-[20px] pl-3.5 whitespace-pre text-text-secondary">{row.path}</div>
-        ) : (
-          <div key={`${row.fi}:${row.lineNumber}`} className="min-h-[20px] leading-[20px] pl-3.5 whitespace-pre">
-            <span className="text-text-faint">{row.lineNumber}: </span>
-            <span className="text-text-secondary">{row.line}</span>
-          </div>
-        ))}
+        {head.map((row, i) =>
+          row.type === 'path' ? (
+            <div key={i} className="min-h-[20px] leading-[20px] pl-3.5 whitespace-pre text-text-secondary">
+              {row.path}
+            </div>
+          ) : (
+            <div key={`${row.fi}:${row.lineNumber}`} className="min-h-[20px] leading-[20px] pl-3.5 whitespace-pre">
+              <span className="text-text-faint">{row.lineNumber}: </span>
+              <span className="text-text-secondary">{row.line}</span>
+            </div>
+          ),
+        )}
         {hidden > 0 && (
           <button
             type="button"
@@ -151,14 +172,22 @@ export function AgentSearchCard({ kind, files = [], paths = [], total, truncated
             {t('tool.moreLines', { n: hidden })}
           </button>
         )}
-        {capped && tail.map((row, i) => row.type === 'path' ? (
-          <div key={`t${i}`} className="min-h-[20px] leading-[20px] pl-3.5 whitespace-pre text-text-secondary">{row.path}</div>
-        ) : (
-          <div key={`t${row.fi}:${row.lineNumber}`} className="min-h-[20px] leading-[20px] pl-[14px] whitespace-pre">
-            <span className="text-text-faint">{row.lineNumber}: </span>
-            <span className="text-text-secondary">{row.line}</span>
-          </div>
-        ))}
+        {capped &&
+          tail.map((row, i) =>
+            row.type === 'path' ? (
+              <div key={`t${i}`} className="min-h-[20px] leading-[20px] pl-3.5 whitespace-pre text-text-secondary">
+                {row.path}
+              </div>
+            ) : (
+              <div
+                key={`t${row.fi}:${row.lineNumber}`}
+                className="min-h-[20px] leading-[20px] pl-[14px] whitespace-pre"
+              >
+                <span className="text-text-faint">{row.lineNumber}: </span>
+                <span className="text-text-secondary">{row.line}</span>
+              </div>
+            ),
+          )}
         {kind === 'matches' && files.length > 1 && (
           <div className="mt-1 flex items-center gap-2 px-3 pt-1 border-t border-border-dim">
             <button
@@ -173,7 +202,9 @@ export function AgentSearchCard({ kind, files = [], paths = [], total, truncated
             >
               {collapsedFiles.size === files.length ? t('tool.expandAllFiles') : t('tool.collapseAllFiles')}
             </button>
-            <span className="ml-auto text-2xs text-text-faint">{files.length} {t('tool.files')}</span>
+            <span className="ml-auto text-2xs text-text-faint">
+              {files.length} {t('tool.files')}
+            </span>
           </div>
         )}
       </div>
@@ -218,13 +249,26 @@ export function AgentWebCard({ kind, answer, sources = [], url, statusCode, trun
       <div className="px-3 py-2 font-mono text-xs">
         {kind === 'fetch' ? (
           <div className="flex items-center gap-2">
-            {url && (safeHref(url) ? (
-              <a className="text-primary hover:underline truncate" href={safeHref(url)} target="_blank" rel="noopener noreferrer">{linkLabel(url)}</a>
-            ) : (
-              <span className="truncate text-text-secondary">{url}</span>
-            ))}
+            {url &&
+              (safeHref(url) ? (
+                <a
+                  className="text-primary hover:underline truncate"
+                  href={safeHref(url)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {linkLabel(url)}
+                </a>
+              ) : (
+                <span className="truncate text-text-secondary">{url}</span>
+              ))}
             {statusCode != null && (
-              <span className={clsx('shrink-0 px-1.5 rounded-full text-2xs', statusCode >= 200 && statusCode < 300 ? 'bg-success-soft text-success' : 'bg-danger-soft text-danger')}>
+              <span
+                className={clsx(
+                  'shrink-0 px-1.5 rounded-full text-2xs',
+                  statusCode >= 200 && statusCode < 300 ? 'bg-success-soft text-success' : 'bg-danger-soft text-danger',
+                )}
+              >
                 HTTP {statusCode}
               </span>
             )}
@@ -233,18 +277,27 @@ export function AgentWebCard({ kind, answer, sources = [], url, statusCode, trun
           <div className="text-text-muted">{t('tool.noResults')}</div>
         ) : (
           <>
-            {answer && <div className="text-text-secondary leading-relaxed mb-2 whitespace-pre-wrap break-words">{answer}</div>}
+            {answer && (
+              <div className="text-text-secondary leading-relaxed mb-2 whitespace-pre-wrap break-words">{answer}</div>
+            )}
             <ol className="m-0 pl-4 flex flex-col gap-1.5">
               {sources.map((source, i) => (
                 <li key={i} value={i + 1} className="text-2xs leading-relaxed">
                   {safeHref(source.url) ? (
-                    <a className="text-primary hover:underline" href={safeHref(source.url)} target="_blank" rel="noopener noreferrer">
+                    <a
+                      className="text-primary hover:underline"
+                      href={safeHref(source.url)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
                       {linkLabel(source.url, source.title)}
                     </a>
                   ) : (
                     <span className="text-text-secondary">{linkLabel(source.url, source.title)}</span>
                   )}
-                  {source.snippet && <div className="text-text-muted whitespace-pre-wrap break-words">{source.snippet}</div>}
+                  {source.snippet && (
+                    <div className="text-text-muted whitespace-pre-wrap break-words">{source.snippet}</div>
+                  )}
                   {source.publishedAt && <div className="text-text-faint">{source.publishedAt}</div>}
                 </li>
               ))}
@@ -258,7 +311,15 @@ export function AgentWebCard({ kind, answer, sources = [], url, statusCode, trun
 }
 
 /* ── Diff card (Write/Edit) ───────────────────────── */
-export function AgentDiffCard({ oldContent, newContent, fileName }: { oldContent: string; newContent: string; fileName?: string }) {
+export function AgentDiffCard({
+  oldContent,
+  newContent,
+  fileName,
+}: {
+  oldContent: string;
+  newContent: string;
+  fileName?: string;
+}) {
   return (
     <div className="rounded-xl border border-border-default overflow-hidden">
       <DiffView oldContent={oldContent} newContent={newContent} fileName={fileName} />
@@ -290,7 +351,12 @@ export function AgentRunCodeCard({
         <span className="min-w-0 truncate text-2xs text-text-secondary">
           {language ? `RunCode · ${language}` : 'RunCode'}
           {exitCode != null && (
-            <span className={clsx('ml-2 px-1.5 rounded-full text-2xs', exitCode === 0 ? 'bg-success-soft text-success' : 'bg-danger-soft text-danger')}>
+            <span
+              className={clsx(
+                'ml-2 px-1.5 rounded-full text-2xs',
+                exitCode === 0 ? 'bg-success-soft text-success' : 'bg-danger-soft text-danger',
+              )}
+            >
               {timedOut ? t('tool.timedOut') : t('tool.exitCode', { code: exitCode })}
             </span>
           )}
@@ -300,20 +366,25 @@ export function AgentRunCodeCard({
       {code && (
         <div className="grid grid-cols-[max-content_1fr] gap-x-3.5 px-4 py-3 max-h-[160px] overflow-y-auto border-b border-border-dim">
           <span className="sticky top-0 text-2xs font-semibold text-text-faint">IN</span>
-          <pre className="m-0 text-xs leading-relaxed text-text-secondary whitespace-pre-wrap break-all font-mono">{code.slice(0, 4000)}</pre>
+          <pre className="m-0 text-xs leading-relaxed text-text-secondary whitespace-pre-wrap break-all font-mono">
+            {code.slice(0, 4000)}
+          </pre>
         </div>
       )}
       {output && (
         <div className="grid grid-cols-[max-content_1fr] gap-x-3.5 px-4 py-3 max-h-[200px] overflow-y-auto">
           <span className="sticky top-0 text-2xs font-semibold text-text-faint">OUT</span>
-          <pre className={clsx('m-0 text-xs leading-relaxed whitespace-pre-wrap break-all font-mono', exitCode !== 0 ? 'text-danger' : 'text-text-secondary')}>
+          <pre
+            className={clsx(
+              'm-0 text-xs leading-relaxed whitespace-pre-wrap break-all font-mono',
+              exitCode !== 0 ? 'text-danger' : 'text-text-secondary',
+            )}
+          >
             {output}
           </pre>
         </div>
       )}
-      {!output && exitCode != null && (
-        <div className="px-3 py-2 text-2xs text-text-faint">{t('tool.noOutput')}</div>
-      )}
+      {!output && exitCode != null && <div className="px-3 py-2 text-2xs text-text-faint">{t('tool.noOutput')}</div>}
     </div>
   );
 }

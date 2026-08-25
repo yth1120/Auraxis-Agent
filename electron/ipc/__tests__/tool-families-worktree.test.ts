@@ -34,8 +34,11 @@ vi.mock('../window-ref', () => ({
 }));
 
 import {
-  executeToolCall, getActiveWorktree, restoreWorktreeSession,
-  clearWorktreeSession, isValidWorktreeTaskId,
+  executeToolCall,
+  getActiveWorktree,
+  restoreWorktreeSession,
+  clearWorktreeSession,
+  isValidWorktreeTaskId,
 } from '../tool-handlers';
 
 let repo = '';

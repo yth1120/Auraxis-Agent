@@ -45,7 +45,7 @@ vi.mock('../settings-store', () => ({
 }));
 
 import { executeToolCall } from '../tool-handlers';
-import { attachmentMimeFor, storeAttachment, MAX_ATTACHMENT_BYTES } from '../../attachments';
+import { attachmentMimeFor, storeAttachment } from '../../attachments';
 import { searchWithProvider } from '../../web-search';
 
 let root = '';
@@ -96,7 +96,9 @@ describe('Read / ReadImage', () => {
     expect((await executeToolCall('Read', { file_path: 'missing.ts' }, ctx())).error).toContain('读取文件失败');
     const ctrl = new AbortController();
     ctrl.abort();
-    expect((await executeToolCall('Read', { file_path: 'a.ts' }, ctx({ abortSignal: ctrl.signal }))).error).toBe('操作已取消');
+    expect((await executeToolCall('Read', { file_path: 'a.ts' }, ctx({ abortSignal: ctrl.signal }))).error).toBe(
+      '操作已取消',
+    );
   });
 
   it('非 full 沙箱且未授权时拒绝越权路径', async () => {
@@ -107,7 +109,12 @@ describe('Read / ReadImage', () => {
 
   it('ReadImage 返回图片数据，超大/非文件/不支持类型拒绝', async () => {
     const r = await executeToolCall('ReadImage', { file_path: 'img.png' }, ctx());
-    expect(r.output).toMatchObject({ mime: 'image/png', bytes: 4, attachment_id: 'att-1', image: 'data:image/png;base64,AAAA' });
+    expect(r.output).toMatchObject({
+      mime: 'image/png',
+      bytes: 4,
+      attachment_id: 'att-1',
+      image: 'data:image/png;base64,AAAA',
+    });
 
     vi.mocked(storeAttachment).mockRejectedValueOnce(new Error('disk'));
     expect((await executeToolCall('ReadImage', { file_path: 'img.png' }, ctx())).error).toContain('读取图片失败');
@@ -158,7 +165,11 @@ describe('Write / Edit', () => {
   it('Write 未授权时拒绝不安全扩展名与保留设备名', async () => {
     const ext = await executeToolCall('Write', { file_path: 'evil.exe', content: 'x' }, ctx({ autoApprove: false }));
     expect(ext.error).toContain('不允许的文件类型');
-    const reserved = await executeToolCall('Write', { file_path: 'nul.txt', content: 'x' }, ctx({ autoApprove: false }));
+    const reserved = await executeToolCall(
+      'Write',
+      { file_path: 'nul.txt', content: 'x' },
+      ctx({ autoApprove: false }),
+    );
     expect(reserved.error).toContain('保留设备名');
   });
 
@@ -179,25 +190,46 @@ describe('Write / Edit', () => {
   });
 
   it('Edit 替换/不唯一/未找到/中止', async () => {
-    const ok = await executeToolCall('Edit', { file_path: 'a.ts', old_string: 'export const a = 1;', new_string: 'export const a = 2;' }, ctx());
+    const ok = await executeToolCall(
+      'Edit',
+      { file_path: 'a.ts', old_string: 'export const a = 1;', new_string: 'export const a = 2;' },
+      ctx(),
+    );
     expect(ok.error).toBeUndefined();
     expect(readFileSync(path.join(root, 'a.ts'), 'utf-8')).toContain('a = 2');
 
     writeFileSync(path.join(root, 'dup.ts'), 'same same same', 'utf-8');
-    expect((await executeToolCall('Edit', { file_path: 'dup.ts', old_string: 'same', new_string: 'x' }, ctx())).error).toContain('必须唯一');
-    expect((await executeToolCall('Edit', { file_path: 'dup.ts', old_string: 'nope', new_string: 'x' }, ctx())).error).toContain('未找到');
+    expect(
+      (await executeToolCall('Edit', { file_path: 'dup.ts', old_string: 'same', new_string: 'x' }, ctx())).error,
+    ).toContain('必须唯一');
+    expect(
+      (await executeToolCall('Edit', { file_path: 'dup.ts', old_string: 'nope', new_string: 'x' }, ctx())).error,
+    ).toContain('未找到');
 
     const ctrl = new AbortController();
     ctrl.abort();
-    expect((await executeToolCall('Edit', { file_path: 'a.ts', old_string: 'x', new_string: 'y' }, ctx({ abortSignal: ctrl.signal }))).error).toBe('操作已取消');
+    expect(
+      (
+        await executeToolCall(
+          'Edit',
+          { file_path: 'a.ts', old_string: 'x', new_string: 'y' },
+          ctx({ abortSignal: ctrl.signal }),
+        )
+      ).error,
+    ).toBe('操作已取消');
   });
 });
 
 describe('Delete / Grep / Glob', () => {
   it('Delete 删除文件与目录（含递归约束）', async () => {
-    expect((await executeToolCall('Delete', { file_path: 'a.ts' }, ctx())).output).toMatchObject({ deleted: expect.stringContaining('a.ts'), isDirectory: false });
+    expect((await executeToolCall('Delete', { file_path: 'a.ts' }, ctx())).output).toMatchObject({
+      deleted: expect.stringContaining('a.ts'),
+      isDirectory: false,
+    });
     expect((await executeToolCall('Delete', { file_path: 'src' }, ctx())).error).toContain('recursive=true');
-    expect((await executeToolCall('Delete', { file_path: 'src', recursive: true }, ctx())).output).toMatchObject({ isDirectory: true });
+    expect((await executeToolCall('Delete', { file_path: 'src', recursive: true }, ctx())).output).toMatchObject({
+      isDirectory: true,
+    });
     expect(existsSync(path.join(root, 'src'))).toBe(false);
     expect((await executeToolCall('Delete', { file_path: 'gone.ts' }, ctx())).error).toContain('文件不存在');
     expect((await executeToolCall('Delete', { file_path: '.' }, ctx())).error).toContain('路径越权');
@@ -231,10 +263,12 @@ describe('WebFetch / WebSearch', () => {
     expect(blocked.error).toContain('内部/本地网络');
     expect(vi.mocked(fetch)).not.toHaveBeenCalled();
 
-    vi.mocked(fetch).mockResolvedValueOnce(new Response('<html><body><script>bad()</script><p>Hello</p></body></html>', {
-      status: 200,
-      headers: { 'content-type': 'text/html' },
-    }));
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response('<html><body><script>bad()</script><p>Hello</p></body></html>', {
+        status: 200,
+        headers: { 'content-type': 'text/html' },
+      }),
+    );
     const ok = await executeToolCall('WebFetch', { url: 'example.com' }, ctx({ autoApprove: true }));
     expect(vi.mocked(fetch)).toHaveBeenCalledWith('https://example.com', expect.anything());
     expect((ok.output as any).content).toContain('Hello');
@@ -244,7 +278,9 @@ describe('WebFetch / WebSearch', () => {
   it('WebFetch HTTP 错误与网络异常', async () => {
     vi.stubGlobal('fetch', vi.fn());
     vi.mocked(fetch).mockResolvedValueOnce(new Response('nope', { status: 404, statusText: 'Not Found' }));
-    expect((await executeToolCall('WebFetch', { url: 'https://example.com/x' }, ctx())).error).toBe('HTTP 404: Not Found');
+    expect((await executeToolCall('WebFetch', { url: 'https://example.com/x' }, ctx())).error).toBe(
+      'HTTP 404: Not Found',
+    );
 
     vi.mocked(fetch).mockRejectedValueOnce(new Error('ECONNREFUSED'));
     expect((await executeToolCall('WebFetch', { url: 'https://example.com/x' }, ctx())).error).toContain('请求失败');

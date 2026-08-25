@@ -34,8 +34,9 @@ async function bootstrapProjectRegistry(): Promise<void> {
         const diskPaths = new Set(base.projects.map((p) => p.path));
         const mergedProjects = [
           ...base.projects,
-          ...legacy.projects.filter((p: { path?: unknown }) =>
-            p && typeof p.path === 'string' && !diskPaths.has(p.path)),
+          ...legacy.projects.filter(
+            (p: { path?: unknown }) => p && typeof p.path === 'string' && !diskPaths.has(p.path),
+          ),
         ];
         state = {
           ...base,

@@ -1,14 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import ExecutingIndicator from '../common/ExecutingIndicator';
-import {
-  ArrowSquareOut,
-  Bell,
-  CalendarCheck,
-  CheckCircle,
-  Trash,
-  X,
-  XCircle,
-} from '@/components/common/icons';
+import { ArrowSquareOut, Bell, CalendarCheck, CheckCircle, Trash, X, XCircle } from '@/components/common/icons';
 import { useNotificationStore } from '@/stores/useNotificationStore';
 import { useAppStore } from '@/stores/useAppStore';
 import { useAgentStore } from '@/stores/useAgentStore';
@@ -31,19 +23,17 @@ function KindIcon({ kind, running, failed }: { kind: AppNotification['kind']; ru
   if (kind === 'system') return <Bell size={14} className="text-text-muted" />;
   return running ? (
     <ExecutingIndicator size={14} />
+  ) : failed ? (
+    <XCircle size={14} className="text-danger" />
   ) : (
-    failed
-      ? <XCircle size={14} className="text-danger" />
-      : <CheckCircle size={14} className="text-[var(--color-success)]" />
+    <CheckCircle size={14} className="text-[var(--color-success)]" />
   );
 }
 
 function isToday(ts: number): boolean {
   const d = new Date(ts);
   const now = new Date();
-  return d.getFullYear() === now.getFullYear()
-    && d.getMonth() === now.getMonth()
-    && d.getDate() === now.getDate();
+  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
 }
 
 export default function NotificationsPanel({ onClose }: { onClose?: () => void }) {
@@ -85,10 +75,14 @@ export default function NotificationsPanel({ onClose }: { onClose?: () => void }
         <div className="mb-1.5 px-1 text-2xs font-medium text-text-muted">{label}</div>
         <ul className="m-0 p-0 list-none rounded-xl bg-[var(--color-bg-secondary)] border border-[var(--color-border-dim)] overflow-hidden divide-y divide-[var(--color-border-dim)]/60">
           {list.map((n) => {
-            const running = n.kind === 'cron' && (n.title.includes('执行中') || n.title.toLowerCase().includes('running'));
+            const running =
+              n.kind === 'cron' && (n.title.includes('执行中') || n.title.toLowerCase().includes('running'));
             const failed = /失败|出错|failed|error/i.test(n.title);
             return (
-              <li key={n.id} className="flex items-start gap-3 px-4 py-3 transition-colors duration-150 hover:bg-[var(--color-hover)]">
+              <li
+                key={n.id}
+                className="flex items-start gap-3 px-4 py-3 transition-colors duration-150 hover:bg-[var(--color-hover)]"
+              >
                 <span className="shrink-0 flex items-center justify-center w-7 h-7 rounded-lg bg-[var(--color-bg-inset)]">
                   <KindIcon kind={n.kind} running={running} failed={failed} />
                 </span>
@@ -99,9 +93,7 @@ export default function NotificationsPanel({ onClose }: { onClose?: () => void }
                     <span className="shrink-0 text-2xs text-text-faint tabular-nums">{fmtTime(n.timestamp)}</span>
                   </span>
                   {n.detail && (
-                    <span className="block text-xs text-text-muted leading-[1.5] mt-0.5 line-clamp-2">
-                      {n.detail}
-                    </span>
+                    <span className="block text-xs text-text-muted leading-[1.5] mt-0.5 line-clamp-2">{n.detail}</span>
                   )}
                 </span>
                 <span className="shrink-0 flex items-center gap-0.5">
@@ -166,9 +158,7 @@ export default function NotificationsPanel({ onClose }: { onClose?: () => void }
             <Bell size={20} />
           </span>
           <span className="text-sm font-medium text-text-muted">{tPanel('notif.empty')}</span>
-          <span className="text-2xs text-text-faint leading-[1.5] max-w-[320px]">
-            {tPanel('notif.desc')}
-          </span>
+          <span className="text-2xs text-text-faint leading-[1.5] max-w-[320px]">{tPanel('notif.desc')}</span>
         </div>
       ) : (
         <div className="flex flex-col gap-4">

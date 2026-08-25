@@ -63,9 +63,7 @@ export default function CoverageBadge() {
         // Electron 桌面端：主进程实时读取 coverage/coverage-summary.json；
         // 纯浏览器 dev 模式退化为 fetch（vite 中间件提供该路径）。
         const ipc = window.electronAPI?.coverage?.get;
-        const raw = ipc
-          ? (await ipc()).data
-          : await (await fetch('./coverage/coverage-summary.json')).json();
+        const raw = ipc ? (await ipc()).data : await (await fetch('./coverage/coverage-summary.json')).json();
         if (cancelled) return;
         const summary = extractSummary(raw);
         if (summary) {
@@ -79,7 +77,9 @@ export default function CoverageBadge() {
       }
     };
     void load();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   if (state === 'loading') return null;
@@ -162,7 +162,10 @@ export default function CoverageBadge() {
           {modules.map(({ name, pct }) => {
             const rounded = Math.round(pct);
             return (
-              <div key={name} className="flex items-center gap-2.5 px-2.5 py-[7px] rounded-lg hover:bg-[var(--color-hover)]">
+              <div
+                key={name}
+                className="flex items-center gap-2.5 px-2.5 py-[7px] rounded-lg hover:bg-[var(--color-hover)]"
+              >
                 <span className="flex-1 min-w-0 truncate font-mono text-2xs text-text-muted">{name}</span>
                 <span className="shrink-0 font-mono text-xs tabular-nums" style={{ color: getColor(pct) }}>
                   {rounded}%

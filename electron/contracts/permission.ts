@@ -29,12 +29,7 @@ export interface PermissionPresetSpec {
   profileId: 'standard' | 'readonly';
 }
 
-export const PERMISSION_PRESET_IDS: readonly PermissionPreset[] = [
-  'ask',
-  'auto',
-  'full',
-  'readonly',
-];
+export const PERMISSION_PRESET_IDS: readonly PermissionPreset[] = ['ask', 'auto', 'full', 'readonly'];
 
 export const PERMISSION_PRESETS: Record<PermissionPreset, PermissionPresetSpec> = {
   ask: {

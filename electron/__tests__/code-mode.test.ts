@@ -1,4 +1,4 @@
-import { describe, it, expect , beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { runCodeProgram } from '../code-mode';
 
 const baseHost = {
@@ -7,10 +7,15 @@ const baseHost = {
   mode: 'ask' as const,
 };
 
-
 let UNSAFE_OLD: string | undefined;
-beforeAll(() => { UNSAFE_OLD = process.env.AURAXIS_ALLOW_UNSAFE_CODE; process.env.AURAXIS_ALLOW_UNSAFE_CODE = '1'; });
-afterAll(() => { if (UNSAFE_OLD === undefined) delete process.env.AURAXIS_ALLOW_UNSAFE_CODE; else process.env.AURAXIS_ALLOW_UNSAFE_CODE = UNSAFE_OLD; });
+beforeAll(() => {
+  UNSAFE_OLD = process.env.AURAXIS_ALLOW_UNSAFE_CODE;
+  process.env.AURAXIS_ALLOW_UNSAFE_CODE = '1';
+});
+afterAll(() => {
+  if (UNSAFE_OLD === undefined) delete process.env.AURAXIS_ALLOW_UNSAFE_CODE;
+  else process.env.AURAXIS_ALLOW_UNSAFE_CODE = UNSAFE_OLD;
+});
 describe('runCodeProgram — TypeScript 工具编排程序', () => {
   it('顺序调用工具并返回程序 return 值', async () => {
     const calls: string[] = [];
@@ -44,8 +49,8 @@ describe('runCodeProgram — TypeScript 工具编排程序', () => {
     expect(r.exitCode).toBe(0);
     expect(r.stdout).toBe('6');
     expect(r.subCalls).toHaveLength(3);
-    const elapsed = Math.max(...r.subCalls.map((s) => s.finishedAt ?? 0)) -
-      Math.min(...r.subCalls.map((s) => s.startedAt));
+    const elapsed =
+      Math.max(...r.subCalls.map((s) => s.finishedAt ?? 0)) - Math.min(...r.subCalls.map((s) => s.startedAt));
     // 3×80ms serial would be ≥240ms; overlapped must be well below that.
     expect(elapsed).toBeLessThan(240);
   });

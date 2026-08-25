@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { isPathWhitelisted, isPathInsideRoot, scanForRisks } from '../plugin-loader';
+import {
+  isPathWhitelisted,
+  isPathInsideRoot,
+  scanForRisks,
+  validatePlugin,
+  loadPlugin,
+  getCapabilitySummary,
+} from '../plugin-loader';
+import type { Plugin } from '../../types/plugin';
 
 // ─── Strict mode: trusted roots supplied ───────────────
 
@@ -85,5 +93,44 @@ describe('scanForRisks', () => {
 
   it('returns nothing for benign source', () => {
     expect(scanForRisks(`export default { id: 'x', name: 'x' };`)).toEqual([]);
+  });
+
+  it('flags network, fs, and path access patterns', () => {
+    const risks = scanForRisks(`fetch('https://evil.example'); require('fs'); require('path');`);
+    expect(risks).toContain('fetch() 到非本地地址 — 可发送网络请求');
+    expect(risks).toContain('fs — 可读写任意文件');
+    expect(risks).toContain('path — 可操作文件路径');
+  });
+});
+
+describe('validatePlugin', () => {
+  it('rejects non-objects and missing required fields', () => {
+    expect(validatePlugin(null).valid).toBe(false);
+    expect(validatePlugin({ id: 'x' }).warnings.join(' ')).toContain('缺少必填字段');
+  });
+
+  it('reports malformed tools while accepting a well-formed plugin', () => {
+    expect(
+      validatePlugin({ id: 'x', name: 'x', version: '1', description: 'x', tools: [{ name: 't' }] }).warnings.join(' '),
+    ).toContain('缺少必填字段');
+    expect(validatePlugin({ id: 'x', name: 'x', version: '1', description: 'x' }).valid).toBe(true);
+  });
+});
+
+describe('loadPlugin and capability summary', () => {
+  it('rejects a path outside the plugin whitelist without importing', async () => {
+    await expect(loadPlugin('../outside.js')).resolves.toBeNull();
+  });
+
+  it('summarizes capabilities and handles an empty plugin', () => {
+    const withTool: Plugin = {
+      id: 'x',
+      name: 'x',
+      version: '1',
+      description: 'x',
+      tools: [{ name: 't', description: 'd', input_schema: { type: 'object', properties: {}, required: [] } }],
+    };
+    expect(getCapabilitySummary(withTool)).toContain('1 个工具');
+    expect(getCapabilitySummary({ id: 'x', name: 'x', version: '1', description: 'x' })).toBe('此插件无扩展点');
   });
 });

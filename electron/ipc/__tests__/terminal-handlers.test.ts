@@ -25,8 +25,11 @@ vi.mock('../pty-tool', () => ({
 }));
 
 import {
-  registerTerminalHandlers, registerAgentShellHandlers, setPtyModuleForTests,
-  cleanupAgentShellWatchers, cleanupTerminalSessions,
+  registerTerminalHandlers,
+  registerAgentShellHandlers,
+  setPtyModuleForTests,
+  cleanupAgentShellWatchers,
+  cleanupTerminalSessions,
 } from '../terminal-handlers';
 import { ptyRegistry } from '../pty-tool';
 
@@ -46,8 +49,12 @@ beforeEach(() => {
   ptyMock.spawn.mockImplementation(() => {
     const listeners: { data?: (d: string) => void; exit?: (info: { exitCode: number }) => void } = {};
     return {
-      onData: vi.fn((cb: (d: string) => void) => { listeners.data = cb; }),
-      onExit: vi.fn((cb: (info: { exitCode: number }) => void) => { listeners.exit = cb; }),
+      onData: vi.fn((cb: (d: string) => void) => {
+        listeners.data = cb;
+      }),
+      onExit: vi.fn((cb: (info: { exitCode: number }) => void) => {
+        listeners.exit = cb;
+      }),
       write: vi.fn(),
       resize: vi.fn(),
       kill: vi.fn(() => listeners.exit?.({ exitCode: 0 })),

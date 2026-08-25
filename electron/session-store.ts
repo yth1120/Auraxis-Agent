@@ -22,14 +22,7 @@ import {
   type ProjectionCache,
 } from './session-projection-cache';
 
-export type {
-  ProjectedMessage,
-  ProjectedSession,
-  ProjectedToolCall,
-  SessionEvent,
-  SessionMeta,
-  SessionSummary,
-};
+export type { ProjectedMessage, ProjectedSession, ProjectedToolCall, SessionEvent, SessionMeta, SessionSummary };
 
 export interface SessionStoreOptions {
   /** Resolved lazily so `app.getPath('userData')` is safe at call time. */
@@ -100,7 +93,10 @@ export class JsonlSessionStore implements SessionStore {
       try {
         const buf = Buffer.alloc(readSize);
         await handle.read(buf, 0, readSize, size - readSize);
-        const lines = buf.toString('utf8').split('\n').filter((l) => l.trim());
+        const lines = buf
+          .toString('utf8')
+          .split('\n')
+          .filter((l) => l.trim());
         const last = lines[lines.length - 1];
         if (!last) return 0;
         const parsed = JSON.parse(last) as SessionEvent;
@@ -161,9 +157,7 @@ export class JsonlSessionStore implements SessionStore {
   async meta(sessionId: string, meta: SessionMeta): Promise<void> {
     if (!this.safeId(sessionId)) return;
     if (sessionId === '__ax-nav-trace__') return;
-    await this.append(sessionId, [
-      { type: 'system', ts: Date.now(), data: { event: 'session_meta', meta } },
-    ]);
+    await this.append(sessionId, [{ type: 'system', ts: Date.now(), data: { event: 'session_meta', meta } }]);
   }
 
   private deriveTitle(events: SessionEvent[]): string {
@@ -179,12 +173,7 @@ export class JsonlSessionStore implements SessionStore {
   private collectMeta(events: SessionEvent[]): SessionMeta {
     const meta: SessionMeta = {};
     for (const e of events) {
-      if (
-        e.type === 'system' &&
-        e.data?.event === 'session_meta' &&
-        e.data.meta &&
-        typeof e.data.meta === 'object'
-      ) {
+      if (e.type === 'system' && e.data?.event === 'session_meta' && e.data.meta && typeof e.data.meta === 'object') {
         Object.assign(meta, e.data.meta);
       }
     }
@@ -354,9 +343,7 @@ export class JsonlSessionStore implements SessionStore {
         if (action === 'progress') continue;
         const key = toolCallId || `${toolName}:${JSON.stringify(data.input ?? {})}`;
         const input =
-          data.input && typeof data.input === 'object'
-            ? (data.input as Record<string, unknown>)
-            : undefined;
+          data.input && typeof data.input === 'object' ? (data.input as Record<string, unknown>) : undefined;
 
         if (action === 'start') {
           const tc: ProjectedToolCall = {

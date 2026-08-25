@@ -63,7 +63,7 @@ export interface MemoryStore {
   clearSearch: () => void;
 }
 
-export const useMemoryStore = create<MemoryStore>()((set, get) => ({
+export const useMemoryStore = create<MemoryStore>()((set) => ({
   activeMemories: [],
   searchResults: [],
   evidenceItems: [],
@@ -81,7 +81,9 @@ export const useMemoryStore = create<MemoryStore>()((set, get) => ({
       if (result.ok && result.data) {
         set({ activeMemories: result.data as MemoryItem[] });
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     set({ isLoading: false });
   },
 
@@ -97,7 +99,9 @@ export const useMemoryStore = create<MemoryStore>()((set, get) => ({
       if (result.ok && result.data) {
         set({ searchResults: result.data as MemoryItem[] });
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   },
 
   archiveMemory: async (id) => {
@@ -131,7 +135,9 @@ export const useMemoryStore = create<MemoryStore>()((set, get) => ({
     try {
       const result = await window.electronAPI.memory.evidenceList(projectPath);
       if (result.ok && result.data) set({ evidenceItems: result.data });
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   },
 
   auditBelief: async (id) => {
@@ -141,7 +147,9 @@ export const useMemoryStore = create<MemoryStore>()((set, get) => ({
       if (result.ok && result.data) {
         set((s) => ({ auditMap: { ...s.auditMap, [id]: result.data as BeliefAuditPayload } }));
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   },
 
   runReadTrace: async (projectPath, query, budgetTokens = 900) => {
@@ -152,7 +160,9 @@ export const useMemoryStore = create<MemoryStore>()((set, get) => ({
         set({ lastReadResult: result.data });
         return result.data;
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     return null;
   },
 
@@ -164,7 +174,9 @@ export const useMemoryStore = create<MemoryStore>()((set, get) => ({
         set({ activeMemories: [], evidenceItems: [], auditMap: {}, lastReadResult: null, rejections: [] });
         return true;
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     return false;
   },
 
@@ -173,7 +185,9 @@ export const useMemoryStore = create<MemoryStore>()((set, get) => ({
     try {
       const result = await window.electronAPI.memory.reindex(projectPath);
       if (result.ok && result.data) return result.data;
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     return null;
   },
 
@@ -182,7 +196,9 @@ export const useMemoryStore = create<MemoryStore>()((set, get) => ({
     try {
       const result = await window.electronAPI.memory.rejections(projectPath);
       if (result.ok && result.data) set({ rejections: result.data });
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   },
 
   clearSearch: () => set({ searchQuery: '', searchResults: [] }),

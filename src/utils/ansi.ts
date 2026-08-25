@@ -59,19 +59,8 @@ const BASIC_BG: Record<string, string> = {
 
 const SGR_NONE: SgrState = {};
 
-function sameStyle(a: SgrState, b: SgrState): boolean {
-  return a.fg === b.fg
-    && a.bg === b.bg
-    && a.bold === b.bold
-    && a.dim === b.dim
-    && a.italic === b.italic
-    && a.underline === b.underline
-    && a.strike === b.strike;
-}
-
 function ansi256ToHex(code: number): string {
   if (code < 16) {
-    const basic = [0, 95, 135, 175, 215, 255];
     const r = Math.floor(code / 36) ? 255 : 0;
     const g = Math.floor((code % 36) / 6) ? 255 : 0;
     const b = code % 6 ? 255 : 0;
@@ -80,7 +69,7 @@ function ansi256ToHex(code: number): string {
   if (code < 232) {
     const n = code - 16;
     const v = (i: number) => {
-      const x = Math.floor(n / (6 ** (2 - i))) % 6;
+      const x = Math.floor(n / 6 ** (2 - i)) % 6;
       return x === 0 ? 0 : 55 + x * 40;
     };
     return `rgb(${v(0)},${v(1)},${v(2)})`;
@@ -94,14 +83,22 @@ function applySgr(state: SgrState, params: string): SgrState {
   let next: SgrState = state;
   for (let i = 0; i < codes.length; i++) {
     const code = codes[i];
-    if (code === '' || code === '0') { next = { ...SGR_NONE }; continue; }
+    if (code === '' || code === '0') {
+      next = { ...SGR_NONE };
+      continue;
+    }
     if (code === '38' || code === '48') {
       const kind = codes[i + 1];
       let value: string | undefined;
       if (kind === '5' && codes[i + 2] !== undefined) {
         value = ansi256ToHex(Number(codes[i + 2]));
         i += 2;
-      } else if (kind === '2' && codes[i + 2] !== undefined && codes[i + 3] !== undefined && codes[i + 4] !== undefined) {
+      } else if (
+        kind === '2' &&
+        codes[i + 2] !== undefined &&
+        codes[i + 3] !== undefined &&
+        codes[i + 4] !== undefined
+      ) {
         value = `rgb(${Number(codes[i + 2])},${Number(codes[i + 3])},${Number(codes[i + 4])})`;
         i += 4;
       }
@@ -110,22 +107,67 @@ function applySgr(state: SgrState, params: string): SgrState {
       }
       continue;
     }
-    if (code === '39') { next = { ...next, fg: undefined }; continue; }
-    if (code === '49') { next = { ...next, bg: undefined }; continue; }
-    if (code === '1') { next = { ...next, bold: true }; continue; }
-    if (code === '2') { next = { ...next, dim: true }; continue; }
-    if (code === '3') { next = { ...next, italic: true }; continue; }
-    if (code === '4') { next = { ...next, underline: true }; continue; }
-    if (code === '9') { next = { ...next, strike: true }; continue; }
-    if (code === '22') { next = { ...next, bold: false, dim: false }; continue; }
-    if (code === '23') { next = { ...next, italic: false }; continue; }
-    if (code === '24') { next = { ...next, underline: false }; continue; }
-    if (code === '29') { next = { ...next, strike: false }; continue; }
+    if (code === '39') {
+      next = { ...next, fg: undefined };
+      continue;
+    }
+    if (code === '49') {
+      next = { ...next, bg: undefined };
+      continue;
+    }
+    if (code === '1') {
+      next = { ...next, bold: true };
+      continue;
+    }
+    if (code === '2') {
+      next = { ...next, dim: true };
+      continue;
+    }
+    if (code === '3') {
+      next = { ...next, italic: true };
+      continue;
+    }
+    if (code === '4') {
+      next = { ...next, underline: true };
+      continue;
+    }
+    if (code === '9') {
+      next = { ...next, strike: true };
+      continue;
+    }
+    if (code === '22') {
+      next = { ...next, bold: false, dim: false };
+      continue;
+    }
+    if (code === '23') {
+      next = { ...next, italic: false };
+      continue;
+    }
+    if (code === '24') {
+      next = { ...next, underline: false };
+      continue;
+    }
+    if (code === '29') {
+      next = { ...next, strike: false };
+      continue;
+    }
     const n = Number(code);
-    if (n >= 30 && n <= 37) { next = { ...next, fg: BASIC_FG[code] }; continue; }
-    if (n >= 90 && n <= 97) { next = { ...next, fg: BASIC_FG[code] }; continue; }
-    if (n >= 40 && n <= 47) { next = { ...next, bg: BASIC_BG[code] }; continue; }
-    if (n >= 100 && n <= 107) { next = { ...next, bg: BASIC_BG[code] }; continue; }
+    if (n >= 30 && n <= 37) {
+      next = { ...next, fg: BASIC_FG[code] };
+      continue;
+    }
+    if (n >= 90 && n <= 97) {
+      next = { ...next, fg: BASIC_FG[code] };
+      continue;
+    }
+    if (n >= 40 && n <= 47) {
+      next = { ...next, bg: BASIC_BG[code] };
+      continue;
+    }
+    if (n >= 100 && n <= 107) {
+      next = { ...next, bg: BASIC_BG[code] };
+      continue;
+    }
   }
   return next;
 }
@@ -159,8 +201,14 @@ function paintLine(raw: string, entry: SgrState): { cells: Cell[]; sgr: SgrState
   const write = (text: string) => {
     const style = stateToStyle(sgr);
     for (const char of text) {
-      if (char === '\r') { cursor = 0; continue; }
-      if (char === '\u0008') { cursor = Math.max(0, cursor - 1); continue; }
+      if (char === '\r') {
+        cursor = 0;
+        continue;
+      }
+      if (char === '\u0008') {
+        cursor = Math.max(0, cursor - 1);
+        continue;
+      }
       if (char === '\t') {
         const stop = cursor + 8 - (cursor % 8);
         for (; cursor < stop; cursor++) cells[cursor] = { char: ' ', style };

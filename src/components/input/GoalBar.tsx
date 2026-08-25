@@ -39,7 +39,7 @@ export default function GoalBar() {
     updateGoal({ text });
     syncGoal('edit', text);
     setEditOpen(false);
-      message.success(t('goal.updated'));
+    message.success(t('goal.updated'));
   };
 
   const running = goal.status === 'running';
@@ -51,15 +51,15 @@ export default function GoalBar() {
           <Target size={14} weight="fill" />
           {running && <span className="absolute -right-[2px] -top-[2px] h-[7px] w-[7px] rounded-full bg-primary" />}
         </span>
-    <span className="shrink-0 text-xs font-semibold text-text-primary">{t('goal.title')}</span>
+        <span className="shrink-0 text-xs font-semibold text-text-primary">{t('goal.title')}</span>
         <span className="flex-1 min-w-0 text-sm text-text-secondary truncate" title={goal.text}>
           {goal.text}
         </span>
         <span className="shrink-0 text-2xs text-text-muted whitespace-nowrap">
-    {running ? t('goal.running') : t('goal.paused')}
+          {running ? t('goal.running') : t('goal.paused')}
         </span>
         <span className="shrink-0 w-px h-3.5 bg-primary/20" />
-    <Tooltip title={running ? t('goal.pauseTip') : t('goal.resumeTip')} placement="top">
+        <Tooltip title={running ? t('goal.pauseTip') : t('goal.resumeTip')} placement="top">
           <button
             type="button"
             className="ax-icon-button !w-6 !h-6 !text-2xs"
@@ -67,31 +67,31 @@ export default function GoalBar() {
               updateGoal({ status: running ? 'paused' : 'running' });
               syncGoal(running ? 'pause' : 'resume');
             }}
-      aria-label={running ? t('goal.pauseTip') : t('goal.resumeTip')}
+            aria-label={running ? t('goal.pauseTip') : t('goal.resumeTip')}
           >
             {running ? <Pause weight="fill" /> : <Play weight="fill" />}
           </button>
         </Tooltip>
-    <Tooltip title={t('goal.editTip')} placement="top">
+        <Tooltip title={t('goal.editTip')} placement="top">
           <button
             type="button"
             className="ax-icon-button !w-6 !h-6 !text-2xs"
             onClick={openEdit}
-      aria-label={t('goal.editTip')}
+            aria-label={t('goal.editTip')}
           >
             <PencilSimple />
           </button>
         </Tooltip>
-    <Tooltip title={t('goal.clearTip')} placement="top">
+        <Tooltip title={t('goal.clearTip')} placement="top">
           <button
             type="button"
             className="ax-icon-button !w-6 !h-6 !text-2xs"
             onClick={() => {
               clearGoal();
               syncGoal('clear');
-      message.info(t('goal.cleared'));
+              message.info(t('goal.cleared'));
             }}
-      aria-label={t('goal.clearTip')}
+            aria-label={t('goal.clearTip')}
           >
             <X />
           </button>
@@ -99,24 +99,22 @@ export default function GoalBar() {
       </div>
 
       <Modal
-    title={t('goal.editTitle')}
+        title={t('goal.editTitle')}
         open={editOpen}
         onOk={saveEdit}
         onCancel={() => setEditOpen(false)}
-    okText={t('goal.save')}
-    cancelText={t('common.cancel')}
+        okText={t('goal.save')}
+        cancelText={t('common.cancel')}
         width={520}
         transitionName=""
         maskTransitionName=""
       >
-        <div className="text-sm text-text-muted mb-2 leading-[1.6]">
-      {t('goal.modalHint')}
-        </div>
+        <div className="text-sm text-text-muted mb-2 leading-[1.6]">{t('goal.modalHint')}</div>
         <Input.TextArea
           value={editValue}
           onChange={(e) => setEditValue(e.target.value)}
           autoSize={{ minRows: 3, maxRows: 6 }}
-      placeholder={t('goal.placeholder')}
+          placeholder={t('goal.placeholder')}
         />
       </Modal>
     </>

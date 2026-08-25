@@ -9,8 +9,11 @@ import { useChatStore } from '@/stores/useChatStore';
 describe('SiderNav — 侧栏按钮组', () => {
   beforeEach(() => {
     useAppStore.setState({
-      sidebarMode: 'code', sidebarCollapsed: false, showSettings: false,
-      activeToolView: 'none', settingsInitialKey: 'general',
+      sidebarMode: 'code',
+      sidebarCollapsed: false,
+      showSettings: false,
+      activeToolView: 'none',
+      settingsInitialKey: 'general',
     });
     useChatStore.setState({ pendingNewTask: false });
   });

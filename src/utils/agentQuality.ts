@@ -98,19 +98,15 @@ export function collectQualityRuns(log: AgentLogEntry[], limit = 4): QualityRun[
  * ReviewArtifact gate failure > tool error > engine error > agent.error.
  * A passed gate after an earlier failure means the issue was resolved.
  */
-export function findLatestFailure(
-  log: AgentLogEntry[],
-  agentError?: string | null,
-): TaskFailure | null {
+export function findLatestFailure(log: AgentLogEntry[], agentError?: string | null): TaskFailure | null {
   for (let i = log.length - 1; i >= 0; i -= 1) {
     const e = log[i];
     if (e.type === 'tool_end' && e.toolName === 'ReviewArtifact') {
       const out = reviewOutput(e);
       if (out.passed === true) return null;
       const checkType = String(out.check_type ?? reviewInput(e).check_type ?? 'review');
-      const err = typeof out.error === 'string' && out.error.trim()
-        ? out.error
-        : String(out.output ?? '').slice(0, 600);
+      const err =
+        typeof out.error === 'string' && out.error.trim() ? out.error : String(out.output ?? '').slice(0, 600);
       return {
         title: `${checkType} 审查未通过`,
         detail: err || '审查未通过（无详细输出）',

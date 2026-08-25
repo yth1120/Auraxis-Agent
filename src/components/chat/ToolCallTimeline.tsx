@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { CaretRight as RightOutlined, CheckCircle as CheckCircleOutlined, XCircle as CloseCircleOutlined } from '@/components/common/icons';
+import { CaretRight as RightOutlined } from '@/components/common/icons';
 import type { ToolCall, ToolName } from '../../types/tools';
 import clsx from 'clsx';
 import { t, useT } from '../../i18n';
@@ -69,7 +69,6 @@ interface ToolCallTimelineProps {
 }
 
 export default function ToolCallTimeline({ toolCalls }: ToolCallTimelineProps) {
-  const tPanel = useT();
   // ── Group by stepGroupId ──
   const groups = useMemo(() => {
     const map = new Map<string, ToolCall[]>();
@@ -111,8 +110,8 @@ export default function ToolCallTimeline({ toolCalls }: ToolCallTimelineProps) {
 
   return (
     <div className="flex flex-col gap-0 my-2.5">
-      {groups.grouped.map((group, i) => (
-        <GroupNode key={group.stepGroupId} group={group} index={i} />
+      {groups.grouped.map((group) => (
+        <GroupNode key={group.stepGroupId} group={group} />
       ))}
       {groups.ungrouped.map((tc, idx) => (
         <div key={tc.id} className={clsx('relative', idx > 0 && 'mt-0.5')}>
@@ -123,31 +122,41 @@ export default function ToolCallTimeline({ toolCalls }: ToolCallTimelineProps) {
   );
 }
 
-function GroupNode({ group, index }: { group: ToolGroup; index: number }) {
+function GroupNode({ group }: { group: ToolGroup }) {
   const tGroup = useT();
   const [expanded, setExpanded] = useState(group.status !== 'done');
-
-
-  const StatusIcon = group.status === 'running'
-    ? <ExecutingIndicator size={12} />
-    : group.status === 'error'
-      ? <CloseCircleOutlined style={{ fontSize: 10, color: 'var(--color-danger, #EF4444)' }} />
-      : <CheckCircleOutlined style={{ fontSize: 10, color: 'var(--color-success, #10B981)' }} />;
 
   const groupDuration = group.endTime
     ? formatElapsed(group.endTime - group.startTime)
     : group.status === 'running'
-    ? tGroup('tl.running')
+      ? tGroup('tl.running')
       : null;
 
   return (
     <div className={clsx('ax-tool-group', group.status === 'done' && 'opacity-85')} data-status={group.status}>
-      <div className="ax-tool-group-header" onClick={() => setExpanded(!expanded)} role="button" tabIndex={0} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setExpanded(!expanded)} data-status={group.status}>
-        <span className={clsx('flex items-center justify-center text-2xs text-text-muted transition-transform duration-200 ease-in w-4 shrink-0', expanded && 'rotate-90')}><RightOutlined /></span>
+      <div
+        className="ax-tool-group-header"
+        onClick={() => setExpanded(!expanded)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setExpanded(!expanded)}
+        data-status={group.status}
+      >
+        <span
+          className={clsx(
+            'flex items-center justify-center text-2xs text-text-muted transition-transform duration-200 ease-in w-4 shrink-0',
+            expanded && 'rotate-90',
+          )}
+        >
+          <RightOutlined />
+        </span>
         {group.status === 'running' ? (
           <ExecutingIndicator size={12} />
         ) : (
-          <ToolIcon toolName={group.toolCalls[0]?.toolName} className={group.status === 'error' ? 'text-danger' : 'text-success'} />
+          <ToolIcon
+            toolName={group.toolCalls[0]?.toolName}
+            className={group.status === 'error' ? 'text-danger' : 'text-success'}
+          />
         )}
         <span className="text-xs font-semibold text-primary leading-none">{getGroupTitle(group.toolCalls)}</span>
         <span className="text-2xs text-text-muted ml-auto flex items-center gap-2 shrink-0">
@@ -158,7 +167,10 @@ function GroupNode({ group, index }: { group: ToolGroup; index: number }) {
       {expanded && (
         <div className="flex flex-col">
           {group.toolCalls.map((tc) => (
-            <div key={tc.id} className="relative p-0 [&:not(:first-child)]:before:content-[''] [&:not(:first-child)]:before:absolute [&:not(:first-child)]:before:top-0 [&:not(:first-child)]:before:left-5 [&:not(:first-child)]:before:w-0.5 [&:not(:first-child)]:before:h-px [&:not(:first-child)]:before:bg-border-dim">
+            <div
+              key={tc.id}
+              className="relative p-0 [&:not(:first-child)]:before:content-[''] [&:not(:first-child)]:before:absolute [&:not(:first-child)]:before:top-0 [&:not(:first-child)]:before:left-5 [&:not(:first-child)]:before:w-0.5 [&:not(:first-child)]:before:h-px [&:not(:first-child)]:before:bg-border-dim"
+            >
               <ToolCallCardWrapper toolCallId={tc.id} />
             </div>
           ))}

@@ -6,9 +6,8 @@ const deps: SdkDeps = {
     if (prompt.includes('boom')) return { output: null, error: 'agent exploded' };
     return { output: { message: `done: ${prompt}` } };
   },
-  searchSessions: async (query, limit = 8) => [
-    { type: 'chat' as const, id: 's1', title: '旧会话', snippet: query, ts: 1, score: 2 },
-  ].slice(0, limit),
+  searchSessions: async (query, limit = 8) =>
+    [{ type: 'chat' as const, id: 's1', title: '旧会话', snippet: query, ts: 1, score: 2 }].slice(0, limit),
 };
 
 describe('sdk-server — JSON-RPC over stdio', () => {

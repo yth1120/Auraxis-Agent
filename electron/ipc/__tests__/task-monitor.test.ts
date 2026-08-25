@@ -1,12 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import {
-  startBashTask,
-  finishBashTask,
-  stopTask,
-  clearTasks,
-  listTasks,
-  setTaskStopper,
-} from '../task-monitor';
+import { startBashTask, finishBashTask, stopTask, clearTasks, listTasks, setTaskStopper } from '../task-monitor';
 
 describe('task-monitor — Agent Bash 任务监控', () => {
   beforeEach(() => {

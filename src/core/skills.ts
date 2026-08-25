@@ -24,7 +24,8 @@ export const AGENT_SKILLS: AgentSkill[] = [
     description: '审查代码质量和潜在问题',
     type: 'Explore',
     icon: 'search',
-    instruction: '全面审查项目代码：检查逻辑错误、安全漏洞、性能问题、边界条件处理。对每个发现的问题提供文件路径、行号和修复建议。',
+    instruction:
+      '全面审查项目代码：检查逻辑错误、安全漏洞、性能问题、边界条件处理。对每个发现的问题提供文件路径、行号和修复建议。',
   },
   {
     key: 'bug-fix',
@@ -56,7 +57,8 @@ export const AGENT_SKILLS: AgentSkill[] = [
     description: '设计系统架构和实现方案',
     type: 'Plan',
     icon: 'architecture',
-    instruction: '设计系统架构方案：分析现有代码结构，提出架构改进方案，绘制模块关系图，列出实施步骤和风险评估。只读分析。',
+    instruction:
+      '设计系统架构方案：分析现有代码结构，提出架构改进方案，绘制模块关系图，列出实施步骤和风险评估。只读分析。',
   },
   {
     key: 'feature-dev',

@@ -1,11 +1,5 @@
 import { useState } from 'react';
-import {
-  CheckCircle,
-  ClipboardCheck,
-  RotateCcw,
-  ArrowUpRight,
-  FileText,
-} from '@/components/common/icons';
+import { CheckCircle, ClipboardCheck, RotateCcw, ArrowUpRight, FileText } from '@/components/common/icons';
 import clsx from 'clsx';
 import { useT } from '../../i18n';
 import { useAgentStore } from '../../stores/useAgentStore';

@@ -71,7 +71,7 @@ describe('sub-agent recursion depth — wiring is in place', () => {
     expect(guardIdx).toBeGreaterThan(0);
     expect(guardIdx).toBeLessThan(importIdx);
     // depth is passed into the nested agentLoopRun call.
-    const loopCall = src.match(/agentLoopRun\(\{[\s\S]*?\n    \}\)/);
+    const loopCall = src.match(/agentLoopRun\(\{[\s\S]*?\n {4}\}\)/);
     expect(loopCall![0]).toContain('depth,');
   });
 });

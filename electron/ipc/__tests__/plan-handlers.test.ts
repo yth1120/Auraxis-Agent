@@ -21,9 +21,7 @@ import { waitForPlanApproval, registerPlanHandlers } from '../plan-handlers';
 import { savePlanMarkdown, listPlanFiles } from '../plan-store';
 
 const plan = {
-  tasks: [
-    { id: '1', description: '步骤一', dependencies: [], toolMatches: ['Write'] },
-  ],
+  tasks: [{ id: '1', description: '步骤一', dependencies: [], toolMatches: ['Write'] }],
 } as any;
 
 function makeWin() {

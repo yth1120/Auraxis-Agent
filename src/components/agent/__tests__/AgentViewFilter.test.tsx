@@ -7,10 +7,19 @@ import { useAppStore } from '@/stores/useAppStore';
 import type { AgentInfo } from '@/types/agent';
 
 const agent: AgentInfo = {
-  id: 'a1', name: '任务', description: '描述', type: 'general-purpose',
-  status: 'running', priority: 'normal', startTime: Date.now(),
-  iteration: 1, maxIterations: 10, toolCallCount: 1, messagesCount: 1,
-  totalInputTokens: 0, totalOutputTokens: 0,
+  id: 'a1',
+  name: '任务',
+  description: '描述',
+  type: 'general-purpose',
+  status: 'running',
+  priority: 'normal',
+  startTime: Date.now(),
+  iteration: 1,
+  maxIterations: 10,
+  toolCallCount: 1,
+  messagesCount: 1,
+  totalInputTokens: 0,
+  totalOutputTokens: 0,
   log: [{ type: 'tool_error', timestamp: 1, toolCallId: 't1', toolName: 'Bash', input: {}, error: 'boom' }],
 };
 

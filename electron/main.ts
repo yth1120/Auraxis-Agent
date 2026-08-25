@@ -1,13 +1,14 @@
-import { app, BrowserWindow, shell, session, ipcMain, Notification } from 'electron';
+import { app, BrowserWindow, shell, session } from 'electron';
 import { secureHandle } from './ipc/trust';
 import path from 'path';
 import os from 'os';
-import { existsSync, mkdtempSync, rmSync } from 'fs';
+import { existsSync, mkdtempSync } from 'fs';
 import { registerIpcHandlers, isWindows11, markAcrylicWindowReady } from './ipc';
 import { cleanupWindowStreams } from './ipc/ai-handlers';
 import { setMainWindowRef, clearMainWindowRef } from './ipc/window-ref';
-import { startSdkServer } from './sdk-server';
 import { sessionQuerySearch } from './fts';
+import { buildConnectSrc, buildFrameSrc } from './network-policy';
+import { errorText } from './errors';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -18,11 +19,11 @@ const isDev = !app.isPackaged && process.env.AURAXIS_FORCE_PRODUCTION !== '1';
 // Headless surfaces (CLI --run / --sdk / --acp) must not contend for the
 // desktop single-instance lock — they run alongside an open app window.
 const headlessMode =
-  process.argv.includes('--run')
-  || process.argv.includes('--sdk')
-  || process.argv.includes('--acp')
-  || process.env.AURAXIS_SDK === '1'
-  || process.env.AURAXIS_ACP === '1';
+  process.argv.includes('--run') ||
+  process.argv.includes('--sdk') ||
+  process.argv.includes('--acp') ||
+  process.env.AURAXIS_SDK === '1' ||
+  process.env.AURAXIS_ACP === '1';
 
 // 测试/便携隔离：显式指定 userData 目录（E2E 启动时设置，正常桌面启动不生效）。
 if (process.env.AURAXIS_USER_DATA_DIR) {
@@ -79,10 +80,10 @@ const CSP_HEADER = isDev
       "script-src 'self' 'unsafe-inline'",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "img-src 'self' data: https: http:",
-      "connect-src 'self' http://localhost:* ws://localhost:* https://api.deepseek.com https://html.duckduckgo.com https://*",
+      `connect-src 'self' ${buildConnectSrc(true)}`,
       "font-src 'self' data: https://fonts.gstatic.com",
-      "frame-src http://localhost:* http://127.0.0.1:* https:",
-      "child-src http://localhost:* http://127.0.0.1:* https:",
+      `frame-src ${buildFrameSrc()}`,
+      `child-src ${buildFrameSrc()}`,
       "object-src 'none'",
       "base-uri 'self'",
     ].join('; ')
@@ -91,10 +92,10 @@ const CSP_HEADER = isDev
       "script-src 'self'",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "img-src 'self' data: https: http:",
-      "connect-src 'self' https://api.deepseek.com https://html.duckduckgo.com https://*",
+      `connect-src 'self' ${buildConnectSrc(false)}`,
       "font-src 'self' data: https://fonts.gstatic.com",
-      "frame-src http://localhost:* http://127.0.0.1:* https:",
-      "child-src http://localhost:* http://127.0.0.1:* https:",
+      `frame-src ${buildFrameSrc()}`,
+      `child-src ${buildFrameSrc()}`,
       "object-src 'none'",
       "base-uri 'self'",
     ].join('; ');
@@ -159,14 +160,19 @@ function createWindow(useAcrylic = false) {
   }
 
   // Set CSP
-  session.defaultSession.webRequest.onHeadersReceived((details: Electron.OnHeadersReceivedListenerDetails, callback: (response: Electron.HeadersReceivedResponse) => void) => {
-    callback({
-      responseHeaders: {
-        ...details.responseHeaders,
-        'Content-Security-Policy': [CSP_HEADER],
-      },
-    });
-  });
+  session.defaultSession.webRequest.onHeadersReceived(
+    (
+      details: Electron.OnHeadersReceivedListenerDetails,
+      callback: (response: Electron.HeadersReceivedResponse) => void,
+    ) => {
+      callback({
+        responseHeaders: {
+          ...details.responseHeaders,
+          'Content-Security-Policy': [CSP_HEADER],
+        },
+      });
+    },
+  );
 
   mainWindow.webContents.setWindowOpenHandler(({ url }: { url: string }) => {
     try {
@@ -174,7 +180,9 @@ function createWindow(useAcrylic = false) {
       if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
         shell.openExternal(url);
       }
-    } catch { /* invalid URL, deny */ }
+    } catch {
+      /* invalid URL, deny */
+    }
     return { action: 'deny' };
   });
 
@@ -236,7 +244,9 @@ app.whenReady().then(async () => {
       const { undoManager } = await import('./ipc/undo-manager');
       await undoManager.init(bootSettings.projectPath);
     }
-  } catch { /* non-critical */ }
+  } catch {
+    /* non-critical */
+  }
 
   const { parseCliArgs, cliUsage } = await import('./cli-args');
   const cli = parseCliArgs(process.argv.slice(2));
@@ -250,7 +260,7 @@ app.whenReady().then(async () => {
     const { readSettings } = await import('./ipc/settings-store');
     const s = await readSettings();
     const catalog = Array.isArray(s.pluginCatalog)
-      ? s.pluginCatalog as { id: string; name: string; version?: string; enabled: boolean }[]
+      ? (s.pluginCatalog as { id: string; name: string; version?: string; enabled: boolean }[])
       : [];
     if (cli.pluginScanDir !== undefined) {
       const { scanPluginDir } = await import('./plugin-cli');
@@ -295,7 +305,9 @@ app.whenReady().then(async () => {
             try {
               const s: any = await (await import('./ipc/settings-store')).readSettings();
               root = typeof s?.projectPath === 'string' ? s.projectPath : '';
-            } catch { /* settings unavailable */ }
+            } catch {
+              /* settings unavailable */
+            }
           }
           return runSubAgent({
             description: description || 'SDK 任务',
@@ -313,8 +325,8 @@ app.whenReady().then(async () => {
       // readable in Electron's main process on Windows).
       process.stdout.write(`AURAXIS_SDK_PORT=${port}\n`);
       process.stdout.write(`AURAXIS_SDK_TOKEN=${token}\n`);
-    } catch (e: any) {
-      process.stderr.write(`[sdk] failed: ${e?.stack || e}\n`);
+    } catch (e: unknown) {
+      process.stderr.write(`[sdk] failed: ${errorText(e)}\n`);
       app.exit(1);
     }
   } else if (acpRequested) {
@@ -330,7 +342,9 @@ app.whenReady().then(async () => {
           try {
             const s: any = await (await import('./ipc/settings-store')).readSettings();
             root = typeof s?.projectPath === 'string' ? s.projectPath : '';
-          } catch { /* settings unavailable */ }
+          } catch {
+            /* settings unavailable */
+          }
         }
         return runSubAgent({
           description: 'ACP 任务',
@@ -378,7 +392,10 @@ app.whenReady().then(async () => {
   });
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0 && !(process.argv.includes('--sdk') || process.env.AURAXIS_SDK === '1')) {
+    if (
+      BrowserWindow.getAllWindows().length === 0 &&
+      !(process.argv.includes('--sdk') || process.env.AURAXIS_SDK === '1')
+    ) {
       createWindow(false);
     }
   });

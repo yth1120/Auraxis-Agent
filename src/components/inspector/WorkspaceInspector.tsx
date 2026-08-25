@@ -1,3 +1,4 @@
+import { errorText } from '../../../electron/errors';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Input, Modal, Dropdown, message } from 'antd';
 import clsx from 'clsx';
@@ -22,14 +23,16 @@ import { collectQualityRuns, findLatestFailure, deriveNextSteps } from '../../ut
 import type { AgentInfo } from '../../types/agent';
 import TaskChecklist from './TaskChecklist';
 import ContextManifest, { type ContextGroup } from './ContextManifest';
-import EmptyState from '../common/EmptyState';
 import ExecutingIndicator from '../common/ExecutingIndicator';
 import type { NamedSnapshot } from '../../types/electron-api';
 import { t, useT, type I18nKey } from '../../i18n';
 import DeliverablesRow from '../common/DeliverablesRow';
 
 /** A minimal tool-invocation shape shared by chat ToolCalls and agent log entries. */
-interface ToolInvocation { toolName: string; input: Record<string, unknown> }
+interface ToolInvocation {
+  toolName: string;
+  input: Record<string, unknown>;
+}
 
 function basename(p: string): string {
   return p.split(/[/\\]/).pop() || p;
@@ -93,10 +96,7 @@ export default function WorkspaceInspector() {
 
   // Selected-agent data (code mode).
   const currentAgentId = useAgentStore((s) => s.currentAgentId);
-  const agent = useAgentStore(
-    (s) => s.agents.find((a) => a.id === currentAgentId),
-    shallow,
-  );
+  const agent = useAgentStore((s) => s.agents.find((a) => a.id === currentAgentId), shallow);
   const agents = useAgentStore((s) => s.agents);
 
   const STATUS_META: Record<string, { labelKey: I18nKey; cls: string }> = {
@@ -135,14 +135,8 @@ export default function WorkspaceInspector() {
   const totalTokens = (agent?.totalInputTokens ?? 0) + (agent?.totalOutputTokens ?? 0);
   const fmtTokens = (n: number) => (n >= 1000 ? `~${(n / 1000).toFixed(1)}k` : `${n}`);
 
-  const qualityRuns = useMemo(
-    () => (agent ? collectQualityRuns(agent.log ?? []) : []),
-    [agent],
-  );
-  const latestFailure = useMemo(
-    () => (agent ? findLatestFailure(agent.log ?? [], agent.error) : null),
-    [agent],
-  );
+  const qualityRuns = useMemo(() => (agent ? collectQualityRuns(agent.log ?? []) : []), [agent]);
+  const latestFailure = useMemo(() => (agent ? findLatestFailure(agent.log ?? [], agent.error) : null), [agent]);
   const [fileTokens, setFileTokens] = useState<Record<string, number | null>>({});
   const filePaths = useMemo(() => {
     const seen = new Set<string>();
@@ -155,7 +149,7 @@ export default function WorkspaceInspector() {
       }
     }
     return out;
-  }, [isCode, agent, messages, tPanel]);
+  }, [isCode, agent, messages]);
   useEffect(() => {
     const api = window.electronAPI?.file;
     const projectRoot = agent?.projectRoot || useSettingsStore.getState().projectPath;
@@ -164,14 +158,21 @@ export default function WorkspaceInspector() {
       return;
     }
     let cancelled = false;
-    api.estimateTokens(filePaths.slice(0, 15), projectRoot).then((r) => {
-      if (cancelled || !r.ok || !r.data) return;
-      const map: Record<string, number | null> = {};
-      for (const f of r.data) map[f.path] = f.tokens;
-      setFileTokens(map);
-    }).catch(() => { if (!cancelled) setFileTokens({}); });
-    return () => { cancelled = true; };
-  }, [filePaths]);
+    api
+      .estimateTokens(filePaths.slice(0, 15), projectRoot)
+      .then((r) => {
+        if (cancelled || !r.ok || !r.data) return;
+        const map: Record<string, number | null> = {};
+        for (const f of r.data) map[f.path] = f.tokens;
+        setFileTokens(map);
+      })
+      .catch(() => {
+        if (!cancelled) setFileTokens({});
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [filePaths, agent?.projectRoot]);
   const maxFileTokens = useMemo(() => {
     let max = 1;
     for (const v of Object.values(fileTokens)) {
@@ -193,10 +194,17 @@ export default function WorkspaceInspector() {
       return;
     }
     let cancelled = false;
-    window.electronAPI?.undo?.getSessionDiffs(agent.id, projectRoot).then((r) => {
-      if (!cancelled) setDiffCount(r.ok && r.data ? r.data.length : 0);
-    }).catch(() => { if (!cancelled) setDiffCount(0); });
-    return () => { cancelled = true; };
+    window.electronAPI?.undo
+      ?.getSessionDiffs(agent.id, projectRoot)
+      .then((r) => {
+        if (!cancelled) setDiffCount(r.ok && r.data ? r.data.length : 0);
+      })
+      .catch(() => {
+        if (!cancelled) setDiffCount(0);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [agent, settled, diffRefresh]);
 
   const [lintFixing, setLintFixing] = useState(false);
@@ -215,16 +223,18 @@ export default function WorkspaceInspector() {
         message.success(tPanel('lint.done'));
       } else {
         const line = (r.data?.output || '').split('\n').find((l) => l.trim()) || '';
-        message.warning(tPanel('lint.remaining', { n: r.data?.exitCode ?? '?', detail: line ? line.slice(0, 120) : '' }));
+        message.warning(
+          tPanel('lint.remaining', { n: r.data?.exitCode ?? '?', detail: line ? line.slice(0, 120) : '' }),
+        );
       }
       useAppStore.getState().incrementFileTreeVersion();
       setDiffRefresh((v) => v + 1);
-    } catch (e: any) {
-      message.error(e?.message || tPanel('lint.failed'));
+    } catch (e: unknown) {
+      message.error(errorText(e) || tPanel('lint.failed'));
     } finally {
       setLintFixing(false);
     }
-  }, [agent]);
+  }, [agent, tPanel]);
 
   const pauseResume = useCallback(async () => {
     if (!agent) return;
@@ -252,15 +262,15 @@ export default function WorkspaceInspector() {
       onOk: async () => {
         try {
           const r = await window.electronAPI?.undo?.revertSessions([agent.id], root);
-      if (!r?.ok) throw new Error(r?.error || tPanel('rollback.failed'));
-      message.success(tPanel('rollback.success', { n: r.data?.reverted ?? 0 }));
+          if (!r?.ok) throw new Error(r?.error || tPanel('rollback.failed'));
+          message.success(tPanel('rollback.success', { n: r.data?.reverted ?? 0 }));
           useAppStore.getState().incrementFileTreeVersion();
-        } catch (e: any) {
-      message.error(e?.message || tPanel('rollback.failed'));
+        } catch (e: unknown) {
+          message.error(errorText(e) || tPanel('rollback.failed'));
         }
       },
     });
-  }, [agent]);
+  }, [agent, tPanel]);
 
   // ── Named snapshots (project-scoped, chat + code modes) ──
   const projectRoot = useSettingsStore((s) => s.projectPath);
@@ -297,71 +307,80 @@ export default function WorkspaceInspector() {
       setSnapshotModalOpen(false);
       setSnapshotName('');
       void loadSnapshots();
-    } catch (e: any) {
-      message.error(e?.message || tPanel('snapshot.createFailed'));
+    } catch (e: unknown) {
+      message.error(errorText(e) || tPanel('snapshot.createFailed'));
     } finally {
       setSnapshotBusy(false);
     }
-  }, [projectRoot, snapshotName, loadSnapshots]);
+  }, [projectRoot, snapshotName, loadSnapshots, tPanel]);
 
-  const restoreSnapshot = useCallback((snap: NamedSnapshot) => {
-    if (!projectRoot) return;
-    Modal.confirm({
-      title: tPanel('snapshot.restoreTitle', { name: snap.name }),
-      content: tPanel('snapshot.restoreBody', { n: snap.files.length }),
-      okText: tPanel('snapshot.restore'),
-      okButtonProps: { danger: true },
-      cancelText: tPanel('snapshot.cancel'),
-      onOk: async () => {
-        try {
-          const r = await window.electronAPI?.snapshot?.restore(snap.id, projectRoot);
-      if (!r?.ok) throw new Error(r?.error || tPanel('snapshot.restoreFailed'));
-          message.success(tPanel('snapshot.restoreOk', { n: r.data?.restored ?? 0 }));
-          useAppStore.getState().incrementFileTreeVersion();
-        } catch (e: any) {
-          message.error(e?.message || tPanel('snapshot.restoreFailed'));
-        }
-      },
-    });
-  }, [projectRoot]);
+  const restoreSnapshot = useCallback(
+    (snap: NamedSnapshot) => {
+      if (!projectRoot) return;
+      Modal.confirm({
+        title: tPanel('snapshot.restoreTitle', { name: snap.name }),
+        content: tPanel('snapshot.restoreBody', { n: snap.files.length }),
+        okText: tPanel('snapshot.restore'),
+        okButtonProps: { danger: true },
+        cancelText: tPanel('snapshot.cancel'),
+        onOk: async () => {
+          try {
+            const r = await window.electronAPI?.snapshot?.restore(snap.id, projectRoot);
+            if (!r?.ok) throw new Error(r?.error || tPanel('snapshot.restoreFailed'));
+            message.success(tPanel('snapshot.restoreOk', { n: r.data?.restored ?? 0 }));
+            useAppStore.getState().incrementFileTreeVersion();
+          } catch (e: unknown) {
+            message.error(errorText(e) || tPanel('snapshot.restoreFailed'));
+          }
+        },
+      });
+    },
+    [projectRoot, tPanel],
+  );
 
-  const deleteSnapshot = useCallback((snap: NamedSnapshot) => {
-    if (!projectRoot) return;
-    Modal.confirm({
-      title: tPanel('snapshot.deleteTitle', { name: snap.name }),
-      content: tPanel('snapshot.deleteBody'),
-      okText: tPanel('snapshot.delete'),
-      okButtonProps: { danger: true },
-      cancelText: tPanel('snapshot.cancel'),
-      onOk: async () => {
-        try {
-          const r = await window.electronAPI?.snapshot?.delete(snap.id, projectRoot);
-      if (!r?.ok) throw new Error(r?.error || tPanel('snapshot.deleteFailed'));
-          message.success(tPanel('snapshot.deleted'));
-          void loadSnapshots();
-        } catch (e: any) {
-          message.error(e?.message || tPanel('snapshot.deleteFailed'));
-        }
-      },
-    });
-  }, [projectRoot, loadSnapshots]);
+  const deleteSnapshot = useCallback(
+    (snap: NamedSnapshot) => {
+      if (!projectRoot) return;
+      Modal.confirm({
+        title: tPanel('snapshot.deleteTitle', { name: snap.name }),
+        content: tPanel('snapshot.deleteBody'),
+        okText: tPanel('snapshot.delete'),
+        okButtonProps: { danger: true },
+        cancelText: tPanel('snapshot.cancel'),
+        onOk: async () => {
+          try {
+            const r = await window.electronAPI?.snapshot?.delete(snap.id, projectRoot);
+            if (!r?.ok) throw new Error(r?.error || tPanel('snapshot.deleteFailed'));
+            message.success(tPanel('snapshot.deleted'));
+            void loadSnapshots();
+          } catch (e: unknown) {
+            message.error(errorText(e) || tPanel('snapshot.deleteFailed'));
+          }
+        },
+      });
+    },
+    [projectRoot, loadSnapshots, tPanel],
+  );
 
   const [preview, setPreview] = useState<{ path: string; mime: string; base64: string } | null>(null);
-  const openPreview = useCallback(async (filePath: string) => {
-    const api = window.electronAPI?.file;
-    const projectRoot = useSettingsStore.getState().projectPath;
-    if (!api?.readPreview) return;
-    try {
-      const r = await api.readPreview(filePath, projectRoot || undefined);
-      if (!r.ok || !r.data) {
-        if (r.error) message.error(r.error);
-        return;
+  const openPreview = useCallback(
+    async (filePath: string) => {
+      const api = window.electronAPI?.file;
+      const projectRoot = useSettingsStore.getState().projectPath;
+      if (!api?.readPreview) return;
+      try {
+        const r = await api.readPreview(filePath, projectRoot || undefined);
+        if (!r.ok || !r.data) {
+          if (r.error) message.error(r.error);
+          return;
+        }
+        setPreview(r.data);
+      } catch {
+        message.error(tPanel('preview.failed'));
       }
-      setPreview(r.data);
-    } catch {
-      message.error(tPanel('preview.failed'));
-    }
-  }, []);
+    },
+    [tPanel],
+  );
 
   // Tasks: derive from the selected agent's todos in code mode, else the foreground chat.
   const tasks = useMemo(() => {
@@ -371,14 +390,15 @@ export default function WorkspaceInspector() {
   }, [isCode, agent, inspectorTasks]);
 
   const nextSteps = useMemo(
-    () => (agent
-      ? deriveNextSteps({
-          latestFailure,
-          pendingTodos: tasks.filter((t) => t.status !== 'done').length,
-          diffCount,
-          hasQualityRuns: qualityRuns.length > 0,
-        })
-      : []),
+    () =>
+      agent
+        ? deriveNextSteps({
+            latestFailure,
+            pendingTodos: tasks.filter((t) => t.status !== 'done').length,
+            diffCount,
+            hasQualityRuns: qualityRuns.length > 0,
+          })
+        : [],
     [agent, latestFailure, tasks, diffCount, qualityRuns],
   );
 
@@ -433,7 +453,7 @@ export default function WorkspaceInspector() {
       { key: 'cmd', icon: <Terminal />, label: tPanel('ctx.group.cmd'), items: commands },
       { key: 'web', icon: <Globe />, label: tPanel('ctx.group.web'), items: web },
     ];
-  }, [isCode, agent, messages]);
+  }, [isCode, agent, messages, tPanel]);
 
   // System prompts only apply to the foreground chat inspector.
   const sysMessages = isCode ? [] : systemMessages;
@@ -457,12 +477,16 @@ export default function WorkspaceInspector() {
         <span className="text-2xs font-semibold text-text-muted tracking-wide">{tPanel('inspector.allTasks')}</span>
         <span className="text-2xs text-text-muted">
           {tPanel('inspector.runningCount', { n: agents.filter((a) => a.status === 'running').length })}
-          {agents.filter((a) => a.status === 'queued').length > 0 && ` · ${tPanel('inspector.queuedCount', { n: agents.filter((a) => a.status === 'queued').length })}`}
+          {agents.filter((a) => a.status === 'queued').length > 0 &&
+            ` · ${tPanel('inspector.queuedCount', { n: agents.filter((a) => a.status === 'queued').length })}`}
         </span>
       </header>
       <ul className="list-none m-0 p-0 flex flex-col gap-[2px]">
         {agents.map((a) => {
-          const meta = STATUS_META[a.status] ?? { labelKey: 'status.stopped' as I18nKey, cls: 'bg-[var(--color-text-faint)]' };
+          const meta = STATUS_META[a.status] ?? {
+            labelKey: 'status.stopped' as I18nKey,
+            cls: 'bg-[var(--color-text-faint)]',
+          };
           const active = a.id === currentAgentId;
           const busy = a.status === 'running' || a.status === 'paused' || a.status === 'queued';
           return (
@@ -475,7 +499,12 @@ export default function WorkspaceInspector() {
               onClick={() => selectAgent(a.id)}
             >
               <span className={clsx('shrink-0 w-1.5 h-1.5 rounded-full', meta.cls)} />
-              <span className={clsx('flex-1 min-w-0 truncate text-xs', active ? 'font-medium text-text-primary' : 'text-text-secondary')}>
+              <span
+                className={clsx(
+                  'flex-1 min-w-0 truncate text-xs',
+                  active ? 'font-medium text-text-primary' : 'text-text-secondary',
+                )}
+              >
                 {a.description || a.name}
               </span>
               <span className="shrink-0 text-2xs text-text-muted tabular-nums">
@@ -489,7 +518,10 @@ export default function WorkspaceInspector() {
                     <button
                       type="button"
                       className="text-2xs text-text-muted px-1 py-[2px] rounded-md cursor-pointer hover:bg-[var(--color-hover)] hover:text-text-secondary"
-                      onClick={(e) => { e.stopPropagation(); void useAgentStore.getState().pauseAgent(a.id); }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void useAgentStore.getState().pauseAgent(a.id);
+                      }}
                     >
                       {tPanel('inspector.pause')}
                     </button>
@@ -498,7 +530,10 @@ export default function WorkspaceInspector() {
                     <button
                       type="button"
                       className="text-2xs text-text-muted px-1 py-[2px] rounded-md cursor-pointer hover:bg-[var(--color-hover)] hover:text-text-secondary"
-                      onClick={(e) => { e.stopPropagation(); void useAgentStore.getState().resumeAgent(a.id); }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void useAgentStore.getState().resumeAgent(a.id);
+                      }}
                     >
                       {tPanel('inspector.resume')}
                     </button>
@@ -506,7 +541,10 @@ export default function WorkspaceInspector() {
                   <button
                     type="button"
                     className="text-2xs text-text-muted px-1 py-[2px] rounded-md cursor-pointer hover:bg-[var(--color-hover)] hover:text-text-secondary"
-                    onClick={(e) => { e.stopPropagation(); void useAgentStore.getState().stopAgent(a.id); }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void useAgentStore.getState().stopAgent(a.id);
+                    }}
                   >
                     {tPanel('inspector.stop')}
                   </button>
@@ -523,19 +561,17 @@ export default function WorkspaceInspector() {
     projectRoot ? (
       <section className="px-3.5 py-2.5 mt-3 mb-2.5 rounded-xl bg-[var(--color-bg-secondary)]">
         <header className="flex items-center justify-between mb-1.5">
-            <span className="text-2xs font-semibold text-text-muted tracking-wide">{tPanel('snapshot.cardTitle')}</span>
+          <span className="text-2xs font-semibold text-text-muted tracking-wide">{tPanel('snapshot.cardTitle')}</span>
           <button
             type="button"
             className="h-6 px-2.5 rounded-full text-2xs font-medium text-[var(--color-primary)] bg-primary-soft border-none cursor-pointer transition-colors duration-150 hover:bg-[var(--color-primary-strong)]"
             onClick={() => setSnapshotModalOpen(true)}
           >
-              {tPanel('snapshot.new')}
+            {tPanel('snapshot.new')}
           </button>
         </header>
         {snapshots.length === 0 ? (
-          <p className="text-2xs text-text-muted leading-[1.5]">
-              {tPanel('snapshot.emptyHint')}
-          </p>
+          <p className="text-2xs text-text-muted leading-[1.5]">{tPanel('snapshot.emptyHint')}</p>
         ) : (
           <ul className="list-none m-0 p-0 flex flex-col gap-1">
             {snapshots.slice(0, 8).map((s) => (
@@ -543,7 +579,7 @@ export default function WorkspaceInspector() {
                 <span className="flex-1 min-w-0">
                   <span className="block truncate text-xs font-medium text-text-primary">{s.name}</span>
                   <span className="block text-2xs text-text-muted tabular-nums">
-                      {fmtRelative(s.createdAt, now)} · {tPanel('snapshot.fileCount', { n: s.files.length })}
+                    {fmtRelative(s.createdAt, now)} · {tPanel('snapshot.fileCount', { n: s.files.length })}
                   </span>
                 </span>
                 <Dropdown
@@ -552,7 +588,12 @@ export default function WorkspaceInspector() {
                   menu={{
                     items: [
                       { key: 'restore', label: tPanel('snapshot.restore'), onClick: () => restoreSnapshot(s) },
-                      { key: 'delete', label: tPanel('snapshot.delete'), danger: true, onClick: () => deleteSnapshot(s) },
+                      {
+                        key: 'delete',
+                        label: tPanel('snapshot.delete'),
+                        danger: true,
+                        onClick: () => deleteSnapshot(s),
+                      },
                     ],
                   }}
                 >
@@ -584,10 +625,14 @@ export default function WorkspaceInspector() {
       <div className="h-full overflow-y-auto px-3 pb-6 pt-3">
         <div className="bg-[var(--color-bg-secondary)] rounded-xl p-6 flex flex-col items-center text-center gap-2">
           <ApartmentOutlined className="text-2xl text-[var(--color-text-faint)]" />
-          <p className="text-sm font-semibold text-[var(--color-text-secondary)] m-0">{tPanel('inspector.emptyTitle')}</p>
+          <p className="text-sm font-semibold text-[var(--color-text-secondary)] m-0">
+            {tPanel('inspector.emptyTitle')}
+          </p>
           <p className="text-2xs text-[var(--color-text-muted)] m-0 leading-relaxed">
             {isCode
-              ? (sidebarMode === 'work' ? tPanel('inspector.emptyWork') : tPanel('inspector.emptyCode'))
+              ? sidebarMode === 'work'
+                ? tPanel('inspector.emptyWork')
+                : tPanel('inspector.emptyCode')
               : tPanel('inspector.emptyChat')}
           </p>
         </div>
@@ -655,23 +700,33 @@ export default function WorkspaceInspector() {
       {activeToolCount > 0 && (
         <div className="flex items-center gap-2 px-4 py-2 mb-3 rounded-lg text-xs text-primary bg-primary-soft">
           <ExecutingIndicator size={14} />
-          <span>{isCode ? tPanel('inspector.taskRunning') : tPanel('inspector.toolsRunning', { n: activeToolCount })}</span>
+          <span>
+            {isCode ? tPanel('inspector.taskRunning') : tPanel('inspector.toolsRunning', { n: activeToolCount })}
+          </span>
         </div>
       )}
 
       {isCode && agent && (
         <section className="px-3.5 py-2.5 mb-2.5 rounded-xl bg-[var(--color-bg-secondary)]">
-          <header className="text-2xs font-semibold text-text-muted tracking-wide mb-1.5">{tPanel('inspector.taskSummary')}</header>
-          <div className="text-xs text-text-secondary leading-[1.5] line-clamp-3">{agent.description || agent.name}</div>
+          <header className="text-2xs font-semibold text-text-muted tracking-wide mb-1.5">
+            {tPanel('inspector.taskSummary')}
+          </header>
+          <div className="text-xs text-text-secondary leading-[1.5] line-clamp-3">
+            {agent.description || agent.name}
+          </div>
           {(agent.result || agent.error) && (
-            <div className="mt-1.5 text-xs text-text-secondary leading-[1.5] line-clamp-3">{agent.result || agent.error}</div>
+            <div className="mt-1.5 text-xs text-text-secondary leading-[1.5] line-clamp-3">
+              {agent.result || agent.error}
+            </div>
           )}
         </section>
       )}
 
       {isCode && agent && qualityRuns.length > 0 && (
         <section className="px-3.5 py-2.5 mb-2.5 rounded-xl bg-[var(--color-bg-secondary)]">
-          <header className="text-2xs font-semibold text-text-muted tracking-wide mb-1.5">{tPanel('inspector.qualityGate')}</header>
+          <header className="text-2xs font-semibold text-text-muted tracking-wide mb-1.5">
+            {tPanel('inspector.qualityGate')}
+          </header>
           {qualityRuns.every((r) => r.passed) ? (
             <div className="flex items-center gap-2 text-xs text-text-secondary">
               <Check size={14} className="text-[var(--color-success)] shrink-0" />
@@ -687,7 +742,9 @@ export default function WorkspaceInspector() {
                     ) : (
                       <X size={14} className="text-danger shrink-0" />
                     )}
-                    <span className="text-xs font-medium text-text-primary shrink-0">{tPanel('inspector.checkLabel', { type: r.checkType })}</span>
+                    <span className="text-xs font-medium text-text-primary shrink-0">
+                      {tPanel('inspector.checkLabel', { type: r.checkType })}
+                    </span>
                     {r.command && (
                       <code className="flex-1 min-w-0 truncate text-2xs text-text-muted font-mono">{r.command}</code>
                     )}
@@ -735,7 +792,9 @@ export default function WorkspaceInspector() {
 
       {isCode && agent && nextSteps.length > 0 && (
         <section className="px-3.5 py-2.5 mb-2.5 rounded-xl bg-[var(--color-bg-secondary)]">
-          <header className="text-2xs font-semibold text-text-muted tracking-wide mb-1.5">{tPanel('inspector.nextSteps')}</header>
+          <header className="text-2xs font-semibold text-text-muted tracking-wide mb-1.5">
+            {tPanel('inspector.nextSteps')}
+          </header>
           <div className="flex flex-col gap-1.5">
             {nextSteps.map((step) => (
               <button
@@ -753,7 +812,9 @@ export default function WorkspaceInspector() {
               >
                 <span className="shrink-0 w-[5px] h-[5px] rounded-full bg-[var(--color-primary)] opacity-70" />
                 <span className="flex-1 min-w-0">{step.label}</span>
-                <span className="shrink-0 text-2xs text-text-faint">{step.kind === 'view' ? tPanel('inspector.view') : tPanel('inspector.continue')}</span>
+                <span className="shrink-0 text-2xs text-text-faint">
+                  {step.kind === 'view' ? tPanel('inspector.view') : tPanel('inspector.continue')}
+                </span>
               </button>
             ))}
           </div>
@@ -770,17 +831,19 @@ export default function WorkspaceInspector() {
 
       {isCode && agent && deliverables.length > 0 && (
         <section className="px-3.5 py-2.5 mb-2.5 rounded-xl bg-[var(--color-bg-secondary)]">
-          <header className="text-2xs font-semibold text-text-muted tracking-wide mb-1.5">{tPanel('inspector.deliverables')}</header>
+          <header className="text-2xs font-semibold text-text-muted tracking-wide mb-1.5">
+            {tPanel('inspector.deliverables')}
+          </header>
           <DeliverablesRow files={deliverables} onPreview={openPreview} />
         </section>
       )}
 
       {isCode && agent && (agent.status === 'completed' || agent.status === 'error' || agent.status === 'stopped') && (
         <section className="px-3.5 py-2.5 mb-2.5 rounded-xl bg-[var(--color-bg-secondary)]">
-          <header className="text-2xs font-semibold text-text-muted tracking-wide mb-1.5">{tPanel('inspector.rollback')}</header>
-          <p className="text-2xs text-text-muted leading-[1.5] mb-2">
-            {tPanel('inspector.rollbackBody')}
-          </p>
+          <header className="text-2xs font-semibold text-text-muted tracking-wide mb-1.5">
+            {tPanel('inspector.rollback')}
+          </header>
+          <p className="text-2xs text-text-muted leading-[1.5] mb-2">{tPanel('inspector.rollbackBody')}</p>
           <button
             type="button"
             className="h-7 px-3 rounded-full text-xs font-medium text-[var(--color-primary)] bg-primary-soft border-none cursor-pointer transition-colors duration-150 hover:bg-[var(--color-primary-strong)]"
@@ -795,15 +858,22 @@ export default function WorkspaceInspector() {
 
       {sysMessages.length > 0 && (
         <section className="px-0.5 pt-[10px] border-t border-[var(--color-border-dim)] mt-1">
-          <header className="text-2xs font-semibold text-muted tracking-wide mb-[6px]">{tPanel('inspector.systemPrompt')}</header>
+          <header className="text-2xs font-semibold text-muted tracking-wide mb-[6px]">
+            {tPanel('inspector.systemPrompt')}
+          </header>
           <ul className="list-none m-0 p-0 flex flex-col gap-1">
             {sysMessages.slice(-8).map((m) => (
-              <li key={m.id} className={clsx(
-                'text-xs leading-[1.5] px-2 py-[5px] rounded-md border border-transparent bg-dim text-secondary break-words',
-                m.level === 'info' && 'bg-primary-soft border-primary',
-                m.level === 'warning' && 'bg-warning-soft border-warning',
-                m.level === 'error' && 'bg-danger-soft border-danger text-text-secondary',
-              )}>{m.content}</li>
+              <li
+                key={m.id}
+                className={clsx(
+                  'text-xs leading-[1.5] px-2 py-[5px] rounded-md border border-transparent bg-dim text-secondary break-words',
+                  m.level === 'info' && 'bg-primary-soft border-primary',
+                  m.level === 'warning' && 'bg-warning-soft border-warning',
+                  m.level === 'error' && 'bg-danger-soft border-danger text-text-secondary',
+                )}
+              >
+                {m.content}
+              </li>
             ))}
           </ul>
         </section>
@@ -848,9 +918,7 @@ export default function WorkspaceInspector() {
           setSnapshotName('');
         }}
       >
-        <p className="text-xs text-text-muted leading-[1.6] mb-3">
-          {tPanel('snapshot.modalBody')}
-        </p>
+        <p className="text-xs text-text-muted leading-[1.6] mb-3">{tPanel('snapshot.modalBody')}</p>
         <Input
           autoFocus
           value={snapshotName}

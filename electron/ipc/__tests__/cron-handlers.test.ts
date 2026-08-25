@@ -22,8 +22,13 @@ vi.mock('../agent-scheduler', () => ({
 }));
 
 import {
-  createCronJob, deleteCronJob, listCronJobs, getCronJob, getCronJobCount,
-  initCronJobs, setCronFireCallback,
+  createCronJob,
+  deleteCronJob,
+  listCronJobs,
+  getCronJob,
+  getCronJobCount,
+  initCronJobs,
+  setCronFireCallback,
 } from '../cron-handlers';
 import { readSettings } from '../settings-store';
 import { scheduler } from '../agent-scheduler';
@@ -80,10 +85,46 @@ describe('cron 解析与持久化', () => {
     const store = {
       version: 1,
       jobs: [
-        { id: 'fired-once', name: 'x', prompt: 'p', cron: '* * * * *', recurring: false, createdAt: now, nextFireAt: now, firedCount: 1 },
-        { id: 'old-recurring', name: 'x', prompt: 'p', cron: '* * * * *', recurring: true, createdAt: now - 8 * 24 * 3600 * 1000, nextFireAt: now, firedCount: 0 },
-        { id: 'bad-cron', name: 'x', prompt: 'p', cron: 'bad', recurring: true, createdAt: now, nextFireAt: now, firedCount: 0 },
-        { id: 'valid', name: 'x', prompt: 'p', cron: '*/5 * * * *', recurring: true, createdAt: now, nextFireAt: now, firedCount: 0 },
+        {
+          id: 'fired-once',
+          name: 'x',
+          prompt: 'p',
+          cron: '* * * * *',
+          recurring: false,
+          createdAt: now,
+          nextFireAt: now,
+          firedCount: 1,
+        },
+        {
+          id: 'old-recurring',
+          name: 'x',
+          prompt: 'p',
+          cron: '* * * * *',
+          recurring: true,
+          createdAt: now - 8 * 24 * 3600 * 1000,
+          nextFireAt: now,
+          firedCount: 0,
+        },
+        {
+          id: 'bad-cron',
+          name: 'x',
+          prompt: 'p',
+          cron: 'bad',
+          recurring: true,
+          createdAt: now,
+          nextFireAt: now,
+          firedCount: 0,
+        },
+        {
+          id: 'valid',
+          name: 'x',
+          prompt: 'p',
+          cron: '*/5 * * * *',
+          recurring: true,
+          createdAt: now,
+          nextFireAt: now,
+          firedCount: 0,
+        },
       ],
     };
     writeFileSync(path.join(h.userData, 'cron-store.json'), JSON.stringify(store), 'utf-8');

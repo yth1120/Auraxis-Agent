@@ -10,10 +10,21 @@ vi.mock('electron', () => ({
 }));
 
 import {
-  addMemory, getMemoriesByProject, getMemoriesByType, getMemoriesByTag,
-  searchMemories, updateMemory, archiveMemory, getActiveMemories, deleteMemory,
-  evidenceContentHash, addEvidence, listEvidence, getEvidenceById,
-  findEvidenceByHash, deleteEvidence,
+  addMemory,
+  getMemoriesByProject,
+  getMemoriesByType,
+  getMemoriesByTag,
+  searchMemories,
+  updateMemory,
+  archiveMemory,
+  getActiveMemories,
+  deleteMemory,
+  evidenceContentHash,
+  addEvidence,
+  listEvidence,
+  getEvidenceById,
+  findEvidenceByHash,
+  deleteEvidence,
   setBackendModeForTest,
 } from '../memory-db';
 
@@ -45,7 +56,16 @@ describe('MemoryDatabase — JSON 回退后端', () => {
 
   it('addMemory 持久化并可按项目/类型/标签查询', () => {
     addMemory(mem());
-    addMemory(mem({ id: 'm2', type: 'problem', title: '端口冲突', content: '8080 被占用', tags: JSON.stringify(['network']), timestamp: 2000 }));
+    addMemory(
+      mem({
+        id: 'm2',
+        type: 'problem',
+        title: '端口冲突',
+        content: '8080 被占用',
+        tags: JSON.stringify(['network']),
+        timestamp: 2000,
+      }),
+    );
     addMemory(mem({ id: 'm3', project_path: 'C:/other', timestamp: 3000 }));
 
     const all = getMemoriesByProject('C:/proj');

@@ -1,14 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type {
-  AgentInfo,
-  AgentStore,
-  AgentCreateRequest,
-  AgentLogEntry,
-  AgentPriority,
-  AgentStatus,
-  AgentAction,
-} from '../types/agent';
+import type { AgentInfo, AgentStore, AgentLogEntry, AgentStatus } from '../types/agent';
 import { useAppStore } from './useAppStore';
 
 // ─── IPC bridge helpers ────────────────────────────
@@ -20,7 +12,11 @@ function agentIpc() {
         schedulerStop: (agentId: string) => Promise<{ ok: boolean; error?: string }>;
         pause: (agentId: string) => Promise<{ ok: boolean; error?: string }>;
         resume: (agentId: string) => Promise<{ ok: boolean; error?: string }>;
-        continue: (agentId: string, instruction: string, displayInstruction?: string) => Promise<{ ok: boolean; error?: string }>;
+        continue: (
+          agentId: string,
+          instruction: string,
+          displayInstruction?: string,
+        ) => Promise<{ ok: boolean; error?: string }>;
         approveDelivery: (agentId: string) => Promise<{ ok: boolean; error?: string }>;
         setPriority: (agentId: string, priority: string) => Promise<{ ok: boolean; error?: string }>;
         setMaxConcurrent: (n: number) => Promise<{ ok: boolean; error?: string }>;
@@ -63,9 +59,7 @@ export const useAgentStore = create<AgentStore>()(
           const id = agentId ?? s.currentAgentId;
           if (!id) return s;
           return {
-            agents: s.agents.map((a) =>
-              a.id === id ? { ...a, planFile: path ?? undefined } : a,
-            ),
+            agents: s.agents.map((a) => (a.id === id ? { ...a, planFile: path ?? undefined } : a)),
           };
         }),
 
@@ -86,8 +80,7 @@ export const useAgentStore = create<AgentStore>()(
           return { agentPermissions: next };
         }),
 
-      addAgent: (agent) =>
-        set((s) => ({ agents: [...s.agents, agent] })),
+      addAgent: (agent) => set((s) => ({ agents: [...s.agents, agent] })),
 
       updateAgent: (id, updates) =>
         set((s) => ({
@@ -238,9 +231,7 @@ export const useAgentStore = create<AgentStore>()(
         }
         set((s) => ({
           agents: s.agents.map((a) =>
-            a.id === agentId
-              ? { ...a, status: 'stopped' as AgentStatus, endTime: Date.now() }
-              : a,
+            a.id === agentId ? { ...a, status: 'stopped' as AgentStatus, endTime: Date.now() } : a,
           ),
         }));
       },
@@ -248,9 +239,7 @@ export const useAgentStore = create<AgentStore>()(
       stopAllAgents: async () => {
         const { agents, stopAgent } = get();
         await Promise.allSettled(
-          agents
-            .filter((a) => a.status === 'running' || a.status === 'queued')
-            .map((a) => stopAgent(a.id)),
+          agents.filter((a) => a.status === 'running' || a.status === 'queued').map((a) => stopAgent(a.id)),
         );
       },
 
@@ -264,9 +253,7 @@ export const useAgentStore = create<AgentStore>()(
           }
         }
         set((s) => ({
-          agents: s.agents.map((a) =>
-            a.id === agentId ? { ...a, status: 'paused' as AgentStatus } : a,
-          ),
+          agents: s.agents.map((a) => (a.id === agentId ? { ...a, status: 'paused' as AgentStatus } : a)),
         }));
       },
 
@@ -280,9 +267,7 @@ export const useAgentStore = create<AgentStore>()(
           }
         }
         set((s) => ({
-          agents: s.agents.map((a) =>
-            a.id === agentId ? { ...a, status: 'running' as AgentStatus } : a,
-          ),
+          agents: s.agents.map((a) => (a.id === agentId ? { ...a, status: 'running' as AgentStatus } : a)),
         }));
       },
 
@@ -333,9 +318,7 @@ export const useAgentStore = create<AgentStore>()(
           }
         }
         set((s) => ({
-          agents: s.agents.map((a) =>
-            a.id === agentId ? { ...a, priority } : a,
-          ),
+          agents: s.agents.map((a) => (a.id === agentId ? { ...a, priority } : a)),
         }));
       },
 
@@ -545,14 +528,15 @@ export const useAgentStore = create<AgentStore>()(
       name: 'auraxis-agent-storage',
       partialize: (state) => ({
         agents: state.agents
-          .filter((a) =>
-            a.status === 'running'
-            || a.status === 'paused'
-            || a.status === 'queued'
-            || a.status === 'completed'
-            || a.status === 'error'
-            || a.status === 'stopped'
-            || a.status === 'review',
+          .filter(
+            (a) =>
+              a.status === 'running' ||
+              a.status === 'paused' ||
+              a.status === 'queued' ||
+              a.status === 'completed' ||
+              a.status === 'error' ||
+              a.status === 'stopped' ||
+              a.status === 'review',
           )
           .map((a) => ({ ...a, log: [] })), // Don't persist streaming logs
         maxConcurrent: state.maxConcurrent,
@@ -571,12 +555,13 @@ export const useAgentStore = create<AgentStore>()(
       merge: (persisted, current) => {
         const persistedAgents = (persisted as { agents?: AgentInfo[] } | undefined)?.agents;
         const agents = Array.isArray(persistedAgents) ? persistedAgents : [];
-        const persistedSelection = (persisted as { currentAgentId?: string | null } | undefined)?.currentAgentId ?? null;
+        const persistedSelection =
+          (persisted as { currentAgentId?: string | null } | undefined)?.currentAgentId ?? null;
         return {
           ...current,
           ...(persisted as Partial<AgentStore>),
-          agents: agents.filter((a) =>
-            a.status === 'completed' || a.status === 'error' || a.status === 'stopped' || a.status === 'review',
+          agents: agents.filter(
+            (a) => a.status === 'completed' || a.status === 'error' || a.status === 'stopped' || a.status === 'review',
           ),
           // Restore the selection. A running task is not in `agents` yet —
           // refreshStates() re-attaches it from the backend right after boot.
@@ -676,13 +661,9 @@ function logEntryFromEvent(event: any): AgentLogEntry | null {
       };
     case 'tool_progress':
       // API retry hints, long-tool liveness pings.
-      return event.progress
-        ? { type: 'progress', timestamp: Date.now(), text: event.progress }
-        : null;
+      return event.progress ? { type: 'progress', timestamp: Date.now(), text: event.progress } : null;
     case 'deviance_warning':
-      return event.message
-        ? { type: 'warning', timestamp: Date.now(), text: event.message }
-        : null;
+      return event.message ? { type: 'warning', timestamp: Date.now(), text: event.message } : null;
     case 'system_message':
       return event.level === 'warning' && event.content
         ? { type: 'warning', timestamp: Date.now(), text: event.content }
@@ -718,9 +699,7 @@ function logEntryFromEvent(event: any): AgentLogEntry | null {
       return { type: 'error', timestamp: Date.now(), error: event.error };
     case 'plan':
       // Sub-agents (agent-handlers) emit fully-formed {todos: [...]}.
-      return event.todos
-        ? { type: 'plan', timestamp: Date.now(), todos: event.todos }
-        : null;
+      return event.todos ? { type: 'plan', timestamp: Date.now(), todos: event.todos } : null;
     default:
       return null;
   }
@@ -749,7 +728,10 @@ function flushChunks() {
       if (last && last.type === c.kind) last.text += c.text;
       else entries.push({ type: c.kind, text: c.text, timestamp: Date.now() });
     }
-    append(id, entries.filter((e) => e.text));
+    append(
+      id,
+      entries.filter((e) => e.text),
+    );
   }
   pendingChunks.clear();
 }
@@ -787,13 +769,9 @@ function flushToolProgress() {
       let log = a.log;
       let changed = false;
       for (const [toolCallId, text] of chunks) {
-        const idx = log.findIndex(
-          (e) => e.type === 'tool_start' && e.toolCallId === toolCallId,
-        );
+        const idx = log.findIndex((e) => e.type === 'tool_start' && e.toolCallId === toolCallId);
         if (idx >= 0) {
-          log = log.map((e, i) =>
-            i === idx ? { ...e, streamOutput: (e.streamOutput || '') + text } : e,
-          );
+          log = log.map((e, i) => (i === idx ? { ...e, streamOutput: (e.streamOutput || '') + text } : e));
           changed = true;
         }
       }
@@ -849,9 +827,7 @@ function ensureEventSub(id: string) {
       if (event.toolName !== 'Planning' && event.toolCallId) {
         queueToolProgress(id, event.toolCallId, text);
       } else {
-        useAgentStore.getState().appendAgentLog(id, [
-          { type: 'progress', timestamp: Date.now(), text },
-        ]);
+        useAgentStore.getState().appendAgentLog(id, [{ type: 'progress', timestamp: Date.now(), text }]);
       }
       return;
     }
@@ -899,14 +875,12 @@ function ensureEventSub(id: string) {
       flushChunks();
     }
     if (
-      (event.type === 'tool_end' || event.type === 'tool_error' || event.type === 'tool_aborted')
-      && event.toolCallId
+      (event.type === 'tool_end' || event.type === 'tool_error' || event.type === 'tool_aborted') &&
+      event.toolCallId
     ) {
       // Carry the live terminal payload onto the settled row.
       const agent = useAgentStore.getState().agents.find((a) => a.id === id);
-      const start = agent?.log.find(
-        (e) => e.type === 'tool_start' && e.toolCallId === event.toolCallId,
-      );
+      const start = agent?.log.find((e) => e.type === 'tool_start' && e.toolCallId === event.toolCallId);
       if (start?.streamOutput) event.streamOutput = start.streamOutput;
     }
     const entry = logEntryFromEvent(event);
@@ -917,7 +891,11 @@ function ensureEventSub(id: string) {
       event.type === 'tool_end' &&
       (event.toolName === 'Write' || event.toolName === 'Edit' || event.toolName === 'Bash')
     ) {
-      try { useAppStore.getState().incrementFileTreeVersion(); } catch { /* non-critical */ }
+      try {
+        useAppStore.getState().incrementFileTreeVersion();
+      } catch {
+        /* non-critical */
+      }
     }
   });
   eventSubs.set(id, unsub);
@@ -931,7 +909,10 @@ function scheduleEventSubCleanup(id: string) {
   const timer = setTimeout(() => {
     cleanupTimers.delete(id);
     const unsub = eventSubs.get(id);
-    if (unsub) { unsub(); eventSubs.delete(id); }
+    if (unsub) {
+      unsub();
+      eventSubs.delete(id);
+    }
   }, 2000);
   cleanupTimers.set(id, timer);
 }
@@ -971,7 +952,9 @@ if (typeof window !== 'undefined') {
     void useAgentStore.getState().refreshStates();
     // Backend maxConcurrent resets to its default on every app launch; push the
     // persisted value at startup so 前端显示与后端调度永远一致.
-    agentIpc()?.setMaxConcurrent?.(useAgentStore.getState().maxConcurrent)?.catch?.(() => {});
+    agentIpc()
+      ?.setMaxConcurrent?.(useAgentStore.getState().maxConcurrent)
+      ?.catch?.(() => {});
     return () => {
       unsubUpdates();
       unsubMode();

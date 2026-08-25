@@ -1,3 +1,4 @@
+import { errorText } from '../../electron/errors';
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type { Message, ChatStore, CodeBlock } from '../types/chat';
@@ -25,7 +26,14 @@ const STREAM_TIMEOUT_MS = 300_000; // 5 min
 const usageAcc = { input: 0, output: 0, reasoning: 0, cacheHit: 0, cacheMiss: 0 };
 
 function flushUsageToStore() {
-  if (usageAcc.input === 0 && usageAcc.output === 0 && usageAcc.reasoning === 0 && usageAcc.cacheHit === 0 && usageAcc.cacheMiss === 0) return;
+  if (
+    usageAcc.input === 0 &&
+    usageAcc.output === 0 &&
+    usageAcc.reasoning === 0 &&
+    usageAcc.cacheHit === 0 &&
+    usageAcc.cacheMiss === 0
+  )
+    return;
   // write directly via useChatStore.getState()—no subscribe trigger
   useChatStore.setState((s) => ({
     exactInputTokens: s.exactInputTokens + usageAcc.input,
@@ -73,9 +81,7 @@ function syncCurrentSessionMessages(messages: Message[]): void {
   if (!id) return;
   useSessionStore.setState((s) => ({
     sessions: s.sessions.map((ses) =>
-      ses.id === id
-        ? { ...ses, messages, messageCount: messages.length, updated: Date.now() }
-        : ses,
+      ses.id === id ? { ...ses, messages, messageCount: messages.length, updated: Date.now() } : ses,
     ),
   }));
 }
@@ -102,18 +108,14 @@ function extractCodeBlocks(content: string): CodeBlock[] {
 
 function setAssistantContent(assistantId: string, content: string) {
   return (s: MsgState) => ({
-    messages: s.messages.map((m) =>
-      m.id === assistantId ? { ...m, content } : m
-    ),
+    messages: s.messages.map((m) => (m.id === assistantId ? { ...m, content } : m)),
   });
 }
 
 function setAssistantDone(assistantId: string) {
   return (s: MsgState) => ({
     messages: s.messages.map((m) =>
-      m.id === assistantId
-        ? { ...m, isStreaming: false, codeBlocks: extractCodeBlocks(getContentText(m.content)) }
-        : m
+      m.id === assistantId ? { ...m, isStreaming: false, codeBlocks: extractCodeBlocks(getContentText(m.content)) } : m,
     ),
   });
 }
@@ -122,17 +124,20 @@ function setAssistantError(assistantId: string, fallback: string) {
   return (s: MsgState) => ({
     messages: s.messages.map((m) =>
       m.id === assistantId
-        ? { ...m, isStreaming: false, content: getContentText(m.content) || fallback, codeBlocks: extractCodeBlocks(getContentText(m.content) || fallback) }
-        : m
+        ? {
+            ...m,
+            isStreaming: false,
+            content: getContentText(m.content) || fallback,
+            codeBlocks: extractCodeBlocks(getContentText(m.content) || fallback),
+          }
+        : m,
     ),
   });
 }
 
 function appendToolCall(assistantId: string, tc: ToolCall) {
   return (s: MsgState & { toolCallMap: Record<string, ToolCall> }) => ({
-    messages: s.messages.map((m) =>
-      m.id === assistantId ? { ...m, toolCalls: [...(m.toolCalls || []), tc] } : m
-    ),
+    messages: s.messages.map((m) => (m.id === assistantId ? { ...m, toolCalls: [...(m.toolCalls || []), tc] } : m)),
     toolCallMap: { ...s.toolCallMap, [tc.id]: tc },
   });
 }
@@ -145,7 +150,10 @@ function updateToolCall(assistantId: string, toolCallId: string, updates: Partia
       return {
         ...m,
         toolCalls: m.toolCalls?.map((tc) => {
-          if (tc.id === toolCallId) { updatedTc = { ...tc, ...updates } as ToolCall; return updatedTc; }
+          if (tc.id === toolCallId) {
+            updatedTc = { ...tc, ...updates } as ToolCall;
+            return updatedTc;
+          }
           return tc;
         }),
       };
@@ -169,27 +177,15 @@ function appendThinkingChunk(
   return [...blocks.slice(0, -1), { ...last, content: last.content + chunk }];
 }
 
-function appendToolProgress(assistantId: string, toolCallId: string, chunk: string) {
-  return (s: MsgState) => ({
-    messages: s.messages.map((m) =>
-      m.id === assistantId
-        ? {
-            ...m,
-            toolCalls: m.toolCalls?.map((tc) =>
-              tc.id === toolCallId ? { ...tc, streamOutput: (tc.streamOutput || '') + chunk } : tc,
-            ),
-          }
-        : m,
-    ),
-  });
-}
-
 const debouncedStorage = createDebouncedStorage(1000);
 
 // ── Durable chat event log (event-sourcing-lite) ──
 // The renderer buffers events during streaming and flushes to the main
 // process once per second + on completion, so every chat is replayable.
-const chatLogBuffer = new Map<string, Array<{ type: 'user' | 'assistant_chunk' | 'tool' | 'system'; ts: number; data: Record<string, unknown> }>>();
+const chatLogBuffer = new Map<
+  string,
+  Array<{ type: 'user' | 'assistant_chunk' | 'tool' | 'system'; ts: number; data: Record<string, unknown> }>
+>();
 let chatLogTimer: ReturnType<typeof setTimeout> | null = null;
 
 function queueChatLog(
@@ -202,7 +198,9 @@ function queueChatLog(
   list.push({ type, ts: Date.now(), data });
   chatLogBuffer.set(sessionId, list);
   if (!chatLogTimer) {
-    chatLogTimer = setTimeout(() => { void flushChatLog(); }, 1000);
+    chatLogTimer = setTimeout(() => {
+      void flushChatLog();
+    }, 1000);
   }
 }
 
@@ -214,15 +212,17 @@ function clearQueryContextForSession(): void {
 }
 
 async function flushChatLog() {
-  if (chatLogTimer) { clearTimeout(chatLogTimer); chatLogTimer = null; }
+  if (chatLogTimer) {
+    clearTimeout(chatLogTimer);
+    chatLogTimer = null;
+  }
   const entries = [...chatLogBuffer.entries()];
   chatLogBuffer.clear();
   for (const [sessionId, events] of entries) {
     if (!window.electronAPI?.chatLog) continue;
     try {
-      const projectPath = useChatStore.getState().currentProjectPath
-        || useSettingsStore.getState().projectPath
-        || undefined;
+      const projectPath =
+        useChatStore.getState().currentProjectPath || useSettingsStore.getState().projectPath || undefined;
       await window.electronAPI.chatLog.append(sessionId, events, projectPath);
     } catch {
       const prev = chatLogBuffer.get(sessionId) || [];
@@ -230,7 +230,9 @@ async function flushChatLog() {
     }
   }
   if (chatLogBuffer.size > 0 && !chatLogTimer) {
-    chatLogTimer = setTimeout(() => { void flushChatLog(); }, 2000);
+    chatLogTimer = setTimeout(() => {
+      void flushChatLog();
+    }, 2000);
   }
 }
 
@@ -273,13 +275,14 @@ export const useChatStore = create<ChatStore>()(
       composerFocusTick: 0,
       pendingNewTask: false,
 
-      setInputValue: (value: string) => set((s) => {
-        const sid = useSessionStore.getState().currentSessionId;
-        return {
-          inputValue: value,
-          drafts: sid ? { ...s.drafts, [sid]: value } : s.drafts,
-        };
-      }),
+      setInputValue: (value: string) =>
+        set((s) => {
+          const sid = useSessionStore.getState().currentSessionId;
+          return {
+            inputValue: value,
+            drafts: sid ? { ...s.drafts, [sid]: value } : s.drafts,
+          };
+        }),
 
       requestModelPanel: () => set((s) => ({ modelPanelRequest: s.modelPanelRequest + 1 })),
       consumeModelPanelRequest: () => set({ modelPanelRequest: 0 }),
@@ -319,8 +322,7 @@ export const useChatStore = create<ChatStore>()(
         }));
       },
 
-      dequeueAgentMessage: (id: string) =>
-        set((s) => ({ agentQueue: s.agentQueue.filter((q) => q.id !== id) })),
+      dequeueAgentMessage: (id: string) => set((s) => ({ agentQueue: s.agentQueue.filter((q) => q.id !== id) })),
 
       editAgentQueueItem: (id: string, text: string) => {
         const trimmed = text.trim();
@@ -478,7 +480,11 @@ export const useChatStore = create<ChatStore>()(
         const logSessionId = useSessionStore.getState().currentSessionId || sessionStore.currentSessionId;
         queueChatLog(logSessionId, 'user', { text: userContent, kind: 'continue_code' });
         stopping = false;
-        set({ messages: [...messages, userMessage, assistantMessage], isStreaming: true, lastUserMessage: userContent });
+        set({
+          messages: [...messages, userMessage, assistantMessage],
+          isStreaming: true,
+          lastUserMessage: userContent,
+        });
 
         const electronAI = window.electronAPI?.ai;
         if (!electronAI) {
@@ -510,9 +516,7 @@ export const useChatStore = create<ChatStore>()(
               onChunk: (chunk: string) => {
                 acc.text += chunk;
                 set((s) => ({
-                  messages: s.messages.map((m) =>
-                    m.id === assistantId ? { ...m, content: acc.text } : m,
-                  ),
+                  messages: s.messages.map((m) => (m.id === assistantId ? { ...m, content: acc.text } : m)),
                 }));
               },
               onUsage: (usage) => {
@@ -527,14 +531,10 @@ export const useChatStore = create<ChatStore>()(
               onDone: () => {
                 ipcSubscription?.unsubscribe();
                 ipcSubscription = null;
-                const wrapped = acc.text.includes('```')
-                  ? acc.text
-                  : `\`\`\`${language}\n${acc.text.trim()}\n\`\`\``;
+                const wrapped = acc.text.includes('```') ? acc.text : `\`\`\`${language}\n${acc.text.trim()}\n\`\`\``;
                 set((s) => ({
                   ...setAssistantDone(assistantId)(s),
-                  messages: s.messages.map((m) =>
-                    m.id === assistantId ? { ...m, content: wrapped } : m,
-                  ),
+                  messages: s.messages.map((m) => (m.id === assistantId ? { ...m, content: wrapped } : m)),
                   isStreaming: false,
                 }));
                 void flushChatLog();
@@ -551,9 +551,9 @@ export const useChatStore = create<ChatStore>()(
             },
           );
           ipcSubscription = subscription;
-        } catch (err: any) {
+        } catch (err: unknown) {
           set((s) => ({
-            ...setAssistantError(assistantId, `Error: ${err.message}`)(s),
+            ...setAssistantError(assistantId, `Error: ${errorText(err)}`)(s),
             isStreaming: false,
           }));
         }
@@ -563,12 +563,14 @@ export const useChatStore = create<ChatStore>()(
         const state = get();
         if (state.isStreaming) return;
         // Fall back to last user message in the chat history when lastUserMessage is null (e.g. after page reload)
-        const lastUser = state.lastUserMessage || (() => {
-          for (let i = state.messages.length - 1; i >= 0; i--) {
-            if (state.messages[i].role === 'user') return getContentText(state.messages[i].content);
-          }
-          return null;
-        })();
+        const lastUser =
+          state.lastUserMessage ||
+          (() => {
+            for (let i = state.messages.length - 1; i >= 0; i--) {
+              if (state.messages[i].role === 'user') return getContentText(state.messages[i].content);
+            }
+            return null;
+          })();
         if (!lastUser) return;
 
         // Stop any in-flight request
@@ -752,11 +754,18 @@ export const useChatStore = create<ChatStore>()(
         const content = resolved.text;
 
         const userMessage: Message = {
-          id: `user-${Date.now()}`, role: 'user', content, timestamp: Date.now(),
+          id: `user-${Date.now()}`,
+          role: 'user',
+          content,
+          timestamp: Date.now(),
         };
         const assistantId = `assistant-${Date.now()}`;
         const assistantMessage: Message = {
-          id: assistantId, role: 'assistant', content: '', timestamp: Date.now(), isStreaming: true,
+          id: assistantId,
+          role: 'assistant',
+          content: '',
+          timestamp: Date.now(),
+          isStreaming: true,
           thinkingEnabled: isDeepThink,
         };
 
@@ -771,7 +780,9 @@ export const useChatStore = create<ChatStore>()(
         const logSessionId = useSessionStore.getState().currentSessionId || sessionStore.currentSessionId;
         queueChatLog(logSessionId, 'user', { text: content });
         stopping = false;
-        usageAcc.input = 0; usageAcc.output = 0; usageAcc.reasoning = 0;
+        usageAcc.input = 0;
+        usageAcc.output = 0;
+        usageAcc.reasoning = 0;
         set({ messages: newMessages, inputValue: '', isStreaming: true, lastUserMessage: content });
         // 发送成功后清除当前会话草稿。
         const sentSid = useSessionStore.getState().currentSessionId;
@@ -787,7 +798,10 @@ export const useChatStore = create<ChatStore>()(
         // so the sidebar clock stays alive during long-running tool executions.
         const sessionTouchInterval = setInterval(() => {
           const s = get();
-          if (!s.isStreaming) { clearInterval(sessionTouchInterval); return; }
+          if (!s.isStreaming) {
+            clearInterval(sessionTouchInterval);
+            return;
+          }
           useSessionStore.getState().touchCurrentSession(s.messages.length);
         }, 15_000);
 
@@ -803,7 +817,11 @@ export const useChatStore = create<ChatStore>()(
                 const msgs = [...s.messages];
                 const last = msgs[msgs.length - 1];
                 if (last?.role === 'assistant' && last.isStreaming) {
-                  msgs[msgs.length - 1] = { ...last, isStreaming: false, content: getContentText(last.content) || '[连接已断开 — 长时间未收到数据]' };
+                  msgs[msgs.length - 1] = {
+                    ...last,
+                    isStreaming: false,
+                    content: getContentText(last.content) || '[连接已断开 — 长时间未收到数据]',
+                  };
                 }
                 return { messages: msgs, isStreaming: false };
               });
@@ -817,9 +835,19 @@ export const useChatStore = create<ChatStore>()(
             const msgs = [...s.messages];
             const last = msgs[msgs.length - 1];
             if (last?.role === 'assistant' && last.isStreaming) {
-              msgs[msgs.length - 1] = { ...last, isStreaming: false, content: getContentText(last.content) || '[请求超时 — 连接异常断开]' };
+              msgs[msgs.length - 1] = {
+                ...last,
+                isStreaming: false,
+                content: getContentText(last.content) || '[请求超时 — 连接异常断开]',
+              };
             }
-            return { messages: msgs, isStreaming: false, currentIteration: null, maxIterations: null, lastCompression: null };
+            return {
+              messages: msgs,
+              isStreaming: false,
+              currentIteration: null,
+              maxIterations: null,
+              lastCompression: null,
+            };
           });
         }, STREAM_TIMEOUT_MS);
 
@@ -827,9 +855,10 @@ export const useChatStore = create<ChatStore>()(
           .filter((m) => !m.isStreaming || m.id === assistantId)
           .map((m) => ({
             role: m.role,
-            content: m.role === 'user' && modelSupportsImageInput(selectedModel)
-              ? toApiMessageContent(m.content, true)
-              : getContentText(m.content),
+            content:
+              m.role === 'user' && modelSupportsImageInput(selectedModel)
+                ? toApiMessageContent(m.content, true)
+                : getContentText(m.content),
           }));
 
         // Inject project context (Code/agent mode only — Chat is a plain,
@@ -848,7 +877,9 @@ export const useChatStore = create<ChatStore>()(
                 if (fileTree) contextBlock += `\n=== 项目结构 ===\n${fileTree.slice(0, 3000)}\n`;
                 if (packageJson) contextBlock += `\n=== package.json ===\n${packageJson.slice(0, 2000)}\n`;
               }
-            } catch { /* fallback */ }
+            } catch {
+              /* fallback */
+            }
           }
           contextBlock += '\n</project_context>';
           chatHistory.unshift({ role: 'user', content: contextBlock });
@@ -859,16 +890,16 @@ export const useChatStore = create<ChatStore>()(
         let memoryContext: string | undefined;
         if (projectPath && appMode !== 'chat' && window.electronAPI?.memory) {
           try {
-            const memResult = await window.electronAPI.memory.readForQuery(
-              projectPath,
-              content.slice(0, 400),
-              { budgetTokens: 900 },
-            );
+            const memResult = await window.electronAPI.memory.readForQuery(projectPath, content.slice(0, 400), {
+              budgetTokens: 900,
+            });
             if (memResult.ok && memResult.data && memResult.data.context.length > 0) {
               const read = memResult.data;
               const preambleParts: string[] = ['## 项目记忆（带证据溯源，来自之前的会话）'];
               preambleParts.push(...read.facts.slice(0, 20));
-              preambleParts.push(`引用要求：${read.policy.requireCitation ? '必须引用记忆来源' : '可选引用'}；不确定时拒答。`);
+              preambleParts.push(
+                `引用要求：${read.policy.requireCitation ? '必须引用记忆来源' : '可选引用'}；不确定时拒答。`,
+              );
               if (read.diagnostics.staleState) preambleParts.push('警告：存在已过期的记忆版本，引用前请核对。');
               if (read.diagnostics.unsupportedExtraction) preambleParts.push('警告：部分记忆缺少证据支持，仅作参考。');
               const preamble = preambleParts.join('\n');
@@ -895,7 +926,9 @@ export const useChatStore = create<ChatStore>()(
                 ],
               }));
             }
-          } catch { /* memory retrieval failed — non-critical */ }
+          } catch {
+            /* memory retrieval failed — non-critical */
+          }
         }
 
         const apiMessages = chatHistory.slice(0, -1);
@@ -926,7 +959,13 @@ export const useChatStore = create<ChatStore>()(
           clearHeartbeatInterval();
           ipcSubscription?.unsubscribe();
           ipcSubscription = null;
-          set((s) => ({ ...setAssistantError(assistantId, `Error: ${error}`)(s), isStreaming: false, currentIteration: null, maxIterations: null, lastCompression: null }));
+          set((s) => ({
+            ...setAssistantError(assistantId, `Error: ${error}`)(s),
+            isStreaming: false,
+            currentIteration: null,
+            maxIterations: null,
+            lastCompression: null,
+          }));
           void flushChatLog();
         };
 
@@ -937,9 +976,21 @@ export const useChatStore = create<ChatStore>()(
           ipcSubscription?.unsubscribe();
           ipcSubscription = null;
           if (err.name === 'AbortError') {
-            set((s) => ({ ...setAssistantError(assistantId, abortedMsg || '[已停止生成]')(s), isStreaming: false, currentIteration: null, maxIterations: null, lastCompression: null }));
+            set((s) => ({
+              ...setAssistantError(assistantId, abortedMsg || '[已停止生成]')(s),
+              isStreaming: false,
+              currentIteration: null,
+              maxIterations: null,
+              lastCompression: null,
+            }));
           } else {
-            set((s) => ({ ...setAssistantError(assistantId, `Error: ${err.message}`)(s), isStreaming: false, currentIteration: null, maxIterations: null, lastCompression: null }));
+            set((s) => ({
+              ...setAssistantError(assistantId, `Error: ${err.message}`)(s),
+              isStreaming: false,
+              currentIteration: null,
+              maxIterations: null,
+              lastCompression: null,
+            }));
           }
           void flushChatLog();
         };
@@ -968,9 +1019,7 @@ export const useChatStore = create<ChatStore>()(
               lastFlush = performance.now();
 
               const thinkingChunks = thinkingBuf.length > 0 ? thinkingBuf.splice(0) : null;
-              const tpEntries = toolProgressDoneBuf.size > 0
-                ? Array.from(toolProgressDoneBuf.entries())
-                : null;
+              const tpEntries = toolProgressDoneBuf.size > 0 ? Array.from(toolProgressDoneBuf.entries()) : null;
               toolProgressDoneBuf.clear();
 
               const currentText = acc.text;
@@ -978,9 +1027,7 @@ export const useChatStore = create<ChatStore>()(
               set((s) => {
                 let msgs = s.messages;
 
-                msgs = msgs.map((m) =>
-                  m.id === assistantId ? { ...m, content: currentText } : m,
-                );
+                msgs = msgs.map((m) => (m.id === assistantId ? { ...m, content: currentText } : m));
 
                 if (thinkingChunks) {
                   msgs = msgs.map((m) => {
@@ -1037,218 +1084,271 @@ export const useChatStore = create<ChatStore>()(
                 surface: appMode,
               },
               {
-                onEvent: ((() => {
+                onEvent: (() => {
                   return (event: ToolStreamEvent) => {
-                  lastEventTime = Date.now();
-                  switch (event.type) {
-                    case 'text_chunk':
-                      queueChatLog(logSessionId, 'assistant_chunk', { text: event.text });
-                      acc.text += event.text;
-                      if (performance.now() - lastFlush >= MIN_INTERVAL) {
-                        flushAll();
-                      } else {
-                        scheduleFlush();
-                      }
-                      break;
-                    case 'tool_start':
-                      queueChatLog(logSessionId, 'tool', { action: 'start', toolName: event.toolName, toolCallId: event.toolCallId, requestId: event.requestId, input: event.input });
-                      flushAll();
-                      useInspectorStore.getState().incrementActiveTools();
-                      useSessionStore.getState().touchCurrentSession(get().messages.length + 2);
-                      set(appendToolCall(assistantId, {
-                        id: event.toolCallId,
-                        requestId: event.requestId,
-                        toolName: event.toolName,
-                        input: event.input,
-                        status: 'running',
-                        startTime: event.timestamp,
-                        stepGroupId: event.stepGroupId,
-                      }));
-                      break;
-                    case 'tool_progress':
-                      toolProgressDoneBuf.set(event.toolCallId, (toolProgressDoneBuf.get(event.toolCallId) || '') + event.progress);
-                      scheduleFlush();
-                      break;
-                    case 'tool_end':
-                      queueChatLog(logSessionId, 'tool', { action: 'end', toolName: event.toolName, toolCallId: event.toolCallId, requestId: event.requestId, output: event.output });
-                      flushAll();
-                      useInspectorStore.getState().decrementActiveTools();
-                      useSessionStore.getState().touchCurrentSession(get().messages.length + 1);
-                      {
-                        const outputObj = event.output as Record<string, unknown> | null | undefined;
-                        const oldContent = outputObj?.oldContent as string | undefined;
-                        const newContent = outputObj?.newContent as string | undefined;
-                        set(updateToolCall(assistantId, event.toolCallId, {
-                          status: 'done', output: event.output, endTime: event.timestamp,
-                          ...(oldContent !== undefined ? { oldContent } : {}),
-                          ...(newContent !== undefined ? { newContent } : {}),
-                        }));
-                      }
-                      // Only Write/Edit actually modify files — skip Bash
-                      if (event.toolName === 'Write' || event.toolName === 'Edit') {
-                        try { useAppStore.getState().incrementFileTreeVersion(); } catch { /* non-critical */ }
-                      }
-                      // Defer undo registration so it doesn't block the event pipeline
-                      if ((event.toolName === 'Write' || event.toolName === 'Edit') && event.input) {
-                        const filePath = (event.input as any).file_path as string;
-                        if (filePath) {
-                          const projectPath = get().currentProjectPath || useSettingsStore.getState().projectPath;
-                          const toolName = event.toolName;
-                          queueMicrotask(() => {
-                            try {
-                              useUndoStore.getState().addUndo({
-                                id: `undo-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-                                sessionId: '',
-                                timestamp: Date.now(),
-                                type: toolName === 'Write' ? 'file:write' : 'file:edit',
-                                description: `${toolName === 'Write' ? '写入' : '编辑'} ${filePath.split(/[\\/]/).pop() || filePath}`,
-                                revert: async () => {
-                                  if (projectPath && window.electronAPI?.undo) {
-                                    await window.electronAPI.undo.revertLast(projectPath);
-                                  }
-                                },
-                              });
-                            } catch { /* non-critical */ }
-                          });
+                    lastEventTime = Date.now();
+                    switch (event.type) {
+                      case 'text_chunk':
+                        queueChatLog(logSessionId, 'assistant_chunk', { text: event.text });
+                        acc.text += event.text;
+                        if (performance.now() - lastFlush >= MIN_INTERVAL) {
+                          flushAll();
+                        } else {
+                          scheduleFlush();
                         }
-                      }
-                      break;
-                    case 'tool_error':
-                      queueChatLog(logSessionId, 'tool', { action: 'error', toolName: event.toolName, toolCallId: event.toolCallId, requestId: event.requestId, error: event.error });
-                      flushAll();
-                      useInspectorStore.getState().decrementActiveTools();
-                      useSessionStore.getState().touchCurrentSession(get().messages.length + 1);
-                      set(updateToolCall(assistantId, event.toolCallId, {
-                        status: 'error', error: event.error, endTime: event.timestamp,
-                      }));
-                      break;
-                    case 'tool_aborted':
-                      flushAll();
-                      useInspectorStore.getState().decrementActiveTools();
-                      useSessionStore.getState().touchCurrentSession(get().messages.length + 1);
-                      set(updateToolCall(assistantId, event.toolCallId, {
-                        status: 'done', error: event.error, endTime: event.timestamp,
-                        streamOutput: undefined, // clear terminal output
-                      }));
-                      break;
-                    case 'iteration':
-                      set({ currentIteration: event.iteration, maxIterations: event.maxIterations });
-                      break;
-                    case 'system_message':
-                      useInspectorStore.getState().addSystemMessage({
-                        id: `sys-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-                        content: event.content,
-                        level: event.level,
-                        timestamp: Date.now(),
-                      });
-                      break;
-                    case 'context_injected': {
-                      const disclosure = {
-                        source: event.source,
-                        producer: event.producer,
-                        detail: event.detail,
-                      };
-                      set((s) => ({
-                        messages: [
-                          ...s.messages,
-                          {
-                            id: `disclosure-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-                            role: 'system' as const,
-                            content: `${disclosure.producer} 已注入上下文`,
-                            timestamp: Date.now(),
-                            tags: ['injected'] as Message['tags'],
-                            disclosure,
-                          },
-                        ],
-                      }));
-                      break;
-                    }
-                    case 'thinking_chunk':
-                      thinkingBuf.push({ chunk: event.chunk, isNewBlock: event.isNewBlock });
-                      scheduleFlush();
-                      break;
-                    case 'usage_update':
-                      // Accumulate locally; flush to store on done/error to avoid per-event set()
-                      usageAcc.input += event.inputTokens;
-                      usageAcc.output += event.outputTokens;
-                      usageAcc.reasoning += event.reasoningTokens || 0;
-                      usageAcc.cacheHit += event.cacheHitTokens || 0;
-                      usageAcc.cacheMiss += event.cacheMissTokens || 0;
-                      break;
-                    case 'context_compressed':
-                      {
-                        const compaction = {
-                          tokensBefore: event.tokensBefore,
-                          tokensAfter: event.tokensAfter,
-                          messagesRemoved: event.messagesRemoved,
-                          tokensSaved: event.tokensSaved,
+                        break;
+                      case 'tool_start':
+                        queueChatLog(logSessionId, 'tool', {
+                          action: 'start',
+                          toolName: event.toolName,
+                          toolCallId: event.toolCallId,
+                          requestId: event.requestId,
+                          input: event.input,
+                        });
+                        flushAll();
+                        useInspectorStore.getState().incrementActiveTools();
+                        useSessionStore.getState().touchCurrentSession(get().messages.length + 2);
+                        set(
+                          appendToolCall(assistantId, {
+                            id: event.toolCallId,
+                            requestId: event.requestId,
+                            toolName: event.toolName,
+                            input: event.input,
+                            status: 'running',
+                            startTime: event.timestamp,
+                            stepGroupId: event.stepGroupId,
+                          }),
+                        );
+                        break;
+                      case 'tool_progress':
+                        toolProgressDoneBuf.set(
+                          event.toolCallId,
+                          (toolProgressDoneBuf.get(event.toolCallId) || '') + event.progress,
+                        );
+                        scheduleFlush();
+                        break;
+                      case 'tool_end':
+                        queueChatLog(logSessionId, 'tool', {
+                          action: 'end',
+                          toolName: event.toolName,
+                          toolCallId: event.toolCallId,
+                          requestId: event.requestId,
+                          output: event.output,
+                        });
+                        flushAll();
+                        useInspectorStore.getState().decrementActiveTools();
+                        useSessionStore.getState().touchCurrentSession(get().messages.length + 1);
+                        {
+                          const outputObj = event.output as Record<string, unknown> | null | undefined;
+                          const oldContent = outputObj?.oldContent as string | undefined;
+                          const newContent = outputObj?.newContent as string | undefined;
+                          set(
+                            updateToolCall(assistantId, event.toolCallId, {
+                              status: 'done',
+                              output: event.output,
+                              endTime: event.timestamp,
+                              ...(oldContent !== undefined ? { oldContent } : {}),
+                              ...(newContent !== undefined ? { newContent } : {}),
+                            }),
+                          );
+                        }
+                        // Only Write/Edit actually modify files — skip Bash
+                        if (event.toolName === 'Write' || event.toolName === 'Edit') {
+                          try {
+                            useAppStore.getState().incrementFileTreeVersion();
+                          } catch {
+                            /* non-critical */
+                          }
+                        }
+                        // Defer undo registration so it doesn't block the event pipeline
+                        if ((event.toolName === 'Write' || event.toolName === 'Edit') && event.input) {
+                          const filePath = (event.input as any).file_path as string;
+                          if (filePath) {
+                            const projectPath = get().currentProjectPath || useSettingsStore.getState().projectPath;
+                            const toolName = event.toolName;
+                            queueMicrotask(() => {
+                              try {
+                                useUndoStore.getState().addUndo({
+                                  id: `undo-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                                  sessionId: '',
+                                  timestamp: Date.now(),
+                                  type: toolName === 'Write' ? 'file:write' : 'file:edit',
+                                  description: `${toolName === 'Write' ? '写入' : '编辑'} ${filePath.split(/[\\/]/).pop() || filePath}`,
+                                  revert: async () => {
+                                    if (projectPath && window.electronAPI?.undo) {
+                                      await window.electronAPI.undo.revertLast(projectPath);
+                                    }
+                                  },
+                                });
+                              } catch {
+                                /* non-critical */
+                              }
+                            });
+                          }
+                        }
+                        break;
+                      case 'tool_error':
+                        queueChatLog(logSessionId, 'tool', {
+                          action: 'error',
+                          toolName: event.toolName,
+                          toolCallId: event.toolCallId,
+                          requestId: event.requestId,
+                          error: event.error,
+                        });
+                        flushAll();
+                        useInspectorStore.getState().decrementActiveTools();
+                        useSessionStore.getState().touchCurrentSession(get().messages.length + 1);
+                        set(
+                          updateToolCall(assistantId, event.toolCallId, {
+                            status: 'error',
+                            error: event.error,
+                            endTime: event.timestamp,
+                          }),
+                        );
+                        break;
+                      case 'tool_aborted':
+                        flushAll();
+                        useInspectorStore.getState().decrementActiveTools();
+                        useSessionStore.getState().touchCurrentSession(get().messages.length + 1);
+                        set(
+                          updateToolCall(assistantId, event.toolCallId, {
+                            status: 'done',
+                            error: event.error,
+                            endTime: event.timestamp,
+                            streamOutput: undefined, // clear terminal output
+                          }),
+                        );
+                        break;
+                      case 'iteration':
+                        set({ currentIteration: event.iteration, maxIterations: event.maxIterations });
+                        break;
+                      case 'system_message':
+                        useInspectorStore.getState().addSystemMessage({
+                          id: `sys-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                          content: event.content,
+                          level: event.level,
+                          timestamp: Date.now(),
+                        });
+                        break;
+                      case 'context_injected': {
+                        const disclosure = {
+                          source: event.source,
+                          producer: event.producer,
+                          detail: event.detail,
                         };
                         set((s) => ({
-                          lastCompression: { ...compaction, timestamp: Date.now() },
                           messages: [
                             ...s.messages,
                             {
-                              id: `compact-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                              id: `disclosure-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
                               role: 'system' as const,
-                              content: '上下文已压缩',
+                              content: `${disclosure.producer} 已注入上下文`,
                               timestamp: Date.now(),
-                              tags: ['system'] as Message['tags'],
-                              compaction,
+                              tags: ['injected'] as Message['tags'],
+                              disclosure,
                             },
                           ],
                         }));
+                        break;
                       }
-                      break;
-                    case 'plan_generated':
-                      useInspectorStore.getState().addPlan({
-                        planId: event.planId,
-                        steps: event.steps,
-                        status: 'pending' as const,
-                        filePath: event.filePath,
-                        agentId: event.agentId,
-                      });
-                      if (event.filePath) useAgentStore.getState().setPlanFile(event.filePath, event.agentId);
-                      flushAll();
-                      break;
-                    case 'done':
-                      // Preload routes 'done' through onEvent first, then onDone.
-                      // Flush all buffered data here so onDone only finalises.
-                      flushAll();
-                      clearStreamTimeout();
-                      clearHeartbeatInterval();
-                      flushUsageToStore();
-                      useInspectorStore.getState().setActiveToolCount(0);
-                      break;
-                    case 'error':
-                      flushAll();
-                      clearStreamTimeout();
-                      clearHeartbeatInterval();
-                      flushUsageToStore();
-                      useInspectorStore.getState().setActiveToolCount(0);
-                      break;
-                  }
-                };
-              })()),
+                      case 'thinking_chunk':
+                        thinkingBuf.push({ chunk: event.chunk, isNewBlock: event.isNewBlock });
+                        scheduleFlush();
+                        break;
+                      case 'usage_update':
+                        // Accumulate locally; flush to store on done/error to avoid per-event set()
+                        usageAcc.input += event.inputTokens;
+                        usageAcc.output += event.outputTokens;
+                        usageAcc.reasoning += event.reasoningTokens || 0;
+                        usageAcc.cacheHit += event.cacheHitTokens || 0;
+                        usageAcc.cacheMiss += event.cacheMissTokens || 0;
+                        break;
+                      case 'context_compressed':
+                        {
+                          const compaction = {
+                            tokensBefore: event.tokensBefore,
+                            tokensAfter: event.tokensAfter,
+                            messagesRemoved: event.messagesRemoved,
+                            tokensSaved: event.tokensSaved,
+                          };
+                          set((s) => ({
+                            lastCompression: { ...compaction, timestamp: Date.now() },
+                            messages: [
+                              ...s.messages,
+                              {
+                                id: `compact-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                                role: 'system' as const,
+                                content: '上下文已压缩',
+                                timestamp: Date.now(),
+                                tags: ['system'] as Message['tags'],
+                                compaction,
+                              },
+                            ],
+                          }));
+                        }
+                        break;
+                      case 'plan_generated':
+                        useInspectorStore.getState().addPlan({
+                          planId: event.planId,
+                          steps: event.steps,
+                          status: 'pending' as const,
+                          filePath: event.filePath,
+                          agentId: event.agentId,
+                        });
+                        if (event.filePath) useAgentStore.getState().setPlanFile(event.filePath, event.agentId);
+                        flushAll();
+                        break;
+                      case 'done':
+                        // Preload routes 'done' through onEvent first, then onDone.
+                        // Flush all buffered data here so onDone only finalises.
+                        flushAll();
+                        clearStreamTimeout();
+                        clearHeartbeatInterval();
+                        flushUsageToStore();
+                        useInspectorStore.getState().setActiveToolCount(0);
+                        break;
+                      case 'error':
+                        flushAll();
+                        clearStreamTimeout();
+                        clearHeartbeatInterval();
+                        flushUsageToStore();
+                        useInspectorStore.getState().setActiveToolCount(0);
+                        break;
+                    }
+                  };
+                })(),
                 onDone: () => {
                   if (stopping) return;
                   // Flush + cleanup already handled by the 'done' case in onEvent.
                   ipcSubscription?.unsubscribe();
                   ipcSubscription = null;
-                  set((s) => ({ ...setAssistantDone(assistantId)(s), isStreaming: false, currentIteration: null, maxIterations: null, lastCompression: null }));
+                  set((s) => ({
+                    ...setAssistantDone(assistantId)(s),
+                    isStreaming: false,
+                    currentIteration: null,
+                    maxIterations: null,
+                    lastCompression: null,
+                  }));
                 },
                 onError: (error: string) => {
                   if (stopping) return;
                   // Flush + cleanup already handled by the 'error' case in onEvent.
                   ipcSubscription?.unsubscribe();
                   ipcSubscription = null;
-                  set((s) => ({ ...setAssistantError(assistantId, `Error: ${error}`)(s), isStreaming: false, currentIteration: null, maxIterations: null, lastCompression: null }));
+                  set((s) => ({
+                    ...setAssistantError(assistantId, `Error: ${error}`)(s),
+                    isStreaming: false,
+                    currentIteration: null,
+                    maxIterations: null,
+                    lastCompression: null,
+                  }));
                 },
-              }
+              },
             );
 
             ipcSubscription = subscription;
             abortController = null;
-          } catch (err: any) {
+          } catch (err: unknown) {
             makeCatch(err);
           }
           return;
@@ -1279,9 +1379,7 @@ export const useChatStore = create<ChatStore>()(
                   thinkingAcc.text += chunk;
                   set((s) => ({
                     messages: s.messages.map((m) =>
-                      m.id === assistantId
-                        ? { ...m, thinkingBlocks: [{ content: thinkingAcc.text }] }
-                        : m,
+                      m.id === assistantId ? { ...m, thinkingBlocks: [{ content: thinkingAcc.text }] } : m,
                     ),
                   }));
                 },
@@ -1296,12 +1394,12 @@ export const useChatStore = create<ChatStore>()(
                 },
                 onDone: makeOnDone,
                 onError: makeOnError,
-              }
+              },
             );
 
             ipcSubscription = subscription;
             abortController = null;
-          } catch (err: any) {
+          } catch (err: unknown) {
             makeCatch(err);
           }
           return;
@@ -1327,15 +1425,13 @@ export const useChatStore = create<ChatStore>()(
               thinkingAcc.text += chunk;
               set((s) => ({
                 messages: s.messages.map((m) =>
-                  m.id === assistantId
-                    ? { ...m, thinkingBlocks: [{ content: thinkingAcc.text }] }
-                    : m,
+                  m.id === assistantId ? { ...m, thinkingBlocks: [{ content: thinkingAcc.text }] } : m,
                 ),
               }));
             },
           );
           set((s) => ({ ...setAssistantDone(assistantId)(s), isStreaming: false }));
-        } catch (err: any) {
+        } catch (err: unknown) {
           makeCatch(err);
         }
         abortController = null;
@@ -1371,7 +1467,9 @@ export const useChatStore = create<ChatStore>()(
           // with the backend process. Persisting them resurrects dead cards.
           .filter((m) => !m.permissionRequest)
           .slice(-40)
-          .map((m) => (m.isStreaming ? { ...m, isStreaming: false, content: getContentText(m.content) || '[未完成的回复]' } : m)),
+          .map((m) =>
+            m.isStreaming ? { ...m, isStreaming: false, content: getContentText(m.content) || '[未完成的回复]' } : m,
+          ),
         selectedModel: state.selectedModel,
         isDeepThink: state.isDeepThink,
         reasoningEffort: state.reasoningEffort,
@@ -1397,8 +1495,8 @@ export const useChatStore = create<ChatStore>()(
           state.inputValue = state.drafts?.[sid] ?? '';
         }
       },
-    }
-  )
+    },
+  ),
 );
 
 // Mode ⇄ plan-mode coupling + per-mode thinking snapshots:
@@ -1439,11 +1537,7 @@ useAppStore.subscribe((state, prev) => {
 // A brand-new task in Work mode re-arms plan mode — each work item is expected
 // to start with a plan. (The user can still cancel the pill for one send.)
 useChatStore.subscribe((state, prev) => {
-  if (
-    state.pendingNewTask
-    && !prev.pendingNewTask
-    && useAppStore.getState().sidebarMode === 'work'
-  ) {
+  if (state.pendingNewTask && !prev.pendingNewTask && useAppStore.getState().sidebarMode === 'work') {
     useChatStore.getState().setPendingPlanMode(true);
   }
 });
@@ -1472,13 +1566,9 @@ useChatStore.subscribe((state) => {
       if (!s.isStreaming && snapshot.sessionId) {
         // 用户可能在 500ms 内删除了该会话——已删会话不能被自动保存复活。
         if (!isSessionDeleted(snapshot.sessionId)) {
-          useSessionStore.getState().saveSession(
-            snapshot.messages,
-            snapshot.model,
-            snapshot.projectRoot,
-            snapshot.mode,
-            snapshot.sessionId,
-          );
+          useSessionStore
+            .getState()
+            .saveSession(snapshot.messages, snapshot.model, snapshot.projectRoot, snapshot.mode, snapshot.sessionId);
         }
       }
     }, 500);

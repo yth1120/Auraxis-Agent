@@ -182,7 +182,11 @@ function ToolDetail({ row }: { row: WorkToolRow }) {
             <span className="min-w-0 truncate">{input.file_path}</span>
           </div>
         )}
-        {content ? <CodeBlock text={truncate(content)} label={row.toolName} /> : <span className="text-2xs text-text-muted">{t('work.noOutput')}</span>}
+        {content ? (
+          <CodeBlock text={truncate(content)} label={row.toolName} />
+        ) : (
+          <span className="text-2xs text-text-muted">{t('work.noOutput')}</span>
+        )}
       </div>
     );
   } else if (row.toolName === 'WebSearch' || row.toolName === 'WebFetch') {
@@ -211,10 +215,18 @@ function ToolDetail({ row }: { row: WorkToolRow }) {
     const lines = Array.isArray(output)
       ? output.map((x) => (typeof x === 'string' ? x : JSON.stringify(x))).join('\n')
       : outputText(output);
-    body = lines.trim() ? <CodeBlock text={truncate(lines)} /> : <span className="text-2xs text-text-muted">{t('work.noOutput')}</span>;
+    body = lines.trim() ? (
+      <CodeBlock text={truncate(lines)} />
+    ) : (
+      <span className="text-2xs text-text-muted">{t('work.noOutput')}</span>
+    );
   } else {
     const text = outputText(output);
-    body = text.trim() ? <CodeBlock text={truncate(text)} /> : <span className="text-2xs text-text-muted">{t('work.noOutput')}</span>;
+    body = text.trim() ? (
+      <CodeBlock text={truncate(text)} />
+    ) : (
+      <span className="text-2xs text-text-muted">{t('work.noOutput')}</span>
+    );
   }
 
   return (
@@ -275,13 +287,9 @@ function TurnCard({
           {t('work.turn', { n: String(turn.iteration + 1) })}
         </span>
         <span className="shrink-0 font-mono text-2xs text-text-muted tabular-nums">{formatTime(turn.startTs)}</span>
-        <span className="shrink-0 text-2xs text-text-faint">
-          {t('work.turnTools', { n: String(turn.toolCount) })}
-        </span>
+        <span className="shrink-0 text-2xs text-text-faint">{t('work.turnTools', { n: String(turn.toolCount) })}</span>
         {turn.errorCount > 0 && (
-          <span className="shrink-0 text-2xs text-danger">
-            {t('work.turnFailed', { n: String(turn.errorCount) })}
-          </span>
+          <span className="shrink-0 text-2xs text-danger">{t('work.turnFailed', { n: String(turn.errorCount) })}</span>
         )}
         <span className="flex-1" />
         {turn.endTs != null && (
@@ -289,7 +297,10 @@ function TurnCard({
             {formatWorkDuration(turn.endTs - turn.startTs)}
           </span>
         )}
-        <CaretDown size={14} className={clsx('shrink-0 text-text-muted transition-transform duration-200', collapsed && '-rotate-90')} />
+        <CaretDown
+          size={14}
+          className={clsx('shrink-0 text-text-muted transition-transform duration-200', collapsed && '-rotate-90')}
+        />
       </button>
 
       {!collapsed && (
@@ -324,9 +335,14 @@ function TurnCard({
             }
             if (item.kind === 'warning') {
               return (
-                <div key={i} className="flex items-start gap-2 px-2.5 py-2 rounded-xl bg-[var(--color-danger-soft)] border border-danger/25">
+                <div
+                  key={i}
+                  className="flex items-start gap-2 px-2.5 py-2 rounded-xl bg-[var(--color-danger-soft)] border border-danger/25"
+                >
                   <WarningCircle size={13} className="mt-[2px] shrink-0 text-danger" />
-                  <span className="min-w-0 text-2xs leading-[1.55] text-danger whitespace-pre-wrap break-words">{item.text}</span>
+                  <span className="min-w-0 text-2xs leading-[1.55] text-danger whitespace-pre-wrap break-words">
+                    {item.text}
+                  </span>
                 </div>
               );
             }
@@ -346,7 +362,9 @@ function TurnCard({
                 key={row.key}
                 className={clsx(
                   'rounded-xl border overflow-hidden',
-                  failed ? 'border-danger/30 bg-[var(--color-danger-soft)]' : 'border-border-dim bg-[var(--color-bg-inset)]',
+                  failed
+                    ? 'border-danger/30 bg-[var(--color-danger-soft)]'
+                    : 'border-border-dim bg-[var(--color-bg-inset)]',
                 )}
               >
                 <button
@@ -363,7 +381,9 @@ function TurnCard({
                   >
                     {TOOL_ICON[row.toolName] ?? <Lightning size={14} />}
                   </span>
-                  <span className="shrink-0 min-w-[72px] font-mono text-2xs font-medium text-text-primary">{row.toolName}</span>
+                  <span className="shrink-0 min-w-[72px] font-mono text-2xs font-medium text-text-primary">
+                    {row.toolName}
+                  </span>
                   <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-2xs text-text-muted">
                     {row.error ? row.error : toolSummary(row)}
                   </span>
@@ -383,7 +403,10 @@ function TurnCard({
                   )}
                   <CaretDown
                     size={13}
-                    className={clsx('shrink-0 text-text-muted transition-transform duration-200', expanded && 'rotate-180')}
+                    className={clsx(
+                      'shrink-0 text-text-muted transition-transform duration-200',
+                      expanded && 'rotate-180',
+                    )}
                   />
                 </button>
                 {expanded && (

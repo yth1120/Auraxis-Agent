@@ -24,12 +24,37 @@ export function isPathInside(child: string, parent: string): boolean {
 // ─── File extension allowlist ──────────────────────────
 
 export const SAFE_EXTENSIONS = new Set([
-  '.ts', '.tsx', '.js', '.jsx', '.css', '.html', '.json', '.md',
-  '.mjs', '.cjs', '.vue', '.svelte',
-  '.scss', '.less', '.py', '.rs', '.go', '.java',
-  '.yaml', '.yml', '.toml', '.xml', '.svg', '.txt',
-  '.env', '.gitignore', '.dockerignore',
-  '.docx', '.xlsx', '.pptx', '.pdf',
+  '.ts',
+  '.tsx',
+  '.js',
+  '.jsx',
+  '.css',
+  '.html',
+  '.json',
+  '.md',
+  '.mjs',
+  '.cjs',
+  '.vue',
+  '.svelte',
+  '.scss',
+  '.less',
+  '.py',
+  '.rs',
+  '.go',
+  '.java',
+  '.yaml',
+  '.yml',
+  '.toml',
+  '.xml',
+  '.svg',
+  '.txt',
+  '.env',
+  '.gitignore',
+  '.dockerignore',
+  '.docx',
+  '.xlsx',
+  '.pptx',
+  '.pdf',
 ]);
 
 /** Binary document extensions handled by ReadDocument / WriteDocument. */
@@ -47,9 +72,19 @@ export function isAllowedExtension(filePath: string): boolean {
 // ─── Directory exclusions ──────────────────────────────
 
 export const EXCLUDED_DIRS = new Set([
-  'node_modules', '.git', 'dist', '.next', '__pycache__',
-  '.venv', 'venv', 'target', 'build', 'out',
-  '.turbo', 'coverage', '.nyc_output',
+  'node_modules',
+  '.git',
+  'dist',
+  '.next',
+  '__pycache__',
+  '.venv',
+  'venv',
+  'target',
+  'build',
+  'out',
+  '.turbo',
+  'coverage',
+  '.nyc_output',
 ]);
 
 // ─── Dev-only logging ───────────────────────────────────

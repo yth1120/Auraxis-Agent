@@ -19,19 +19,6 @@ const extraHooks: NonNullable<Plugin['hooks']>[] = [];
 // ─── Plugin Manager ────────────────────────────────────
 
 class PluginManager {
-  /**
-   * Get the secure storage directory for plugin files.
-   * In Electron: copies to userData/plugins/{pluginId}/
-   */
-  private getPluginDir(pluginId: string): string {
-    // Use a safe default for non-Electron environments
-    if (typeof window !== 'undefined' && (window as any).electronAPI) {
-      // The actual copy happens in the main process via IPC
-      return `userData/plugins/${pluginId}/`;
-    }
-    return `plugins/${pluginId}/`;
-  }
-
   /** Install from a dynamically loaded module object */
   install(plugin: Plugin, filePath: string): boolean {
     return this.installInternal(plugin, filePath, true);
@@ -62,9 +49,7 @@ class PluginManager {
       riskLines.push(...risks.map((r) => `• ${r}`));
     }
 
-    const riskText = riskLines.length > 0
-      ? `\n\n${riskLines.join('\n')}`
-      : '';
+    const riskText = riskLines.length > 0 ? `\n\n${riskLines.join('\n')}` : '';
 
     if (requireConfirm) {
       const confirmed = confirm(
@@ -74,9 +59,13 @@ class PluginManager {
     }
 
     const info: InstalledPlugin = {
-      id: plugin.id, name: plugin.name, version: plugin.version,
-      description: plugin.description, enabled: false, // Must be manually enabled after review
-      installedAt: Date.now(), path: filePath,
+      id: plugin.id,
+      name: plugin.name,
+      version: plugin.version,
+      description: plugin.description,
+      enabled: false, // Must be manually enabled after review
+      installedAt: Date.now(),
+      path: filePath,
     };
     store.installPlugin(info, plugin);
     return true;
@@ -140,7 +129,9 @@ class PluginManager {
           store.setActivePlugins([...store.activePlugins.filter((p) => p.id !== plugin.id), plugin]);
           this.activatePlugin(plugin);
         }
-      } catch (e) { console.warn(`[plugin] failed to load ${info.id}:`, e); }
+      } catch (e) {
+        console.warn(`[plugin] failed to load ${info.id}:`, e);
+      }
     }
   }
 
@@ -162,7 +153,13 @@ class PluginManager {
   ) {
     for (const h of extraHooks) {
       const fn = h[hook] as any;
-      if (fn) { try { fn(...args); } catch { /* non-fatal */ } }
+      if (fn) {
+        try {
+          fn(...args);
+        } catch {
+          /* non-fatal */
+        }
+      }
     }
   }
 

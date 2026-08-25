@@ -7,15 +7,7 @@ import type { CompactionData, ContextDisclosure } from './chat';
 
 // ─── Status ────────────────────────────────────────
 
-export type AgentStatus =
-  | 'idle'
-  | 'queued'
-  | 'running'
-  | 'paused'
-  | 'completed'
-  | 'error'
-  | 'stopped'
-  | 'review';
+export type AgentStatus = 'idle' | 'queued' | 'running' | 'paused' | 'completed' | 'error' | 'stopped' | 'review';
 
 // ─── Priority ──────────────────────────────────────
 
@@ -24,7 +16,22 @@ export type AgentPriority = 'high' | 'normal' | 'low';
 // ─── Log ───────────────────────────────────────────
 
 export interface AgentLogEntry {
-  type: 'text' | 'thinking' | 'user_message' | 'tool_start' | 'tool_end' | 'tool_error' | 'iteration_start' | 'iteration_end' | 'turn_start' | 'turn_end' | 'error' | 'plan' | 'progress' | 'warning' | 'context';
+  type:
+    | 'text'
+    | 'thinking'
+    | 'user_message'
+    | 'tool_start'
+    | 'tool_end'
+    | 'tool_error'
+    | 'iteration_start'
+    | 'iteration_end'
+    | 'turn_start'
+    | 'turn_end'
+    | 'error'
+    | 'plan'
+    | 'progress'
+    | 'warning'
+    | 'context';
   timestamp: number;
   text?: string;
   toolCallId?: string;
@@ -225,7 +232,11 @@ export interface AgentStore {
   pauseAgent: (agentId: string) => Promise<void>;
   resumeAgent: (agentId: string) => Promise<void>;
   /** Continue a settled task on the SAME agent (id/workspace/history). */
-  continueAgent: (agentId: string, instruction: string, displayInstruction?: string) => Promise<{ ok: boolean; error?: string }>;
+  continueAgent: (
+    agentId: string,
+    instruction: string,
+    displayInstruction?: string,
+  ) => Promise<{ ok: boolean; error?: string }>;
   /** Work 交付验收通过：review → completed。 */
   approveDelivery: (agentId: string) => Promise<{ ok: boolean; error?: string }>;
   setAgentPriority: (agentId: string, priority: AgentPriority) => Promise<void>;

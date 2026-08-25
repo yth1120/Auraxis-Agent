@@ -6,7 +6,7 @@
  * copies those files back, so the user can return to a named point in time
  * without losing the conversation.
  */
-import { ipcMain } from 'electron';
+import { errorText } from '../errors';
 import { secureHandle } from './trust';
 import { resolveTrustedProjectRoot } from './project-access';
 import { promises as fs } from 'fs';
@@ -61,10 +61,7 @@ async function readManifest(projectRoot: string, id: string): Promise<NamedSnaps
   }
 }
 
-export async function createNamedSnapshot(
-  projectRoot: string,
-  name: string,
-): Promise<NamedSnapshot> {
+export async function createNamedSnapshot(projectRoot: string, name: string): Promise<NamedSnapshot> {
   const trimmed = name.trim();
   if (!trimmed) throw new Error('快照名称不能为空');
   if (trimmed.length > 60) throw new Error('快照名称最长 60 个字符');
@@ -191,8 +188,8 @@ export function registerSnapshotHandlers() {
       const root = await resolveTrustedProjectRoot(projectRoot);
       const snap = await createNamedSnapshot(root, name);
       return { ok: true, data: snap };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
@@ -200,8 +197,8 @@ export function registerSnapshotHandlers() {
     try {
       const root = await resolveTrustedProjectRoot(projectRoot);
       return { ok: true, data: await listNamedSnapshots(root) };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
@@ -210,8 +207,8 @@ export function registerSnapshotHandlers() {
       const root = await resolveTrustedProjectRoot(projectRoot);
       const result = await restoreNamedSnapshot(id, root);
       return { ok: true, data: result };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
@@ -220,8 +217,8 @@ export function registerSnapshotHandlers() {
       const root = await resolveTrustedProjectRoot(projectRoot);
       await deleteNamedSnapshot(id, root);
       return { ok: true };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 }

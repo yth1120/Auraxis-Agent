@@ -60,13 +60,16 @@ function eventToEntries(e: ReplayEvent): AgentLogEntry[] {
         case 'start':
           return [{ type: 'tool_start', ...base }];
         case 'end':
-          return [{
-            type: 'tool_end',
-            ...base,
-            output: d.output,
-            durationMs: num(d.durationMs),
-            summary: (d.summary && typeof d.summary === 'object' ? d.summary : undefined) as Record<string, unknown> | undefined,
-          }];
+          return [
+            {
+              type: 'tool_end',
+              ...base,
+              output: d.output,
+              durationMs: num(d.durationMs),
+              summary: (d.summary && typeof d.summary === 'object' ? d.summary : undefined) as
+                Record<string, unknown> | undefined,
+            },
+          ];
         case 'error':
           return [{ type: 'tool_error', ...base, error: str(d.error) || '工具执行失败' }];
         case 'progress': {
@@ -97,13 +100,15 @@ function eventToEntries(e: ReplayEvent): AgentLogEntry[] {
             return [{ type: 'iteration_start', timestamp: e.ts, iteration: num(d.iteration) }];
           }
           if (d.action === 'end') {
-            return [{
-              type: 'iteration_end',
-              timestamp: e.ts,
-              iteration: num(d.iteration),
-              toolsThisIteration: num(d.toolsThisIteration),
-              llmLatencyMs: num(d.llmLatencyMs),
-            }];
+            return [
+              {
+                type: 'iteration_end',
+                timestamp: e.ts,
+                iteration: num(d.iteration),
+                toolsThisIteration: num(d.toolsThisIteration),
+                llmLatencyMs: num(d.llmLatencyMs),
+              },
+            ];
           }
           return [];
         case 'context_compressed': {

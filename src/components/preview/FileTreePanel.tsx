@@ -1,16 +1,9 @@
+import { errorText } from '../../../electron/errors';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { message } from 'antd';
 import clsx from 'clsx';
 import FileTree from '../layout/FileTree';
-import {
-  ArrowSquareOut,
-  Copy,
-  ExternalLink,
-  FileText,
-  Folder,
-  MagnifyingGlass,
-  X,
-} from '@/components/common/icons';
+import { ArrowSquareOut, Copy, ExternalLink, FileText, Folder, MagnifyingGlass, X } from '@/components/common/icons';
 import LoadingState from '../common/LoadingState';
 import { useSettingsStore } from '@/stores/useSettingsStore';
 import { useFileTreeStore } from '@/stores/useFileTreeStore';
@@ -61,18 +54,21 @@ export default function FileTreePanel({ tabId: _tabId, variant = 'tabs' }: FileT
     }
   };
 
-  const openFile = useCallback(async (path: string) => {
-    setFile(path);
-    setLoading(true);
-    try {
-      const r = await window.electronAPI?.file.read(path, projectRoot ?? undefined);
-      setContent(r?.ok ? (r.data ?? '') : tPanel('ftp.readFailed', { error: String(r?.error ?? '') }));
-    } catch (e: any) {
-      setContent(tPanel('ftp.readFailed', { error: String(e?.message ?? e) }));
-    } finally {
-      setLoading(false);
-    }
-  }, [projectRoot]);
+  const openFile = useCallback(
+    async (path: string) => {
+      setFile(path);
+      setLoading(true);
+      try {
+        const r = await window.electronAPI?.file.read(path, projectRoot ?? undefined);
+        setContent(r?.ok ? (r.data ?? '') : tPanel('ftp.readFailed', { error: String(r?.error ?? '') }));
+      } catch (e: unknown) {
+        setContent(tPanel('ftp.readFailed', { error: String(errorText(e)) }));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [projectRoot, tPanel],
+  );
 
   useEffect(() => {
     // Project switch clears the stale preview.
@@ -98,13 +94,16 @@ export default function FileTreePanel({ tabId: _tabId, variant = 'tabs' }: FileT
     useAppStore.getState().clearOpenFileRequest();
   }, [isTabs, openFileRequest]);
 
-  const selectFile = useCallback((path: string) => {
-    if (isTabs) {
-      useAppStore.getState().openFileTab(path);
-    } else {
-      void openFile(path);
-    }
-  }, [isTabs, openFile]);
+  const selectFile = useCallback(
+    (path: string) => {
+      if (isTabs) {
+        useAppStore.getState().openFileTab(path);
+      } else {
+        void openFile(path);
+      }
+    },
+    [isTabs, openFile],
+  );
 
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -152,9 +151,7 @@ export default function FileTreePanel({ tabId: _tabId, variant = 'tabs' }: FileT
     <div
       className={clsx(
         'min-h-0 flex flex-col',
-        embedded
-          ? 'shrink-0 h-[42%] border-t border-[var(--color-border-dim)]'
-          : 'flex-1 border-t-0',
+        embedded ? 'shrink-0 h-[42%] border-t border-[var(--color-border-dim)]' : 'flex-1 border-t-0',
       )}
     >
       <div className="flex items-center gap-2 px-3 py-1.5 shrink-0">
@@ -165,7 +162,7 @@ export default function FileTreePanel({ tabId: _tabId, variant = 'tabs' }: FileT
           type="button"
           className="text-2xs text-text-muted px-1.5 py-[2px] rounded-md cursor-pointer hover:bg-[var(--color-hover)] hover:text-text-secondary"
           onClick={() => void copyContent()}
-      title={tPanel('ftp.copyTip')}
+          title={tPanel('ftp.copyTip')}
         >
           <Copy size={14} />
         </button>
@@ -174,10 +171,10 @@ export default function FileTreePanel({ tabId: _tabId, variant = 'tabs' }: FileT
           className="text-2xs text-text-muted px-1.5 py-[2px] rounded-md cursor-pointer hover:bg-[var(--color-hover)] hover:text-text-secondary"
           onClick={() => {
             void window.electronAPI?.shell.openFileInVSCode(file ?? '').then((r) => {
-    if (r && !r.ok) message.error(r.error || tPanel('ftp.openVSCodeFailed'));
+              if (r && !r.ok) message.error(r.error || tPanel('ftp.openVSCodeFailed'));
             });
           }}
-      title={tPanel('ftp.openVSCode')}
+          title={tPanel('ftp.openVSCode')}
         >
           <ArrowSquareOut size={14} />
         </button>
@@ -187,7 +184,7 @@ export default function FileTreePanel({ tabId: _tabId, variant = 'tabs' }: FileT
           onClick={() => {
             void window.electronAPI?.shell.openPath(file ?? '');
           }}
-      title={tPanel('ftp.openSystem')}
+          title={tPanel('ftp.openSystem')}
         >
           <ExternalLink size={14} />
         </button>
@@ -248,7 +245,7 @@ export default function FileTreePanel({ tabId: _tabId, variant = 'tabs' }: FileT
       {query.trim() ? (
         matches.length === 0 ? (
           <div className="flex-1 min-h-0 flex items-center justify-center px-6 pb-8">
-    <p className="text-2xs text-[var(--color-text-muted)] text-center">{tPanel('ftp.noMatch')}</p>
+            <p className="text-2xs text-[var(--color-text-muted)] text-center">{tPanel('ftp.noMatch')}</p>
           </div>
         ) : (
           <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-1.5 pb-2">
@@ -283,7 +280,7 @@ export default function FileTreePanel({ tabId: _tabId, variant = 'tabs' }: FileT
         <div
           className="shrink-0 flex items-center gap-1 px-2 pt-1.5 pb-1.5 overflow-x-auto [scrollbar-width:none] border-b border-[var(--color-border-dim)]"
           role="tablist"
-      aria-label={tPanel('ftp.openTabs')}
+          aria-label={tPanel('ftp.openTabs')}
         >
           <button
             type="button"
@@ -298,7 +295,7 @@ export default function FileTreePanel({ tabId: _tabId, variant = 'tabs' }: FileT
             onClick={() => useAppStore.getState().setActiveFilePath(null)}
           >
             <Folder size={14} className={!activeFilePath ? 'text-primary' : 'text-faint'} />
-      {tPanel('ftp.fileTree')}
+            {tPanel('ftp.fileTree')}
           </button>
           {fileTabs.map((t) => {
             const active = t.path === activeFilePath;

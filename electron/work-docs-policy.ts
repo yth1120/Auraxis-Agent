@@ -25,31 +25,75 @@ const WORK_SHELL_MUTATION_TOOLS = new Set(['Bash', 'Pwsh']);
 
 /** 源代码 / 脚本 / Web 前端等“代码文件”扩展名。 */
 const CODE_EXTENSIONS = new Set([
-  'ts', 'tsx', 'mts', 'cts',
-  'js', 'jsx', 'mjs', 'cjs',
-  'py', 'pyw',
-  'java', 'kt', 'kts',
-  'c', 'h', 'cpp', 'hpp', 'cc', 'cxx', 'hxx', 'cs',
-  'go', 'rs', 'rb', 'php', 'swift', 'scala', 'sc',
-  'sh', 'bash', 'zsh', 'bat', 'cmd', 'ps1', 'psm1',
-  'sql', 'html', 'htm', 'css', 'scss', 'less', 'sass',
-  'vue', 'svelte', 'astro', 'graphql', 'proto', 'dart',
-  'ex', 'exs', 'erl', 'hs', 'lua', 'r', 'm', 'mm',
-  'groovy', 'gradle', 'tf', 'tfvars',
+  'ts',
+  'tsx',
+  'mts',
+  'cts',
+  'js',
+  'jsx',
+  'mjs',
+  'cjs',
+  'py',
+  'pyw',
+  'java',
+  'kt',
+  'kts',
+  'c',
+  'h',
+  'cpp',
+  'hpp',
+  'cc',
+  'cxx',
+  'hxx',
+  'cs',
+  'go',
+  'rs',
+  'rb',
+  'php',
+  'swift',
+  'scala',
+  'sc',
+  'sh',
+  'bash',
+  'zsh',
+  'bat',
+  'cmd',
+  'ps1',
+  'psm1',
+  'sql',
+  'html',
+  'htm',
+  'css',
+  'scss',
+  'less',
+  'sass',
+  'vue',
+  'svelte',
+  'astro',
+  'graphql',
+  'proto',
+  'dart',
+  'ex',
+  'exs',
+  'erl',
+  'hs',
+  'lua',
+  'r',
+  'm',
+  'mm',
+  'groovy',
+  'gradle',
+  'tf',
+  'tfvars',
 ]);
 
 /** 无扩展名但本质是构建/脚本入口的文件名。 */
-const CODE_BASENAMES = new Set([
-  'dockerfile',
-  'makefile',
-  'cmakelists.txt',
-  'justfile',
-  'gemfile',
-  'rakefile',
-]);
+const CODE_BASENAMES = new Set(['dockerfile', 'makefile', 'cmakelists.txt', 'justfile', 'gemfile', 'rakefile']);
 
 export function isCodeFilePath(filePath: string): boolean {
-  const normalized = String(filePath || '').trim().toLowerCase();
+  const normalized = String(filePath || '')
+    .trim()
+    .toLowerCase();
   if (!normalized) return false;
   const ext = normalized.slice(normalized.lastIndexOf('.') + 1);
   if (CODE_EXTENSIONS.has(ext)) return true;
@@ -128,10 +172,7 @@ export function workDocsOnlyVerdict(
     return { allowed: true };
   }
 
-  if (
-    WORK_SHELL_MUTATION_TOOLS.has(toolName)
-    && typeof input.command === 'string'
-  ) {
+  if (WORK_SHELL_MUTATION_TOOLS.has(toolName) && typeof input.command === 'string') {
     const target = shellCommandTargetsCode(input.command);
     if (target) {
       return {
@@ -160,10 +201,7 @@ export const WORK_CLARIFY_RULE = `
 任务已经明确时不要为了提问而提问。`;
 
 /** 给 Work 任务的系统提示追加边界规则。 */
-export function appendWorkDocsSystemRule(
-  systemPrompt: string,
-  surface: WorkSurface | undefined,
-): string {
+export function appendWorkDocsSystemRule(systemPrompt: string, surface: WorkSurface | undefined): string {
   if (surface !== 'work') return systemPrompt;
   if (systemPrompt.includes('## Work 模式边界')) return systemPrompt;
   return `${systemPrompt}\n${WORK_DOCS_ONLY_SYSTEM_RULE}`;

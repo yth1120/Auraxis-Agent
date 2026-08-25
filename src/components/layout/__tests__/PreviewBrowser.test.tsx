@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, fireEvent } from '@testing-library/react';
+import { render } from '@testing-library/react';
 import PreviewBrowser from '../PreviewBrowser';
 
 describe('PreviewBrowser — 预览浏览器按钮', () => {

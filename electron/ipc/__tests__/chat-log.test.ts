@@ -105,9 +105,7 @@ describe('chat-log', () => {
       { type: 'user', ts: 1000, data: { text: '第一条消息' } },
       { type: 'assistant_chunk', ts: 1001, data: { text: '回复' } },
     ]);
-    await appendChatEvents('session-chat-2', [
-      { type: 'user', ts: 2000, data: { text: '第二条会话' } },
-    ]);
+    await appendChatEvents('session-chat-2', [{ type: 'user', ts: 2000, data: { text: '第二条会话' } }]);
     await appendChatMeta('session-chat-2', { title: '手动标题', messageCount: 7 });
 
     const list = await listChatSessions();

@@ -6,6 +6,7 @@
  *   - json : emit NDJSON events + a final `result` record
  */
 
+import { errorText } from './errors';
 import { app } from 'electron';
 import { rmSync } from 'fs';
 import type { CliArgs } from './cli-args';
@@ -21,10 +22,24 @@ import { isPermissionPreset, PERMISSION_PRESETS } from './contracts/permission';
 
 /** Tools that never mutate anything — safe to allow even in headless ask mode. */
 const READ_ONLY_TOOLS = new Set([
-  'Read', 'Grep', 'Glob', 'WebFetch', 'WebSearch', 'LSP',
-  'SessionQuery', 'SessionEventSearch', 'SessionEventRead', 'SessionTrace',
-  'ReadSpill', 'ListAgents', 'ListSkills', 'InspectRuntime', 'TaskList',
-  'TaskOutput', 'CronList', 'GetGoal',
+  'Read',
+  'Grep',
+  'Glob',
+  'WebFetch',
+  'WebSearch',
+  'LSP',
+  'SessionQuery',
+  'SessionEventSearch',
+  'SessionEventRead',
+  'SessionTrace',
+  'ReadSpill',
+  'ListAgents',
+  'ListSkills',
+  'InspectRuntime',
+  'TaskList',
+  'TaskOutput',
+  'CronList',
+  'GetGoal',
 ]);
 
 export interface HeadlessRunOptions extends CliArgs {
@@ -39,7 +54,9 @@ function toolSummary(toolName: string, input: Record<string, unknown>): string {
       return String(input.file_path ?? '');
     case 'Bash':
     case 'Pwsh':
-      return String(input.command ?? '').replace(/\s+/g, ' ').slice(0, 80);
+      return String(input.command ?? '')
+        .replace(/\s+/g, ' ')
+        .slice(0, 80);
     case 'Grep':
     case 'Glob':
       return String(input.pattern ?? '');
@@ -62,14 +79,17 @@ export async function runHeadlessTask(opts: HeadlessRunOptions): Promise<number>
   const settings = (await readSettings().catch(() => ({}))) as Record<string, any>;
 
   const model = opts.model || settings.defaultModel || 'deepseek-v4-pro';
-  const apiKey = opts.apiKey
-    || (await resolveModelApiKey(model))
-    || process.env.DEEPSEEK_API_KEY
-    || (await resolveCredential('DEEPSEEK_API_KEY').catch(() => undefined))?.value
-    || settings.deepseekApiKey
-    || '';
+  const apiKey =
+    opts.apiKey ||
+    (await resolveModelApiKey(model)) ||
+    process.env.DEEPSEEK_API_KEY ||
+    (await resolveCredential('DEEPSEEK_API_KEY').catch(() => undefined))?.value ||
+    settings.deepseekApiKey ||
+    '';
   if (!apiKey) {
-    process.stderr.write('错误: 未配置 API Key。请使用 --api-key、设置 DEEPSEEK_API_KEY 环境变量，或先在桌面应用设置中配置。\n');
+    process.stderr.write(
+      '错误: 未配置 API Key。请使用 --api-key、设置 DEEPSEEK_API_KEY 环境变量，或先在桌面应用设置中配置。\n',
+    );
     return 2;
   }
 
@@ -79,14 +99,13 @@ export async function runHeadlessTask(opts: HeadlessRunOptions): Promise<number>
     ? PERMISSION_PRESETS[settings.permissionPreset]
     : undefined;
   const mode = opts.mode || preset?.mode || 'auto';
-  const sandboxMode: SandboxMode = opts.sandbox
-    || preset?.sandboxMode
-    || (settings.sandboxMode === 'read' || settings.sandboxMode === 'workspace-write' || settings.sandboxMode === 'full'
+  const sandboxMode: SandboxMode =
+    opts.sandbox ||
+    preset?.sandboxMode ||
+    (settings.sandboxMode === 'read' || settings.sandboxMode === 'workspace-write' || settings.sandboxMode === 'full'
       ? settings.sandboxMode
       : 'workspace-write');
-  const autoApprove = opts.autoApprove !== undefined
-    ? opts.autoApprove
-    : (preset ? preset.autoApprove : mode === 'auto');
+  const autoApprove = opts.autoApprove !== undefined ? opts.autoApprove : preset ? preset.autoApprove : mode === 'auto';
   const json = opts.json === true;
   const verbose = opts.verbose === true || json;
 
@@ -163,9 +182,10 @@ export async function runHeadlessTask(opts: HeadlessRunOptions): Promise<number>
   };
 
   const platform = process.platform === 'win32' ? 'Windows' : process.platform === 'darwin' ? 'macOS' : 'Linux';
-  const shellHint = process.platform === 'win32'
-    ? 'On Windows, the shell is Git Bash — standard Unix commands work natively. Use them freely.'
-    : 'Use standard Unix shell commands.';
+  const shellHint =
+    process.platform === 'win32'
+      ? 'On Windows, the shell is Git Bash — standard Unix commands work natively. Use them freely.'
+      : 'Use standard Unix shell commands.';
   const systemPrompt = getAgentDef('general-purpose').getSystemPrompt(opts.task, platform, shellHint, projectRoot);
 
   const checkPermission = async (toolName: string): Promise<boolean> => {
@@ -221,19 +241,21 @@ export async function runHeadlessTask(opts: HeadlessRunOptions): Promise<number>
         `[结果] 状态=${hadError ? 'error' : 'completed'} 轮次=${result.iterations} 工具调用=${result.toolCallCount}\n`,
       );
     } else {
-      process.stdout.write(`${JSON.stringify({
-        type: 'result',
-        ok: !hadError,
-        text: (streamedText || result.allText).trim(),
-        iterations: result.iterations,
-        toolCallCount: result.toolCallCount,
-        plan: result.plan,
-      })}\n`);
+      process.stdout.write(
+        `${JSON.stringify({
+          type: 'result',
+          ok: !hadError,
+          text: (streamedText || result.allText).trim(),
+          iterations: result.iterations,
+          toolCallCount: result.toolCallCount,
+          plan: result.plan,
+        })}\n`,
+      );
     }
 
     return hadError ? 1 : 0;
-  } catch (err: any) {
-    const message = err?.message || String(err);
+  } catch (err: unknown) {
+    const message = errorText(err) || String(err);
     if (json) {
       process.stdout.write(`${JSON.stringify({ type: 'error', error: message })}\n`);
     } else {
@@ -252,6 +274,8 @@ export async function cliRunTask(args: CliArgs, task: string): Promise<void> {
   try {
     const cliUserData = process.env.AURAXIS_CLI_USER_DATA;
     if (cliUserData) rmSync(cliUserData, { recursive: true, force: true });
-  } catch { /* best-effort cleanup */ }
+  } catch {
+    /* best-effort cleanup */
+  }
   app.exit(code);
 }

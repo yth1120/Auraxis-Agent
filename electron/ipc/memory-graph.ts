@@ -14,8 +14,6 @@ import {
   listReadRuns,
   listSignals,
   newId,
-  type BeliefRecord,
-  type EvidenceRecord,
   type EvidenceRole,
 } from './memory-db';
 
@@ -200,11 +198,7 @@ export function filterGraphByRole(graph: MemoryGraph, role: AgentRole): MemoryGr
 }
 
 /** 路径信任：来源信任 × 0.8^(路径长度)。直接支持路径长度为 1。 */
-export function computeTrust(
-  graph: MemoryGraph,
-  beliefId: string,
-  evidenceIds: string[],
-): number {
+export function computeTrust(graph: MemoryGraph, beliefId: string, evidenceIds: string[]): number {
   const beliefNode = `bel:${beliefId}`;
   if (!graph.nodes.some((n) => n.id === beliefNode)) return 0;
   let best = 0;
@@ -212,9 +206,7 @@ export function computeTrust(
     const sourceNode = `ev:${evidenceId}`;
     const source = graph.nodes.find((n) => n.id === sourceNode);
     if (!source || typeof source.trust !== 'number') continue;
-    const support = graph.edges.find(
-      (e) => e.from === beliefNode && e.to === sourceNode && e.kind === 'supported_by',
-    );
+    const support = graph.edges.find((e) => e.from === beliefNode && e.to === sourceNode && e.kind === 'supported_by');
     const strength = typeof support?.trust === 'number' ? support.trust : 1;
     best = Math.max(best, source.trust * strength * 0.8);
   }
@@ -231,11 +223,7 @@ export function riskLevelForTool(toolName: string): 'low' | 'medium' | 'high' {
  * 风险敏感动作门控：高危险动作要求 trust ≥ 0.7 且 ≥2 条证据；
  * 中等危险动作要求 trust ≥ 0.5 且 ≥1 条证据；低危动作放行。
  */
-export function evaluateRiskGate(
-  toolName: string,
-  trust: number,
-  evidenceCount: number,
-): RiskVerdict {
+export function evaluateRiskGate(toolName: string, trust: number, evidenceCount: number): RiskVerdict {
   const risk = riskLevelForTool(toolName);
   if (risk === 'low') return { allowed: true, trust, evidenceCount };
   const requiredTrust = risk === 'high' ? 0.7 : 0.5;
@@ -287,7 +275,11 @@ export function createMemoryRiskGate(scope: string, role: AgentRole = 'general-p
     let bestEvidence = 0;
     for (const b of beliefs) {
       const own = links.filter((l) => l.belief_id === b.id);
-      const trust = computeTrust(graph, b.id, own.map((l) => l.evidence_id));
+      const trust = computeTrust(
+        graph,
+        b.id,
+        own.map((l) => l.evidence_id),
+      );
       if (trust > bestTrust) {
         bestTrust = trust;
         bestEvidence = own.length;

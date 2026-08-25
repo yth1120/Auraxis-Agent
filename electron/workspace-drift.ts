@@ -171,7 +171,7 @@ export function driftSummary(files: DriftedFile[]): string {
   const lines = files.map((f) => {
     const rel = path.relative(process.cwd(), f.filePath).replace(/\\/g, '/');
     const name = rel && !rel.startsWith('..') ? rel : f.filePath.replace(/\\/g, '/');
-    return `- ${name}（${f.reason === 'size' ? '大小变化' : f.reason === 'mtime' ? '修改时间变化' : '内容变化' }）`;
+    return `- ${name}（${f.reason === 'size' ? '大小变化' : f.reason === 'mtime' ? '修改时间变化' : '内容变化'}）`;
   });
   return (
     `[工作区变更] 检测到 ${files.length} 个文件在任务执行期间被外部修改（可能来自用户或其它进程）：\n` +

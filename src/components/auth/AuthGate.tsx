@@ -1,3 +1,4 @@
+import { errorText } from '../../../electron/errors';
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Button, Checkbox, Input } from 'antd';
@@ -27,7 +28,10 @@ function AuthShell({ children, avatar, name }: { children: ReactNode; avatar?: s
               </>
             ) : (
               <>
-                <div className="text-lg font-bold text-text-primary tracking-[0.02em]" style={{ fontFamily: 'var(--font-heading)' }}>
+                <div
+                  className="text-lg font-bold text-text-primary tracking-[0.02em]"
+                  style={{ fontFamily: 'var(--font-heading)' }}
+                >
                   Auraxis
                 </div>
                 <div className="mt-1 text-xs leading-[18px] text-text-muted">{t('auth.subtitle')}</div>
@@ -86,9 +90,9 @@ function SetupScreen() {
       const msg = res?.error || t('auth.connectFailed');
       setConnectMsg(msg);
       return { ok: false, msg };
-    } catch (err: any) {
+    } catch (err: unknown) {
       setConnectState('fail');
-      const msg = err?.message || t('auth.connectFailed');
+      const msg = errorText(err) || t('auth.connectFailed');
       setConnectMsg(msg);
       return { ok: false, msg };
     }
@@ -138,16 +142,34 @@ function SetupScreen() {
         }}
       >
         <Field label={t('auth.name')}>
-          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('auth.namePlaceholder')} autoFocus />
+          <Input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder={t('auth.namePlaceholder')}
+            autoFocus
+          />
         </Field>
         <Field label={t('auth.email')}>
-          <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t('auth.emailPlaceholder')} type="email" />
+          <Input
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder={t('auth.emailPlaceholder')}
+            type="email"
+          />
         </Field>
         <Field label={t('auth.password')}>
-          <Input.Password value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t('auth.passwordPlaceholder')} />
+          <Input.Password
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder={t('auth.passwordPlaceholder')}
+          />
         </Field>
         <Field label={t('auth.confirmPassword')}>
-          <Input.Password value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder={t('auth.confirmPasswordPlaceholder')} />
+          <Input.Password
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            placeholder={t('auth.confirmPasswordPlaceholder')}
+          />
         </Field>
         <Field label={t('auth.apiKey')}>
           <div className="flex gap-2">
@@ -173,14 +195,14 @@ function SetupScreen() {
               {t('auth.testConnection')}
             </Button>
           </div>
-          {connectMsg && (
-            <span className={connectState === 'ok' ? 'text-success' : 'text-danger'}>
-              {connectMsg}
-            </span>
-          )}
+          {connectMsg && <span className={connectState === 'ok' ? 'text-success' : 'text-danger'}>{connectMsg}</span>}
           <span className="text-2xs leading-[18px] text-text-faint">{t('auth.apiKeySkipHint')}</span>
         </Field>
-        <Checkbox checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} className="text-xs text-text-secondary">
+        <Checkbox
+          checked={rememberMe}
+          onChange={(e) => setRememberMe(e.target.checked)}
+          className="text-xs text-text-secondary"
+        >
           {t('auth.rememberMe')}
         </Checkbox>
         {error && <div className="text-xs leading-[18px] text-danger">{error}</div>}
@@ -233,16 +255,28 @@ function LoginScreen() {
           void submit();
         }}
       >
-        {notice === 'created' && (
-          <div className="text-xs leading-[18px] text-success">{t('auth.createdNotice')}</div>
-        )}
+        {notice === 'created' && <div className="text-xs leading-[18px] text-success">{t('auth.createdNotice')}</div>}
         <Field label={t('auth.email')}>
-          <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t('auth.emailPlaceholder')} type="email" autoFocus />
+          <Input
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder={t('auth.emailPlaceholder')}
+            type="email"
+            autoFocus
+          />
         </Field>
         <Field label={t('auth.password')}>
-          <Input.Password value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t('auth.passwordPlaceholder')} />
+          <Input.Password
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder={t('auth.passwordPlaceholder')}
+          />
         </Field>
-        <Checkbox checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} className="text-xs text-text-secondary">
+        <Checkbox
+          checked={rememberMe}
+          onChange={(e) => setRememberMe(e.target.checked)}
+          className="text-xs text-text-secondary"
+        >
           {t('auth.rememberMe')}
         </Checkbox>
         {error && <div className="text-xs leading-[18px] text-danger">{error}</div>}

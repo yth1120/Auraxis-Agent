@@ -27,15 +27,16 @@ export default function ConversationTimeline({ messages, scrollerRef, scrollToIn
   const rafRef = useRef(0);
 
   const ticks = useMemo<TimelineTick[]>(
-    () => messages
-      .filter((m) => m.role === 'user')
-      .map((m, i) => ({
-        id: m.id,
-        title: t('conv.you'),
-        summary: summaryOf(m),
-        timestamp: m.timestamp,
-        index: messages.indexOf(m),
-      })),
+    () =>
+      messages
+        .filter((m) => m.role === 'user')
+        .map((m) => ({
+          id: m.id,
+          title: t('conv.you'),
+          summary: summaryOf(m),
+          timestamp: m.timestamp,
+          index: messages.indexOf(m),
+        })),
     [messages, t],
   );
 
@@ -67,17 +68,14 @@ export default function ConversationTimeline({ messages, scrollerRef, scrollToIn
     };
   }, [scrollerRef]);
 
-  const onScrubTo = useCallback((index: number, mode: 'click' | 'drag') => {
-    scrollToIndex(index, mode === 'click' ? 'smooth' : 'auto');
-  }, [scrollToIndex]);
+  const onScrubTo = useCallback(
+    (index: number, mode: 'click' | 'drag') => {
+      scrollToIndex(index, mode === 'click' ? 'smooth' : 'auto');
+    },
+    [scrollToIndex],
+  );
 
   if (messages.length === 0) return null;
 
-  return (
-    <TimelineScrubber
-      ticks={ticks}
-      scrollRatio={scrollRatio}
-      onScrubTo={onScrubTo}
-    />
-  );
+  return <TimelineScrubber ticks={ticks} scrollRatio={scrollRatio} onScrubTo={onScrubTo} />;
 }

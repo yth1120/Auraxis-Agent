@@ -11,14 +11,29 @@ import {
 describe('work-docs-policy — Work 模式文档边界', () => {
   it('isCodeFilePath 识别代码文件，放行文档/文本', () => {
     for (const f of [
-      'src/app.ts', 'a.tsx', 'b.py', 'c.js', 'd.html', 'e.css', 'f.sh',
-      'Dockerfile', 'Makefile', 'x.gradle', 'y.ps1',
+      'src/app.ts',
+      'a.tsx',
+      'b.py',
+      'c.js',
+      'd.html',
+      'e.css',
+      'f.sh',
+      'Dockerfile',
+      'Makefile',
+      'x.gradle',
+      'y.ps1',
     ]) {
       expect(isCodeFilePath(f), f).toBe(true);
     }
     for (const f of [
-      'docs/readme.md', 'notes.txt', 'data.json', 'config.yaml', 'a.pdf',
-      'b.docx', 'c.ipynb', 'd.csv',
+      'docs/readme.md',
+      'notes.txt',
+      'data.json',
+      'config.yaml',
+      'a.pdf',
+      'b.docx',
+      'c.ipynb',
+      'd.csv',
     ]) {
       expect(isCodeFilePath(f), f).toBe(false);
     }

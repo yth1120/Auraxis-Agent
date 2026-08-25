@@ -5,7 +5,6 @@
  * toolCallId），状态变化通过 `terminal:tasks:changed` 广播给渲染层。
  * 渲染层可以列出任务、停止运行中的任务、以及把命令回放到交互终端。
  */
-import { ipcMain } from 'electron';
 import { secureHandle } from './trust';
 import { randomUUID } from 'crypto';
 import { getMainWindowRef } from './window-ref';
@@ -123,5 +122,7 @@ function broadcast(): void {
   if (!win || win.isDestroyed()) return;
   try {
     win.webContents.send('terminal:tasks:changed', listTasks());
-  } catch { /* window may be closing */ }
+  } catch {
+    /* window may be closing */
+  }
 }

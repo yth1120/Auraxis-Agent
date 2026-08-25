@@ -1,15 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Dropdown, App } from 'antd';
-import {
-  CaretDown,
-  CaretRight,
-  Eye,
-  Gauge,
-  Key,
-  ShieldCheck,
-} from '@/components/common/icons';
+import { CaretDown, CaretRight, Eye, Gauge, Key, ShieldCheck } from '@/components/common/icons';
 import type { ReactNode } from 'react';
-import clsx from 'clsx';
 import { useT, type I18nKey } from '../../i18n';
 import { useAppStore } from '../../stores/useAppStore';
 import { PERMISSION_PRESET_IDS, type PermissionPreset } from '../../types/advanced';
@@ -49,11 +41,7 @@ interface PermissionSelectorProps {
  * electron/contracts/permission.ts); named profiles layer hard scopes on top
  * and are managed from Settings → 权限.
  */
-export default function PermissionSelector({
-  preset,
-  onChangePreset,
-  popDirection = 'up',
-}: PermissionSelectorProps) {
+export default function PermissionSelector({ preset, onChangePreset, popDirection = 'up' }: PermissionSelectorProps) {
   const { modal } = App.useApp();
   const t = useT();
   const [open, setOpen] = useState(false);
@@ -117,16 +105,12 @@ export default function PermissionSelector({
             className="flex items-center gap-2 w-full min-h-[32px] px-2.5 py-1.5 border-none rounded-lg bg-transparent text-left cursor-pointer transition-colors duration-100 hover:bg-[var(--color-hover)]"
             onClick={openProfiles}
           >
-            <span className="flex-1 min-w-0 text-xs text-text-muted truncate">
-              {t('access.more')}
-            </span>
+            <span className="flex-1 min-w-0 text-xs text-text-muted truncate">{t('access.more')}</span>
             <span className="flex flex-none items-center justify-center text-text-faint">
               <CaretRight size={12} />
             </span>
           </button>
-          <div className="px-2.5 pb-1 pt-0.5 text-[11px] leading-[15px] text-text-faint">
-            {t('access.applyNext')}
-          </div>
+          <div className="px-2.5 pb-1 pt-0.5 text-[11px] leading-[15px] text-text-faint">{t('access.applyNext')}</div>
         </>
       }
     >

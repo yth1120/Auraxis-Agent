@@ -9,13 +9,7 @@ vi.mock('electron', () => ({
   app: { getPath: () => h.userData },
 }));
 
-import {
-  detectSignals,
-  detectAndStoreSignals,
-  llmSignalsEnabled,
-  ruleSignalsFor,
-  hasSignal,
-} from '../signal-rules';
+import { detectSignals, detectAndStoreSignals, llmSignalsEnabled, hasSignal } from '../signal-rules';
 import { listSignals, setBackendModeForTest } from '../memory-db';
 
 beforeAll(() => {

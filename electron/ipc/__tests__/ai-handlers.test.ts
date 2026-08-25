@@ -61,7 +61,6 @@ import { registerAiHandlers, cleanupWindowStreams } from '../ai-handlers';
 import { runQuery } from '../query-engine';
 import { requestPermission } from '../permission-handlers';
 import { readSettings } from '../settings-store';
-import { resolveModelApiBase, resolveModelApiKey } from '../model-config';
 import { executeToolCall } from '../tool-handlers';
 import { toToolStreamEvent } from '../event-bridge';
 import { clearLlmContext } from '../query-context';
@@ -107,10 +106,7 @@ describe('ai:chatStream', () => {
     h.win = null;
     const sender = { send: vi.fn() };
     await handler('ai:chatStream')({ sender }, chatPayload());
-    expect(sender.send).toHaveBeenCalledWith(
-      'ai:chunk:r1',
-      expect.objectContaining({ type: 'error' }),
-    );
+    expect(sender.send).toHaveBeenCalledWith('ai:chunk:r1', expect.objectContaining({ type: 'error' }));
   });
 
   it('未配置 API Key 时拒绝', async () => {
@@ -125,7 +121,11 @@ describe('ai:chatStream', () => {
 
   it('SSE 分块转发到渲染层并单次 done', async () => {
     vi.mocked(axios.post).mockResolvedValue({
-      data: sse('data: {"choices":[{"delta":{"content":"你"}}]}\n\n', 'data: {"choices":[{"delta":{"content":"好"}}]}\n\n', 'data: [DONE]\n\n'),
+      data: sse(
+        'data: {"choices":[{"delta":{"content":"你"}}]}\n\n',
+        'data: {"choices":[{"delta":{"content":"好"}}]}\n\n',
+        'data: [DONE]\n\n',
+      ),
     } as any);
     await handler('ai:chatStream')({ sender: { send: vi.fn() } }, chatPayload());
     const sends = h.win.webContents.send.mock.calls.filter((c: any) => c[0] === 'ai:chunk:r1');
@@ -174,14 +174,14 @@ describe('ai:chatStream', () => {
 
   it('prefix 续写：追加 assistant 前缀消息并设置 stop', async () => {
     vi.mocked(axios.post).mockResolvedValue({
-      data: sse(
-        'data: {"choices":[{"delta":{"content":"more"}}]}\n\n',
-        'data: [DONE]\n\n',
-      ),
+      data: sse('data: {"choices":[{"delta":{"content":"more"}}]}\n\n', 'data: [DONE]\n\n'),
     } as any);
-    await handler('ai:chatStream')({ sender: { send: vi.fn() } }, chatPayload({
-      prefix: { content: '```ts\nconst x = 1;', stop: ['```'] },
-    }));
+    await handler('ai:chatStream')(
+      { sender: { send: vi.fn() } },
+      chatPayload({
+        prefix: { content: '```ts\nconst x = 1;', stop: ['```'] },
+      }),
+    );
     const body = vi.mocked(axios.post).mock.calls[0][1] as any;
     const last = body.messages.at(-1);
     expect(last.role).toBe('assistant');
@@ -243,11 +243,14 @@ describe('ai:fim', () => {
     vi.mocked(axios.post).mockResolvedValue({
       data: { choices: [{ text: '  return fib(a-1) + fib(a-2)' }] },
     } as any);
-    const result = await handler('ai:fim')({}, {
-      model: 'deepseek-v4-pro',
-      prompt: 'def fib(a):',
-      suffix: ' return fib(a-1) + fib(a-2)',
-    });
+    const result = await handler('ai:fim')(
+      {},
+      {
+        model: 'deepseek-v4-pro',
+        prompt: 'def fib(a):',
+        suffix: ' return fib(a-1) + fib(a-2)',
+      },
+    );
     expect(result.ok).toBe(true);
     expect(result.data.text).toContain('return fib');
     const [url, body] = vi.mocked(axios.post).mock.calls.at(-1)! as any;
@@ -276,20 +279,14 @@ describe('ai:sendQuery / abortQuery / abortTool / retryTool', () => {
 
   it('对话模式被后端隔离拒绝', async () => {
     await handler('ai:sendQuery')({ sender: { send: vi.fn() } }, { ...queryPayload(), surface: 'chat' });
-    expect(h.win.webContents.send).toHaveBeenCalledWith(
-      'ai:queryEvent:q1',
-      expect.objectContaining({ type: 'error' }),
-    );
+    expect(h.win.webContents.send).toHaveBeenCalledWith('ai:queryEvent:q1', expect.objectContaining({ type: 'error' }));
     expect(runQuery).not.toHaveBeenCalled();
   });
 
   it('未配置 Key 拒绝', async () => {
     vi.mocked(readSettings).mockResolvedValue({ deepseekApiKey: '' });
     await handler('ai:sendQuery')({ sender: { send: vi.fn() } }, queryPayload());
-    expect(h.win.webContents.send).toHaveBeenCalledWith(
-      'ai:queryEvent:q1',
-      expect.objectContaining({ type: 'error' }),
-    );
+    expect(h.win.webContents.send).toHaveBeenCalledWith('ai:queryEvent:q1', expect.objectContaining({ type: 'error' }));
   });
 
   it('autoApprove 时权限回调恒真并运行查询', async () => {
@@ -304,9 +301,7 @@ describe('ai:sendQuery / abortQuery / abortTool / retryTool', () => {
     await handler('ai:sendQuery')({ sender: { send: vi.fn() } }, queryPayload());
     const req = vi.mocked(runQuery).mock.calls[0][0] as any;
     await expect(req.checkPermission('Bash', {}, 'c1')).resolves.toBe(true);
-    expect(requestPermission).toHaveBeenCalledWith(
-      'Bash', {}, h.win, 'c1', expect.objectContaining({ mode: 'ask' }),
-    );
+    expect(requestPermission).toHaveBeenCalledWith('Bash', {}, h.win, 'c1', expect.objectContaining({ mode: 'ask' }));
 
     vi.mocked(toToolStreamEvent).mockReturnValueOnce({ type: 'tool_start' } as any);
     const emit = vi.mocked(runQuery).mock.calls[0][1] as any;

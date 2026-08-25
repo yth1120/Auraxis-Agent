@@ -15,7 +15,11 @@ vi.mock('../plan-handlers', () => ({
 }));
 vi.mock('../../tool-registry', () => ({
   getAllTools: vi.fn(() => [
-    { name: 'Read' }, { name: 'Write' }, { name: 'Bash' }, { name: 'Agent' }, { name: 'Grep' },
+    { name: 'Read' },
+    { name: 'Write' },
+    { name: 'Bash' },
+    { name: 'Agent' },
+    { name: 'Grep' },
   ]),
 }));
 vi.mock('../model-config', () => ({
@@ -40,9 +44,16 @@ vi.mock('../tool-handlers', () => ({
 }));
 
 import {
-  runSubAgent, getSubAgentStates, getSubAgentReports, sendMessageToSubAgent,
-  drainSubAgentInbox, interruptSubAgent, reportFromSubAgent, getAgentDef,
-  registerAgentHandlers, genAgentId,
+  runSubAgent,
+  getSubAgentStates,
+  getSubAgentReports,
+  sendMessageToSubAgent,
+  drainSubAgentInbox,
+  interruptSubAgent,
+  reportFromSubAgent,
+  getAgentDef,
+  registerAgentHandlers,
+  genAgentId,
 } from '../agent-handlers';
 import { appendAgentLog } from '../../session-log';
 import { cacheTaskResult } from '../tool-handlers';
@@ -126,10 +137,31 @@ describe('runSubAgent — 同步执行路径', () => {
     opts.observer.emit({ type: 'text_chunk', text: 'hi' });
     opts.observer.emit({ type: 'thinking_chunk', chunk: 'th', isNewBlock: true });
     opts.observer.emit({ type: 'iteration_start', iteration: 1 });
-    opts.observer.emit({ type: 'iteration_end', iteration: 1, toolsThisIteration: 1, llmLatencyMs: 2, firstTokenMs: 1, outputTokens: 3 });
+    opts.observer.emit({
+      type: 'iteration_end',
+      iteration: 1,
+      toolsThisIteration: 1,
+      llmLatencyMs: 2,
+      firstTokenMs: 1,
+      outputTokens: 3,
+    });
     opts.observer.emit({ type: 'tool_start', toolCallId: 'c1', toolName: 'Read', input: {}, stepGroupId: 'g1' });
-    opts.observer.emit({ type: 'tool_end', toolCallId: 'c1', toolName: 'Read', output: {}, durationMs: 5, stepGroupId: 'g1' });
-    opts.observer.emit({ type: 'tool_error', toolCallId: 'c2', toolName: 'Bash', input: {}, error: 'e', stepGroupId: 'g1' });
+    opts.observer.emit({
+      type: 'tool_end',
+      toolCallId: 'c1',
+      toolName: 'Read',
+      output: {},
+      durationMs: 5,
+      stepGroupId: 'g1',
+    });
+    opts.observer.emit({
+      type: 'tool_error',
+      toolCallId: 'c2',
+      toolName: 'Bash',
+      input: {},
+      error: 'e',
+      stepGroupId: 'g1',
+    });
     opts.observer.emit({ type: 'error', error: 'boom' });
     opts.observer.emit({ type: 'plan_created', plan: { tasks: [{ description: '步骤', status: 'pending' }] } });
     opts.observer.emit({ type: 'deviance_warning', message: 'warn' });
@@ -209,7 +241,10 @@ describe('子代理消息/报告/中断', () => {
     expect(drainSubAgentInbox(agentId)).toEqual(['补充']);
     expect(drainSubAgentInbox(agentId)).toEqual([]);
 
-    expect(sendMessageToSubAgent('missing', 'x')).toEqual({ ok: false, error: expect.stringContaining('未找到子代理') });
+    expect(sendMessageToSubAgent('missing', 'x')).toEqual({
+      ok: false,
+      error: expect.stringContaining('未找到子代理'),
+    });
   });
 
   it('结束的子代理不能收消息', async () => {

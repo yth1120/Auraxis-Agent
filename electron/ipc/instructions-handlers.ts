@@ -6,7 +6,7 @@
  * All writes stay inside the project root (folder scope) or the userData dir
  * (global scope).
  */
-import { ipcMain } from 'electron';
+import { errorText } from '../errors';
 import { secureHandle } from './trust';
 import { readFile, writeFile, mkdir, readdir, stat } from 'fs/promises';
 import path from 'path';
@@ -30,7 +30,12 @@ async function readFirstExisting(dir: string): Promise<{ name: string; content: 
   return null;
 }
 
-async function walkFolders(root: string, dir: string, depth: number, out: { relPath: string; hasOverride: boolean; hasAgents: boolean }[]): Promise<void> {
+async function walkFolders(
+  root: string,
+  dir: string,
+  depth: number,
+  out: { relPath: string; hasOverride: boolean; hasAgents: boolean }[],
+): Promise<void> {
   if (depth > MAX_FOLDER_DEPTH) return;
   let entries;
   try {
@@ -59,9 +64,7 @@ async function walkFolders(root: string, dir: string, depth: number, out: { relP
 
 function resolveFolder(projectRoot: string, relPath: string | undefined): string {
   const root = path.resolve(projectRoot);
-  const target = relPath && relPath.trim() && relPath !== '.'
-    ? path.resolve(root, relPath.replace(/\\/g, '/'))
-    : root;
+  const target = relPath && relPath.trim() && relPath !== '.' ? path.resolve(root, relPath.replace(/\\/g, '/')) : root;
   if (target !== root && !isPathInside(target, root)) {
     throw new Error('指令文件夹越界：只能编辑项目内的 AGENTS.md');
   }
@@ -78,8 +81,8 @@ export function registerInstructionsHandlers() {
         ok: true,
         data: { path: path.join(dir, hit?.name ?? 'AGENTS.md'), content: hit?.content ?? '' },
       };
-    } catch (error: any) {
-      return { ok: false, error: error?.message ?? String(error) };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
@@ -90,8 +93,8 @@ export function registerInstructionsHandlers() {
       await mkdir(dir, { recursive: true });
       await writeFile(path.join(dir, 'AGENTS.md'), String(content ?? ''), 'utf8');
       return { ok: true };
-    } catch (error: any) {
-      return { ok: false, error: error?.message ?? String(error) };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
@@ -107,8 +110,8 @@ export function registerInstructionsHandlers() {
         return a.relPath.localeCompare(b.relPath);
       });
       return { ok: true, data: folders };
-    } catch (error: any) {
-      return { ok: false, error: error?.message ?? String(error) };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
@@ -126,21 +129,24 @@ export function registerInstructionsHandlers() {
           relPath: path.relative(root, dir).replace(/\\/g, '/') || '.',
         },
       };
-    } catch (error: any) {
-      return { ok: false, error: error?.message ?? String(error) };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
-  secureHandle('instructions:set', async (event, projectRoot: string, relPath: string | undefined, content: unknown) => {
-    assertTrustedIpcSender(event);
-    try {
-      const root = await resolveTrustedProjectRoot(projectRoot);
-      const dir = resolveFolder(root, relPath);
-      await mkdir(dir, { recursive: true });
-      await writeFile(path.join(dir, 'AGENTS.md'), String(content ?? ''), 'utf8');
-      return { ok: true };
-    } catch (error: any) {
-      return { ok: false, error: error?.message ?? String(error) };
-    }
-  });
+  secureHandle(
+    'instructions:set',
+    async (event, projectRoot: string, relPath: string | undefined, content: unknown) => {
+      assertTrustedIpcSender(event);
+      try {
+        const root = await resolveTrustedProjectRoot(projectRoot);
+        const dir = resolveFolder(root, relPath);
+        await mkdir(dir, { recursive: true });
+        await writeFile(path.join(dir, 'AGENTS.md'), String(content ?? ''), 'utf8');
+        return { ok: true };
+      } catch (error: unknown) {
+        return { ok: false, error: errorText(error) };
+      }
+    },
+  );
 }

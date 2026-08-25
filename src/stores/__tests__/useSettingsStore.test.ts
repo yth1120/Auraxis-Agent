@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useSettingsStore, getApiKeyFromStore } from '../useSettingsStore';
 import type { AccountInfo } from '../useSettingsStore';
 
@@ -139,6 +139,40 @@ describe('useSettingsStore — setters', () => {
     useSettingsStore.setState({ sidebarGlassReady: true });
     useSettingsStore.getState().setSidebarGlass(0);
     expect(setMaterial).toHaveBeenLastCalledWith(false);
+  });
+
+  it('setNotificationMode 同步旧布尔字段', () => {
+    useSettingsStore.getState().setNotificationMode('background');
+    expect(useSettingsStore.getState().notificationMode).toBe('background');
+    expect(useSettingsStore.getState().notifyOnAgentComplete).toBe(true);
+    useSettingsStore.getState().setNotificationMode('never');
+    expect(useSettingsStore.getState().notifyOnAgentComplete).toBe(false);
+  });
+
+  it('setPermissionPreset 联动 sandboxMode 并持久化', () => {
+    const set = (window as any).electronAPI.settings.set;
+    useSettingsStore.getState().setPermissionPreset('full');
+    expect(useSettingsStore.getState().permissionPreset).toBe('full');
+    expect(useSettingsStore.getState().sandboxMode).toBe('full');
+    expect(set).toHaveBeenCalledWith('permissionPreset', 'full');
+    expect(set).toHaveBeenCalledWith('sandboxMode', 'full');
+  });
+
+  it('setMaxOutputTokens 固定 1024–384000 区间', () => {
+    useSettingsStore.getState().setMaxOutputTokens(100);
+    expect(useSettingsStore.getState().maxOutputTokens).toBe(1024);
+    useSettingsStore.getState().setMaxOutputTokens(999_999);
+    expect(useSettingsStore.getState().maxOutputTokens).toBe(384_000);
+  });
+
+  it('外部搜索 key 设置委托主进程', () => {
+    const set = (window as any).electronAPI.settings.set;
+    useSettingsStore.getState().setExaApiKey('exa-1');
+    useSettingsStore.getState().setPerplexityApiKey('pplx-1');
+    expect(useSettingsStore.getState().exaApiKey).toBe('exa-1');
+    expect(useSettingsStore.getState().perplexityApiKey).toBe('pplx-1');
+    expect(set).toHaveBeenCalledWith('exaApiKey', 'exa-1');
+    expect(set).toHaveBeenCalledWith('perplexityApiKey', 'pplx-1');
   });
 });
 

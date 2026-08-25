@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('electron', () => ({
   app: { getPath: () => '', getName: () => 'auraxis' },
@@ -25,10 +25,7 @@ describe('session-title', () => {
   });
 
   it('frames user messages as JSON so quotes cannot break the prompt', () => {
-    const { system, user } = buildTitlePrompt([
-      { content: '他说 "你好" 并写了 `code`' },
-      { content: '修复 bug' },
-    ]);
+    const { system, user } = buildTitlePrompt([{ content: '他说 "你好" 并写了 `code`' }, { content: '修复 bug' }]);
     expect(system).toContain('Return only the title on one line');
     expect(user).toContain('JSON array');
     expect(user).toContain('他说 \\"你好\\"');
@@ -45,21 +42,28 @@ describe('session-title', () => {
       completionStopReason: 'end_turn',
     }));
     registerLlmAdapter('title-test', adapter);
-    const title = await generateSessionTitle(
-      [{ content: '帮我优化登录流程' }],
-      { model: 'deepseek-v4-flash', apiKey: 'k', apiBase: 'http://x', adapter: 'title-test' },
-    );
+    const title = await generateSessionTitle([{ content: '帮我优化登录流程' }], {
+      model: 'deepseek-v4-flash',
+      apiKey: 'k',
+      apiBase: 'http://x',
+      adapter: 'title-test',
+    });
     expect(title).toBe('优化登录流程');
   });
 
   it('returns null when the LLM call fails (rule-based fallback)', async () => {
-    registerLlmAdapter('title-fail', vi.fn(async () => {
-      throw new Error('api down');
-    }));
-    const title = await generateSessionTitle(
-      [{ content: '任务' }],
-      { model: 'deepseek-v4-flash', apiKey: 'k', apiBase: 'http://x', adapter: 'title-fail' },
+    registerLlmAdapter(
+      'title-fail',
+      vi.fn(async () => {
+        throw new Error('api down');
+      }),
     );
+    const title = await generateSessionTitle([{ content: '任务' }], {
+      model: 'deepseek-v4-flash',
+      apiKey: 'k',
+      apiBase: 'http://x',
+      adapter: 'title-fail',
+    });
     expect(title).toBeNull();
   });
 

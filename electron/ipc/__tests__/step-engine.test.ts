@@ -4,12 +4,20 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 // surface used at load time (binary not installed offline).
 vi.mock('electron', () => ({
   app: { getPath: () => '', getName: () => 'auraxis' },
-  BrowserWindow: class { static fromWebContents() { return null; } },
+  BrowserWindow: class {
+    static fromWebContents() {
+      return null;
+    }
+  },
   ipcMain: { handle: vi.fn(), on: vi.fn(), removeHandler: vi.fn() },
   dialog: { showOpenDialog: vi.fn(), showMessageBox: vi.fn() },
   shell: { openExternal: vi.fn() },
   Notification: class {},
-  safeStorage: { encryptString: vi.fn((s: string) => s), decryptString: vi.fn((s: string) => s), isEncryptionAvailable: () => true },
+  safeStorage: {
+    encryptString: vi.fn((s: string) => s),
+    decryptString: vi.fn((s: string) => s),
+    isEncryptionAvailable: () => true,
+  },
 }));
 vi.mock('../memory-graph', () => ({
   createMemoryRiskGate: vi.fn(() => () => ({
@@ -22,7 +30,14 @@ vi.mock('../memory-graph', () => ({
   roleForAgent: vi.fn(() => 'general-purpose'),
 }));
 
-import { runStep, createStepState, buildTimeContextMessage, buildTmuxContextMessage, resolveTmuxLocation, resetTmuxLocationCache } from '../step-engine';
+import {
+  runStep,
+  createStepState,
+  buildTimeContextMessage,
+  buildTmuxContextMessage,
+  resolveTmuxLocation,
+  resetTmuxLocationCache,
+} from '../step-engine';
 import type { StepEngineConfig } from '../step-engine';
 import { registerLlmAdapter } from '../llm-adapter';
 import type { EngineEvent } from '../engine-events';
@@ -148,16 +163,12 @@ describe('step-engine', () => {
       expect(outcome.status).toBe('continue');
       expect(executeTool).not.toHaveBeenCalled();
       const toolEvents = events.filter((e) => e.type === 'tool_error' || e.type === 'tool_aborted');
-      const { roleForAgent, recordRiskAudit, createMemoryRiskGate } = await import('../memory-graph');
+      const { roleForAgent, recordRiskAudit } = await import('../memory-graph');
       expect(toolEvents.length).toBeGreaterThan(0);
       expect(String((toolEvents[0] as any).error)).toContain('记忆风险门控拒绝');
 
       expect(roleForAgent).toHaveBeenCalledWith('');
-      expect(recordRiskAudit).toHaveBeenCalledWith(
-        'C:/proj',
-        'Write',
-        expect.objectContaining({ allowed: false }),
-      );
+      expect(recordRiskAudit).toHaveBeenCalledWith('C:/proj', 'Write', expect.objectContaining({ allowed: false }));
     } finally {
       delete process.env.AURAXIS_MEMORY_RISK_GATE;
     }
@@ -258,7 +269,9 @@ describe('step-engine', () => {
 
     expect(outcome.status).toBe('aborted');
     expect(events.some((e) => e.type === 'error')).toBe(false);
-    expect(events.some((e) => e.type === 'system_message' && String((e as any).content).includes('API 请求失败'))).toBe(false);
+    expect(events.some((e) => e.type === 'system_message' && String((e as any).content).includes('API 请求失败'))).toBe(
+      false,
+    );
   });
 
   describe('tmux context', () => {

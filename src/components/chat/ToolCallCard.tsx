@@ -4,7 +4,7 @@ import {
   Stop as StopOutlined,
   ArrowClockwise as ReloadOutlined,
   CaretDown as CaretDownOutlined,
-} from '@/components/common/icons'
+} from '@/components/common/icons';
 import { shallow } from 'zustand/shallow';
 import type { ToolCall, ToolName } from '../../types/tools';
 import clsx from 'clsx';
@@ -202,9 +202,7 @@ const ToolCallCard = memo(function ToolCallCard({ toolCall }: ToolCallCardProps)
   useT();
   const [expanded, setExpanded] = useState(false);
   const metaLabelDef = TOOL_LABEL[toolCall.toolName] ?? toolCall.toolName;
-  const metaLabel = typeof metaLabelDef === 'object'
-    ? t(metaLabelDef.key)
-    : metaLabelDef;
+  const metaLabel = typeof metaLabelDef === 'object' ? t(metaLabelDef.key) : metaLabelDef;
 
   const isRunning = toolCall.status === 'running';
   const isError = toolCall.status === 'error';
@@ -213,38 +211,39 @@ const ToolCallCard = memo(function ToolCallCard({ toolCall }: ToolCallCardProps)
   const summary = formatInput(toolCall.toolName, toolCall.input);
   const bashTerm = toolCall.toolName === 'Bash' ? extractBashTerminal(toolCall) : null;
 
-  const handleAbort = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation(); // don't toggle expand
-    const api = window.electronAPI?.ai;
-    if (api) {
-      api.abortTool(toolCall.requestId, toolCall.id);
-    }
-  }, [toolCall.requestId, toolCall.id]);
+  const handleAbort = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation(); // don't toggle expand
+      const api = window.electronAPI?.ai;
+      if (api) {
+        api.abortTool(toolCall.requestId, toolCall.id);
+      }
+    },
+    [toolCall.requestId, toolCall.id],
+  );
 
-  const handleRetry = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    useChatStore.getState().retryTool(toolCall.requestId, toolCall.id, toolCall.toolName);
-  }, [toolCall.requestId, toolCall.id, toolCall.toolName]);
+  const handleRetry = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      useChatStore.getState().retryTool(toolCall.requestId, toolCall.id, toolCall.toolName);
+    },
+    [toolCall.requestId, toolCall.id, toolCall.toolName],
+  );
 
   const failureLine = isError && toolCall.error ? toolCall.error.split('\n')[0] : null;
   const summaryText = failureLine ?? summary;
   const statusLabel = isRunning ? t('tl.running') : isError ? t('tl.failed') : null;
 
-  const leading = expanded
-    ? <CaretDownOutlined size={14} className="ax-tool-row-chevron" />
-    : (
-      <>
-        <span className="ax-tool-row-icon">
-          {isError
-            ? <StateDot state="error" />
-            : <ToolIcon toolName={toolCall.toolName} size={14} />}
-        </span>
-        <CaretDownOutlined
-          size={14}
-          className="ax-tool-row-chevron ax-tool-row-chevron-hover"
-        />
-      </>
-    );
+  const leading = expanded ? (
+    <CaretDownOutlined size={14} className="ax-tool-row-chevron" />
+  ) : (
+    <>
+      <span className="ax-tool-row-icon">
+        {isError ? <StateDot state="error" /> : <ToolIcon toolName={toolCall.toolName} size={14} />}
+      </span>
+      <CaretDownOutlined size={14} className="ax-tool-row-chevron ax-tool-row-chevron-hover" />
+    </>
+  );
 
   const diffCard = (() => {
     if (toolCall.status !== 'done') return null;
@@ -256,11 +255,7 @@ const ToolCallCard = memo(function ToolCallCard({ toolCall }: ToolCallCardProps)
     const fp = (toolCall.input as Record<string, unknown>).file_path as string | undefined;
     return (
       <div className="ax-tool-card-surface">
-        <DiffView
-          oldContent={oldContent || ''}
-          newContent={newContentValue || ''}
-          fileName={fp}
-        />
+        <DiffView oldContent={oldContent || ''} newContent={newContentValue || ''} fileName={fp} />
       </div>
     );
   })();
@@ -270,11 +265,7 @@ const ToolCallCard = memo(function ToolCallCard({ toolCall }: ToolCallCardProps)
   const showGeneric = toolCall.toolName !== 'Bash' && diffCard === null && (hasInput || hasOutput);
 
   return (
-    <div
-      className="m-0 group/row ax-tool-row"
-      data-state={toolCall.status}
-      data-tool={toolCall.toolName}
-    >
+    <div className="m-0 group/row ax-tool-row" data-state={toolCall.status} data-tool={toolCall.toolName}>
       <div
         className={clsx('ax-tool-row-head', isRunning && 'ax-tool-row-running')}
         role="button"
@@ -295,9 +286,7 @@ const ToolCallCard = memo(function ToolCallCard({ toolCall }: ToolCallCardProps)
         {summaryText !== '' && (
           <>
             <span className="ax-tool-row-sep" aria-hidden />
-            <span className={clsx('ax-tool-row-summary', failureLine && 'ax-tool-row-error')}>
-              {summaryText}
-            </span>
+            <span className={clsx('ax-tool-row-summary', failureLine && 'ax-tool-row-error')}>{summaryText}</span>
           </>
         )}
         <span className="ax-tool-row-actions">
@@ -334,10 +323,10 @@ const ToolCallCard = memo(function ToolCallCard({ toolCall }: ToolCallCardProps)
               className="ax-tool-card-surface"
               command={bashCommand}
               cwd={bashCwd}
-              output={toolCall.error ? toolCall.error : bashTerm?.content ?? ''}
+              output={toolCall.error ? toolCall.error : (bashTerm?.content ?? '')}
               running={isRunning}
               failed={!!toolCall.error}
-              exitCode={toolCall.error ? bashTerm?.exitCode ?? 1 : bashTerm?.exitCode}
+              exitCode={toolCall.error ? (bashTerm?.exitCode ?? 1) : bashTerm?.exitCode}
             />
           ) : diffCard !== null ? (
             diffCard
@@ -366,10 +355,12 @@ const ToolCallCard = memo(function ToolCallCard({ toolCall }: ToolCallCardProps)
                           className="max-w-full max-h-[320px] rounded-md border border-[var(--color-border-dim)] object-contain bg-[var(--color-bg-inset)]"
                         />
                       )}
-                      <pre className={clsx(
-                        'm-0 text-2xs leading-relaxed whitespace-pre-wrap break-all font-mono',
-                        toolCall.error ? 'text-danger' : 'text-text-secondary',
-                      )}>
+                      <pre
+                        className={clsx(
+                          'm-0 text-2xs leading-relaxed whitespace-pre-wrap break-all font-mono',
+                          toolCall.error ? 'text-danger' : 'text-text-secondary',
+                        )}
+                      >
                         {cleanOutput(toolCall.error || formatOutput(toolCall.toolName, toolCall.output)).cleanedText}
                       </pre>
                     </div>
@@ -390,10 +381,7 @@ const ToolCallCard = memo(function ToolCallCard({ toolCall }: ToolCallCardProps)
  * content hasn't changed, even though the parent's messages array is new.
  */
 export default function ToolCallCardWrapper({ toolCallId }: ToolCallCardWrapperProps) {
-  const toolCall = useChatStore(
-    (s) => s.toolCallMap[toolCallId],
-    shallow,
-  );
+  const toolCall = useChatStore((s) => s.toolCallMap[toolCallId], shallow);
   if (!toolCall) return null;
   return <ToolCallCard toolCall={toolCall} />;
 }

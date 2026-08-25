@@ -74,11 +74,13 @@ function parseField(field: string, min: number, max: number): Set<number> {
     if (part.includes('/')) {
       const [range, stepStr] = part.split('/');
       const step = parseInt(stepStr, 10) || 1;
-      let rangeMin = min, rangeMax = max;
+      let rangeMin = min,
+        rangeMax = max;
       if (range !== '*') {
         if (range.includes('-')) {
           const [a, b] = range.split('-').map(Number);
-          rangeMin = a; rangeMax = b;
+          rangeMin = a;
+          rangeMax = b;
         } else {
           rangeMin = rangeMax = parseInt(range, 10);
         }
@@ -172,7 +174,7 @@ async function loadJobs(): Promise<void> {
       if (!job.recurring && job.firedCount > 0) continue;
 
       // Clean up recurring jobs older than 7 days
-      if (job.recurring && (now - job.createdAt) > 7 * 24 * 60 * 60 * 1000) continue;
+      if (job.recurring && now - job.createdAt > 7 * 24 * 60 * 60 * 1000) continue;
 
       // Recalculate next fire time
       const fields = parseCron(job.cron);
@@ -202,7 +204,7 @@ function armJob(job: CronJob): void {
 
   // 7-day recurring expiry: if the next fire is beyond the 7-day
   // window from creation, delete the job
-  if (job.recurring && (Date.now() - job.createdAt) > 7 * 24 * 60 * 60 * 1000) {
+  if (job.recurring && Date.now() - job.createdAt > 7 * 24 * 60 * 60 * 1000) {
     jobs.delete(job.id);
     timers.delete(job.id);
     saveJobs();
@@ -251,12 +253,11 @@ function fireJob(jobId: string): void {
 
 // ─── Public API ─────────────────────────────────────────
 
-export function createCronJob(params: {
-  name: string;
-  prompt: string;
-  cron: string;
-  recurring: boolean;
-}): { ok: boolean; data?: { jobId: string; nextFireAt: number }; error?: string } {
+export function createCronJob(params: { name: string; prompt: string; cron: string; recurring: boolean }): {
+  ok: boolean;
+  data?: { jobId: string; nextFireAt: number };
+  error?: string;
+} {
   const fields = parseCron(params.cron);
   if (!fields) {
     return { ok: false, error: `无效的 cron 表达式: "${params.cron}"。请使用标准 5 字段格式: 分钟 小时 日 月 星期` };
@@ -302,7 +303,16 @@ export function deleteCronJob(jobId: string): { ok: boolean; error?: string } {
   return { ok: true };
 }
 
-export function listCronJobs(): { id: string; name: string; cron: string; recurring: boolean; nextFireAt: number; firedCount: number; createdAt: number; lastRun?: CronJob['lastRun'] }[] {
+export function listCronJobs(): {
+  id: string;
+  name: string;
+  cron: string;
+  recurring: boolean;
+  nextFireAt: number;
+  firedCount: number;
+  createdAt: number;
+  lastRun?: CronJob['lastRun'];
+}[] {
   return Array.from(jobs.values()).map((j) => ({
     id: j.id,
     name: j.name,
@@ -325,7 +335,11 @@ function updateJobRun(jobId: string, run: NonNullable<CronJob['lastRun']>): void
 /** Run a scheduled prompt as a real, unattended Agent task. */
 async function runCronAgent(job: CronJob): Promise<void> {
   updateJobRun(job.id, { at: Date.now(), status: 'running' });
-  const settings = await readSettings().catch(() => null) as { deepseekApiKey?: string; projectPath?: string; defaultModel?: string } | null;
+  const settings = (await readSettings().catch(() => null)) as {
+    deepseekApiKey?: string;
+    projectPath?: string;
+    defaultModel?: string;
+  } | null;
   const projectPath = settings?.projectPath || '';
   const apiKey = process.env.DEEPSEEK_API_KEY || settings?.deepseekApiKey || '';
   if (!projectPath || !apiKey) {
@@ -343,17 +357,15 @@ async function runCronAgent(job: CronJob): Promise<void> {
     apiKey,
     priority: 'normal' as const,
     autoApprove: unattendedAuto,
-    mode: unattendedAuto ? 'auto' as const : 'ask' as const,
-    sandboxMode: unattendedAuto ? 'full' as const : 'workspace-write' as const,
+    mode: unattendedAuto ? ('auto' as const) : ('ask' as const),
+    sandboxMode: unattendedAuto ? ('full' as const) : ('workspace-write' as const),
     maxIterations: 50,
     metadata: { cronJobId: job.id },
   };
   scheduler.startAgent(
     config,
     projectPath,
-    unattendedAuto
-      ? () => Promise.resolve(true)
-      : createUnattendedPermissionChecker(config, projectPath),
+    unattendedAuto ? () => Promise.resolve(true) : createUnattendedPermissionChecker(config, projectPath),
   );
 }
 
@@ -368,9 +380,9 @@ export function getCronJob(jobId: string): CronJob | undefined {
 // ─── IPC Registration ──────────────────────────────────
 
 export function registerCronIpc(): void {
-  const { ipcMain } = require('electron');
-
-  setCronFireCallback((job) => { void runCronAgent(job); });
+  setCronFireCallback((job) => {
+    void runCronAgent(job);
+  });
   scheduler.onAgentTerminal((inst) => {
     const jobId = inst.config.metadata?.cronJobId as string | undefined;
     if (!jobId) return;
@@ -381,10 +393,13 @@ export function registerCronIpc(): void {
     }
   });
 
-  secureHandle('cron:create', async (_e: any, params: { name: string; prompt: string; cron: string; recurring: boolean }) => {
-    const result = createCronJob(params);
-    return result;
-  });
+  secureHandle(
+    'cron:create',
+    async (_e: any, params: { name: string; prompt: string; cron: string; recurring: boolean }) => {
+      const result = createCronJob(params);
+      return result;
+    },
+  );
 
   secureHandle('cron:delete', async (_e: any, jobId: string) => {
     const result = deleteCronJob(jobId);

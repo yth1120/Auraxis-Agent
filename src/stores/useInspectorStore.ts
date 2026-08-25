@@ -18,8 +18,7 @@ export interface RawTodo {
 /** Normalize TodoWrite todos into the workspace TaskChecklist model. */
 export function mapTodosToTasks(todos: RawTodo[]): AgentTask[] {
   return todos.map((t, i) => {
-    const status: TaskStatus =
-      t.status === 'completed' ? 'done' : t.status === 'in_progress' ? 'running' : 'pending';
+    const status: TaskStatus = t.status === 'completed' ? 'done' : t.status === 'in_progress' ? 'running' : 'pending';
     const title = t.status === 'in_progress' && t.activeForm ? t.activeForm : t.content;
     return { id: `task-${i}`, title, status };
   });
@@ -55,10 +54,7 @@ export interface InspectorStore {
  * user switches to that agent to approve it. Unowned (legacy query-path)
  * plans still show as a fallback when no agent is selected.
  */
-export function selectPendingPlan(
-  plans: PlanData[],
-  currentAgentId: string | null,
-): PlanData | undefined {
+export function selectPendingPlan(plans: PlanData[], currentAgentId: string | null): PlanData | undefined {
   const pending = plans.filter((p) => p.status === 'pending');
   if (pending.length === 0) return undefined;
   if (currentAgentId) {
@@ -67,7 +63,7 @@ export function selectPendingPlan(
   return pending.find((p) => !p.agentId) ?? pending[0];
 }
 
-export const useInspectorStore = create<InspectorStore>()((set, get) => ({
+export const useInspectorStore = create<InspectorStore>()((set) => ({
   tasks: [],
   plans: [],
   systemMessages: [],
@@ -86,8 +82,7 @@ export const useInspectorStore = create<InspectorStore>()((set, get) => ({
       plans: s.plans.map((p) => (p.planId === planId ? { ...p, ...updates } : p)),
     })),
 
-  removePlan: (planId) =>
-    set((s) => ({ plans: s.plans.filter((p) => p.planId !== planId) })),
+  removePlan: (planId) => set((s) => ({ plans: s.plans.filter((p) => p.planId !== planId) })),
 
   addSystemMessage: (msg) =>
     set((s) => ({
@@ -96,14 +91,11 @@ export const useInspectorStore = create<InspectorStore>()((set, get) => ({
 
   setActiveToolCount: (n) => set({ activeToolCount: Math.max(0, n) }),
 
-  incrementActiveTools: () =>
-    set((s) => ({ activeToolCount: s.activeToolCount + 1, lastToolActivity: Date.now() })),
+  incrementActiveTools: () => set((s) => ({ activeToolCount: s.activeToolCount + 1, lastToolActivity: Date.now() })),
 
-  decrementActiveTools: () =>
-    set((s) => ({ activeToolCount: Math.max(0, s.activeToolCount - 1) })),
+  decrementActiveTools: () => set((s) => ({ activeToolCount: Math.max(0, s.activeToolCount - 1) })),
 
   touchToolActivity: () => set({ lastToolActivity: Date.now() }),
 
-  clear: () =>
-    set({ tasks: [], plans: [], systemMessages: [], activeToolCount: 0, lastToolActivity: 0 }),
+  clear: () => set({ tasks: [], plans: [], systemMessages: [], activeToolCount: 0, lastToolActivity: 0 }),
 }));

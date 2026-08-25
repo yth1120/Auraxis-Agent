@@ -71,15 +71,7 @@ const TOOL_ICON_MAP: Record<string, (size: number) => ReactNode> = {
   TaskList: (size) => <ListChecks size={size} />,
 };
 
-export function ToolIcon({
-  toolName,
-  size = 14,
-  className,
-}: {
-  toolName?: string;
-  size?: number;
-  className?: string;
-}) {
+export function ToolIcon({ toolName, size = 14, className }: { toolName?: string; size?: number; className?: string }) {
   const render = toolName ? TOOL_ICON_MAP[toolName] : undefined;
   if (render) {
     return <span className={clsx('shrink-0', className)}>{render(size)}</span>;

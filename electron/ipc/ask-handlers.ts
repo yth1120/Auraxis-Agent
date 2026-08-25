@@ -4,7 +4,7 @@
  * The model can ask the human a question mid-task. The question is surfaced
  * through the renderer as a modal; the answer resolves the pending tool call.
  */
-import { ipcMain, BrowserWindow } from 'electron';
+import { BrowserWindow } from 'electron';
 import { secureHandle } from './trust';
 
 interface PendingAsk {

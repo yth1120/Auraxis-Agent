@@ -11,6 +11,7 @@
  * event types (ToolStreamEvent vs AgentLoopEvent), track stats, update plans,
  * and handle sub-agent bookkeeping.
  */
+import { errorText } from '../errors';
 import type { ApprovalPolicy } from '../types';
 import type { WorkAutonomyTier } from '../types';
 import type { SandboxMode } from '../sandbox-policy';
@@ -67,7 +68,11 @@ export interface ToolRunContext {
    * 记忆风险门控（M5，MAP-Graph）：高风险工具要求更高的证据信任。
    * 默认 undefined；仅在显式配置或 AURAXIS_MEMORY_RISK_GATE=1 时生效。
    */
-  riskGate?: (toolName: string, input: Record<string, unknown>, toolCallId: string) => Promise<{ allowed: boolean; reason?: string }>;
+  riskGate?: (
+    toolName: string,
+    input: Record<string, unknown>,
+    toolCallId: string,
+  ) => Promise<{ allowed: boolean; reason?: string }>;
   autoApprove?: boolean;
   abortSignal?: AbortSignal;
   mode: ApprovalPolicy;
@@ -125,8 +130,6 @@ export async function runToolBatch(
   const resultMap = new Map<number, RunnerToolResult>();
   const exec = ctx.executeTool ?? executeToolCall;
   const makeToolCallId = cb.makeToolCallId ?? ((tc: RunnerToolCall) => tc.id);
-  let anyError = false;
-
   for (const batchIndices of batches) {
     if (ctx.abortSignal?.aborted) break;
 
@@ -160,8 +163,11 @@ export async function runToolBatch(
               };
               denied.add(idx);
               resultMap.set(idx, deniedResult);
-              anyError = true;
-              try { cb.onToolResult(deniedResult, tc, toolCallId); } catch { /* best-effort */ }
+              try {
+                cb.onToolResult(deniedResult, tc, toolCallId);
+              } catch {
+                /* best-effort */
+              }
               continue;
             }
           } catch {
@@ -180,8 +186,11 @@ export async function runToolBatch(
             durationMs: 0,
           };
           resultMap.set(idx, deniedResult);
-          anyError = true;
-          try { cb.onToolResult(deniedResult, tc, toolCallId); } catch { /* best-effort */ }
+          try {
+            cb.onToolResult(deniedResult, tc, toolCallId);
+          } catch {
+            /* best-effort */
+          }
         }
       }
     }
@@ -203,12 +212,11 @@ export async function runToolBatch(
           let synthetic: { output: unknown; error?: string } | null = null;
           try {
             synthetic = await ctx.interceptTool(tc, toolCallId);
-          } catch (interceptErr: any) {
-            synthetic = { output: null, error: `工具拦截异常: ${interceptErr.message || String(interceptErr)}` };
+          } catch (interceptErr: unknown) {
+            synthetic = { output: null, error: `工具拦截异常: ${errorText(interceptErr) || String(interceptErr)}` };
           }
           if (synthetic) {
             const durationMs = Date.now() - start;
-            if (synthetic.error) anyError = true;
             return {
               index: idx,
               toolUseId: tc.id,
@@ -238,11 +246,14 @@ export async function runToolBatch(
           sandboxMode: ctx.sandboxMode,
           surface: ctx.surface,
           onProgress: (chunk: string) => {
-            try { cb.onToolProgress?.(tc, toolCallId, chunk); } catch { /* best-effort */ }
+            try {
+              cb.onToolProgress?.(tc, toolCallId, chunk);
+            } catch {
+              /* best-effort */
+            }
           },
         });
         const durationMs = Date.now() - start;
-        if (result.error) anyError = true;
         return {
           index: idx,
           toolUseId: tc.id,
@@ -252,15 +263,14 @@ export async function runToolBatch(
           error: result.error,
           durationMs,
         };
-      } catch (execErr: any) {
-        anyError = true;
+      } catch (execErr: unknown) {
         return {
           index: idx,
           toolUseId: tc.id,
           toolName: tc.name,
           input: tc.input,
           output: null,
-          error: `工具执行异常: ${execErr.message || String(execErr)}`,
+          error: `工具执行异常: ${errorText(execErr) || String(execErr)}`,
           durationMs: Date.now() - start,
         };
       }
@@ -273,7 +283,11 @@ export async function runToolBatch(
           const r = s.value;
           resultMap.set(r.index, r);
           const tc = batchCalls[r.index];
-          try { cb.onToolResult(r, tc, makeToolCallId(tc)); } catch { /* best-effort */ }
+          try {
+            cb.onToolResult(r, tc, makeToolCallId(tc));
+          } catch {
+            /* best-effort */
+          }
         } else {
           // Defense-in-depth — runOne never rejects, but never orphan an id.
           const idx = activeIndices[0];
@@ -288,8 +302,11 @@ export async function runToolBatch(
             durationMs: 0,
           };
           resultMap.set(tc.index, emergency);
-          anyError = true;
-          try { cb.onToolResult(emergency, tc, makeToolCallId(tc)); } catch { /* best-effort */ }
+          try {
+            cb.onToolResult(emergency, tc, makeToolCallId(tc));
+          } catch {
+            /* best-effort */
+          }
         }
       }
     } else {
@@ -297,7 +314,11 @@ export async function runToolBatch(
       const r = await runOne(idx);
       resultMap.set(idx, r);
       const tc = batchCalls[idx];
-      try { cb.onToolResult(r, tc, makeToolCallId(tc)); } catch { /* best-effort */ }
+      try {
+        cb.onToolResult(r, tc, makeToolCallId(tc));
+      } catch {
+        /* best-effort */
+      }
     }
   }
 
@@ -311,7 +332,9 @@ export async function runToolBatch(
       results.push(r);
     } else {
       const tc = batchCalls[i];
-      console.error(`[tool-runner] Missing result for tool index=${i} id=${tc.id} name=${tc.name} — synthesizing emergency error`);
+      console.error(
+        `[tool-runner] Missing result for tool index=${i} id=${tc.id} name=${tc.name} — synthesizing emergency error`,
+      );
       results.push({
         index: i,
         toolUseId: tc.id,
@@ -326,8 +349,13 @@ export async function runToolBatch(
 
   // AutoTool：登记本批工具调用序列（跨批次衔接由惯性图内部处理）。
   try {
-    toolInertia.observeSequence(ctx.sessionId ?? ctx.requestId, calls.map((c) => c.name));
-  } catch { /* 统计层不允许影响工具执行 */ }
+    toolInertia.observeSequence(
+      ctx.sessionId ?? ctx.requestId,
+      calls.map((c) => c.name),
+    );
+  } catch {
+    /* 统计层不允许影响工具执行 */
+  }
 
   return results;
 }

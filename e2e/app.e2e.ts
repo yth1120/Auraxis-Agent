@@ -87,9 +87,7 @@ test('Chat 模式发送消息并渲染用户气泡', async () => {
   await composer.fill('E2E 你好');
   await page.getByRole('button', { name: '发送' }).click();
 
-  await expect(
-    page.locator('.ax-message-user').filter({ hasText: 'E2E 你好' }),
-  ).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('.ax-message-user').filter({ hasText: 'E2E 你好' })).toBeVisible({ timeout: 15_000 });
 
   // 测试环境未配置 API Key：助手应返回明确错误而不是静默失败
   await expect(page.getByText(/API Key/).first()).toBeVisible({ timeout: 20_000 });
@@ -132,7 +130,9 @@ test('Code 模式顶部工具面板可开合且不被遮挡', async () => {
   await expect(page.getByText('集成终端', { exact: true }).first()).toBeVisible();
   await terminalBtn.click();
   // 抽屉用高度动画收起：闭合后容器高度归零（内容被 overflow 裁剪）。
-  const closedDrawer = page.getByText('集成终端', { exact: true }).first()
+  const closedDrawer = page
+    .getByText('集成终端', { exact: true })
+    .first()
     .locator('xpath=ancestor::div[contains(@style,"height: 0px")]');
   await expect(closedDrawer).toBeAttached();
 
@@ -167,9 +167,6 @@ test('Code 模式侧边栏工具面板可打开', async () => {
   await page.getByRole('radio', { name: 'Code' }).click();
   const sidebar = page.locator('nav.ax-sidebar');
 
-  // 工具类入口已收进「工具」手风琴，先展开
-  await sidebar.getByRole('button', { name: '工具' }).click();
-
   // 插件中心
   await sidebar.getByRole('button', { name: '插件中心' }).click();
   await expect(page.getByRole('heading', { name: '插件中心' })).toBeVisible();
@@ -186,11 +183,13 @@ test('Code 模式侧边栏工具面板可打开', async () => {
   await sidebar.getByRole('button', { name: '技能' }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
   await page.keyboard.press('Escape');
-  await expect(page.getByRole('dialog')).toBeHidden({ timeout: 3000 }).catch(async () => {
-    // 满载时偶发：Esc 未命中弹窗键盘监听，兜底点关闭按钮，避免 CI 偶发红。
-    await page.locator('.ant-modal-close').click();
-    await expect(page.getByRole('dialog')).toBeHidden();
-  });
+  await expect(page.getByRole('dialog'))
+    .toBeHidden({ timeout: 3000 })
+    .catch(async () => {
+      // 满载时偶发：Esc 未命中弹窗键盘监听，兜底点关闭按钮，避免 CI 偶发红。
+      await page.locator('.ant-modal-close').click();
+      await expect(page.getByRole('dialog')).toBeHidden();
+    });
 });
 
 test('输入区模型选择与思考深度面板联动', async () => {
@@ -203,7 +202,7 @@ test('输入区模型选择与思考深度面板联动', async () => {
   await expect(page.getByRole('menuitemradio').first()).toBeVisible();
 
   // 选择 Flash 模型后面板关闭，触发按钮展示新模型名
-  await page.getByRole('menuitemradio', { name: /DeepSeek V4 Flash/ }).click();
+  await page.getByRole('menuitemradio', { name: 'DeepSeek V4 Flash 轻快响应，适合高频对话与简单任务' }).click();
   await expect(page.getByRole('slider', { name: '思考深度' })).toBeHidden();
   await expect(modelTrigger).toContainText('DeepSeek V4 Flash');
 

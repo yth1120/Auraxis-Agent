@@ -34,16 +34,9 @@ afterEach(async () => {
 describe('pruneAgentCache', () => {
   it('removes projection rows for agent runs whose log file is gone', async () => {
     const { appendAgentLog, listAgentLogs, pruneAgentCache } = await loadSessionLog();
-    await appendAgentLog('agent-keep', [
-      { type: 'text_chunk', text: 'keep me', timestamp: 1 },
-    ]);
-    await appendAgentLog('agent-drop', [
-      { type: 'text_chunk', text: 'drop me', timestamp: 2 },
-    ]);
-    expect((await listAgentLogs()).map((s) => s.id).sort()).toEqual([
-      'agent-drop',
-      'agent-keep',
-    ]);
+    await appendAgentLog('agent-keep', [{ type: 'text_chunk', text: 'keep me', timestamp: 1 }]);
+    await appendAgentLog('agent-drop', [{ type: 'text_chunk', text: 'drop me', timestamp: 2 }]);
+    expect((await listAgentLogs()).map((s) => s.id).sort()).toEqual(['agent-drop', 'agent-keep']);
 
     await fs.unlink(path.join(root, 'agent-agent-drop.jsonl'));
     const removed = await pruneAgentCache();

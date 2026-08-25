@@ -82,10 +82,12 @@
 
 /* ── Cursor Blink (typing indicator) ───────────────────── */
 @keyframes cursorBlink {
-  0%, 50% {
+  0%,
+  50% {
     opacity: 1;
   }
-  51%, 100% {
+  51%,
+  100% {
     opacity: 0;
   }
 }
@@ -114,7 +116,8 @@
 
 /* ── Spark Beat (thinking indicator core pulse) ────────── */
 @keyframes sparkBeat {
-  0%, 100% {
+  0%,
+  100% {
     transform: scale(1);
     background: var(--color-primary);
     box-shadow: 0 0 6px var(--color-primary-border);
@@ -140,20 +143,37 @@
 
 /* ── Dot Blink (loading dots stagger) ──────────────────── */
 @keyframes dotBlink {
-  0%, 80%, 100% { opacity: 0.25; }
-  40%           { opacity: 1; }
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+  }
+  40% {
+    opacity: 1;
+  }
 }
 
 /* ── Indicator In (thinking indicator entrance) ────────── */
 @keyframes indicatorIn {
-  from { opacity: 0; transform: translateY(4px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* ── Terminal Pulse (status dot) ──────────────────────── */
 @keyframes terminal-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
 }
 
 /* ── Tool Card In (tool call card entrance) ────────────── */
@@ -170,61 +190,120 @@
 
 /* ── Pulse Dot (timeline status dot) ───────────────────── */
 @keyframes pulse-dot {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.5; transform: scale(1.2); }
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.2);
+  }
 }
 
 /* ── Dot Pulse (status dots) ──────────────────────────── */
 @keyframes dotPulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.35; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
 }
 
 /* ── Compression In ───────────────────────────────────── */
 @keyframes compressionIn {
-  from { opacity: 0; transform: translateY(-6px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* ── Compression Out ──────────────────────────────────── */
 @keyframes compressionOut {
-  from { opacity: 1; }
-  to { opacity: 0; }
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
 }
 
 /* ── ChatInput smart panel entrance ────────────────────── */
 @keyframes smartPanelIn {
-  to { opacity: 1; transform: translateY(0); }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes smartPanelInDown {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes smartPanelInUp {
-  from { opacity: 0; transform: translateY(-4px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* ── SiderNav agent pending badge pulse ────────────────── */
 @keyframes agentPendingPulse {
-  0%, 100% { opacity: 1; }
-  50%      { opacity: 0.55; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
 }
 
 /* ── 运行中工具行流光 ─────────────────── */
 @keyframes toolRowSweep {
-  0%          { left: -300px; }
-  90%, 100%   { left: 100%; }
+  0% {
+    left: -300px;
+  }
+  90%,
+  100% {
+    left: 100%;
+  }
 }
 
 /* ── StateDot pixel chase ─────────────────────────────── */
 @keyframes stateDotChase {
-  0%, 12.4%  { opacity: 1; }
-  12.5%, 24.9% { opacity: 0.6; }
-  25%, 37.4% { opacity: 0.35; }
-  37.5%, 100% { opacity: 0.15; }
+  0%,
+  12.4% {
+    opacity: 1;
+  }
+  12.5%,
+  24.9% {
+    opacity: 0.6;
+  }
+  25%,
+  37.4% {
+    opacity: 0.35;
+  }
+  37.5%,
+  100% {
+    opacity: 0.15;
+  }
 }
 
 /* ── Thinking-depth effort label swap（Claude-style）────── */
@@ -268,7 +347,9 @@
 
 /* ── Reduced motion ────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;

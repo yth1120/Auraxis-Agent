@@ -91,7 +91,8 @@ export default function ContextMeter() {
       <div className="flex items-baseline justify-between gap-2">
         <span className="text-sm font-semibold text-text-primary">{t('ctxMeter.title')}</span>
         <span className="text-xs text-text-muted tabular-nums">
-          {hasReal ? '' : '~'}{used.toLocaleString()} / {capacity.toLocaleString()} tokens
+          {hasReal ? '' : '~'}
+          {used.toLocaleString()} / {capacity.toLocaleString()} tokens
         </span>
       </div>
       <div className="flex flex-col gap-2">
@@ -128,15 +129,7 @@ export default function ContextMeter() {
         title={t('ctxMeter.aria', { pct })}
       >
         <svg viewBox="0 0 16 16" width="14" height="14" className="block">
-          <circle
-            cx="8"
-            cy="8"
-            r={ringR}
-            fill="none"
-            stroke="currentColor"
-            strokeOpacity="0.2"
-            strokeWidth="2"
-          />
+          <circle cx="8" cy="8" r={ringR} fill="none" stroke="currentColor" strokeOpacity="0.2" strokeWidth="2" />
           <circle
             cx="8"
             cy="8"

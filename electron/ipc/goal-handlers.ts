@@ -1,16 +1,23 @@
-import { ipcMain } from 'electron';
+import { errorText } from '../errors';
 import { secureHandle } from './trust';
 import {
-  getGoal, createGoal, editGoal, pauseGoal, resumeGoal,
-  completeGoal, blockGoal, clearGoal, recordGoalRound,
+  getGoal,
+  createGoal,
+  editGoal,
+  pauseGoal,
+  resumeGoal,
+  completeGoal,
+  blockGoal,
+  clearGoal,
+  recordGoalRound,
 } from '../goal-store';
 
 function wrap<T>(fn: () => Promise<T>) {
   return async () => {
     try {
       return { ok: true, data: await fn() };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   };
 }

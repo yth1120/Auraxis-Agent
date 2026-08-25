@@ -40,7 +40,14 @@ describe('JsonlSessionStore', () => {
     await store.meta('s1', { title: '自定义标题', model: 'm', messageCount: 7, pinned: true });
     const list = await store.list();
     expect(list).toHaveLength(1);
-    expect(list[0]).toMatchObject({ id: 's1', title: '自定义标题', model: 'm', messageCount: 7, pinned: true, kind: 'chat' });
+    expect(list[0]).toMatchObject({
+      id: 's1',
+      title: '自定义标题',
+      model: 'm',
+      messageCount: 7,
+      pinned: true,
+      kind: 'chat',
+    });
   });
 
   it('projects messages and tool lifecycle', async () => {
@@ -80,7 +87,11 @@ describe('JsonlSessionStore', () => {
   });
 
   it('tolerates corrupt lines during read', async () => {
-    await fs.writeFile(path.join(root, 's1.jsonl'), '{"seq":1,"type":"user","ts":1,"data":{"text":"ok"}}\nbroken\n', 'utf8');
+    await fs.writeFile(
+      path.join(root, 's1.jsonl'),
+      '{"seq":1,"type":"user","ts":1,"data":{"text":"ok"}}\nbroken\n',
+      'utf8',
+    );
     const events = await store.read('s1');
     expect(events).toHaveLength(1);
   });

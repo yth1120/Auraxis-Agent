@@ -24,7 +24,10 @@ function cleanup() {
 }
 
 describe('UndoManager 最佳补丁检查点（Coherence Collapse）', () => {
-  beforeEach(() => { cleanup(); setup(); });
+  beforeEach(() => {
+    cleanup();
+    setup();
+  });
   afterEach(() => cleanup());
 
   it('markBest 标记最近一次编辑前的备份为最佳，restoreBest 可恢复', async () => {

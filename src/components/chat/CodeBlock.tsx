@@ -1,3 +1,4 @@
+import { errorText } from '../../../electron/errors';
 import { useState, useCallback, useMemo, useEffect, useRef, memo } from 'react';
 import { message, Modal, Input } from 'antd';
 import { useT } from '../../i18n';
@@ -5,7 +6,9 @@ import {
   Copy as CopyOutlined,
   Check as CheckOutlined,
   Play as PlayOutlined,
-} from '@/components/common/icons'
+  FilePlus as FilePlusOutlined,
+  Eye as EyeOutlined,
+} from '@/components/common/icons';
 import hljs from 'highlight.js/lib/core';
 import typescript from 'highlight.js/lib/languages/typescript';
 import javascript from 'highlight.js/lib/languages/javascript';
@@ -73,6 +76,10 @@ function CodeBlock({ language, code, onApply, onPreview }: CodeBlockProps) {
   const [fileName, setFileName] = useState('');
   const projectPath = useSettingsStore((s) => s.projectPath);
 
+  useEffect(() => {
+    setApplied(false);
+  }, [code]);
+
   // Listen for postMessage from the sandboxed preview iframe.
   // Without allow-same-origin the iframe's origin is null — we only accept
   // messages from null-origin iframes when the preview modal is open.
@@ -97,8 +104,8 @@ function CodeBlock({ language, code, onApply, onPreview }: CodeBlockProps) {
       setCopied(true);
       message.success(t('code.copied'));
       setTimeout(() => setCopied(false), 2000);
-    } catch (err: any) {
-      console.debug('[CodeBlock] 复制到剪贴板失败:', err?.message || err);
+    } catch (err: unknown) {
+      console.debug('[CodeBlock] 复制到剪贴板失败:', errorText(err) || err);
       message.error(t('code.copyFailed'));
     }
   }, [code, t]);
@@ -118,7 +125,7 @@ function CodeBlock({ language, code, onApply, onPreview }: CodeBlockProps) {
 
     const agentState = useAgentStore.getState();
     const current = agentState.currentAgentId
-      ? agentState.agents.find((a) => a.id === agentState.currentAgentId) ?? null
+      ? (agentState.agents.find((a) => a.id === agentState.currentAgentId) ?? null)
       : null;
     // Agent 正在运行/暂停/排队 → 作为跟进消息入队，任务结束后自动继续。
     if (current && (current.status === 'running' || current.status === 'paused' || current.status === 'queued')) {
@@ -131,13 +138,16 @@ function CodeBlock({ language, code, onApply, onPreview }: CodeBlockProps) {
     if (follow) {
       const priorResult = scrubSandboxPaths(follow.result || '（无结果记录）').slice(0, 2000);
       const finalInstruction = `请继续当前任务，在前序工作的基础上推进。\n\n【任务背景】\n${follow.description || follow.name}\n\n【当前进展】\n${priorResult}\n\n【现在请继续】\n${instructionText}\n\n请继续在同一个工作目录内工作，不要访问历史任务的沙箱目录。`;
-      void useAgentStore.getState().continueAgent(follow.id, finalInstruction, instructionText).then((cont) => {
-        if (cont.ok) {
-          useAgentStore.getState().setCurrentAgent(follow.id);
-        } else {
-          message.error(cont.error || t('composer.continueFailed'));
-        }
-      });
+      void useAgentStore
+        .getState()
+        .continueAgent(follow.id, finalInstruction, instructionText)
+        .then((cont) => {
+          if (cont.ok) {
+            useAgentStore.getState().setCurrentAgent(follow.id);
+          } else {
+            message.error(cont.error || t('composer.continueFailed'));
+          }
+        });
       return;
     }
     // 无任务可续 → 新建一个 Agent 任务。
@@ -161,11 +171,24 @@ function CodeBlock({ language, code, onApply, onPreview }: CodeBlockProps) {
   }, [language, code, t]);
 
   const extMap: Record<string, string> = {
-    typescript: '.ts', ts: '.ts', tsx: '.tsx',
-    javascript: '.js', js: '.js', jsx: '.jsx',
-    css: '.css', html: '.html', json: '.json', md: '.md',
-    py: '.py', rs: '.rs', go: '.go', java: '.java',
-    vue: '.vue', svelte: '.svelte', scss: '.scss', less: '.less',
+    typescript: '.ts',
+    ts: '.ts',
+    tsx: '.tsx',
+    javascript: '.js',
+    js: '.js',
+    jsx: '.jsx',
+    css: '.css',
+    html: '.html',
+    json: '.json',
+    md: '.md',
+    py: '.py',
+    rs: '.rs',
+    go: '.go',
+    java: '.java',
+    vue: '.vue',
+    svelte: '.svelte',
+    scss: '.scss',
+    less: '.less',
   };
 
   const defaultExt = extMap[language.toLowerCase()] || `.${language}`;
@@ -199,12 +222,17 @@ function CodeBlock({ language, code, onApply, onPreview }: CodeBlockProps) {
 
         if (result.ok) {
           setApplied(true);
-          message.success(t('code.appliedAction', { action: result.action === 'created' ? t('code.created') : t('code.overwritten'), file: fileName }));
+          message.success(
+            t('code.appliedAction', {
+              action: result.action === 'created' ? t('code.created') : t('code.overwritten'),
+              file: fileName,
+            }),
+          );
         } else {
           message.error(result.error || t('code.applyFailed'));
         }
-      } catch (err: any) {
-        message.error(err.message || t('code.applyFailed'));
+      } catch (err: unknown) {
+        message.error(errorText(err) || t('code.applyFailed'));
       } finally {
         setApplying(false);
       }
@@ -221,9 +249,14 @@ function CodeBlock({ language, code, onApply, onPreview }: CodeBlockProps) {
     const api = window.electronAPI;
     if (api) {
       const extMap: Record<string, string> = {
-        typescript: '.tsx', ts: '.tsx', tsx: '.tsx',
-        javascript: '.jsx', js: '.jsx', jsx: '.jsx',
-        html: '.html', css: '.css',
+        typescript: '.tsx',
+        ts: '.tsx',
+        tsx: '.tsx',
+        javascript: '.jsx',
+        js: '.jsx',
+        jsx: '.jsx',
+        html: '.html',
+        css: '.css',
       };
       const ext = extMap[language.toLowerCase()];
       if (!ext) {
@@ -242,29 +275,58 @@ function CodeBlock({ language, code, onApply, onPreview }: CodeBlockProps) {
         } else {
           message.error(result.error || t('code.previewFailed'));
         }
-      } catch (err: any) {
-        message.error(err.message || t('code.previewFailed'));
+      } catch (err: unknown) {
+        message.error(errorText(err) || t('code.previewFailed'));
       }
       return;
     }
 
     setPreviewVisible(true);
-  }, [code, language, onPreview]);
+  }, [code, language, onPreview, t]);
 
-  const previewHtml = language === 'html'
-    ? code
-    : `<html><body><pre><code>${code.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></pre></body></html>`;
+  const previewHtml =
+    language === 'html'
+      ? code
+      : `<html><body><pre><code>${code.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></pre></body></html>`;
 
   return (
     <div className="my-4 rounded-xl overflow-hidden bg-[var(--color-code-bg)]">
       <div className="flex items-center justify-between px-3 py-1.5 font-mono text-xs text-[var(--color-text-muted)] select-none bg-[var(--color-bg-tertiary)]">
         <span className="font-medium lowercase tracking-wide">{language}</span>
         <span className="inline-flex items-center gap-1">
-          <button className="inline-flex items-center gap-1 border-none bg-transparent text-[var(--color-text-muted)] text-2xs cursor-pointer px-1.5 py-0.5 rounded-md hover:text-[var(--color-text-secondary)] hover:bg-white/8 transition-colors duration-150" onClick={handleContinue} type="button" title={t('code.continueTip')}>
+          <button
+            className="inline-flex items-center gap-1 border-none bg-transparent text-[var(--color-text-muted)] text-2xs cursor-pointer px-1.5 py-0.5 rounded-md hover:text-[var(--color-text-secondary)] hover:bg-white/8 transition-colors duration-150"
+            onClick={handleContinue}
+            type="button"
+            title={t('code.continueTip')}
+          >
             <PlayOutlined size={12} />
             <span>{t('code.continue')}</span>
           </button>
-          <button className="inline-flex items-center gap-1 border-none bg-transparent text-[var(--color-text-muted)] text-2xs cursor-pointer px-1.5 py-0.5 rounded-md hover:text-[var(--color-text-secondary)] hover:bg-white/8 transition-colors duration-150" onClick={handleCopy} type="button">
+          <button
+            className="inline-flex items-center gap-1 border-none bg-transparent text-[var(--color-text-muted)] text-2xs cursor-pointer px-1.5 py-0.5 rounded-md hover:text-[var(--color-text-secondary)] hover:bg-white/8 transition-colors duration-150 disabled:cursor-wait disabled:opacity-70"
+            onClick={handleApplyClick}
+            disabled={applying}
+            type="button"
+            title={t('code.applyTip')}
+          >
+            {applied ? <CheckOutlined size={12} /> : <FilePlusOutlined size={12} />}
+            <span>{applied ? t('code.applied') : t('code.apply')}</span>
+          </button>
+          <button
+            className="inline-flex items-center gap-1 border-none bg-transparent text-[var(--color-text-muted)] text-2xs cursor-pointer px-1.5 py-0.5 rounded-md hover:text-[var(--color-text-secondary)] hover:bg-white/8 transition-colors duration-150"
+            onClick={handlePreview}
+            type="button"
+            title={t('code.preview')}
+          >
+            <EyeOutlined size={12} />
+            <span>{t('code.preview')}</span>
+          </button>
+          <button
+            className="inline-flex items-center gap-1 border-none bg-transparent text-[var(--color-text-muted)] text-2xs cursor-pointer px-1.5 py-0.5 rounded-md hover:text-[var(--color-text-secondary)] hover:bg-white/8 transition-colors duration-150"
+            onClick={handleCopy}
+            type="button"
+          >
             {copied ? <CheckOutlined /> : <CopyOutlined />}
             <span>{copied ? t('code.copiedShort') : t('code.copy')}</span>
           </button>
@@ -284,9 +346,7 @@ function CodeBlock({ language, code, onApply, onPreview }: CodeBlockProps) {
         maskTransitionName=""
       >
         <div className="mb-2">
-          <label className="text-primary font-body text-sm">
-            {t('code.targetPath')}
-          </label>
+          <label className="text-primary font-body text-sm">{t('code.targetPath')}</label>
         </div>
         <Input
           value={fileName}
@@ -336,7 +396,7 @@ function HighlightedCode({ language, code }: { language: string; code: string })
           observer.disconnect();
         }
       },
-      { rootMargin: '200px' }
+      { rootMargin: '200px' },
     );
     observer.observe(el);
     return () => observer.disconnect();
@@ -354,11 +414,11 @@ function HighlightedCode({ language, code }: { language: string; code: string })
   }, [code, language, isVisible]);
 
   return (
-    <pre ref={ref} className="m-0 px-4 py-3 overflow-x-auto font-mono text-sm leading-[22px] text-[var(--color-text-secondary)] tab-2 bg-[var(--color-code-bg)] [&_code]:bg-transparent [&_code]:p-0 [&_code]:border-none [&_code]:text-inherit">
-      <code
-        className={`language-${language} hljs`}
-        dangerouslySetInnerHTML={{ __html: html }}
-      />
+    <pre
+      ref={ref}
+      className="m-0 px-4 py-3 overflow-x-auto font-mono text-sm leading-[22px] text-[var(--color-text-secondary)] tab-2 bg-[var(--color-code-bg)] [&_code]:bg-transparent [&_code]:p-0 [&_code]:border-none [&_code]:text-inherit"
+    >
+      <code className={`language-${language} hljs`} dangerouslySetInnerHTML={{ __html: html }} />
     </pre>
   );
 }

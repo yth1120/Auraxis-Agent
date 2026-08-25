@@ -153,10 +153,22 @@ function QueueRow({
           onBlur={onSaveEdit}
           className="!text-xs"
         />
-        <button type="button" className="ax-icon-button !w-6 !h-6 !text-xs" onClick={onSaveEdit} aria-label={t('dock.saveQueue')} title={t('dock.saveQueue')}>
+        <button
+          type="button"
+          className="ax-icon-button !w-6 !h-6 !text-xs"
+          onClick={onSaveEdit}
+          aria-label={t('dock.saveQueue')}
+          title={t('dock.saveQueue')}
+        >
           <CheckIcon />
         </button>
-        <button type="button" className="ax-icon-button !w-6 !h-6 !text-xs" onClick={onCancelEdit} aria-label={t('dock.cancelEdit')} title={t('dock.cancelEdit')}>
+        <button
+          type="button"
+          className="ax-icon-button !w-6 !h-6 !text-xs"
+          onClick={onCancelEdit}
+          aria-label={t('dock.cancelEdit')}
+          title={t('dock.cancelEdit')}
+        >
           <X />
         </button>
       </div>
@@ -223,10 +235,7 @@ function QueueDock({ onSendNow }: { onSendNow: (text: string) => void }) {
       {queue.map((item) => (
         <div
           key={item.id}
-          className={clsx(
-            'flex items-center gap-2 px-3 min-h-[32px] text-xs',
-            queue.length > 1 && 'py-1',
-          )}
+          className={clsx('flex items-center gap-2 px-3 min-h-[32px] text-xs', queue.length > 1 && 'py-1')}
         >
           <QueueRow
             item={item}
@@ -266,7 +275,9 @@ function QueueDock({ onSendNow }: { onSendNow: (text: string) => void }) {
               aria-expanded={open}
             >
               <Clock size={14} className="shrink-0 text-text-muted" />
-              <span className="shrink-0 text-xs font-medium text-text-primary">{t('dock.queueCount', { n: queue.length })}</span>
+              <span className="shrink-0 text-xs font-medium text-text-primary">
+                {t('dock.queueCount', { n: queue.length })}
+              </span>
               <CaretDown
                 size={12}
                 className={clsx('shrink-0 text-text-faint transition-transform duration-150', open && 'rotate-180')}
@@ -284,11 +295,7 @@ function QueueDock({ onSendNow }: { onSendNow: (text: string) => void }) {
   );
 }
 
-export default function InputDock({
-  onSendNow,
-}: {
-  onSendNow: (text: string) => void;
-}) {
+export default function InputDock({ onSendNow }: { onSendNow: (text: string) => void }) {
   return (
     <div className="w-full">
       <TodoDock />

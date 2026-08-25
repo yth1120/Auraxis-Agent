@@ -11,7 +11,13 @@ import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'crypto';
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import path from 'path';
 import { app } from 'electron';
-import type { AuthChangeNameParams, AuthChangePasswordParams, AuthLoginParams, AuthSetupParams, AuthStatus } from './contracts/auth';
+import type {
+  AuthChangeNameParams,
+  AuthChangePasswordParams,
+  AuthLoginParams,
+  AuthSetupParams,
+  AuthStatus,
+} from './contracts/auth';
 
 interface StoredAccount {
   version: 1;
@@ -33,7 +39,10 @@ interface StoredAccount {
 let unlocked = false;
 
 /** 持久化限流：写入 userData，重启后仍保留失败计数，防跨重启爆破。 */
-interface ThrottleState { count: number; windowStart: number }
+interface ThrottleState {
+  count: number;
+  windowStart: number;
+}
 
 function throttlePath(): string {
   const dir = process.env.AURAXIS_USER_DATA_DIR || app.getPath('userData');
@@ -47,7 +56,9 @@ async function readThrottle(): Promise<ThrottleState> {
     if (typeof data.count === 'number' && typeof data.windowStart === 'number') {
       return { count: data.count, windowStart: data.windowStart };
     }
-  } catch { /* 无限流文件视为全新窗口 */ }
+  } catch {
+    /* 无限流文件视为全新窗口 */
+  }
   return { count: 0, windowStart: 0 };
 }
 
@@ -56,14 +67,19 @@ async function writeThrottle(state: ThrottleState): Promise<void> {
     const file = throttlePath();
     await mkdir(path.dirname(file), { recursive: true });
     await writeFile(file, JSON.stringify(state), 'utf-8');
-  } catch { /* 限流写入失败不阻塞登录 */ }
+  } catch {
+    /* 限流写入失败不阻塞登录 */
+  }
 }
 
 /** 串行化登录尝试，避免并发读改写竞态绕过限流。 */
 let throttleLock: Promise<void> = Promise.resolve();
 function withThrottleLock<T>(fn: () => Promise<T>): Promise<T> {
   const run = throttleLock.then(fn, fn);
-  throttleLock = run.then(() => undefined, () => undefined);
+  throttleLock = run.then(
+    () => undefined,
+    () => undefined,
+  );
   return run;
 }
 
@@ -115,7 +131,13 @@ export async function getAuthStatus(): Promise<AuthStatus> {
   if (!account) return { phase: 'setup', rememberMe: false };
   if (unlocked || account.rememberMe) {
     unlocked = true;
-    return { phase: 'unlocked', name: account.name, email: account.email, avatar: account.avatar, rememberMe: account.rememberMe };
+    return {
+      phase: 'unlocked',
+      name: account.name,
+      email: account.email,
+      avatar: account.avatar,
+      rememberMe: account.rememberMe,
+    };
   }
   return { phase: 'locked', name: account.name, email: account.email, avatar: account.avatar, rememberMe: false };
 }
@@ -128,10 +150,7 @@ export async function getDeepSeekUserId(): Promise<string | undefined> {
   if (process.env.AURAXIS_AUTH_DISABLED === '1') return undefined;
   const account = await readAccount();
   if (!account?.email) return undefined;
-  const digest = createHash('sha256')
-    .update(account.email.trim().toLowerCase())
-    .digest('hex')
-    .slice(0, 24);
+  const digest = createHash('sha256').update(account.email.trim().toLowerCase()).digest('hex').slice(0, 24);
   return `au-${digest}`;
 }
 
@@ -198,7 +217,9 @@ export async function logoutAccount(): Promise<void> {
   }
 }
 
-export async function changeAccountPassword(params: AuthChangePasswordParams): Promise<{ ok: boolean; error?: string }> {
+export async function changeAccountPassword(
+  params: AuthChangePasswordParams,
+): Promise<{ ok: boolean; error?: string }> {
   const account = await readAccount();
   if (!account) return { ok: false, error: '尚未创建账户' };
   if (!verify(params.currentPassword, account)) return { ok: false, error: '当前密码错误' };

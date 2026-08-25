@@ -144,7 +144,11 @@ describe('TodoWrite / TaskOutput / TaskStop / TaskList', () => {
   });
 
   it('executeToolCall 按 toolCallId 自动缓存结果', async () => {
-    await executeToolCall('TodoWrite', { todos: [{ content: 'x', status: 'pending', activeForm: 'x' }] }, ctx({ toolCallId: 'tc-9' }));
+    await executeToolCall(
+      'TodoWrite',
+      { todos: [{ content: 'x', status: 'pending', activeForm: 'x' }] },
+      ctx({ toolCallId: 'tc-9' }),
+    );
     const r = await executeToolCall('TaskOutput', { taskId: 'tc-9' }, ctx());
     expect((r.output as any).status).toBe('completed');
   });
@@ -160,7 +164,17 @@ describe('TodoWrite / TaskOutput / TaskStop / TaskList', () => {
 
   it('TaskList 合并后台任务与 Agent 实例', async () => {
     vi.mocked(listTasks).mockReturnValue([
-      { id: 'bg1', command: 'node', cwd: '/', status: 'running', startedAt: 1, finishedAt: null, exitCode: null, durationMs: 3, error: null } as any,
+      {
+        id: 'bg1',
+        command: 'node',
+        cwd: '/',
+        status: 'running',
+        startedAt: 1,
+        finishedAt: null,
+        exitCode: null,
+        durationMs: 3,
+        error: null,
+      } as any,
     ]);
     vi.mocked(scheduler.getAgentInstances).mockReturnValue([
       { agentId: 'a1', name: 'A', description: 'd', status: 'running', startTime: 1, endTime: undefined } as any,
@@ -195,7 +209,15 @@ describe('Job* / Schedule* / Cron* 任务别名族', () => {
     expect((await executeToolCall('ScheduleDelete', { id: 'x' }, ctx())).error).toContain('未找到跟进任务');
 
     vi.mocked(listSchedules).mockReturnValue([
-      { id: 's1', kind: 'repeat', prompt: 'p'.repeat(10), nextFireAt: 1, everySeconds: 2, repeatsRemaining: 3, firedCount: 4 } as any,
+      {
+        id: 's1',
+        kind: 'repeat',
+        prompt: 'p'.repeat(10),
+        nextFireAt: 1,
+        everySeconds: 2,
+        repeatsRemaining: 3,
+        firedCount: 4,
+      } as any,
     ]);
     const list = await executeToolCall('ScheduleList', {}, ctx());
     expect((list.output as any).count).toBe(1);
@@ -203,17 +225,27 @@ describe('Job* / Schedule* / Cron* 任务别名族', () => {
   });
 
   it('CronCreate / Delete / List 全链路', async () => {
-    const created = await executeToolCall('CronCreate', { name: 'n', prompt: 'p', cron: '0 * * * *', recurring: true }, ctx());
+    const created = await executeToolCall(
+      'CronCreate',
+      { name: 'n', prompt: 'p', cron: '0 * * * *', recurring: true },
+      ctx(),
+    );
     expect(created.output).toMatchObject({ jobId: 'j1', message: expect.stringContaining('已创建') });
 
     vi.mocked(createCronJob).mockReturnValueOnce({ ok: false, error: 'bad' });
-    expect((await executeToolCall('CronCreate', { name: 'n', prompt: 'p', cron: 'x', recurring: true }, ctx())).error).toBe('bad');
+    expect(
+      (await executeToolCall('CronCreate', { name: 'n', prompt: 'p', cron: 'x', recurring: true }, ctx())).error,
+    ).toBe('bad');
 
-    expect((await executeToolCall('CronDelete', { jobId: 'j1' }, ctx())).output).toMatchObject({ message: expect.stringContaining('已删除') });
+    expect((await executeToolCall('CronDelete', { jobId: 'j1' }, ctx())).output).toMatchObject({
+      message: expect.stringContaining('已删除'),
+    });
     vi.mocked(deleteCronJob).mockReturnValueOnce({ ok: false, error: 'nope' });
     expect((await executeToolCall('CronDelete', { jobId: 'x' }, ctx())).error).toBe('nope');
 
-    vi.mocked(listCronJobs).mockReturnValue([{ id: 'j1', name: 'n', cron: 'c', recurring: true, nextFireAt: 1, firedCount: 0, createdAt: 1 }]);
+    vi.mocked(listCronJobs).mockReturnValue([
+      { id: 'j1', name: 'n', cron: 'c', recurring: true, nextFireAt: 1, firedCount: 0, createdAt: 1 },
+    ]);
     const list = await executeToolCall('CronList', {}, ctx());
     expect((list.output as any).count).toBe(1);
   });
@@ -253,7 +285,9 @@ describe('SendMessage / InterruptAgent / Report — 任务控制', () => {
 
   it('Report 校验内容与子代理上下文', async () => {
     expect((await executeToolCall('Report', {}, ctx())).error).toBe('content 不能为空');
-    expect((await executeToolCall('Report', { content: 'x' }, ctx({ sessionId: 'agent-1' }))).error).toContain('只能由子代理调用');
+    expect((await executeToolCall('Report', { content: 'x' }, ctx({ sessionId: 'agent-1' }))).error).toContain(
+      '只能由子代理调用',
+    );
 
     vi.mocked(reportFromSubAgent).mockReturnValueOnce({ ok: true, report: { id: 'r1', text: '', ts: 1 } });
     const ok = await executeToolCall('Report', { content: '完成' }, ctx({ sessionId: 'sub-1' }));
@@ -290,13 +324,19 @@ describe('EnterPlanMode / ExitPlanMode', () => {
     const r = await executeToolCall('EnterPlanMode', { goal: 'g', context: 'ctx' }, ctx());
     expect(r.output).toMatchObject({ planApproved: true, message: expect.stringContaining('1/1') });
     expect((r.output as any).tasks[0].approved).toBe(true);
-    expect(waitForPlanApproval).toHaveBeenCalledWith(expect.objectContaining({ tasks: expect.any(Array) }), null, expect.objectContaining({ title: 'g' }));
+    expect(waitForPlanApproval).toHaveBeenCalledWith(
+      expect.objectContaining({ tasks: expect.any(Array) }),
+      null,
+      expect.objectContaining({ title: 'g' }),
+    );
   });
 
   it('批准为空 / 异常路径', async () => {
     vi.mocked(readSettings).mockResolvedValue({ deepseekApiKey: 'sk' });
     vi.mocked(llmClientInvoke).mockResolvedValue({ rawText: 'PLAN' } as any);
-    vi.mocked(parsePlanFromLLMText).mockReturnValue({ tasks: [{ id: '1', description: 'd', dependencies: [] }] } as any);
+    vi.mocked(parsePlanFromLLMText).mockReturnValue({
+      tasks: [{ id: '1', description: 'd', dependencies: [] }],
+    } as any);
     vi.mocked(waitForPlanApproval).mockResolvedValue([]);
     const denied = await executeToolCall('EnterPlanMode', { goal: 'g' }, ctx());
     expect(denied.output).toMatchObject({ planApproved: false });

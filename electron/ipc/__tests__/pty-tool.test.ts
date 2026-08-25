@@ -7,19 +7,27 @@ class FakeSession implements PtySessionLike {
   private dataCbs: ((d: string) => void)[] = [];
   private exitCbs: (() => void)[] = [];
 
-  write(data: string): void { this.written.push(data); }
+  write(data: string): void {
+    this.written.push(data);
+  }
   kill(): void {
     this.killed = true;
     for (const cb of this.exitCbs.splice(0)) cb();
   }
-  onData(cb: (d: string) => void): void { this.dataCbs.push(cb); }
-  onExit(cb: () => void): void { this.exitCbs.push(cb); }
-  push(data: string): void { for (const cb of [...this.dataCbs]) cb(data); }
+  onData(cb: (d: string) => void): void {
+    this.dataCbs.push(cb);
+  }
+  onExit(cb: () => void): void {
+    this.exitCbs.push(cb);
+  }
+  push(data: string): void {
+    for (const cb of [...this.dataCbs]) cb(data);
+  }
 }
 
 function makeRegistry(): { registry: PtyRegistry; last: () => FakeSession } {
   let last = new FakeSession();
-  const factory: PtyFactory = (opts) => {
+  const factory: PtyFactory = (_opts) => {
     last = new FakeSession();
     return last;
   };

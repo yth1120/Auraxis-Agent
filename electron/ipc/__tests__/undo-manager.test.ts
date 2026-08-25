@@ -24,7 +24,10 @@ function cleanup() {
 }
 
 describe('UndoManager', () => {
-  beforeEach(() => { cleanup(); setupTestDir(); });
+  beforeEach(() => {
+    cleanup();
+    setupTestDir();
+  });
   afterEach(() => cleanup());
 
   it('备份文件后，原文件内容被保存到快照目录', () => {
@@ -174,7 +177,7 @@ describe('UndoManager', () => {
 
     // Simulate expiry filter
     const expiryThreshold = 5 * 60 * 1000; // 5 min
-    const active = entries.filter((e) => (now - e.timestamp) < expiryThreshold);
+    const active = entries.filter((e) => now - e.timestamp < expiryThreshold);
     expect(active).toHaveLength(2);
     expect(active.map((e) => e.id)).toEqual(['1', '3']);
   });

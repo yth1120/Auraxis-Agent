@@ -65,12 +65,11 @@ export default function AgentWorkflowGraph({ plan, onTaskClick }: Props) {
     <div className="h-full flex flex-col min-h-0">
       <div className="flex items-center justify-between gap-3 px-1 pb-2 shrink-0">
         <div className="flex-1 h-1 rounded-full bg-[var(--color-bg-inset)] overflow-hidden">
-          <div
-            className="h-full rounded-full bg-primary [transition:width_0.35s_ease]"
-            style={{ width: `${pct}%` }}
-          />
+          <div className="h-full rounded-full bg-primary [transition:width_0.35s_ease]" style={{ width: `${pct}%` }} />
         </div>
-        <span className="text-2xs text-text-muted tabular-nums shrink-0">{done}/{todos.length}</span>
+        <span className="text-2xs text-text-muted tabular-nums shrink-0">
+          {done}/{todos.length}
+        </span>
       </div>
 
       <ol className="list-none m-0 p-0 flex-1 min-h-0 overflow-y-auto pr-1">
@@ -80,27 +79,21 @@ export default function AgentWorkflowGraph({ plan, onTaskClick }: Props) {
           return (
             <li
               key={index}
-              className={clsx(
-                'relative flex gap-2.5 min-h-[44px]',
-                onTaskClick && 'cursor-pointer',
-              )}
+              className={clsx('relative flex gap-2.5 min-h-[44px]', onTaskClick && 'cursor-pointer')}
               onClick={onTaskClick ? () => onTaskClick(String(index)) : undefined}
               role={onTaskClick ? 'button' : undefined}
               tabIndex={onTaskClick ? 0 : undefined}
-              onKeyDown={onTaskClick ? (e) => (e.key === 'Enter' || e.key === ' ') && onTaskClick(String(index)) : undefined}
+              onKeyDown={
+                onTaskClick ? (e) => (e.key === 'Enter' || e.key === ' ') && onTaskClick(String(index)) : undefined
+              }
             >
               <div className="flex flex-col items-center shrink-0">
                 <span
-                  className={clsx(
-                    'flex items-center justify-center w-6 h-6 rounded-full border',
-                    statusTone(status),
-                  )}
+                  className={clsx('flex items-center justify-center w-6 h-6 rounded-full border', statusTone(status))}
                 >
                   {STATUS_ICON[status] ?? STATUS_ICON.pending}
                 </span>
-                {index < todos.length - 1 && (
-                  <span className="w-px flex-1 my-0.5 bg-[var(--color-border-default)]" />
-                )}
+                {index < todos.length - 1 && <span className="w-px flex-1 my-0.5 bg-[var(--color-border-default)]" />}
               </div>
               <div className={clsx('flex flex-col min-w-0 pt-[2px] pb-2')}>
                 <span

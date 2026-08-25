@@ -63,7 +63,10 @@ function ctx(extra: Record<string, unknown> = {}) {
   };
 }
 
-function writeNotebook(p = 'nb.ipynb', cells = [{ cell_type: 'code', source: ['print(1)'], metadata: {}, execution_count: 1, outputs: [] }]) {
+function writeNotebook(
+  p = 'nb.ipynb',
+  cells = [{ cell_type: 'code', source: ['print(1)'], metadata: {}, execution_count: 1, outputs: [] }],
+) {
   const file = path.join(root, p);
   writeFileSync(file, JSON.stringify({ cells, metadata: {}, nbformat: 4, nbformat_minor: 5 }), 'utf-8');
   return file;
@@ -73,7 +76,12 @@ beforeEach(() => {
   root = mkdtempSync(path.join(tmpRoot, 'proj-'));
   vi.clearAllMocks();
   clearWorktreeSession('lr-1');
-  spawnSyncMock.mockReturnValue({ status: 0, stdout: Buffer.from(''), stderr: Buffer.from(''), error: undefined } as any);
+  spawnSyncMock.mockReturnValue({
+    status: 0,
+    stdout: Buffer.from(''),
+    stderr: Buffer.from(''),
+    error: undefined,
+  } as any);
   vi.mocked(queryLsp).mockResolvedValue({ ok: false });
 });
 
@@ -91,17 +99,29 @@ describe('NotebookEdit', () => {
 
   it('write / insert / delete 修改单元格', async () => {
     writeNotebook();
-    const w = await executeToolCall('NotebookEdit', { file_path: 'nb.ipynb', action: 'write', cell_index: 0, source: 'a\nb' }, ctx());
+    const w = await executeToolCall(
+      'NotebookEdit',
+      { file_path: 'nb.ipynb', action: 'write', cell_index: 0, source: 'a\nb' },
+      ctx(),
+    );
     expect(w.error).toBeUndefined();
     let nb = JSON.parse(readFileSync(path.join(root, 'nb.ipynb'), 'utf-8'));
     expect(nb.cells[0].source).toEqual(['a', 'b']);
 
-    const ins = await executeToolCall('NotebookEdit', { file_path: 'nb.ipynb', action: 'insert', source: 'x\ny', cell_type: 'markdown' }, ctx());
+    const ins = await executeToolCall(
+      'NotebookEdit',
+      { file_path: 'nb.ipynb', action: 'insert', source: 'x\ny', cell_type: 'markdown' },
+      ctx(),
+    );
     expect((ins.output as any).cell_index).toBe(1);
     nb = JSON.parse(readFileSync(path.join(root, 'nb.ipynb'), 'utf-8'));
     expect(nb.cells[1].cell_type).toBe('markdown');
 
-    const del = await executeToolCall('NotebookEdit', { file_path: 'nb.ipynb', action: 'delete', cell_index: 0 }, ctx());
+    const del = await executeToolCall(
+      'NotebookEdit',
+      { file_path: 'nb.ipynb', action: 'delete', cell_index: 0 },
+      ctx(),
+    );
     expect(del.error).toBeUndefined();
     nb = JSON.parse(readFileSync(path.join(root, 'nb.ipynb'), 'utf-8'));
     expect(nb.cells).toHaveLength(1);
@@ -109,23 +129,43 @@ describe('NotebookEdit', () => {
 
   it('越界/缺参/类型/损坏文件均被拒绝', async () => {
     writeNotebook();
-    expect((await executeToolCall('NotebookEdit', { file_path: 'nb.ipynb', cell_index: 5 }, ctx())).error).toContain('超出范围');
-    expect((await executeToolCall('NotebookEdit', { file_path: 'nb.ipynb', cell_index: -1 }, ctx())).error).toContain('超出范围');
-    expect((await executeToolCall('NotebookEdit', { file_path: 'nb.ipynb', action: 'write', cell_index: 0 }, ctx())).error).toContain('source 参数');
-    expect((await executeToolCall('NotebookEdit', { file_path: 'nb.ipynb', action: 'insert' }, ctx())).error).toContain('source 参数');
-    expect((await executeToolCall('NotebookEdit', { file_path: 'nb.ipynb', action: 'explode', cell_index: 0 }, ctx())).error).toContain('未知操作');
+    expect((await executeToolCall('NotebookEdit', { file_path: 'nb.ipynb', cell_index: 5 }, ctx())).error).toContain(
+      '超出范围',
+    );
+    expect((await executeToolCall('NotebookEdit', { file_path: 'nb.ipynb', cell_index: -1 }, ctx())).error).toContain(
+      '超出范围',
+    );
+    expect(
+      (await executeToolCall('NotebookEdit', { file_path: 'nb.ipynb', action: 'write', cell_index: 0 }, ctx())).error,
+    ).toContain('source 参数');
+    expect((await executeToolCall('NotebookEdit', { file_path: 'nb.ipynb', action: 'insert' }, ctx())).error).toContain(
+      'source 参数',
+    );
+    expect(
+      (await executeToolCall('NotebookEdit', { file_path: 'nb.ipynb', action: 'explode', cell_index: 0 }, ctx())).error,
+    ).toContain('未知操作');
     expect((await executeToolCall('NotebookEdit', { file_path: 'x.txt' }, ctx())).error).toContain('仅支持 .ipynb');
-    expect((await executeToolCall('NotebookEdit', { file_path: 'missing.ipynb' }, ctx())).error).toContain('文件不存在');
+    expect((await executeToolCall('NotebookEdit', { file_path: 'missing.ipynb' }, ctx())).error).toContain(
+      '文件不存在',
+    );
 
     writeFileSync(path.join(root, 'bad.ipynb'), '{broken', 'utf-8');
-    expect((await executeToolCall('NotebookEdit', { file_path: 'bad.ipynb' }, ctx())).error).toContain('NotebookEdit 失败');
+    expect((await executeToolCall('NotebookEdit', { file_path: 'bad.ipynb' }, ctx())).error).toContain(
+      'NotebookEdit 失败',
+    );
     writeFileSync(path.join(root, 'nocells.ipynb'), JSON.stringify({ cells: null }), 'utf-8');
-    expect((await executeToolCall('NotebookEdit', { file_path: 'nocells.ipynb' }, ctx())).error).toContain('缺少 cells');
+    expect((await executeToolCall('NotebookEdit', { file_path: 'nocells.ipynb' }, ctx())).error).toContain(
+      '缺少 cells',
+    );
   });
 
   it('版本守卫拒绝过期写入', async () => {
     writeNotebook();
-    const r = await executeToolCall('NotebookEdit', { file_path: 'nb.ipynb', action: 'write', cell_index: 0, source: 'x', version: 'new' }, ctx());
+    const r = await executeToolCall(
+      'NotebookEdit',
+      { file_path: 'nb.ipynb', action: 'write', cell_index: 0, source: 'x', version: 'new' },
+      ctx(),
+    );
     expect(r.error).toContain('版本守卫');
   });
 });
@@ -134,7 +174,11 @@ describe('LSP — 定义/引用/悬停/诊断', () => {
   it('真实 LSP hover 结果优先返回', async () => {
     writeFileSync(path.join(root, 'a.ts'), 'export const x = 1;', 'utf-8');
     vi.mocked(queryLsp).mockResolvedValue({ ok: true, hover: { contents: 'const x: 1', range: null } } as any);
-    const r = await executeToolCall('LSP', { action: 'hover', file_path: 'a.ts', symbol: 'x', line: 1, column: 10 }, ctx());
+    const r = await executeToolCall(
+      'LSP',
+      { action: 'hover', file_path: 'a.ts', symbol: 'x', line: 1, column: 10 },
+      ctx(),
+    );
     expect(r.output).toMatchObject({ found: true, hover: 'const x: 1', source: 'lsp' });
   });
 
@@ -171,7 +215,12 @@ describe('LSP — 定义/引用/悬停/诊断', () => {
   });
 
   it('回退定义查找无结果与缺 symbol', async () => {
-    spawnSyncMock.mockReturnValue({ status: 1, stdout: Buffer.from(''), stderr: Buffer.from(''), error: undefined } as any);
+    spawnSyncMock.mockReturnValue({
+      status: 1,
+      stdout: Buffer.from(''),
+      stderr: Buffer.from(''),
+      error: undefined,
+    } as any);
     const r = await executeToolCall('LSP', { action: 'definition', file_path: 'a.ts', symbol: 'nope' }, ctx());
     expect(r.output).toMatchObject({ found: false });
     expect((await executeToolCall('LSP', { action: 'definition' }, ctx())).error).toContain('symbol 参数');
@@ -188,7 +237,12 @@ describe('LSP — 定义/引用/悬停/诊断', () => {
 
   it('references 解析 grep -w 输出并截断', async () => {
     const lines = Array.from({ length: 50 }, (_, i) => `${root}/f.ts:${i + 1}: use add()`).join('\n');
-    spawnSyncMock.mockReturnValue({ status: 0, stdout: Buffer.from(lines), stderr: Buffer.from(''), error: undefined } as any);
+    spawnSyncMock.mockReturnValue({
+      status: 0,
+      stdout: Buffer.from(lines),
+      stderr: Buffer.from(''),
+      error: undefined,
+    } as any);
     const r = await executeToolCall('LSP', { action: 'references', symbol: 'add' }, ctx());
     expect(r.output).toMatchObject({ found: true, count: 50, hint: expect.any(String) });
     expect((await executeToolCall('LSP', { action: 'references' }, ctx())).error).toContain('symbol 参数');
@@ -211,16 +265,28 @@ describe('LSP — 定义/引用/悬停/诊断', () => {
 
   it('diagnostics：tsconfig 全量检查 / 非 TS 文件 / 通过 / 未知操作', async () => {
     writeFileSync(path.join(root, 'tsconfig.json'), '{}', 'utf-8');
-    spawnSyncMock.mockReturnValue({ status: 0, stdout: Buffer.from(''), stderr: Buffer.from(''), error: undefined } as any);
+    spawnSyncMock.mockReturnValue({
+      status: 0,
+      stdout: Buffer.from(''),
+      stderr: Buffer.from(''),
+      error: undefined,
+    } as any);
     const full = await executeToolCall('LSP', { action: 'diagnostics' }, ctx());
     expect(full.output).toMatchObject({ passed: true, message: '类型检查通过，未发现错误。' });
     expect(spawnSyncMock.mock.calls.some((c: any) => c[0] === npxCmd && c[1].includes('--noEmit'))).toBe(true);
 
-    spawnSyncMock.mockReturnValueOnce({ status: null, stdout: Buffer.from(''), stderr: Buffer.from(''), error: { message: 'spawn ENOENT' } } as any);
+    spawnSyncMock.mockReturnValueOnce({
+      status: null,
+      stdout: Buffer.from(''),
+      stderr: Buffer.from(''),
+      error: { message: 'spawn ENOENT' },
+    } as any);
     expect((await executeToolCall('LSP', { action: 'diagnostics' }, ctx())).error).toContain('诊断执行失败');
 
     rmSync(path.join(root, 'tsconfig.json'));
-    expect((await executeToolCall('LSP', { action: 'diagnostics', file_path: 'style.css' }, ctx())).output).toMatchObject({ message: expect.stringContaining('不是 TypeScript') });
+    expect(
+      (await executeToolCall('LSP', { action: 'diagnostics', file_path: 'style.css' }, ctx())).output,
+    ).toMatchObject({ message: expect.stringContaining('不是 TypeScript') });
     expect((await executeToolCall('LSP', { action: 'boom' }, ctx())).error).toContain('未知 LSP 操作');
   });
 });
@@ -231,9 +297,13 @@ describe('ReviewArtifact', () => {
   }
 
   it('缺少或损坏 package.json 拒绝', async () => {
-    expect((await executeToolCall('ReviewArtifact', { check_type: 'build' }, ctx())).error).toContain('未找到 package.json');
+    expect((await executeToolCall('ReviewArtifact', { check_type: 'build' }, ctx())).error).toContain(
+      '未找到 package.json',
+    );
     writeFileSync(path.join(root, 'package.json'), '{broken', 'utf-8');
-    expect((await executeToolCall('ReviewArtifact', { check_type: 'build' }, ctx())).error).toContain('读取 package.json 失败');
+    expect((await executeToolCall('ReviewArtifact', { check_type: 'build' }, ctx())).error).toContain(
+      '读取 package.json 失败',
+    );
   });
 
   it('typecheck 选择脚本或 npx 回退', async () => {
@@ -257,20 +327,39 @@ describe('ReviewArtifact', () => {
 
     writePkg({});
     await executeToolCall('ReviewArtifact', { check_type: 'lint' }, ctx());
-    expect(spawnSyncMock).toHaveBeenLastCalledWith(npxCmd, ['eslint', '.', '--ext', '.ts,.tsx', '--max-warnings', '0'], expect.anything());
+    expect(spawnSyncMock).toHaveBeenLastCalledWith(
+      npxCmd,
+      ['eslint', '.', '--ext', '.ts,.tsx', '--max-warnings', '0'],
+      expect.anything(),
+    );
   });
 
   it('进程错误/非零退出/通过三种结果', async () => {
     writePkg({});
-    spawnSyncMock.mockReturnValueOnce({ status: null, stdout: Buffer.from(''), stderr: Buffer.from(''), error: { message: 'spawn ENOENT' } } as any);
+    spawnSyncMock.mockReturnValueOnce({
+      status: null,
+      stdout: Buffer.from(''),
+      stderr: Buffer.from(''),
+      error: { message: 'spawn ENOENT' },
+    } as any);
     const procErr = await executeToolCall('ReviewArtifact', { check_type: 'build' }, ctx());
     expect(procErr.output).toMatchObject({ passed: false, summary: expect.stringContaining('进程错误') });
 
-    spawnSyncMock.mockReturnValueOnce({ status: 1, stdout: Buffer.from(''), stderr: Buffer.from('err out'), error: undefined } as any);
+    spawnSyncMock.mockReturnValueOnce({
+      status: 1,
+      stdout: Buffer.from(''),
+      stderr: Buffer.from('err out'),
+      error: undefined,
+    } as any);
     const failed = await executeToolCall('ReviewArtifact', { check_type: 'build' }, ctx());
     expect(failed.output).toMatchObject({ passed: false, exitCode: 1, error: 'err out' });
 
-    spawnSyncMock.mockReturnValueOnce({ status: 0, stdout: Buffer.from('ok'), stderr: Buffer.from(''), error: undefined } as any);
+    spawnSyncMock.mockReturnValueOnce({
+      status: 0,
+      stdout: Buffer.from('ok'),
+      stderr: Buffer.from(''),
+      error: undefined,
+    } as any);
     const ok = await executeToolCall('ReviewArtifact', { check_type: 'build' }, ctx());
     expect(ok.output).toMatchObject({ passed: true, summary: expect.stringContaining('通过') });
   });

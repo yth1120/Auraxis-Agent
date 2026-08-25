@@ -4,9 +4,8 @@ import {
   MinusCircle as MinusCircleOutlined,
   Copy as CopyOutlined,
   Check as CheckOutlined,
-} from '@/components/common/icons'
+} from '@/components/common/icons';
 import { Flex } from 'antd';
-import clsx from 'clsx';
 import { useT } from '../../i18n';
 import type { Message } from '../../types/chat';
 import { getContentText } from '../../types/chat';
@@ -27,7 +26,11 @@ function projectUserText(text: string): React.ReactNode {
     const tokenStart = m.index + (m[1]?.length ?? 0);
     const label = m[2] ?? '';
     if (tokenStart > cursor) parts.push(text.slice(cursor, tokenStart));
-    parts.push(<span key={tokenStart} className="ax-ref-chip">{label}</span>);
+    parts.push(
+      <span key={tokenStart} className="ax-ref-chip">
+        {label}
+      </span>,
+    );
     cursor = tokenStart + label.length;
   }
   if (parts.length === 0) return text;
@@ -62,16 +65,19 @@ export default memo(function UserMessage({ message }: UserMessageProps) {
     setIsEditing(false);
   }, [editValue, contentText, editMessage, message.id]);
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSaveEdit();
-    }
-    if (e.key === 'Escape') {
-      setEditValue(contentText);
-      setIsEditing(false);
-    }
-  }, [handleSaveEdit, contentText]);
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        handleSaveEdit();
+      }
+      if (e.key === 'Escape') {
+        setEditValue(contentText);
+        setIsEditing(false);
+      }
+    },
+    [handleSaveEdit, contentText],
+  );
 
   return (
     <div className="ax-message-user group mb-1">
@@ -100,8 +106,11 @@ export default memo(function UserMessage({ message }: UserMessageProps) {
               <button
                 type="button"
                 className="ax-message-action"
-                onClick={() => { setEditValue(contentText); setIsEditing(true); }}
-          title={t('msg.edit')}
+                onClick={() => {
+                  setEditValue(contentText);
+                  setIsEditing(true);
+                }}
+                title={t('msg.edit')}
               >
                 <EditOutlined />
               </button>
@@ -113,7 +122,7 @@ export default memo(function UserMessage({ message }: UserMessageProps) {
                   setCopied(true);
                   setTimeout(() => setCopied(false), 1500);
                 }}
-          title={t('msg.copy')}
+                title={t('msg.copy')}
               >
                 {copied ? <CheckOutlined style={{ color: 'var(--color-primary)' }} /> : <CopyOutlined />}
               </button>
@@ -121,7 +130,7 @@ export default memo(function UserMessage({ message }: UserMessageProps) {
                 type="button"
                 className="ax-message-action"
                 onClick={() => deleteMessage(message.id)}
-          title={t('msg.delete')}
+                title={t('msg.delete')}
               >
                 <MinusCircleOutlined />
               </button>

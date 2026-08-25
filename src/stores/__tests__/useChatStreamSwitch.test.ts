@@ -19,10 +19,18 @@ describe('useChatStore — 流式进行中切换/清空会话', () => {
       { id: 'a1', role: 'assistant', content: '', timestamp: 2, isStreaming: true },
     ] as any[];
     useSessionStore.setState({
-      sessions: [{
-        id: sid, title: '会话', created: 1, updated: 1, model: 'm',
-        messageCount: 2, messages: msgs, mode: 'chat',
-      }],
+      sessions: [
+        {
+          id: sid,
+          title: '会话',
+          created: 1,
+          updated: 1,
+          model: 'm',
+          messageCount: 2,
+          messages: msgs,
+          mode: 'chat',
+        },
+      ],
     });
     useChatStore.setState({ messages: msgs, isStreaming: true });
 
@@ -32,7 +40,16 @@ describe('useChatStore — 流式进行中切换/清空会话', () => {
     useSessionStore.setState((s) => ({
       sessions: [
         ...s.sessions,
-        { id: targetId, title: '目标', created: 1, updated: 1, model: 'm', messageCount: 0, messages: [], mode: 'chat' },
+        {
+          id: targetId,
+          title: '目标',
+          created: 1,
+          updated: 1,
+          model: 'm',
+          messageCount: 0,
+          messages: [],
+          mode: 'chat',
+        },
       ],
     }));
 
@@ -66,19 +83,24 @@ describe('useChatStore — 流式进行中切换/清空会话', () => {
       { id: 'a1', role: 'assistant', content: '旧回复', timestamp: 2 },
     ] as any[];
     useSessionStore.setState({
-      sessions: [{
-        id: sid, title: '会话', created: 1, updated: 1, model: 'm',
-        messageCount: 2, messages: oldMsgs, mode: 'chat',
-      }],
+      sessions: [
+        {
+          id: sid,
+          title: '会话',
+          created: 1,
+          updated: 1,
+          model: 'm',
+          messageCount: 2,
+          messages: oldMsgs,
+          mode: 'chat',
+        },
+      ],
     });
     useChatStore.setState({ messages: oldMsgs, isStreaming: false });
 
     // Stream just completed: chat store has a fresh reply the session
     // store hasn't persisted yet (500ms auto-save pending).
-    const freshMsgs = [
-      ...oldMsgs,
-      { id: 'a2', role: 'assistant', content: '新回复', timestamp: 3 },
-    ];
+    const freshMsgs = [...oldMsgs, { id: 'a2', role: 'assistant', content: '新回复', timestamp: 3 }];
     useChatStore.setState({ messages: freshMsgs as any[] });
 
     useChatStore.getState().switchSession(sid);
@@ -95,10 +117,18 @@ describe('useChatStore — 流式进行中切换/清空会话', () => {
       { id: 'a1', role: 'assistant', content: '旧回复', timestamp: 2 },
     ] as any[];
     useSessionStore.setState({
-      sessions: [{
-        id: sid, title: '会话', created: 1, updated: 1, model: 'm',
-        messageCount: 2, messages: msgs, mode: 'chat',
-      }],
+      sessions: [
+        {
+          id: sid,
+          title: '会话',
+          created: 1,
+          updated: 1,
+          model: 'm',
+          messageCount: 2,
+          messages: msgs,
+          mode: 'chat',
+        },
+      ],
     });
     useChatStore.setState({ messages: [], isStreaming: false });
 
@@ -169,5 +199,4 @@ describe('useChatStore — 流式进行中切换/清空会话', () => {
       vi.useRealTimers();
     }
   });
-
 });

@@ -21,7 +21,6 @@ import {
   searchEvidence,
   type BeliefEvidenceLink,
   type BeliefRecord,
-  type EvidenceRecord,
   type ReadResultRecord,
   type ReadRunRecord,
 } from './memory-db';
@@ -113,7 +112,7 @@ export function embedText(text: string): number[] {
   for (const token of tokens) {
     if (!token) continue;
     const h = createHash('sha256').update(token).digest();
-    const idx = (h[0] << 8 | h[1]) % EMBEDDING_DIM;
+    const idx = ((h[0] << 8) | h[1]) % EMBEDDING_DIM;
     const sign = (h[2] & 1) === 1 ? 1 : -1;
     vector[idx] += sign;
   }
@@ -232,11 +231,7 @@ function routeHits(
   return out;
 }
 
-export function readForQuery(
-  query: string,
-  scope: string,
-  opts: ReadQueryOptions = {},
-): MemoryReadResult {
+export function readForQuery(query: string, scope: string, opts: ReadQueryOptions = {}): MemoryReadResult {
   const start = Date.now();
   const now = opts.now ?? Date.now();
   const budget = Math.max(200, Math.min(8000, opts.budgetTokens ?? 1200));
@@ -246,15 +241,21 @@ export function readForQuery(
   const links = listBeliefEvidence();
   const hits = routeHits(query, scope, beliefs, links, now);
 
-  const scored: Map<string, {
-    belief: BeliefRecord;
-    score: number;
-    routes: ReadRouteName[];
-    evidenceIds: Set<string>;
-  }> = new Map();
+  const scored: Map<
+    string,
+    {
+      belief: BeliefRecord;
+      score: number;
+      routes: ReadRouteName[];
+      evidenceIds: Set<string>;
+    }
+  > = new Map();
 
   const routeLatency: Record<ReadRouteName, number> = {
-    keyword: 0, entity_time: 0, observations: 0, vector: 0,
+    keyword: 0,
+    entity_time: 0,
+    observations: 0,
+    vector: 0,
   };
   const routeStart = Date.now();
   for (const route of Object.keys(hits) as ReadRouteName[]) {
@@ -274,8 +275,9 @@ export function readForQuery(
           belief,
           score,
           routes: [route],
-          evidenceIds: new Set([...r.evidenceIds].filter((id) =>
-            links.some((l) => l.belief_id === beliefId && l.evidence_id === id))),
+          evidenceIds: new Set(
+            [...r.evidenceIds].filter((id) => links.some((l) => l.belief_id === beliefId && l.evidence_id === id)),
+          ),
         });
       } else if (confidence > ROUTE_CONFIDENCE[existing.routes[0]]) {
         existing.score = Math.max(existing.score, score);
@@ -301,8 +303,7 @@ export function readForQuery(
     }
   }
 
-  const ranked = [...scored.values()].sort((a, b) =>
-    b.score - a.score || b.belief.updated_at - a.belief.updated_at);
+  const ranked = [...scored.values()].sort((a, b) => b.score - a.score || b.belief.updated_at - a.belief.updated_at);
 
   const context: MemoryContextItem[] = [];
   let usedTokens = 0;

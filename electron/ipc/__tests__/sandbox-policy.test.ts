@@ -4,7 +4,9 @@ import { enforceSandbox, commandMutates, MUTATION_TOOLS } from '../../sandbox-po
 describe('sandbox-policy — 每调用沙箱强制', () => {
   it('full mode allows everything', () => {
     expect(enforceSandbox({ sandboxMode: 'full', toolName: 'Write', input: { file_path: 'a.ts' } }).allowed).toBe(true);
-    expect(enforceSandbox({ sandboxMode: 'full', toolName: 'Bash', input: { command: 'rm -rf /' } }).allowed).toBe(true);
+    expect(enforceSandbox({ sandboxMode: 'full', toolName: 'Bash', input: { command: 'rm -rf /' } }).allowed).toBe(
+      true,
+    );
   });
 
   it('read mode denies mutation tools', () => {
@@ -30,7 +32,11 @@ describe('sandbox-policy — 每调用沙箱强制', () => {
   });
 
   it('workspace-write mode allows reads and writes (confinement is path-level)', () => {
-    expect(enforceSandbox({ sandboxMode: 'workspace-write', toolName: 'Write', input: { file_path: 'a.ts' } }).allowed).toBe(true);
-    expect(enforceSandbox({ sandboxMode: 'workspace-write', toolName: 'Bash', input: { command: 'npm test' } }).allowed).toBe(true);
+    expect(
+      enforceSandbox({ sandboxMode: 'workspace-write', toolName: 'Write', input: { file_path: 'a.ts' } }).allowed,
+    ).toBe(true);
+    expect(
+      enforceSandbox({ sandboxMode: 'workspace-write', toolName: 'Bash', input: { command: 'npm test' } }).allowed,
+    ).toBe(true);
   });
 });

@@ -36,7 +36,10 @@ process.stdin.on('data', (chunk) => {
     if (idx < 0) return;
     const header = buffer.slice(0, idx).toString('utf8');
     const m = /Content-Length:\s*(\d+)/i.exec(header);
-    if (!m) { buffer = buffer.slice(idx + 4); continue; }
+    if (!m) {
+      buffer = buffer.slice(idx + 4);
+      continue;
+    }
     const len = parseInt(m[1], 10);
     const bodyStart = idx + 4;
     if (buffer.length < bodyStart + len) return;
@@ -44,6 +47,8 @@ process.stdin.on('data', (chunk) => {
     buffer = buffer.slice(bodyStart + len);
     try {
       handle(JSON.parse(body));
-    } catch { /* ignore malformed */ }
+    } catch {
+      /* ignore malformed */
+    }
   }
 });

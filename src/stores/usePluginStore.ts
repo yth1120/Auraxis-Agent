@@ -18,7 +18,7 @@ export interface PluginStore {
 
 export const usePluginStore = create<PluginStore>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       installedPlugins: [],
       activePlugins: [],
       seededBuiltins: false,
@@ -39,9 +39,7 @@ export const usePluginStore = create<PluginStore>()(
         set((s) => {
           if (typeof window !== 'undefined') window.electronAPI?.pluginState?.set(id, true).catch(() => {});
           return {
-            installedPlugins: s.installedPlugins.map((p) =>
-              p.id === id ? { ...p, enabled: true } : p,
-            ),
+            installedPlugins: s.installedPlugins.map((p) => (p.id === id ? { ...p, enabled: true } : p)),
           };
         }),
 
@@ -49,9 +47,7 @@ export const usePluginStore = create<PluginStore>()(
         set((s) => {
           if (typeof window !== 'undefined') window.electronAPI?.pluginState?.set(id, false).catch(() => {});
           return {
-            installedPlugins: s.installedPlugins.map((p) =>
-              p.id === id ? { ...p, enabled: false } : p,
-            ),
+            installedPlugins: s.installedPlugins.map((p) => (p.id === id ? { ...p, enabled: false } : p)),
           };
         }),
 
@@ -71,16 +67,19 @@ export const usePluginStore = create<PluginStore>()(
         // Apply CLI-managed plugin state (userData/plugin-state.json).
         const api = typeof window !== 'undefined' ? window.electronAPI?.pluginState : undefined;
         if (!api || !state?.installedPlugins) return;
-        void api.get().then((r) => {
-          if (!r?.ok || !Array.isArray(r.data?.enabledIds)) return;
-          const enabled = new Set(r.data!.enabledIds);
-          usePluginStore.setState({
-            installedPlugins: state.installedPlugins.map((p) => ({
-              ...p,
-              enabled: enabled.has(p.id),
-            })),
-          });
-        }).catch(() => {});
+        void api
+          .get()
+          .then((r) => {
+            if (!r?.ok || !Array.isArray(r.data?.enabledIds)) return;
+            const enabled = new Set(r.data!.enabledIds);
+            usePluginStore.setState({
+              installedPlugins: state.installedPlugins.map((p) => ({
+                ...p,
+                enabled: enabled.has(p.id),
+              })),
+            });
+          })
+          .catch(() => {});
       },
     },
   ),

@@ -27,10 +27,7 @@ export function estimateTokens(text: string): number {
 export function estimateTokensForMessages(messages: any[]): number {
   let total = 0;
   for (const msg of messages) {
-    const contentStr =
-      typeof msg.content === 'string'
-        ? msg.content
-        : JSON.stringify(msg.content);
+    const contentStr = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content);
     total += estimateTokens(contentStr) + MESSAGE_OVERHEAD;
   }
   return total;

@@ -39,18 +39,19 @@ export const EMPTY_PROJECT_GLOBAL_STATE: ProjectGlobalState = {
 function asRecordList(value: unknown): ProjectRecord[] {
   if (!Array.isArray(value)) return [];
   const strList = (v: unknown, fallback: string[]): string[] => {
-    const list = Array.isArray(v)
-      ? v.filter((x): x is string => typeof x === 'string' && x.length > 0)
-      : [];
+    const list = Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && x.length > 0) : [];
     const merged = list.length > 0 ? list : fallback;
     return merged.filter((x, i, arr) => arr.indexOf(x) === i);
   };
   return value
-    .filter((x): x is Record<string, unknown> =>
-      !!x && typeof x === 'object' &&
-      typeof (x as Record<string, unknown>).id === 'string' &&
-      typeof (x as Record<string, unknown>).name === 'string' &&
-      typeof (x as Record<string, unknown>).path === 'string')
+    .filter(
+      (x): x is Record<string, unknown> =>
+        !!x &&
+        typeof x === 'object' &&
+        typeof (x as Record<string, unknown>).id === 'string' &&
+        typeof (x as Record<string, unknown>).name === 'string' &&
+        typeof (x as Record<string, unknown>).path === 'string',
+    )
     .map((x) => ({
       id: x.id as string,
       name: x.name as string,
@@ -67,14 +68,11 @@ export function normalizeProjectGlobalState(value: unknown): ProjectGlobalState 
     return { ...EMPTY_PROJECT_GLOBAL_STATE };
   }
   const v = value as Record<string, unknown>;
-  const rawView = v.view && typeof v.view === 'object'
-    ? (v.view as Record<string, unknown>)
-    : {};
-  const rawSessionOrder = v.sessionOrder
-    && typeof v.sessionOrder === 'object'
-    && !Array.isArray(v.sessionOrder)
-    ? (v.sessionOrder as Record<string, unknown>)
-    : {};
+  const rawView = v.view && typeof v.view === 'object' ? (v.view as Record<string, unknown>) : {};
+  const rawSessionOrder =
+    v.sessionOrder && typeof v.sessionOrder === 'object' && !Array.isArray(v.sessionOrder)
+      ? (v.sessionOrder as Record<string, unknown>)
+      : {};
   return {
     projects: asRecordList(v.projects),
     currentProjectId: typeof v.currentProjectId === 'string' ? v.currentProjectId : null,
@@ -88,10 +86,7 @@ export function normalizeProjectGlobalState(value: unknown): ProjectGlobalState 
     sessionOrder: Object.fromEntries(
       Object.entries(rawSessionOrder)
         .filter(([, val]) => Array.isArray(val))
-        .map(([key, val]) => [
-          key,
-          (val as unknown[]).filter((x): x is string => typeof x === 'string'),
-        ]),
+        .map(([key, val]) => [key, (val as unknown[]).filter((x): x is string => typeof x === 'string')]),
     ),
   };
 }

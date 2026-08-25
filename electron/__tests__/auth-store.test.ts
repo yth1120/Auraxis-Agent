@@ -56,7 +56,12 @@ describe('auth-store — 本地账户登录系统', () => {
   });
 
   it('注册后必须登录：创建账户后 phase 为 locked，邮箱归一化，重复创建被拒绝', async () => {
-    const res = await setupAccount({ name: ' 小明 ', email: ' Foo@Example.COM ', password: 'secret1', rememberMe: false });
+    const res = await setupAccount({
+      name: ' 小明 ',
+      email: ' Foo@Example.COM ',
+      password: 'secret1',
+      rememberMe: false,
+    });
     expect(res.ok).toBe(true);
 
     const status = await getAuthStatus();

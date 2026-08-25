@@ -22,20 +22,72 @@ export function toToolStreamEvent(event: EngineEvent, requestId: string): ToolSt
     case 'thinking_chunk':
       return { type: 'thinking_chunk', requestId, chunk: event.chunk, isNewBlock: event.isNewBlock };
     case 'tool_start':
-      return { type: 'tool_start', requestId, toolCallId: event.toolCallId, toolName: event.toolName, input: event.input, timestamp: Date.now(), stepGroupId: event.stepGroupId };
+      return {
+        type: 'tool_start',
+        requestId,
+        toolCallId: event.toolCallId,
+        toolName: event.toolName,
+        input: event.input,
+        timestamp: Date.now(),
+        stepGroupId: event.stepGroupId,
+      };
     case 'tool_progress':
-      return { type: 'tool_progress', requestId, toolCallId: event.toolCallId, toolName: event.toolName, input: event.input, timestamp: Date.now(), progress: event.progress, stepGroupId: event.stepGroupId };
+      return {
+        type: 'tool_progress',
+        requestId,
+        toolCallId: event.toolCallId,
+        toolName: event.toolName,
+        input: event.input,
+        timestamp: Date.now(),
+        progress: event.progress,
+        stepGroupId: event.stepGroupId,
+      };
     case 'tool_end':
-      return { type: 'tool_end', requestId, toolCallId: event.toolCallId, toolName: event.toolName, output: event.output, durationMs: event.durationMs, timestamp: Date.now(), stepGroupId: event.stepGroupId, input: event.input };
+      return {
+        type: 'tool_end',
+        requestId,
+        toolCallId: event.toolCallId,
+        toolName: event.toolName,
+        output: event.output,
+        durationMs: event.durationMs,
+        timestamp: Date.now(),
+        stepGroupId: event.stepGroupId,
+        input: event.input,
+      };
     case 'tool_error':
-      return { type: 'tool_error', requestId, toolCallId: event.toolCallId, toolName: event.toolName, input: event.input, error: event.error, timestamp: Date.now(), stepGroupId: event.stepGroupId };
+      return {
+        type: 'tool_error',
+        requestId,
+        toolCallId: event.toolCallId,
+        toolName: event.toolName,
+        input: event.input,
+        error: event.error,
+        timestamp: Date.now(),
+        stepGroupId: event.stepGroupId,
+      };
     case 'tool_aborted':
-      return { type: 'tool_aborted', requestId, toolCallId: event.toolCallId, toolName: event.toolName, input: event.input, error: event.error, timestamp: Date.now(), stepGroupId: event.stepGroupId };
+      return {
+        type: 'tool_aborted',
+        requestId,
+        toolCallId: event.toolCallId,
+        toolName: event.toolName,
+        input: event.input,
+        error: event.error,
+        timestamp: Date.now(),
+        stepGroupId: event.stepGroupId,
+      };
     case 'iteration_start':
       // Chat surface shows a single "iteration" counter.
       return { type: 'iteration', requestId, iteration: event.iteration };
     case 'context_compressed':
-      return { type: 'context_compressed', requestId, tokensBefore: event.tokensBefore, tokensAfter: event.tokensAfter, messagesRemoved: event.messagesRemoved, tokensSaved: event.tokensSaved };
+      return {
+        type: 'context_compressed',
+        requestId,
+        tokensBefore: event.tokensBefore,
+        tokensAfter: event.tokensAfter,
+        messagesRemoved: event.messagesRemoved,
+        tokensSaved: event.tokensSaved,
+      };
     case 'usage':
       return {
         type: 'usage_update',

@@ -1,4 +1,4 @@
-import { app, ipcMain } from 'electron';
+import { app } from 'electron';
 import { secureHandle } from './trust';
 import { readFile } from 'fs/promises';
 import path from 'path';

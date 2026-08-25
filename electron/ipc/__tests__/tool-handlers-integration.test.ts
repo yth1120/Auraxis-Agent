@@ -166,11 +166,7 @@ describe('executeToolCall — 真实工具处理器', () => {
     expect(codeDenied.error).toContain('Work 模式');
     expect(codeDenied.output).toBeNull();
 
-    const docOk = await executeToolCall(
-      'Write',
-      { file_path: 'docs/notes.md', content: '# hi' },
-      work,
-    );
+    const docOk = await executeToolCall('Write', { file_path: 'docs/notes.md', content: '# hi' }, work);
     expect(docOk.error).toBeUndefined();
     expect(readFileSync(path.join(root, 'docs', 'notes.md'), 'utf8')).toContain('# hi');
   });

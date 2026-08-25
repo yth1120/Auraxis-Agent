@@ -3,11 +3,7 @@ import { promises as fs } from 'fs';
 import os from 'os';
 import path from 'path';
 import { JsonlSessionStore } from '../../session-store';
-import {
-  SessionProjectionCache,
-  SqliteProjectionCache,
-  sqliteAvailable,
-} from '../../session-projection-cache';
+import { SessionProjectionCache, SqliteProjectionCache, sqliteAvailable } from '../../session-projection-cache';
 
 let root: string;
 let cacheDir: string;
@@ -96,8 +92,14 @@ describe('session projection cache', () => {
     const cache = new SqliteProjectionCache(path.join(cacheDir, 'roundtrip.sqlite'));
     expect(cache.available()).toBe(true);
     const row = {
-      id: 'r1', kind: 'chat' as const, title: 'T', created: 1, updated: 2,
-      messageCount: 1, eventCount: 1, lastSeq: 1,
+      id: 'r1',
+      kind: 'chat' as const,
+      title: 'T',
+      created: 1,
+      updated: 2,
+      messageCount: 1,
+      eventCount: 1,
+      lastSeq: 1,
     };
     await cache.write(row);
     expect(await cache.read('r1')).toMatchObject({ id: 'r1', title: 'T' });

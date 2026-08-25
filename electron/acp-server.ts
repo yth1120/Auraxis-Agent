@@ -9,6 +9,7 @@
  * request/error. Text + plan prompts; text file read/write inside the session
  * project root.
  */
+import { errorText } from './errors';
 import { createInterface } from 'readline';
 import { promises as fs } from 'fs';
 import path from 'path';
@@ -115,7 +116,11 @@ export class AcpServer {
           const text = typeof p.prompt?.text === 'string' ? p.prompt.text : '';
           const promptType: 'text' | 'plan' = p.prompt?.type === 'plan' ? 'plan' : 'text';
           if (!text.trim()) {
-            this.send({ jsonrpc: '2.0', id: msg.id ?? null, error: { code: -32602, message: 'prompt.text is required' } });
+            this.send({
+              jsonrpc: '2.0',
+              id: msg.id ?? null,
+              error: { code: -32602, message: 'prompt.text is required' },
+            });
             return;
           }
           session.seq += 1;
@@ -176,10 +181,14 @@ export class AcpServer {
           this.deps.onShutdown?.();
           return;
         default:
-          this.send({ jsonrpc: '2.0', id: msg.id ?? null, error: { code: -32601, message: `Method not found: ${msg.method}` } });
+          this.send({
+            jsonrpc: '2.0',
+            id: msg.id ?? null,
+            error: { code: -32601, message: `Method not found: ${msg.method}` },
+          });
       }
-    } catch (e: any) {
-      this.send({ jsonrpc: '2.0', id: msg.id ?? null, error: { code: -32603, message: e?.message ?? String(e) } });
+    } catch (e: unknown) {
+      this.send({ jsonrpc: '2.0', id: msg.id ?? null, error: { code: -32603, message: errorText(e) } });
     }
   }
 
@@ -197,7 +206,12 @@ export class AcpServer {
     return resolved;
   }
 
-  private async runPrompt(session: AcpSession, sequenceId: number, text: string, promptType: 'text' | 'plan'): Promise<void> {
+  private async runPrompt(
+    session: AcpSession,
+    sequenceId: number,
+    text: string,
+    promptType: 'text' | 'plan',
+  ): Promise<void> {
     this.send({
       jsonrpc: '2.0',
       method: 'session/update',
@@ -239,11 +253,11 @@ export class AcpServer {
           },
         });
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       this.send({
         jsonrpc: '2.0',
         method: 'request/error',
-        params: { sessionId: session.id, sequenceId, error: { code: -32000, message: e?.message ?? String(e) } },
+        params: { sessionId: session.id, sequenceId, error: { code: -32000, message: errorText(e) } },
       });
     } finally {
       this.send({

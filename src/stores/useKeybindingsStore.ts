@@ -14,8 +14,7 @@ export const useKeybindingsStore = create<KeybindingsStore>()(
     (set, get) => ({
       overrides: {},
 
-      setOverride: (index, binding) =>
-        set((s) => ({ overrides: { ...s.overrides, [index]: binding } })),
+      setOverride: (index, binding) => set((s) => ({ overrides: { ...s.overrides, [index]: binding } })),
 
       clearOverrides: () => set({ overrides: {} }),
 

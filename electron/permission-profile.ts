@@ -6,7 +6,7 @@
  * enforced before any prompt; write-grants fall through to the normal mode
  * prompt flow so the built-in "标准" profile preserves current behavior.
  */
-import { ipcMain } from 'electron';
+import { errorText } from './errors';
 import { secureHandle } from './ipc/trust';
 import path from 'path';
 import { readSettings, writeSettings } from './ipc/settings-store';
@@ -78,14 +78,13 @@ export async function loadPermissionProfiles(): Promise<{
         .filter((p): p is PermissionProfile => !!p && !!p.id)
     : [];
   const profiles = [...BUILTIN_PROFILES, ...custom];
-  const activeId = typeof settings.activePermissionProfile === 'string'
-    ? settings.activePermissionProfile
-    : 'standard';
-  const overrides = settings.projectPermissionProfiles
-    && typeof settings.projectPermissionProfiles === 'object'
-    && !Array.isArray(settings.projectPermissionProfiles)
-    ? (settings.projectPermissionProfiles as Record<string, string>)
-    : {};
+  const activeId = typeof settings.activePermissionProfile === 'string' ? settings.activePermissionProfile : 'standard';
+  const overrides =
+    settings.projectPermissionProfiles &&
+    typeof settings.projectPermissionProfiles === 'object' &&
+    !Array.isArray(settings.projectPermissionProfiles)
+      ? (settings.projectPermissionProfiles as Record<string, string>)
+      : {};
   return { profiles, activeId, overrides };
 }
 
@@ -98,9 +97,7 @@ export async function getActivePermissionProfile(): Promise<PermissionProfile | 
  * 项目级权限 Profile：项目可覆盖全局预设（settings.projectPermissionProfiles，
  * 键为项目绝对路径）。未指定或指定的 Profile 不存在时回退到全局 activeId。
  */
-export async function getProfileForProject(
-  projectRoot?: string,
-): Promise<PermissionProfile | null> {
+export async function getProfileForProject(projectRoot?: string): Promise<PermissionProfile | null> {
   const { profiles, activeId, overrides } = await loadPermissionProfiles();
   if (projectRoot) {
     const overrideId = overrides[projectRoot];
@@ -147,7 +144,10 @@ function matchesGlob(pattern: string, relPath: string): boolean {
 }
 
 function domainMatches(pattern: string, host: string): boolean {
-  const p = pattern.trim().toLowerCase().replace(/^https?:\/\//, '');
+  const p = pattern
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, '');
   const h = host.toLowerCase();
   if (p === '*' || p === h) return true;
   if (p.startsWith('*.')) {
@@ -200,14 +200,13 @@ export function evaluateFileProfile(
  * for WebSearch (only a catch-all rule can match it). Deny is hard-blocked;
  * anything else falls through to the normal prompt flow.
  */
-export function evaluateNetworkProfile(
-  profile: PermissionProfile,
-  urlOrHost: string,
-): ProfileVerdict {
+export function evaluateNetworkProfile(profile: PermissionProfile, urlOrHost: string): ProfileVerdict {
   let host = urlOrHost;
   try {
     host = new URL(urlOrHost).hostname || urlOrHost;
-  } catch { /* already a host or plain text */ }
+  } catch {
+    /* already a host or plain text */
+  }
   let verdict: NetworkAccess | null = null;
   let matched: string | null = null;
   for (const scope of profile.networkScopes) {
@@ -225,19 +224,24 @@ export function evaluateNetworkProfile(
 const FILE_TOOL_READ = new Set(['Read', 'Grep', 'Glob', 'ReadDocument']);
 const FILE_TOOL_WRITE = new Set(['Write', 'Edit', 'Delete', 'NotebookEdit', 'WriteDocument']);
 const NETWORK_TOOLS = new Set([
-  'WebFetch', 'WebSearch',
-  'SlackListChannels', 'SlackPostMessage',
-  'DriveList', 'DriveRead',
-  'NotionSearch', 'NotionCreatePage',
+  'WebFetch',
+  'WebSearch',
+  'SlackListChannels',
+  'SlackPostMessage',
+  'DriveList',
+  'DriveRead',
+  'NotionSearch',
+  'NotionCreatePage',
 ]);
 
 /** Extract a scoped path from a tool input (file_path or path). */
-function inputPath(toolName: string, input: Record<string, unknown>): string | null {
-  const raw = typeof input.file_path === 'string' && input.file_path
-    ? input.file_path
-    : typeof input.path === 'string' && input.path
-      ? input.path
-      : null;
+function inputPath(_toolName: string, input: Record<string, unknown>): string | null {
+  const raw =
+    typeof input.file_path === 'string' && input.file_path
+      ? input.file_path
+      : typeof input.path === 'string' && input.path
+        ? input.path
+        : null;
   return raw;
 }
 
@@ -268,11 +272,7 @@ export async function evaluateToolProfileGate(
     const containing = roots.find((root) => abs === root || abs.startsWith(root + path.sep));
     if (!containing) return { allowed: true }; // 所有工作区根之外 → 维持原流程
     const rel = path.relative(containing, abs);
-    return evaluateFileProfile(
-      profile,
-      rel,
-      FILE_TOOL_WRITE.has(toolName) ? 'write' : 'read',
-    );
+    return evaluateFileProfile(profile, rel, FILE_TOOL_WRITE.has(toolName) ? 'write' : 'read');
   }
 
   if (NETWORK_TOOLS.has(toolName)) {
@@ -288,88 +288,106 @@ export function registerPermissionProfileIpc() {
   secureHandle('permission:listProfiles', async () => {
     try {
       return { ok: true, data: await loadPermissionProfiles() };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
   secureHandle('permission:listProjectProfiles', async () => {
     try {
       return { ok: true, data: await loadPermissionProfiles() };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 
-  secureHandle('permission:setProjectProfile', async (_event, params: {
-    path?: string;
-    profileId?: string | null;
-  }) => {
-    try {
-      const projectPath = typeof params?.path === 'string' ? params.path.trim() : '';
-      if (!projectPath) return { ok: false, error: '项目路径不能为空' };
-      const profileId = params.profileId || null;
-      if (profileId) {
-        const { profiles } = await loadPermissionProfiles();
-        if (!profiles.some((p) => p.id === profileId)) {
-          return { ok: false, error: '权限 Profile 不存在' };
+  secureHandle(
+    'permission:setProjectProfile',
+    async (
+      _event,
+      params: {
+        path?: string;
+        profileId?: string | null;
+      },
+    ) => {
+      try {
+        const projectPath = typeof params?.path === 'string' ? params.path.trim() : '';
+        if (!projectPath) return { ok: false, error: '项目路径不能为空' };
+        const profileId = params.profileId || null;
+        if (profileId) {
+          const { profiles } = await loadPermissionProfiles();
+          if (!profiles.some((p) => p.id === profileId)) {
+            return { ok: false, error: '权限 Profile 不存在' };
+          }
         }
+        const settings = await readSettings();
+        const overrides = {
+          ...(settings.projectPermissionProfiles as Record<string, string> | undefined),
+        };
+        if (profileId) {
+          overrides[projectPath] = profileId;
+        } else {
+          delete overrides[projectPath];
+        }
+        settings.projectPermissionProfiles = overrides;
+        await writeSettings(settings);
+        return { ok: true };
+      } catch (error: unknown) {
+        return { ok: false, error: errorText(error) };
       }
-      const settings = await readSettings();
-      const overrides = {
-        ...(settings.projectPermissionProfiles as Record<string, string> | undefined),
-      };
-      if (profileId) {
-        overrides[projectPath] = profileId;
-      } else {
-        delete overrides[projectPath];
-      }
-      settings.projectPermissionProfiles = overrides;
-      await writeSettings(settings);
-      return { ok: true };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
-    }
-  });
+    },
+  );
 
-  secureHandle('permission:moveProjectProfile', async (_event, params: {
-    from?: string;
-    to?: string;
-  }) => {
-    try {
-      const from = typeof params?.from === 'string' ? params.from.trim() : '';
-      const to = typeof params?.to === 'string' ? params.to.trim() : '';
-      if (!from || !to) return { ok: false, error: '路径不能为空' };
-      const settings = await readSettings();
-      const overrides = {
-        ...(settings.projectPermissionProfiles as Record<string, string> | undefined),
-      };
-      if (from in overrides) {
-        overrides[to] = overrides[from];
-        delete overrides[from];
+  secureHandle(
+    'permission:moveProjectProfile',
+    async (
+      _event,
+      params: {
+        from?: string;
+        to?: string;
+      },
+    ) => {
+      try {
+        const from = typeof params?.from === 'string' ? params.from.trim() : '';
+        const to = typeof params?.to === 'string' ? params.to.trim() : '';
+        if (!from || !to) return { ok: false, error: '路径不能为空' };
+        const settings = await readSettings();
+        const overrides = {
+          ...(settings.projectPermissionProfiles as Record<string, string> | undefined),
+        };
+        if (from in overrides) {
+          overrides[to] = overrides[from];
+          delete overrides[from];
+        }
+        settings.projectPermissionProfiles = overrides;
+        await writeSettings(settings);
+        return { ok: true };
+      } catch (error: unknown) {
+        return { ok: false, error: errorText(error) };
       }
-      settings.projectPermissionProfiles = overrides;
-      await writeSettings(settings);
-      return { ok: true };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
-    }
-  });
+    },
+  );
 
-  secureHandle('permission:saveProfiles', async (_event, params: {
-    custom: PermissionProfile[];
-    activeId: string;
-  }) => {
-    try {
-      const settings = await readSettings();
-      settings.permissionProfiles = Array.isArray(params?.custom) ? params.custom : [];
-      if (typeof params?.activeId === 'string' && params.activeId) {
-        settings.activePermissionProfile = params.activeId;
+  secureHandle(
+    'permission:saveProfiles',
+    async (
+      _event,
+      params: {
+        custom: PermissionProfile[];
+        activeId: string;
+      },
+    ) => {
+      try {
+        const settings = await readSettings();
+        settings.permissionProfiles = Array.isArray(params?.custom) ? params.custom : [];
+        if (typeof params?.activeId === 'string' && params.activeId) {
+          settings.activePermissionProfile = params.activeId;
+        }
+        await writeSettings(settings);
+        return { ok: true };
+      } catch (error: unknown) {
+        return { ok: false, error: errorText(error) };
       }
-      await writeSettings(settings);
-      return { ok: true };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
-    }
-  });
+    },
+  );
 }

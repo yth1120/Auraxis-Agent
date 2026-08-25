@@ -19,6 +19,7 @@
  *      `[System Notification]: 早期详细历史已折叠释放。核心成果摘要如下：...`
  */
 
+import { errorText } from '../errors';
 import { llmClientInvoke, matchesPlanTask } from './agent-loop';
 import type { LLMSummaryConfig, TaskPlan } from './agent-loop';
 import { Planner } from './agent-loop';
@@ -53,9 +54,6 @@ const HEAD_LOCK_COUNT = 1;
 
 /** Number of tail messages locked at the end (short-term working memory). */
 const TAIL_LOCK_COUNT = 6;
-
-/** Minimum total messages before truncation is even considered. */
-const MIN_MESSAGES_FOR_TRUNCATION = HEAD_LOCK_COUNT + TAIL_LOCK_COUNT + 2;
 
 // ═══════════════════════════════════════════════════════════
 // Core 1: Static Prefix Locking (Cache Alignment)
@@ -103,16 +101,12 @@ export const STATIC_SYSTEM_PROMPT = `你是 Auraxis，一个具备工具调用�
  * system prompt as a user-role message so the system+tools prefix stays
  * byte-identical for DeepSeek disk cache.
  */
-export function buildSessionPreamble(params: {
-  platform: string;
-  projectRoot: string;
-  isDeepThink?: boolean;
-}): string {
-  const platformLabel = params.platform === 'win32' ? 'Windows'
-    : params.platform === 'darwin' ? 'macOS' : 'Linux';
-  const shellHint = params.platform === 'win32'
-    ? 'On Windows, the shell is Git Bash — standard Unix commands (ls, cat, grep, find, etc.) work natively.'
-    : 'Use standard Unix shell commands.';
+export function buildSessionPreamble(params: { platform: string; projectRoot: string; isDeepThink?: boolean }): string {
+  const platformLabel = params.platform === 'win32' ? 'Windows' : params.platform === 'darwin' ? 'macOS' : 'Linux';
+  const shellHint =
+    params.platform === 'win32'
+      ? 'On Windows, the shell is Git Bash — standard Unix commands (ls, cat, grep, find, etc.) work natively.'
+      : 'Use standard Unix shell commands.';
 
   let text = `平台：${platformLabel}\nShell：${shellHint}\n当前项目根目录：${params.projectRoot}`;
 
@@ -303,8 +297,7 @@ export function findTruncationIndex(messages: any[], keepRounds: number): number
   for (let gi = groups.length - 1; gi >= 0; gi--) {
     const g = groups[gi];
     const isCompleteRound =
-      (g.isToolCallGroup && !g.hasUnresolvedCalls) ||
-      (!g.isToolCallGroup && g.messages[0]?.role === 'assistant');
+      (g.isToolCallGroup && !g.hasUnresolvedCalls) || (!g.isToolCallGroup && g.messages[0]?.role === 'assistant');
 
     if (isCompleteRound) {
       roundsFromEnd++;
@@ -316,14 +309,6 @@ export function findTruncationIndex(messages: any[], keepRounds: number): number
 
   return 0; // fewer rounds than keepRounds — keep everything
 }
-
-/**
- * The number of prefix messages that are always preserved during truncation:
- *   [0] system  — STATIC_SYSTEM_PROMPT (cache-aligned)
- *   [1] user    — session preamble (platform, project root)
- *   [2] user    — work guide (minimal working instructions)
- */
-const PREFIX_LENGTH = 3;
 
 /** Default token budget for Snip-Compact: keep ~60K tokens of recent history. */
 export const SNIP_COMPACT_TOKEN_BUDGET = 60_000;
@@ -342,7 +327,11 @@ function groupContainsCriticalRead(group: AtomicGroup, plan: TaskPlan): boolean 
       if (fn.name !== 'Read') continue;
       let args: any = fn.arguments;
       if (typeof args === 'string') {
-        try { args = JSON.parse(args); } catch { args = {}; }
+        try {
+          args = JSON.parse(args);
+        } catch {
+          args = {};
+        }
       }
       if (args?.file_path && matchesPlanTask(args.file_path, plan)) {
         return true;
@@ -350,19 +339,6 @@ function groupContainsCriticalRead(group: AtomicGroup, plan: TaskPlan): boolean 
     }
   }
   return false;
-}
-
-// Keep roundContainsCriticalRead as an alias for backward compatibility
-function roundContainsCriticalRead(roundMsgs: any[], plan: TaskPlan): boolean {
-  const dummyGroup: AtomicGroup = {
-    messages: roundMsgs,
-    startIndex: 0,
-    endIndex: roundMsgs.length,
-    estimatedTokens: estimateTokens(roundMsgs),
-    isToolCallGroup: true,
-    hasUnresolvedCalls: false,
-  };
-  return groupContainsCriticalRead(dummyGroup, plan);
 }
 
 /**
@@ -507,14 +483,14 @@ export function snipCompact(
       if (orphans.size > 0) {
         console.error(
           `[ContextManager] CRITICAL RESCUE SAFETY VIOLATION: ${orphans.size} orphans ` +
-          `after rescue. IDs: ${[...orphans].join(', ')}. Falling back to no truncation.`,
+            `after rescue. IDs: ${[...orphans].join(', ')}. Falling back to no truncation.`,
         );
         return { truncated: [...messages], removed: [] };
       }
 
       devLog(
         `[ContextManager] CRITICAL RESCUE: ${rescuedMsgs.length} messages rescued ` +
-        `from truncation (matched pending plan tasks).`,
+          `from truncation (matched pending plan tasks).`,
       );
 
       return { truncated, removed: stillRemovedMsgs };
@@ -529,7 +505,7 @@ export function snipCompact(
   if (orphans.size > 0) {
     console.error(
       `[ContextManager] SAFE-TRUNCATE SAFETY VIOLATION: ${orphans.size} orphaned tool_calls ` +
-      `after truncation. IDs: ${[...orphans].join(', ')}. Falling back to no truncation.`,
+        `after truncation. IDs: ${[...orphans].join(', ')}. Falling back to no truncation.`,
     );
     return { truncated: [...messages], removed: [] };
   }
@@ -567,7 +543,11 @@ function extractActivityLog(messages: any[]): string {
           const fn = tc.function || tc;
           let args: any = fn.arguments;
           if (typeof args === 'string') {
-            try { args = JSON.parse(args); } catch { args = {}; }
+            try {
+              args = JSON.parse(args);
+            } catch {
+              args = {};
+            }
           }
           if (fn.name === 'Read' && args?.file_path) filesRead.add(args.file_path);
           if (fn.name === 'Edit' && args?.file_path) filesEdited.add(args.file_path);
@@ -642,8 +622,8 @@ export async function generateSummary(
     if (result?.rawText && result.rawText.trim().length > 20) {
       return result.rawText.trim();
     }
-  } catch (err: any) {
-    console.warn('[ContextManager] LLM summary generation failed, using rule-based fallback:', err.message);
+  } catch (err: unknown) {
+    console.warn('[ContextManager] LLM summary generation failed, using rule-based fallback:', errorText(err));
   }
 
   // Rule-based fallback
@@ -664,7 +644,11 @@ function buildRuleBasedSummary(messages: any[], plan: TaskPlan | null): string {
         const fn = tc.function || tc;
         let args: any = fn.arguments;
         if (typeof args === 'string') {
-          try { args = JSON.parse(args); } catch { args = {}; }
+          try {
+            args = JSON.parse(args);
+          } catch {
+            args = {};
+          }
         }
         if (fn.name === 'Read' && args?.file_path) filesRead.add(args.file_path);
         if (fn.name === 'Edit' && args?.file_path) filesEdited.add(args.file_path);
@@ -683,7 +667,9 @@ function buildRuleBasedSummary(messages: any[], plan: TaskPlan | null): string {
   if (plan) {
     const completed = plan.tasks.filter((t) => t.status === 'completed').map((t) => t.description);
     const blocked = plan.tasks.filter((t) => t.status === 'blocked').map((t) => t.description);
-    const pending = plan.tasks.filter((t) => t.status === 'pending' || t.status === 'in_progress').map((t) => t.description);
+    const pending = plan.tasks
+      .filter((t) => t.status === 'pending' || t.status === 'in_progress')
+      .map((t) => t.description);
     if (completed.length > 0) parts.push(`已完成任务: ${completed.join('; ')}`);
     if (blocked.length > 0) parts.push(`已阻塞任务: ${blocked.join('; ')}`);
     if (pending.length > 0) parts.push(`待完成任务: ${pending.join('; ')}`);
@@ -759,7 +745,14 @@ export async function compactHistory(params: {
   const { truncated, removed } = snipCompact(messages, maxTokens, plan);
 
   if (removed.length === 0) {
-    return { messages, wasTruncated: false, roundsRemoved: 0, summaryInjected: false, messagesRemoved: 0, tokensSaved: 0 };
+    return {
+      messages,
+      wasTruncated: false,
+      roundsRemoved: 0,
+      summaryInjected: false,
+      messagesRemoved: 0,
+      tokensSaved: 0,
+    };
   }
 
   // Generate summary of removed history
@@ -806,11 +799,7 @@ export async function compactHistory(params: {
  * 先清除历史摘要注入，避免跨轮压缩出现摘要叠加；摘要统一走
  * [System Notification] 约定，与 snip 管线对齐。
  */
-function compactWithSteps(
-  messages: any[],
-  plan: TaskPlan | null,
-  keepRecentSteps: number,
-): CompactResult {
+function compactWithSteps(messages: any[], plan: TaskPlan | null, keepRecentSteps: number): CompactResult {
   const stripped = messages.filter(
     (m) =>
       !(
@@ -838,8 +827,7 @@ function compactWithSteps(
   }
 
   const removedAssistantRounds =
-    stripped.filter((m) => m.role === 'assistant').length -
-    result.filter((m) => m.role === 'assistant').length;
+    stripped.filter((m) => m.role === 'assistant').length - result.filter((m) => m.role === 'assistant').length;
   // result 里比 stripped 多一条摘要消息，故 +1 折算真实移除数。
   const messagesRemoved = stripped.length - result.length + 1;
   const tokensSaved = Math.max(0, estimateTokens(stripped) - estimateTokens(result));

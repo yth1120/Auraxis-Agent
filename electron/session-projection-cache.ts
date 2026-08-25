@@ -132,9 +132,7 @@ export class SqliteProjectionCache implements ProjectionCache {
     this.db = openSqlite(dbPath);
     if (this.db) {
       try {
-        this.db.exec(
-          'CREATE TABLE IF NOT EXISTS session_cache (id TEXT PRIMARY KEY, row_json TEXT NOT NULL)',
-        );
+        this.db.exec('CREATE TABLE IF NOT EXISTS session_cache (id TEXT PRIMARY KEY, row_json TEXT NOT NULL)');
         // Schema versioning — bump and migrate in future changes.
         const row = this.db.prepare('PRAGMA user_version').get() as { user_version?: number } | undefined;
         const version = typeof row?.user_version === 'number' ? row.user_version : 0;
@@ -160,9 +158,8 @@ export class SqliteProjectionCache implements ProjectionCache {
   async read(id: string): Promise<SessionCacheRow | null> {
     if (!this.db) return null;
     try {
-      const row = this.db
-        .prepare('SELECT row_json FROM session_cache WHERE id = ?')
-        .get(id) as { row_json?: string } | undefined;
+      const row = this.db.prepare('SELECT row_json FROM session_cache WHERE id = ?').get(id) as
+        { row_json?: string } | undefined;
       return row?.row_json ? (JSON.parse(row.row_json) as SessionCacheRow) : null;
     } catch {
       return null;
@@ -174,8 +171,8 @@ export class SqliteProjectionCache implements ProjectionCache {
     try {
       this.db
         .prepare(
-          'INSERT INTO session_cache (id, row_json) VALUES (?, ?) '
-          + 'ON CONFLICT(id) DO UPDATE SET row_json = excluded.row_json',
+          'INSERT INTO session_cache (id, row_json) VALUES (?, ?) ' +
+            'ON CONFLICT(id) DO UPDATE SET row_json = excluded.row_json',
         )
         .run(row.id, JSON.stringify(row));
     } catch {

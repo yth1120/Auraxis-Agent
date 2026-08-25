@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron';
+import { errorText } from '../errors';
 import { secureHandle } from './trust';
 import { resolveTrustedProjectRoot } from './project-access';
 import { listWorkflows, startWorkflow, getWorkflowRun, listWorkflowRuns } from '../workflow-engine';
@@ -7,8 +7,8 @@ function wrap<T>(fn: () => Promise<T>) {
   return async () => {
     try {
       return { ok: true, data: await fn() };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   };
 }
@@ -28,8 +28,8 @@ export function registerWorkflowHandlers() {
       if (!def) return { ok: false, error: `工作流不存在: ${payload?.workflowId}` };
       const runId = await startWorkflow(def, root);
       return { ok: true, data: { runId } };
-    } catch (error: any) {
-      return { ok: false, error: error.message };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
     }
   });
 

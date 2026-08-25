@@ -70,7 +70,13 @@ vi.mock('../signal-rules', () => ({
   detectAndStoreSignals: vi.fn(async () => []),
 }));
 vi.mock('../belief-validation', () => ({
-  validateBeliefAnchors: vi.fn(() => ({ ok: true, reasons: [], supportStrength: 0.8, matchedAnchors: 1, totalAnchors: 1 })),
+  validateBeliefAnchors: vi.fn(() => ({
+    ok: true,
+    reasons: [],
+    supportStrength: 0.8,
+    matchedAnchors: 1,
+    totalAnchors: 1,
+  })),
 }));
 vi.mock('../memory-read', () => ({
   readForQuery: vi.fn(() => ({
@@ -78,9 +84,15 @@ vi.mock('../memory-read', () => ({
     policy: { requireCitation: true, refuseOnUncertain: true, scope: 'C:/proj', maxTokens: 900, defaultRules: [] },
     facts: [],
     diagnostics: {
-      routes: [], budget: { allocated: 900, used: 0, truncated: false },
-      missingEvidence: false, unsupportedExtraction: false, staleState: false,
-      retrievalLoss: false, modelBehaviorFlagged: false, latencyMs: 1, deterministic: true,
+      routes: [],
+      budget: { allocated: 900, used: 0, truncated: false },
+      missingEvidence: false,
+      unsupportedExtraction: false,
+      staleState: false,
+      retrievalLoss: false,
+      modelBehaviorFlagged: false,
+      latencyMs: 1,
+      deterministic: true,
     },
   })),
   getReadTrace: vi.fn(() => null),
@@ -101,9 +113,20 @@ vi.mock('../settings-store', () => ({
 
 import { registerMemoryIpc } from '../memory-ipc';
 import {
-  addBelief, addBeliefEvidence, addBeliefRejection, archiveBelief, deleteBelief,
-  getBeliefsByScope, getEvidenceById, listEvidence, searchBeliefs,
-  updateBeliefStatus, eraseScope, beliefToMemoryRecord, getReadRun, listReadResults,
+  addBelief,
+  addBeliefEvidence,
+  addBeliefRejection,
+  archiveBelief,
+  deleteBelief,
+  getBeliefsByScope,
+  getEvidenceById,
+  listEvidence,
+  searchBeliefs,
+  updateBeliefStatus,
+  eraseScope,
+  beliefToMemoryRecord,
+  getReadRun,
+  listReadResults,
   listEraseAudits,
   listBeliefRejections,
 } from '../memory-db';
@@ -146,7 +169,13 @@ beforeEach(() => {
   vi.mocked(captureEvidenceFromSession).mockReturnValue({ added: 0, skipped: 0, evidence: [] });
   vi.mocked(extractMemories).mockResolvedValue([]);
   vi.mocked(readSettings).mockResolvedValue({});
-  vi.mocked(validateBeliefAnchors).mockReturnValue({ ok: true, reasons: [], supportStrength: 0.8, matchedAnchors: 1, totalAnchors: 1 });
+  vi.mocked(validateBeliefAnchors).mockReturnValue({
+    ok: true,
+    reasons: [],
+    supportStrength: 0.8,
+    matchedAnchors: 1,
+    totalAnchors: 1,
+  });
   delete process.env.DEEPSEEK_API_KEY;
   registerMemoryIpc();
 });
@@ -165,7 +194,14 @@ describe('registerMemoryIpc — 提取（Evidence before Belief）', () => {
     vi.mocked(readSettings).mockResolvedValue({ defaultModel: 'deepseek-v4-pro', deepseekApiKey: 'sk' });
     vi.mocked(listEvidence).mockReturnValue([{ id: 'ev1' } as any]);
     vi.mocked(extractMemories).mockResolvedValue([
-      { type: 'decision', title: 'T', content: '使用 React Router v6', tags: ['react'], importance: 4, evidenceIds: ['ev1'] },
+      {
+        type: 'decision',
+        title: 'T',
+        content: '使用 React Router v6',
+        tags: ['react'],
+        importance: 4,
+        evidenceIds: ['ev1'],
+      },
     ]);
 
     const r = await handler('memory:extract')({}, { projectPath: 'C:/proj', sessionId: 's', messages: [] });
@@ -201,10 +237,12 @@ describe('registerMemoryIpc — 提取（Evidence before Belief）', () => {
     expect(r.ok).toBe(true);
     expect(r.data).toEqual([]);
     expect(addBelief).not.toHaveBeenCalled();
-    expect(addBeliefRejection).toHaveBeenCalledWith(expect.objectContaining({
-      scope: 'C:/proj',
-      reasons: '缺少证据引用',
-    }));
+    expect(addBeliefRejection).toHaveBeenCalledWith(
+      expect.objectContaining({
+        scope: 'C:/proj',
+        reasons: '缺少证据引用',
+      }),
+    );
   });
 
   it('环境变量 Key 优先于设置', async () => {
@@ -277,11 +315,11 @@ describe('registerMemoryIpc — 溯源通道（M2–M5）', () => {
   it('beliefAudit 返回证据链与修订历史', async () => {
     const { getBeliefById, listBeliefEvidence, listBeliefRevisions } = await import('../memory-db');
     vi.mocked(getBeliefById).mockReturnValue(belief() as any);
-    vi.mocked(listBeliefEvidence).mockReturnValue([
-      { belief_id: 'b1', evidence_id: 'ev1', support_strength: 0.8 },
-    ]);
+    vi.mocked(listBeliefEvidence).mockReturnValue([{ belief_id: 'b1', evidence_id: 'ev1', support_strength: 0.8 }]);
     vi.mocked(getEvidenceById).mockReturnValue({ id: 'ev1' } as any);
-    vi.mocked(listBeliefRevisions).mockReturnValue([{ id: 'r1', belief_id: 'b1', prev_status: null, next_status: 'active', reason: null, actor: 'system', ts: 1 }]);
+    vi.mocked(listBeliefRevisions).mockReturnValue([
+      { id: 'r1', belief_id: 'b1', prev_status: null, next_status: 'active', reason: null, actor: 'system', ts: 1 },
+    ]);
 
     const r = await handler('memory:beliefAudit')({}, 'b1');
     expect(r.ok).toBe(true);
@@ -363,7 +401,14 @@ describe('registerMemoryIpc — 补充分支', () => {
     vi.mocked(listEvidence).mockReturnValue([{ id: 'ev1' } as any]);
     vi.mocked(getBeliefsByScope).mockReturnValue([belief({ id: 'b1', title: 'T' }) as any]);
     vi.mocked(extractMemories).mockResolvedValue([
-      { type: 'decision', title: 'T', content: '使用 React Router v6.2.1', tags: [], importance: 4, evidenceIds: ['ev1'] },
+      {
+        type: 'decision',
+        title: 'T',
+        content: '使用 React Router v6.2.1',
+        tags: [],
+        importance: 4,
+        evidenceIds: ['ev1'],
+      },
     ]);
 
     const r = await handler('memory:extract')({}, { projectPath: 'C:/proj', sessionId: 's', messages: [] });
@@ -375,15 +420,18 @@ describe('registerMemoryIpc — 补充分支', () => {
       evidence_id: 'ev1',
       support_strength: 0.8,
     });
-    expect(updateBeliefStatus).toHaveBeenCalledWith('b1', 'active', expect.stringContaining('追加 1 条证据'), 'extractor');
+    expect(updateBeliefStatus).toHaveBeenCalledWith(
+      'b1',
+      'active',
+      expect.stringContaining('追加 1 条证据'),
+      'extractor',
+    );
   });
 
   it('beliefAudit 过滤引用不存在的证据', async () => {
     const { getBeliefById, listBeliefEvidence } = await import('../memory-db');
     vi.mocked(getBeliefById).mockReturnValue(belief() as any);
-    vi.mocked(listBeliefEvidence).mockReturnValue([
-      { belief_id: 'b1', evidence_id: 'missing', support_strength: 0.5 },
-    ]);
+    vi.mocked(listBeliefEvidence).mockReturnValue([{ belief_id: 'b1', evidence_id: 'missing', support_strength: 0.5 }]);
     vi.mocked(getEvidenceById).mockReturnValue(null);
     const r = await handler('memory:beliefAudit')({}, 'b1');
     expect(r.ok).toBe(true);
@@ -418,47 +466,73 @@ describe('registerMemoryIpc — 补充分支', () => {
   });
 
   it('查询/证据通道异常统一包装为失败响应', async () => {
-    vi.mocked(getBeliefsByScope).mockImplementationOnce(() => { throw new Error('t'); });
+    vi.mocked(getBeliefsByScope).mockImplementationOnce(() => {
+      throw new Error('t');
+    });
     expect(await handler('memory:getByType')({}, 'C:/proj', 'decision')).toEqual({ ok: false, error: 't' });
 
-    vi.mocked(searchBeliefs).mockImplementationOnce(() => { throw new Error('s'); });
+    vi.mocked(searchBeliefs).mockImplementationOnce(() => {
+      throw new Error('s');
+    });
     expect(await handler('memory:search')({}, 'C:/proj', 'q')).toEqual({ ok: false, error: 's' });
 
-    vi.mocked(archiveBelief).mockImplementationOnce(() => { throw new Error('a'); });
+    vi.mocked(archiveBelief).mockImplementationOnce(() => {
+      throw new Error('a');
+    });
     expect(await handler('memory:archive')({}, 'b1')).toEqual({ ok: false, error: 'a' });
 
-    vi.mocked(deleteBelief).mockImplementationOnce(() => { throw new Error('d'); });
+    vi.mocked(deleteBelief).mockImplementationOnce(() => {
+      throw new Error('d');
+    });
     expect(await handler('memory:delete')({}, 'b1')).toEqual({ ok: false, error: 'd' });
 
-    vi.mocked(listEvidence).mockImplementationOnce(() => { throw new Error('e'); });
+    vi.mocked(listEvidence).mockImplementationOnce(() => {
+      throw new Error('e');
+    });
     expect(await handler('memory:evidenceList')({}, 'C:/proj')).toEqual({ ok: false, error: 'e' });
 
-    vi.mocked(getEvidenceById).mockImplementationOnce(() => { throw new Error('ed'); });
+    vi.mocked(getEvidenceById).mockImplementationOnce(() => {
+      throw new Error('ed');
+    });
     expect(await handler('memory:evidenceDetail')({}, 'ev1')).toEqual({ ok: false, error: 'ed' });
   });
 
   it('溯源通道异常统一包装为失败响应', async () => {
     const { getBeliefById } = await import('../memory-db');
-    vi.mocked(getBeliefById).mockImplementationOnce(() => { throw new Error('ba'); });
+    vi.mocked(getBeliefById).mockImplementationOnce(() => {
+      throw new Error('ba');
+    });
     expect(await handler('memory:beliefAudit')({}, 'b1')).toEqual({ ok: false, error: 'ba' });
 
-    vi.mocked(readForQuery).mockImplementationOnce(() => { throw new Error('rq'); });
+    vi.mocked(readForQuery).mockImplementationOnce(() => {
+      throw new Error('rq');
+    });
     expect(await handler('memory:readForQuery')({}, 'C:/proj', 'q')).toEqual({ ok: false, error: 'rq' });
 
-    vi.mocked(getReadTrace).mockImplementationOnce(() => { throw new Error('rt'); });
+    vi.mocked(getReadTrace).mockImplementationOnce(() => {
+      throw new Error('rt');
+    });
     expect(await handler('memory:readTrace')({}, 'run1')).toEqual({ ok: false, error: 'rt' });
 
-    vi.mocked(eraseScope).mockImplementationOnce(() => { throw new Error('er'); });
+    vi.mocked(eraseScope).mockImplementationOnce(() => {
+      throw new Error('er');
+    });
     expect(await handler('memory:erase')({}, 'C:/proj')).toEqual({ ok: false, error: 'er' });
 
     vi.mocked(listEvidence).mockReturnValue([{ id: 'ev1', role: 'user', content: 'x' } as any]);
-    vi.mocked(detectAndStoreSignals).mockImplementationOnce(() => { throw new Error('ri'); });
+    vi.mocked(detectAndStoreSignals).mockImplementationOnce(() => {
+      throw new Error('ri');
+    });
     expect(await handler('memory:reindex')({}, 'C:/proj')).toEqual({ ok: false, error: 'ri' });
 
-    vi.mocked(buildScopeGraph).mockImplementationOnce(() => { throw new Error('gr'); });
+    vi.mocked(buildScopeGraph).mockImplementationOnce(() => {
+      throw new Error('gr');
+    });
     expect(await handler('memory:graph')({}, 'C:/proj')).toEqual({ ok: false, error: 'gr' });
 
-    vi.mocked(listBeliefRejections).mockImplementationOnce(() => { throw new Error('rj'); });
+    vi.mocked(listBeliefRejections).mockImplementationOnce(() => {
+      throw new Error('rj');
+    });
     expect(await handler('memory:rejections')({}, 'C:/proj')).toEqual({ ok: false, error: 'rj' });
   });
 });

@@ -19,8 +19,13 @@ afterEach(async () => {
 describe('ssh-store', () => {
   it('saves and lists connections', async () => {
     await saveSshConnection({
-      id: 'ssh-1', name: '服务器', host: 'example.com', port: 22, username: 'root',
-      keyPath: '/home/user/.ssh/id_ed25519', createdAt: Date.now(),
+      id: 'ssh-1',
+      name: '服务器',
+      host: 'example.com',
+      port: 22,
+      username: 'root',
+      keyPath: '/home/user/.ssh/id_ed25519',
+      createdAt: Date.now(),
     });
     const list = await listSshConnections();
     expect(list).toHaveLength(1);

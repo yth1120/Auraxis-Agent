@@ -43,9 +43,7 @@ describe('captureEvidenceFromSession — 证据先于信念（Eywa M1）', () =>
     const result = captureEvidenceFromSession({
       projectPath: 'C:/proj',
       sessionId: 's1',
-      toolResults: [
-        { toolName: 'Read', summary: '读取 package.json 成功', success: true, ts: 300 },
-      ],
+      toolResults: [{ toolName: 'Read', summary: '读取 package.json 成功', success: true, ts: 300 }],
     });
 
     expect(result.added).toBe(1);
@@ -144,12 +142,26 @@ describe('captureFeedbackEvidence — INO 纠错闭环', () => {
   });
 
   it('up 评分且无备注不产生证据', () => {
-    expect(captureFeedbackEvidence({ projectPath: 'C:/ino', messageId: 'm2', sessionId: 's1', rating: 'up' }).added).toBe(0);
+    expect(
+      captureFeedbackEvidence({ projectPath: 'C:/ino', messageId: 'm2', sessionId: 's1', rating: 'up' }).added,
+    ).toBe(0);
   });
 
   it('重复反馈内容去重', () => {
-    const first = captureFeedbackEvidence({ projectPath: 'C:/ino', messageId: 'm3', sessionId: 's1', rating: 'down', note: '重复反馈' });
-    const second = captureFeedbackEvidence({ projectPath: 'C:/ino', messageId: 'm4', sessionId: 's1', rating: 'down', note: '重复反馈' });
+    const first = captureFeedbackEvidence({
+      projectPath: 'C:/ino',
+      messageId: 'm3',
+      sessionId: 's1',
+      rating: 'down',
+      note: '重复反馈',
+    });
+    const second = captureFeedbackEvidence({
+      projectPath: 'C:/ino',
+      messageId: 'm4',
+      sessionId: 's1',
+      rating: 'down',
+      note: '重复反馈',
+    });
     expect(first.added).toBe(1);
     expect(second.added).toBe(0);
     expect(second.skipped).toBe(1);

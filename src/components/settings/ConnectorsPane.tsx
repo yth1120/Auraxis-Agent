@@ -8,9 +8,24 @@ type Kind = 'slack' | 'drive' | 'notion';
 const KINDS: Kind[] = ['slack', 'drive', 'notion'];
 
 const KIND_META: Record<Kind, { icon: React.ReactNode; nameKey: string; descKey: string; placeholder: string }> = {
-  slack: { icon: <ChatTeardropDots size={18} />, nameKey: 'settings.connectors.slack', descKey: 'settings.connectors.slack.desc', placeholder: 'xoxb-…' },
-  drive: { icon: <Folder size={18} />, nameKey: 'settings.connectors.drive', descKey: 'settings.connectors.drive.desc', placeholder: 'ya29.…' },
-  notion: { icon: <FileText size={18} />, nameKey: 'settings.connectors.notion', descKey: 'settings.connectors.notion.desc', placeholder: 'secret_…' },
+  slack: {
+    icon: <ChatTeardropDots size={18} />,
+    nameKey: 'settings.connectors.slack',
+    descKey: 'settings.connectors.slack.desc',
+    placeholder: 'xoxb-…',
+  },
+  drive: {
+    icon: <Folder size={18} />,
+    nameKey: 'settings.connectors.drive',
+    descKey: 'settings.connectors.drive.desc',
+    placeholder: 'ya29.…',
+  },
+  notion: {
+    icon: <FileText size={18} />,
+    nameKey: 'settings.connectors.notion',
+    descKey: 'settings.connectors.notion.desc',
+    placeholder: 'secret_…',
+  },
 };
 
 export default function ConnectorsPane() {
@@ -30,7 +45,9 @@ export default function ConnectorsPane() {
         for (const s of r.data) next[s.kind] = s.configured;
         setConfigured(next);
       })
-      .catch(() => { /* keep defaults */ });
+      .catch(() => {
+        /* keep defaults */
+      });
   }, []);
 
   const saveToken = async (kind: Kind) => {
@@ -55,9 +72,7 @@ export default function ConnectorsPane() {
       const r = await window.electronAPI?.connectors?.test(kind);
       setMessages((m) => ({
         ...m,
-        [kind]: r?.ok && r.data
-          ? r.data.message
-          : r?.error || t('settings.connectFailed'),
+        [kind]: r?.ok && r.data ? r.data.message : r?.error || t('settings.connectFailed'),
       }));
     } finally {
       setTesting(null);
@@ -67,7 +82,9 @@ export default function ConnectorsPane() {
   return (
     <div>
       <div className="mb-6">
-        <h2 className="m-0 text-lg font-semibold text-text-primary tracking-[-0.01em]">{t('settings.item.connectors')}</h2>
+        <h2 className="m-0 text-lg font-semibold text-text-primary tracking-[-0.01em]">
+          {t('settings.item.connectors')}
+        </h2>
         <p className="m-0 mt-1 text-xs text-text-muted leading-[1.6]">{t('settings.connectors.desc')}</p>
       </div>
       <div className="flex flex-col gap-3">
@@ -75,7 +92,10 @@ export default function ConnectorsPane() {
           const meta = KIND_META[kind];
           const ok = configured[kind];
           return (
-            <section key={kind} className="px-4 py-3 rounded-xl bg-[var(--color-bg-secondary)] border border-[var(--color-border-dim)]">
+            <section
+              key={kind}
+              className="px-4 py-3 rounded-xl bg-[var(--color-bg-secondary)] border border-[var(--color-border-dim)]"
+            >
               <div className="flex items-center gap-2.5">
                 <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-[var(--color-bg-primary)] text-text-secondary">
                   {meta.icon}
@@ -86,7 +106,9 @@ export default function ConnectorsPane() {
                 </div>
                 <span
                   className={`ml-auto inline-flex items-center h-5 px-2 rounded-full text-2xs font-medium ${
-                    ok ? 'bg-[var(--color-success-soft)] text-text-secondary' : 'bg-[var(--color-border-dim)] text-text-muted'
+                    ok
+                      ? 'bg-[var(--color-success-soft)] text-text-secondary'
+                      : 'bg-[var(--color-border-dim)] text-text-muted'
                   }`}
                 >
                   {ok ? t('settings.connectors.configured') : t('settings.connectors.notConfigured')}
@@ -103,13 +125,15 @@ export default function ConnectorsPane() {
                 <Button loading={saving === kind} onClick={() => void saveToken(kind)}>
                   {t('settings.save')}
                 </Button>
-                <Button loading={testing === kind} disabled={!configured[kind] && !tokens[kind].trim()} onClick={() => void test(kind)}>
+                <Button
+                  loading={testing === kind}
+                  disabled={!configured[kind] && !tokens[kind].trim()}
+                  onClick={() => void test(kind)}
+                >
                   {t('settings.test')}
                 </Button>
               </div>
-              {messages[kind] && (
-                <div className="mt-2 text-xs text-text-muted leading-[1.5]">{messages[kind]}</div>
-              )}
+              {messages[kind] && <div className="mt-2 text-xs text-text-muted leading-[1.5]">{messages[kind]}</div>}
             </section>
           );
         })}

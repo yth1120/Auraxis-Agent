@@ -75,7 +75,15 @@ describe.skipIf(!sqliteAvailable())('SQLite 后端（node:sqlite 通道）', () 
       latency_ms: 2,
       ts: 3,
     });
-    addReadResult({ id: 'sq-rr1', read_run_id: 'sq-run1', belief_id: b.id, evidence_ids: '["sq-ev1"]', route: 'keyword', rank: 0, score: 0.9 });
+    addReadResult({
+      id: 'sq-rr1',
+      read_run_id: 'sq-run1',
+      belief_id: b.id,
+      evidence_ids: '["sq-ev1"]',
+      route: 'keyword',
+      rank: 0,
+      score: 0.9,
+    });
 
     expect(listEvidence('C:/sqlite')).toHaveLength(1);
     expect(searchEvidence('C:/sqlite', 'React Router').map((e) => e.id)).toContain('sq-ev1');

@@ -51,11 +51,15 @@ export function appendChatEvents(
   const pending = chatStore.append(sessionId, events);
   // Eywa M1 实时钩子：best-effort 捕获用户消息与工具终态证据。
   if (scope) {
-    void pending.then(() => {
-      try {
-        captureEvidenceFromEvents(scope, sessionId, events);
-      } catch { /* evidence capture is best-effort */ }
-    }).catch(() => {});
+    void pending
+      .then(() => {
+        try {
+          captureEvidenceFromEvents(scope, sessionId, events);
+        } catch {
+          /* evidence capture is best-effort */
+        }
+      })
+      .catch(() => {});
   }
   return pending;
 }

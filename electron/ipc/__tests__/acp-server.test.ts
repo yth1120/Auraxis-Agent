@@ -55,11 +55,11 @@ describe('acp-server', () => {
 
   it('cancel aborts the running agent', async () => {
     const runAgent = vi.fn(async ({ signal }: { signal?: AbortSignal }) => {
-        await new Promise((resolve) => {
-          signal?.addEventListener('abort', resolve, { once: true });
-        });
-        return { output: null, error: 'cancelled' };
+      await new Promise((resolve) => {
+        signal?.addEventListener('abort', resolve, { once: true });
       });
+      return { output: null, error: 'cancelled' };
+    });
     const { server, sent } = makeServer({ runAgent });
     server.handle({ jsonrpc: '2.0', id: 1, method: 'session/new' });
     const sessionId = (sent[0].result as any).sessionId;

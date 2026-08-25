@@ -14,6 +14,7 @@
  */
 
 import { getDeepSeekUserId } from './auth-store';
+import { getDeepSeekSearchBaseUrl } from './api-config';
 
 export interface WebSearchResult {
   title: string;
@@ -73,7 +74,11 @@ export function parseDuckDuckGoHtml(html: string, limit = 10): WebSearchResult[]
 
 // ─── Exa ───────────────────────────────────────────────
 
-export function buildExaRequest(query: string, apiKey: string, numResults = 8): {
+export function buildExaRequest(
+  query: string,
+  apiKey: string,
+  numResults = 8,
+): {
   url: string;
   headers: Record<string, string>;
   body: Record<string, unknown>;
@@ -94,7 +99,10 @@ export function parseExaResponse(data: unknown): WebSearchResult[] {
       const item = r as { title?: unknown; text?: unknown; snippet?: unknown; url?: unknown };
       return {
         title: String(item.title ?? ''),
-        snippet: String(item.text ?? item.snippet ?? '').replace(/\s+/g, ' ').trim().slice(0, 400),
+        snippet: String(item.text ?? item.snippet ?? '')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .slice(0, 400),
         url: String(item.url ?? ''),
       };
     })
@@ -103,7 +111,10 @@ export function parseExaResponse(data: unknown): WebSearchResult[] {
 
 // ─── Perplexity ────────────────────────────────────────
 
-export function buildPerplexityRequest(query: string, apiKey: string): {
+export function buildPerplexityRequest(
+  query: string,
+  apiKey: string,
+): {
   url: string;
   headers: Record<string, string>;
   body: Record<string, unknown>;
@@ -127,14 +138,14 @@ export function parsePerplexityResponse(data: unknown): WebSearchResult[] {
   const content = choice?.message?.content;
   if (!content) return [];
   const citations = (data as { citations?: unknown[] } | null)?.citations;
-  const firstUrl = Array.isArray(citations)
-    ? String(citations.find((c) => typeof c === 'string' && c) ?? '')
-    : '';
-  return [{
-    title: 'Perplexity 搜索结果',
-    snippet: String(content).replace(/\s+/g, ' ').trim().slice(0, 1000),
-    url: firstUrl,
-  }];
+  const firstUrl = Array.isArray(citations) ? String(citations.find((c) => typeof c === 'string' && c) ?? '') : '';
+  return [
+    {
+      title: 'Perplexity 搜索结果',
+      snippet: String(content).replace(/\s+/g, ' ').trim().slice(0, 1000),
+      url: firstUrl,
+    },
+  ];
 }
 
 // ─── Registry wiring ───────────────────────────────────
@@ -202,12 +213,16 @@ registerWebSearchProvider({
 
 // ─── DeepSeek native web_search (Anthropic-compatible Messages API) ─────
 
-export function buildDeepSeekSearchRequest(query: string, apiKey: string, baseURL?: string): {
+export function buildDeepSeekSearchRequest(
+  query: string,
+  apiKey: string,
+  baseURL?: string,
+): {
   url: string;
   headers: Record<string, string>;
   body: Record<string, unknown>;
 } {
-  const base = (baseURL || process.env.DEEPSEEK_SEARCH_BASE_URL || 'https://api.deepseek.com/anthropic/v1').replace(/\/+$/, '');
+  const base = (baseURL || getDeepSeekSearchBaseUrl()).replace(/\/+$/, '');
   return {
     url: `${base}/messages`,
     headers: {

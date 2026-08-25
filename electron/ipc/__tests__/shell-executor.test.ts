@@ -1,12 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import path from 'path';
 import os from 'os';
-import {
-  nodeShellExecutor,
-  getShellExecutor,
-  setShellExecutor,
-  type ShellExecutor,
-} from '../shell-executor';
+import { nodeShellExecutor, getShellExecutor, setShellExecutor, type ShellExecutor } from '../shell-executor';
 
 afterEach(() => {
   setShellExecutor(nodeShellExecutor);
@@ -58,7 +53,9 @@ describe('shell-executor', () => {
   });
 
   it('exposes a swappable registry seam', async () => {
-    const fake: ShellExecutor = { run: vi.fn(async () => ({ stdout: 'fake', stderr: '', exitCode: 0, timedOut: false, truncated: false })) };
+    const fake: ShellExecutor = {
+      run: vi.fn(async () => ({ stdout: 'fake', stderr: '', exitCode: 0, timedOut: false, truncated: false })),
+    };
     setShellExecutor(fake);
     expect(getShellExecutor()).toBe(fake);
     const r = await getShellExecutor().run({ command: 'anything', cwd: path.resolve('.') });

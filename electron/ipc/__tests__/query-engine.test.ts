@@ -37,7 +37,8 @@ vi.mock('../query-context', () => ({
   loadLlmContext: vi.fn(async () => null),
   saveLlmContext: vi.fn(async () => {}),
   buildModeHint: vi.fn((mode: string) =>
-    mode === 'plan' ? '当前为计划模式' : mode === 'auto' ? '当前为全自动模式' : '当前为交互模式'),
+    mode === 'plan' ? '当前为计划模式' : mode === 'auto' ? '当前为全自动模式' : '当前为交互模式',
+  ),
   tryReplayStoredContext: vi.fn(() => ({ ok: false, messages: [] })),
 }));
 
@@ -88,9 +89,7 @@ describe('runQuery — 生命周期与模式规范化', () => {
   it('完成一轮后发出 turn_start / turn_end / done', async () => {
     const { p, events } = run();
     await p;
-    expect(events.map((e) => e.type)).toEqual(
-      expect.arrayContaining(['turn_start', 'turn_end', 'done']),
-    );
+    expect(events.map((e) => e.type)).toEqual(expect.arrayContaining(['turn_start', 'turn_end', 'done']));
     const turnEnd = events.find((e) => e.type === 'turn_end');
     expect(turnEnd.reason).toBe('completed');
     expect(vi.mocked(trackSession)).toHaveBeenCalledTimes(1);

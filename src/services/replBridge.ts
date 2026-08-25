@@ -30,14 +30,18 @@ class PermissionBridge {
   /** Subscribe to incoming permission requests. Returns unsubscribe function. */
   onRequest(callback: PermissionListener): () => void {
     this.listeners.add(callback);
-    return () => { this.listeners.delete(callback); };
+    return () => {
+      this.listeners.delete(callback);
+    };
   }
 
   /** Subscribe to bridge status changes (idle ↔ waiting). */
   onStatusChange(callback: (status: PermissionBridgeStatus) => void): () => void {
     this.statusListeners.add(callback);
     callback(this.currentStatus);
-    return () => { this.statusListeners.delete(callback); };
+    return () => {
+      this.statusListeners.delete(callback);
+    };
   }
 
   get status(): PermissionBridgeStatus {
@@ -48,7 +52,11 @@ class PermissionBridge {
   _dispatch(request: PermissionRequest): void {
     this._setStatus('waiting');
     for (const listener of this.listeners) {
-      try { listener(request); } catch { /* isolate listener failures */ }
+      try {
+        listener(request);
+      } catch {
+        /* isolate listener failures */
+      }
     }
   }
 
@@ -74,7 +82,11 @@ class PermissionBridge {
     if (this.currentStatus === status) return;
     this.currentStatus = status;
     for (const listener of this.statusListeners) {
-      try { listener(status); } catch { /* isolate */ }
+      try {
+        listener(status);
+      } catch {
+        /* isolate */
+      }
     }
   }
 }

@@ -23,11 +23,13 @@ const agent = (id: string, status: AgentInfo['status'], endTime?: number): Agent
 describe('resolveFollowTarget', () => {
   it('uses the selected settled task first', () => {
     const selected = agent('selected', 'error', 20);
-    expect(resolveFollowTarget({
-      selected,
-      agents: [agent('older', 'completed', 40)],
-      pendingNewTask: false,
-    })?.id).toBe('selected');
+    expect(
+      resolveFollowTarget({
+        selected,
+        agents: [agent('older', 'completed', 40)],
+        pendingNewTask: false,
+      })?.id,
+    ).toBe('selected');
   });
 
   it('falls back to the most recently settled task after a restart', () => {
@@ -37,36 +39,44 @@ describe('resolveFollowTarget', () => {
       agent('recent', 'stopped', 50),
       agent('queued', 'queued'),
     ];
-    expect(resolveFollowTarget({
-      selected: null,
-      agents,
-      pendingNewTask: false,
-    })?.id).toBe('recent');
+    expect(
+      resolveFollowTarget({
+        selected: null,
+        agents,
+        pendingNewTask: false,
+      })?.id,
+    ).toBe('recent');
   });
 
   it('ignores running/queued tasks and returns null when nothing is settled', () => {
-    expect(resolveFollowTarget({
-      selected: null,
-      agents: [agent('running', 'running'), agent('queued', 'queued')],
-      pendingNewTask: false,
-    })).toBeNull();
+    expect(
+      resolveFollowTarget({
+        selected: null,
+        agents: [agent('running', 'running'), agent('queued', 'queued')],
+        pendingNewTask: false,
+      }),
+    ).toBeNull();
   });
 
   it('skips the fallback when the user explicitly asked for a new task', () => {
     const recent = agent('recent', 'completed', 50);
-    expect(resolveFollowTarget({
-      selected: null,
-      agents: [recent],
-      pendingNewTask: true,
-    })).toBeNull();
+    expect(
+      resolveFollowTarget({
+        selected: null,
+        agents: [recent],
+        pendingNewTask: true,
+      }),
+    ).toBeNull();
   });
 
   it('still honors the selected target when pendingNewTask is set', () => {
     const selected = agent('selected', 'completed', 10);
-    expect(resolveFollowTarget({
-      selected,
-      agents: [selected, agent('recent', 'completed', 50)],
-      pendingNewTask: true,
-    })?.id).toBe('selected');
+    expect(
+      resolveFollowTarget({
+        selected,
+        agents: [selected, agent('recent', 'completed', 50)],
+        pendingNewTask: true,
+      })?.id,
+    ).toBe('selected');
   });
 });

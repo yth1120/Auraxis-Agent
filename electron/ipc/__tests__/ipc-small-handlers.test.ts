@@ -78,17 +78,29 @@ import { registerSystemHandlers } from '../system-handlers';
 import { loadProjectActions } from '../../actions';
 import { loadRules } from '../../rules';
 import { describeCredential, setCredential, unsetCredential } from '../../credentials';
-import { ensureSkillsDirectory, listSkills, readSkill, seedBuiltinSkills } from '../../skill-store';
+import { ensureSkillsDirectory, listSkills, readSkill } from '../../skill-store';
 import { readAgentLog, projectAgentLog } from '../../session-log';
 import { listWorkflows, startWorkflow, getWorkflowRun, listWorkflowRuns } from '../../workflow-engine';
 import {
-  getGoal, createGoal, editGoal, pauseGoal, resumeGoal,
-  completeGoal, blockGoal, clearGoal, recordGoalRound,
+  getGoal,
+  createGoal,
+  editGoal,
+  pauseGoal,
+  resumeGoal,
+  completeGoal,
+  blockGoal,
+  clearGoal,
+  recordGoalRound,
 } from '../../goal-store';
 import { searchFts, rebuildFts, removeFtsDoc } from '../../fts';
 import {
-  appendChatEvents, readChatLog, listChatSessions, projectChatSession,
-  deleteChatSession, forkChatSession, appendChatMeta,
+  appendChatEvents,
+  readChatLog,
+  listChatSessions,
+  projectChatSession,
+  deleteChatSession,
+  forkChatSession,
+  appendChatMeta,
 } from '../../chat-log';
 
 type Handler = (event: unknown, ...args: unknown[]) => Promise<any>;
@@ -205,9 +217,7 @@ describe('IPC 小型处理器（actions/rules/credentials/skills/session-log/wor
 
   it('workflow — list/run/get/runs 与缺定义/错误', async () => {
     const h = await capture(registerWorkflowHandlers);
-    vi.mocked(listWorkflows).mockResolvedValue([
-      { id: 'wf1', name: '重构', projectRoot: '', steps: [] } as any,
-    ]);
+    vi.mocked(listWorkflows).mockResolvedValue([{ id: 'wf1', name: '重构', projectRoot: '', steps: [] } as any]);
     await expect(h.get('workflow:list')!({}, '/proj')).resolves.toMatchObject({ ok: true });
     await expect(h.get('workflow:run')!({}, { workflowId: 'wf1', projectRoot: '/proj' })).resolves.toEqual({
       ok: true,
@@ -256,7 +266,9 @@ describe('IPC 小型处理器（actions/rules/credentials/skills/session-log/wor
 
   it('chatLog — 追加/读取/列表/投影/删除/分叉/元数据', async () => {
     const h = await capture(registerChatLogHandlers);
-    await expect(h.get('chatLog:append')!({}, 's1', [{ type: 'user', ts: 1, data: {} }])).resolves.toEqual({ ok: true });
+    await expect(h.get('chatLog:append')!({}, 's1', [{ type: 'user', ts: 1, data: {} }])).resolves.toEqual({
+      ok: true,
+    });
     expect(appendChatEvents).toHaveBeenCalledWith('s1', expect.any(Array), undefined);
     await expect(h.get('chatLog:read')!({}, 's1')).resolves.toMatchObject({ ok: true });
     await expect(h.get('chatLog:list')!({})).resolves.toMatchObject({ ok: true });
@@ -282,17 +294,21 @@ describe('IPC 小型处理器（actions/rules/credentials/skills/session-log/wor
     expect(typeof stats.data.cpu).toBe('number');
     expect(typeof stats.data.mem.percent).toBe('number');
 
-    execFileMock.mockImplementation((_cmd: string, args: string[], _opts: unknown, cb: (err: Error | null, out: string) => void) => {
-      cb(null, args.includes('--show-current') ? 'main' : '* main\n  dev');
-    });
+    execFileMock.mockImplementation(
+      (_cmd: string, args: string[], _opts: unknown, cb: (err: Error | null, out: string) => void) => {
+        cb(null, args.includes('--show-current') ? 'main' : '* main\n  dev');
+      },
+    );
     await expect(h.get('system:getGitBranches')!({}, '/proj')).resolves.toMatchObject({
       ok: true,
       data: { current: 'main', branches: ['main', 'dev'] },
     });
 
-    execFileMock.mockImplementation((_cmd: string, _args: string[], _opts: unknown, cb: (err: Error | null, out: string) => void) => {
-      cb(new Error('not a repo'), '');
-    });
+    execFileMock.mockImplementation(
+      (_cmd: string, _args: string[], _opts: unknown, cb: (err: Error | null, out: string) => void) => {
+        cb(new Error('not a repo'), '');
+      },
+    );
     await expect(h.get('system:getGitBranches')!({}, '/proj')).resolves.toEqual({
       ok: true,
       data: { current: '', branches: [] },
@@ -300,24 +316,35 @@ describe('IPC 小型处理器（actions/rules/credentials/skills/session-log/wor
 
     await expect(h.get('system:getVersion')!({})).resolves.toEqual({ ok: true, data: '2.0.0' });
 
-    vi.stubGlobal('fetch', vi.fn(async () => ({
-      ok: true,
-      json: async () => ({
-        balance_infos: [{ total_balance: '10.5', topped_up_balance: '5.0', currency: 'CNY' }],
-      }),
-    })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({
+          balance_infos: [{ total_balance: '10.5', topped_up_balance: '5.0', currency: 'CNY' }],
+        }),
+      })),
+    );
     await expect(h.get('system:getAccountInfo')!({}, 'sk-test')).resolves.toEqual({
       ok: true,
       data: { balance: '10.5', toppedUp: '5.0', currency: 'CNY' },
     });
 
-    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 401, statusText: 'Unauthorized' })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: false, status: 401, statusText: 'Unauthorized' })),
+    );
     await expect(h.get('system:getAccountInfo')!({}, 'sk-test')).resolves.toEqual({
       ok: false,
       error: 'HTTP 401: Unauthorized',
     });
 
-    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('network'); }));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new Error('network');
+      }),
+    );
     await expect(h.get('system:getAccountInfo')!({}, 'sk-test')).resolves.toEqual({
       ok: false,
       error: 'network',

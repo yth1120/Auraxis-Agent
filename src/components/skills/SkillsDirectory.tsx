@@ -50,7 +50,7 @@ export default function SkillsDirectory({ open, onClose }: { open: boolean; onCl
       onCancel={onClose}
       footer={
         <Button type="primary" icon={<FolderOpen />} onClick={openDirectory}>
-      {t('skills.open')}
+          {t('skills.open')}
         </Button>
       }
       width={520}
@@ -72,24 +72,28 @@ export default function SkillsDirectory({ open, onClose }: { open: boolean; onCl
                   className="ml-auto shrink-0 flex items-center justify-center w-7 h-7 rounded-lg text-text-muted cursor-pointer border-none bg-transparent transition-colors duration-150 hover:bg-[var(--color-hover)] hover:text-text-primary"
                   onClick={() => {
                     void navigator.clipboard?.writeText(`$${s.name}`).then(
-      () => message.success(t('skills.copied', { name: `$${s.name}` })),
-      () => message.error(t('skills.copyFailed')),
+                      () => message.success(t('skills.copied', { name: `$${s.name}` })),
+                      () => message.error(t('skills.copyFailed')),
                     );
                   }}
-      title={t('skills.copyTip')}
-                  >
-      <Copy size={14} />
-                  </button>
+                  title={t('skills.copyTip')}
+                >
+                  <Copy size={14} />
+                </button>
               </div>
-      {s.whenToUse && <span className="text-2xs text-text-muted truncate">{t('skills.whenToUse', { text: s.whenToUse })}</span>}
-              {s.description && <span className="text-xs text-text-muted leading-[1.5] line-clamp-2">{s.description}</span>}
+              {s.whenToUse && (
+                <span className="text-2xs text-text-muted truncate">
+                  {t('skills.whenToUse', { text: s.whenToUse })}
+                </span>
+              )}
+              {s.description && (
+                <span className="text-xs text-text-muted leading-[1.5] line-clamp-2">{s.description}</span>
+              )}
             </div>
           ))}
         </div>
       )}
-      <div className="mt-3 text-xs text-[var(--color-text-muted)]">
-      {t('skills.hint')}
-      </div>
+      <div className="mt-3 text-xs text-[var(--color-text-muted)]">{t('skills.hint')}</div>
     </Modal>
   );
 }

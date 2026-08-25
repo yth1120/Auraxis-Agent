@@ -53,8 +53,12 @@ export default function QuickActionsPanel() {
               {SKILL_ICONS[skill.icon]}
             </span>
             <span className="min-w-0 w-full flex flex-col items-center gap-0.5">
-              <span className="block text-sm font-medium text-text-primary leading-snug truncate">{t(agentSkillNameKey(skill.key))}</span>
-              <span className="block w-full text-2xs text-text-muted leading-[1.4] truncate px-1">{t(agentSkillDescKey(skill.key))}</span>
+              <span className="block text-sm font-medium text-text-primary leading-snug truncate">
+                {t(agentSkillNameKey(skill.key))}
+              </span>
+              <span className="block w-full text-2xs text-text-muted leading-[1.4] truncate px-1">
+                {t(agentSkillDescKey(skill.key))}
+              </span>
             </span>
           </button>
         ))}

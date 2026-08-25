@@ -1,6 +1,6 @@
 {
   "name": "auraxis",
-  "version": "3.0.1",
+  "version": "3.1.0",
   "description": "Auraxis - 桌面端 AI 智能体工作台：编码 / 文档 / 自动化，支持多智能体调度与插件扩展",
   "license": "MIT",
   "main": "dist-electron/main.js",
@@ -23,7 +23,12 @@
     "test:e2e": "npm run electron:compile && vite build && playwright test",
     "test:backend": "vitest run electron/ipc",
     "test:frontend": "vitest run src",
-    "test:all": "vitest run"
+    "test:all": "vitest run",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "npm run lint && npm run electron:compile && npx tsc --noEmit -p tsconfig.json && npm run test"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.3.0",
@@ -62,6 +67,7 @@
     "zustand": "^4.5.0"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.61.1",
     "@tailwindcss/vite": "^4.3.1",
     "@testing-library/react": "^14.3.0",
@@ -77,10 +83,15 @@
     "concurrently": "^8.2.0",
     "electron": "^43.4.0",
     "electron-builder": "^26.15.3",
+    "eslint": "^10.9.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react-hooks": "^7.1.1",
     "jsdom": "^29.1.1",
     "playwright": "^1.61.1",
+    "prettier": "^3.9.6",
     "tailwindcss": "^4.3.1",
     "typescript": "^5.5.0",
+    "typescript-eslint": "^8.68.0",
     "vite": "^7.3.6",
     "vitest": "^3.2.7",
     "wait-on": "^7.2.0"
@@ -88,7 +99,8 @@
   "overrides": {
     "exceljs": {
       "uuid": "^11.1.1"
-    }
+    },
+    "image-size": "file:vendor/image-size-safe"
   },
   "optionalDependencies": {
     "better-sqlite3": "^11.10.0"

@@ -26,19 +26,30 @@ function Row({ agent, active }: { agent: AgentInfo; active: boolean }) {
       onClick={() => useAgentStore.getState().setCurrentAgent(agent.id)}
       className={clsx(
         'flex flex-col gap-1 w-full min-w-0 px-2.5 py-2 rounded-xl text-left cursor-pointer transition-colors duration-150',
-        active
-          ? 'bg-primary-soft'
-          : 'bg-transparent hover:bg-[var(--color-hover)]',
+        active ? 'bg-primary-soft' : 'bg-transparent hover:bg-[var(--color-hover)]',
       )}
       data-active={active || undefined}
     >
       <span className="flex items-center gap-1.5 min-w-0">
-        <span className={clsx('w-1.5 h-1.5 rounded-full shrink-0', STATUS_DOT[agent.status] ?? 'bg-[var(--color-text-faint)]')} />
-        <span className={clsx('min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-xs', active ? 'font-semibold text-text-primary' : 'font-medium text-text-secondary')}>
+        <span
+          className={clsx(
+            'w-1.5 h-1.5 rounded-full shrink-0',
+            STATUS_DOT[agent.status] ?? 'bg-[var(--color-text-faint)]',
+          )}
+        />
+        <span
+          className={clsx(
+            'min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-xs',
+            active ? 'font-semibold text-text-primary' : 'font-medium text-text-secondary',
+          )}
+        >
           {agent.name || agent.description || '—'}
         </span>
         {pending > 0 && (
-          <span className="shrink-0 inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-warning-soft text-warning text-2xs font-semibold leading-none" title={t('work.pendingPerm', { n: pending })}>
+          <span
+            className="shrink-0 inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-warning-soft text-warning text-2xs font-semibold leading-none"
+            title={t('work.pendingPerm', { n: pending })}
+          >
             <ShieldCheck size={9} className="mr-0.5" />
             {pending}
           </span>
@@ -51,7 +62,10 @@ function Row({ agent, active }: { agent: AgentInfo; active: boolean }) {
       )}
       <span className="flex items-center gap-1.5 pl-[10px]">
         <span className="flex-1 h-[3px] rounded-full bg-[var(--color-bg-inset)] overflow-hidden">
-          <span className="block h-full rounded-full bg-primary transition-[width] duration-500" style={{ width: `${pct}%` }} />
+          <span
+            className="block h-full rounded-full bg-primary transition-[width] duration-500"
+            style={{ width: `${pct}%` }}
+          />
         </span>
       </span>
     </button>

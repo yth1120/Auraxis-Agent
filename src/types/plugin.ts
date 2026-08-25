@@ -59,5 +59,5 @@ export interface InstalledPlugin {
   description: string;
   enabled: boolean;
   installedAt: number;
-  path: string;  // filesystem path to the plugin module
+  path: string; // filesystem path to the plugin module
 }

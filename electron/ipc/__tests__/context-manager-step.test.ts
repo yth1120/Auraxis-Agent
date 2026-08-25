@@ -3,7 +3,11 @@ import { vi } from 'vitest';
 
 vi.mock('electron', () => ({
   app: { getPath: () => '', getName: () => 'auraxis' },
-  BrowserWindow: class { static fromWebContents() { return null; } },
+  BrowserWindow: class {
+    static fromWebContents() {
+      return null;
+    }
+  },
   ipcMain: { handle: vi.fn(), on: vi.fn(), removeHandler: vi.fn() },
   dialog: { showOpenDialog: vi.fn(), showMessageBox: vi.fn() },
   shell: { openExternal: vi.fn() },
@@ -108,7 +112,9 @@ describe('compactHistory — step 模式（AGORA 联动）', () => {
   });
 
   it('计划相关的关键步骤被救回', async () => {
-    const plan = { tasks: [{ id: '1', description: 'fix src/app.ts module', status: 'pending', dependencies: [], toolMatches: [] }] } as any;
+    const plan = {
+      tasks: [{ id: '1', description: 'fix src/app.ts module', status: 'pending', dependencies: [], toolMatches: [] }],
+    } as any;
     const messages = [
       { role: 'system', content: 'sys' },
       ...step('s1', 'Grep', { pattern: 'x' }, 'nothing'),

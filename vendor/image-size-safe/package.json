@@ -1,0 +1,7 @@
+{
+  "name": "image-size",
+  "version": "2.0.3",
+  "description": "Safe local stub for unused image-size dependency in pptxgenjs",
+  "main": "index.js",
+  "license": "MIT"
+}

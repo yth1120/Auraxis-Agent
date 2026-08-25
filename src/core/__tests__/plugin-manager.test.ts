@@ -23,7 +23,10 @@ import { registerTools, unregisterTools } from '../tool-registry';
 import { registerCommands, unregisterCommands } from '../command-registry';
 
 const plugin = () => ({
-  id: 'p1', name: '测试插件', version: '1.0.0', description: 'd',
+  id: 'p1',
+  name: '测试插件',
+  version: '1.0.0',
+  description: 'd',
   tools: [{ name: 'p-tool', description: 't', input_schema: {} }],
   commands: [{ id: 'c1', name: 'cmd', handler: () => {} }],
   hooks: { afterSessionEnd: vi.fn() },
@@ -31,8 +34,14 @@ const plugin = () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.stubGlobal('confirm', vi.fn(() => true));
-  vi.stubGlobal('fetch', vi.fn(async () => ({ text: async () => 'source code' })));
+  vi.stubGlobal(
+    'confirm',
+    vi.fn(() => true),
+  );
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => ({ text: async () => 'source code' })),
+  );
   usePluginStore.setState({ installedPlugins: [], activePlugins: [] });
   vi.mocked(validatePlugin).mockReturnValue({ valid: true, warnings: [] });
   vi.mocked(getCapabilitySummary).mockReturnValue('能力摘要');
@@ -46,7 +55,9 @@ describe('pluginManager — install / enable / disable', () => {
     expect(pluginManager.install(plugin() as any, '/p.js')).toBe(false);
     expect(usePluginStore.getState().installedPlugins).toHaveLength(1);
     expect(usePluginStore.getState().installedPlugins[0]).toMatchObject({
-      id: 'p1', enabled: false, path: '/p.js',
+      id: 'p1',
+      enabled: false,
+      path: '/p.js',
     });
   });
 
@@ -62,7 +73,9 @@ describe('pluginManager — install / enable / disable', () => {
     expect(spy).not.toHaveBeenCalled();
     expect(usePluginStore.getState().installedPlugins).toHaveLength(1);
     expect(usePluginStore.getState().installedPlugins[0]).toMatchObject({
-      id: 'p1', enabled: false, path: 'builtin:p1',
+      id: 'p1',
+      enabled: false,
+      path: 'builtin:p1',
     });
     expect(pluginManager.installBuiltin(plugin() as any, 'builtin:p1')).toBe(false);
   });
@@ -121,7 +134,9 @@ describe('pluginManager — installFromPath / loadAll / hooks', () => {
     const p = plugin();
     (window as any).__pluginModules = { p1: { default: p } };
     usePluginStore.setState({
-      installedPlugins: [{ id: 'p1', name: 'n', version: '1', description: 'd', enabled: true, installedAt: 1, path: '/p' } as any],
+      installedPlugins: [
+        { id: 'p1', name: 'n', version: '1', description: 'd', enabled: true, installedAt: 1, path: '/p' } as any,
+      ],
     });
     pluginManager.loadAll();
     expect(registerTools).toHaveBeenCalledWith('p1', expect.any(Array));

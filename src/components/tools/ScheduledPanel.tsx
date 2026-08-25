@@ -37,18 +37,28 @@ export default function ScheduledPanel({ onClose }: { onClose?: () => void }) {
     setJobs(r?.ok && r.data ? (r.data as CronJob[]) : []);
   }, []);
 
-  useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
 
   const create = async () => {
     if (!name.trim() || !prompt.trim()) {
       message.warning(tPanel('sched.namePrompt'));
       return;
     }
-    const r = await window.electronAPI?.cron.create({ name: name.trim(), prompt: prompt.trim(), cron: cron.trim(), recurring });
+    const r = await window.electronAPI?.cron.create({
+      name: name.trim(),
+      prompt: prompt.trim(),
+      cron: cron.trim(),
+      recurring,
+    });
     if (r?.ok) {
       message.success(tPanel('sched.created', { time: fmtTime(r.data?.nextFireAt ?? Date.now()) }));
       setCreateOpen(false);
-      setName(''); setPrompt(''); setCron('0 9 * * 1-5'); setRecurring(true);
+      setName('');
+      setPrompt('');
+      setCron('0 9 * * 1-5');
+      setRecurring(true);
       void refresh();
     } else {
       message.error(r?.error || tPanel('sched.createFailed'));
@@ -57,8 +67,10 @@ export default function ScheduledPanel({ onClose }: { onClose?: () => void }) {
 
   const remove = async (id: string) => {
     const r = await window.electronAPI?.cron.delete(id);
-    if (r?.ok) { message.success(tPanel('sched.deleted')); void refresh(); }
-    else message.error(r?.error || tPanel('sched.deleteFailed'));
+    if (r?.ok) {
+      message.success(tPanel('sched.deleted'));
+      void refresh();
+    } else message.error(r?.error || tPanel('sched.deleteFailed'));
   };
 
   return (
@@ -91,13 +103,18 @@ export default function ScheduledPanel({ onClose }: { onClose?: () => void }) {
           {jobs.map((job) => {
             const run = job.lastRun;
             return (
-              <li key={job.id} className="px-4 py-3 rounded-xl bg-[var(--color-bg-secondary)] border border-[var(--color-border-dim)]">
+              <li
+                key={job.id}
+                className="px-4 py-3 rounded-xl bg-[var(--color-bg-secondary)] border border-[var(--color-border-dim)]"
+              >
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-text-primary truncate">{job.name}</span>
                   <span className="shrink-0 inline-flex items-center h-5 px-1.5 rounded-md bg-[var(--color-bg-inset)] text-2xs text-text-muted font-mono">
                     {job.cron}
                   </span>
-                  <span className="shrink-0 text-2xs text-text-faint">{job.recurring ? tPanel('sched.recurring') : tPanel('sched.once')}</span>
+                  <span className="shrink-0 text-2xs text-text-faint">
+                    {job.recurring ? tPanel('sched.recurring') : tPanel('sched.once')}
+                  </span>
                   {run && (
                     <span
                       className={clsx(
@@ -107,7 +124,11 @@ export default function ScheduledPanel({ onClose }: { onClose?: () => void }) {
                         run.status === 'running' && 'bg-[var(--color-primary-soft)] text-text-secondary',
                       )}
                     >
-                      {run.status === 'running' ? tPanel('status.running') : run.status === 'success' ? tPanel('sched.success') : tPanel('status.error')}
+                      {run.status === 'running'
+                        ? tPanel('status.running')
+                        : run.status === 'success'
+                          ? tPanel('sched.success')
+                          : tPanel('status.error')}
                     </span>
                   )}
                   <button
@@ -131,7 +152,9 @@ export default function ScheduledPanel({ onClose }: { onClose?: () => void }) {
                     </>
                   )}
                 </div>
-                {run?.result && <div className="mt-1.5 text-xs text-text-secondary leading-[1.5] line-clamp-2">{run.result}</div>}
+                {run?.result && (
+                  <div className="mt-1.5 text-xs text-text-secondary leading-[1.5] line-clamp-2">{run.result}</div>
+                )}
                 {run?.error && <div className="mt-1.5 text-xs text-text-secondary leading-[1.5]">{run.error}</div>}
               </li>
             );
@@ -153,7 +176,11 @@ export default function ScheduledPanel({ onClose }: { onClose?: () => void }) {
         <div className="flex flex-col gap-3">
           <div>
             <div className="text-xs text-text-muted mb-1">{tPanel('sched.nameLabel')}</div>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={tPanel('sched.namePlaceholder')} />
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder={tPanel('sched.namePlaceholder')}
+            />
           </div>
           <div>
             <div className="text-xs text-text-muted mb-1">{tPanel('sched.promptLabel')}</div>

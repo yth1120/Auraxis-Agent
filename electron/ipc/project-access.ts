@@ -56,14 +56,8 @@ export async function getKnownProjectRoots(): Promise<string[]> {
  */
 export async function resolveTrustedProjectRoot(projectRoot?: string): Promise<string> {
   const settings = await readSettingsSafe();
-  const current = typeof settings?.projectPath === 'string' && settings.projectPath
-    ? settings.projectPath
-    : '';
-  const requested = projectRoot
-    ? normalizeRoot(projectRoot)
-    : current
-      ? normalizeRoot(current)
-      : '';
+  const current = typeof settings?.projectPath === 'string' && settings.projectPath ? settings.projectPath : '';
+  const requested = projectRoot ? normalizeRoot(projectRoot) : current ? normalizeRoot(current) : '';
   if (!requested) throw new Error('缺少项目路径');
   if (process.env.NODE_ENV === 'test' || process.env.VITEST === 'true') return requested;
 

@@ -23,8 +23,13 @@ describe('pruneToolResults', () => {
   });
 
   it('prunes Grep results to pattern + count + top hits', () => {
-    const content = JSON.stringify({ pattern: 'TODO', results: Array.from({ length: 50 }, (_, i) => ({ file: `f${i}.ts`, line: i })) });
-    const { pruned, messages: next } = pruneToolResults([{ role: 'tool', tool_call_id: 't2', content }], null, { pruneAboveChars: 100 });
+    const content = JSON.stringify({
+      pattern: 'TODO',
+      results: Array.from({ length: 50 }, (_, i) => ({ file: `f${i}.ts`, line: i })),
+    });
+    const { pruned, messages: next } = pruneToolResults([{ role: 'tool', tool_call_id: 't2', content }], null, {
+      pruneAboveChars: 100,
+    });
     expect(pruned).toBe(1);
     const parsed = JSON.parse(next[0].content);
     expect(parsed.pattern).toBe('TODO');

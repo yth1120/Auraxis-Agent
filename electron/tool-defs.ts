@@ -47,14 +47,29 @@ export interface ToolDef extends ContractToolDef {
 export const TOOL_DEFINITIONS: ToolDef[] = [
   {
     name: 'RunCode',
-    description: 'Run model-written code. language=javascript/python/shell executes a snippet in an isolated temporary directory with a hard timeout and output cap. language=typescript runs a TypeScript program whose body can call every available tool as `await tools.ToolName(args)`; sub-calls re-enter the full permission/sandbox pipeline, overlap up to 8 concurrent safe calls, and only what you print or return is sent back.',
+    description:
+      'Run model-written code. language=javascript/python/shell executes a snippet in an isolated temporary directory with a hard timeout and output cap. language=typescript runs a TypeScript program whose body can call every available tool as `await tools.ToolName(args)`; sub-calls re-enter the full permission/sandbox pipeline, overlap up to 8 concurrent safe calls, and only what you print or return is sent back.',
     input_schema: {
       type: 'object',
       properties: {
-        language: { type: 'string', enum: ['javascript', 'python', 'shell', 'typescript'], description: 'Runtime language. typescript = tool-orchestration program (Code Mode)' },
-        code: { type: 'string', description: 'Source code to execute. For typescript: the BODY of an async function; top-level await and return are allowed, `import` resolves via require, `export` is not supported.' },
-        description: { type: 'string', description: 'For typescript: a clear 5-10 word description of what the program does, shown in the UI' },
-        timeout_ms: { type: 'number', description: 'Timeout in milliseconds (default 30000; typescript default 120000)' },
+        language: {
+          type: 'string',
+          enum: ['javascript', 'python', 'shell', 'typescript'],
+          description: 'Runtime language. typescript = tool-orchestration program (Code Mode)',
+        },
+        code: {
+          type: 'string',
+          description:
+            'Source code to execute. For typescript: the BODY of an async function; top-level await and return are allowed, `import` resolves via require, `export` is not supported.',
+        },
+        description: {
+          type: 'string',
+          description: 'For typescript: a clear 5-10 word description of what the program does, shown in the UI',
+        },
+        timeout_ms: {
+          type: 'number',
+          description: 'Timeout in milliseconds (default 30000; typescript default 120000)',
+        },
       },
       required: ['language', 'code'],
       additionalProperties: false,
@@ -63,13 +78,17 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   },
   {
     name: 'RunWorkflow',
-    description: 'Run a scripted multi-agent workflow. Two modes: (1) pass name to run a predefined workflow from .auraxis/workflows; (2) pass script to run an inline orchestration script — plain JS with top-level await, ending with `return <json>`. The script gets ctx.projectRoot, ctx.log, ctx.sleep, and ctx.agents.run/start/list/send/interrupt to fan work out across sub-agents. Returns the script result plus a transcript.',
+    description:
+      'Run a scripted multi-agent workflow. Two modes: (1) pass name to run a predefined workflow from .auraxis/workflows; (2) pass script to run an inline orchestration script — plain JS with top-level await, ending with `return <json>`. The script gets ctx.projectRoot, ctx.log, ctx.sleep, and ctx.agents.run/start/list/send/interrupt to fan work out across sub-agents. Returns the script result plus a transcript.',
     input_schema: {
       type: 'object',
       properties: {
         name: { type: 'string', description: 'Workflow id or name' },
         projectRoot: { type: 'string', description: 'Optional project root override' },
-        script: { type: 'string', description: 'Optional inline orchestration script body (async JS ending with return)' },
+        script: {
+          type: 'string',
+          description: 'Optional inline orchestration script body (async JS ending with return)',
+        },
       },
       required: [],
       additionalProperties: false,
@@ -78,7 +97,8 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   },
   {
     name: 'ListSkills',
-    description: 'List skills available in the local skills directory. Each skill packages a repeatable workflow (instructions + resources). When a task matches a skill description, use ReadSkill to load its instructions.',
+    description:
+      'List skills available in the local skills directory. Each skill packages a repeatable workflow (instructions + resources). When a task matches a skill description, use ReadSkill to load its instructions.',
     input_schema: {
       type: 'object',
       properties: {},
@@ -89,7 +109,8 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   },
   {
     name: 'ReadSkill',
-    description: 'Read the full instructions and resources of a skill by name (from ListSkills). Follow the skill workflow exactly.',
+    description:
+      'Read the full instructions and resources of a skill by name (from ListSkills). Follow the skill workflow exactly.',
     input_schema: {
       type: 'object',
       properties: {
@@ -102,17 +123,36 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   },
   {
     name: 'Bash',
-    description: 'Execute a shell command in the project directory. Returns stdout, stderr, and exit code. For long-running commands (npm install, cargo build), set a timeout value in milliseconds, or set run_in_background=true to get a task id immediately and read the output later with TaskOutput. When the command needs a wider sandbox than the current mode, set sandbox_permissions (read/workspace-write/full) together with a one-sentence justification.',
+    description:
+      'Execute a shell command in the project directory. Returns stdout, stderr, and exit code. For long-running commands (npm install, cargo build), set a timeout value in milliseconds, or set run_in_background=true to get a task id immediately and read the output later with TaskOutput. When the command needs a wider sandbox than the current mode, set sandbox_permissions (read/workspace-write/full) together with a one-sentence justification.',
     input_schema: {
       type: 'object',
       properties: {
         command: { type: 'string', description: 'The shell command to execute' },
         workdir: { type: 'string', description: 'Working directory (optional, defaults to project root)' },
-        timeout: { type: 'number', description: 'Timeout in milliseconds. Default 120000 (2 min), max 600000 (10 min). Use for long-running commands like builds or installs.' },
-        description: { type: 'string', description: 'One-line description of what the command does (helpful for background tasks)' },
-        run_in_background: { type: 'boolean', description: 'Start in the background and return a task id immediately; poll with TaskOutput and stop with TaskStop' },
-        sandbox_permissions: { type: 'string', enum: ['read', 'workspace-write', 'full'], description: 'Request a wider sandbox for this call (must pair with justification)' },
-        justification: { type: 'string', description: 'One-sentence justification — required when sandbox_permissions is set' },
+        timeout: {
+          type: 'number',
+          description:
+            'Timeout in milliseconds. Default 120000 (2 min), max 600000 (10 min). Use for long-running commands like builds or installs.',
+        },
+        description: {
+          type: 'string',
+          description: 'One-line description of what the command does (helpful for background tasks)',
+        },
+        run_in_background: {
+          type: 'boolean',
+          description:
+            'Start in the background and return a task id immediately; poll with TaskOutput and stop with TaskStop',
+        },
+        sandbox_permissions: {
+          type: 'string',
+          enum: ['read', 'workspace-write', 'full'],
+          description: 'Request a wider sandbox for this call (must pair with justification)',
+        },
+        justification: {
+          type: 'string',
+          description: 'One-sentence justification — required when sandbox_permissions is set',
+        },
       },
       required: ['command', 'workdir', 'timeout'],
       additionalProperties: false,
@@ -121,7 +161,8 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   },
   {
     name: 'Read',
-    description: 'Read the contents of a file. Supports text files. The result includes a "version" (content hash) — pass it back to Write/Edit to avoid overwriting concurrent changes.',
+    description:
+      'Read the contents of a file. Supports text files. The result includes a "version" (content hash) — pass it back to Write/Edit to avoid overwriting concurrent changes.',
     input_schema: {
       type: 'object',
       properties: {
@@ -136,7 +177,8 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   },
   {
     name: 'ReadImage',
-    description: 'Read an image file (png/jpg/jpeg/gif/webp/bmp/svg) and make it visible to the model. Returns the image content plus a durable attachment id; the bytes are also stored content-addressed so repeated reads are cheap. Use this to inspect screenshots, diagrams, or UI mockups.',
+    description:
+      'Read an image file (png/jpg/jpeg/gif/webp/bmp/svg) and make it visible to the model. Returns the image content plus a durable attachment id; the bytes are also stored content-addressed so repeated reads are cheap. Use this to inspect screenshots, diagrams, or UI mockups.',
     input_schema: {
       type: 'object',
       properties: {
@@ -149,13 +191,17 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   },
   {
     name: 'Write',
-    description: 'Create or overwrite a file. If you read the file first, pass its "version" back to avoid clobbering concurrent edits; pass version="new" to refuse overwriting an existing file.',
+    description:
+      'Create or overwrite a file. If you read the file first, pass its "version" back to avoid clobbering concurrent edits; pass version="new" to refuse overwriting an existing file.',
     input_schema: {
       type: 'object',
       properties: {
         file_path: { type: 'string', description: 'Path to the file' },
         content: { type: 'string', description: 'Full file content' },
-        version: { type: 'string', description: 'Optional version from Read; the write fails if the file changed since' },
+        version: {
+          type: 'string',
+          description: 'Optional version from Read; the write fails if the file changed since',
+        },
       },
       required: ['file_path', 'content'],
       additionalProperties: false,
@@ -164,14 +210,18 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   },
   {
     name: 'Edit',
-    description: 'Replace old_string with new_string in a file. Must match exactly once. Pass the "version" from your last Read to reject stale edits.',
+    description:
+      'Replace old_string with new_string in a file. Must match exactly once. Pass the "version" from your last Read to reject stale edits.',
     input_schema: {
       type: 'object',
       properties: {
         file_path: { type: 'string', description: 'Path to the file' },
         old_string: { type: 'string', description: 'Exact text to replace' },
         new_string: { type: 'string', description: 'Replacement text' },
-        version: { type: 'string', description: 'Optional version from Read; the edit fails if the file changed since' },
+        version: {
+          type: 'string',
+          description: 'Optional version from Read; the edit fails if the file changed since',
+        },
       },
       required: ['file_path', 'old_string', 'new_string'],
       additionalProperties: false,
@@ -180,7 +230,8 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   },
   {
     name: 'StrReplaceEditor',
-    description: 'Single-purpose text editor with unified editor semantics. Commands: view (read a file), create (write a new file, fails if it exists), str_replace (replace old_str with new_str, must match exactly once), insert (append new_str after insert_line). Use this instead of mixing Read/Write/Edit when the task is a localized file change.',
+    description:
+      'Single-purpose text editor with unified editor semantics. Commands: view (read a file), create (write a new file, fails if it exists), str_replace (replace old_str with new_str, must match exactly once), insert (append new_str after insert_line). Use this instead of mixing Read/Write/Edit when the task is a localized file change.',
     input_schema: {
       type: 'object',
       properties: {
@@ -255,13 +306,15 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   },
   {
     name: 'TodoWrite',
-    description: 'Create and manage a structured task list for tracking progress. Use this to plan complex multi-step tasks, track what is in progress, and mark items as completed. Always update the list as you make progress — mark items complete IMMEDIATELY after finishing.',
+    description:
+      'Create and manage a structured task list for tracking progress. Use this to plan complex multi-step tasks, track what is in progress, and mark items as completed. Always update the list as you make progress — mark items complete IMMEDIATELY after finishing.',
     input_schema: {
       type: 'object',
       properties: {
         todos: {
           type: 'array',
-          description: 'The complete todo list. Each item must have: content (what to do), status (pending/in_progress/completed), activeForm (present continuous form shown during execution, e.g. "Adding login"). Exactly ONE item in_progress at a time.',
+          description:
+            'The complete todo list. Each item must have: content (what to do), status (pending/in_progress/completed), activeForm (present continuous form shown during execution, e.g. "Adding login"). Exactly ONE item in_progress at a time.',
           items: {
             type: 'object',
             properties: {
@@ -281,15 +334,33 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   },
   {
     name: 'Agent',
-    description: 'Launch a sub-agent to handle complex, multi-step tasks autonomously. Use for research (Explore), planning (Plan), or general coding tasks (general-purpose). The sub-agent runs independently and returns a single result message. Default backend "internal" runs the built-in sub-agent; "fork" spawns a one-shot child-process fork with its own session.',
+    description:
+      'Launch a sub-agent to handle complex, multi-step tasks autonomously. Use for research (Explore), planning (Plan), or general coding tasks (general-purpose). The sub-agent runs independently and returns a single result message. Default backend "internal" runs the built-in sub-agent; "fork" spawns a one-shot child-process fork with its own session.',
     input_schema: {
       type: 'object',
       properties: {
         description: { type: 'string', description: 'Short (3-5 word) description of the task' },
-        prompt: { type: 'string', description: 'Complete task description for the sub-agent. Include context, what to do, what tools to use, and expected output format.' },
-        subagent_type: { type: 'string', enum: ['Explore', 'Plan', 'general-purpose'], description: 'Agent type: Explore (search/read code), Plan (design implementation), general-purpose (full tools)' },
-        backend: { type: 'string', enum: ['internal', 'fork'], description: 'Sub-agent backend: internal (built-in, default), fork (one-shot headless fork)' },
-        background: { type: 'boolean', description: 'Start in the background and return immediately with an agentId. Use ListAgents to track it, SendMessage to steer it, and TaskOutput to read the final result.' },
+        prompt: {
+          type: 'string',
+          description:
+            'Complete task description for the sub-agent. Include context, what to do, what tools to use, and expected output format.',
+        },
+        subagent_type: {
+          type: 'string',
+          enum: ['Explore', 'Plan', 'general-purpose'],
+          description:
+            'Agent type: Explore (search/read code), Plan (design implementation), general-purpose (full tools)',
+        },
+        backend: {
+          type: 'string',
+          enum: ['internal', 'fork'],
+          description: 'Sub-agent backend: internal (built-in, default), fork (one-shot headless fork)',
+        },
+        background: {
+          type: 'boolean',
+          description:
+            'Start in the background and return immediately with an agentId. Use ListAgents to track it, SendMessage to steer it, and TaskOutput to read the final result.',
+        },
       },
       required: ['description', 'prompt'],
       additionalProperties: false,
@@ -298,12 +369,20 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   },
   {
     name: 'Replan',
-    description: 'When the current execution plan cannot proceed (tasks are blocked or the original approach is invalid), call this tool to generate a new sub-plan for the remaining work. Provide the status of completed and blocked tasks so the planner understands the current situation.',
+    description:
+      'When the current execution plan cannot proceed (tasks are blocked or the original approach is invalid), call this tool to generate a new sub-plan for the remaining work. Provide the status of completed and blocked tasks so the planner understands the current situation.',
     input_schema: {
       type: 'object',
       properties: {
-        currentPlanStatus: { type: 'string', description: 'Summary of the current plan status — which tasks are completed, blocked, and still pending.' },
-        blockedTasks: { type: 'array', items: { type: 'string' }, description: 'List of blocked task IDs that need a new approach' },
+        currentPlanStatus: {
+          type: 'string',
+          description: 'Summary of the current plan status — which tasks are completed, blocked, and still pending.',
+        },
+        blockedTasks: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'List of blocked task IDs that need a new approach',
+        },
         reason: { type: 'string', description: 'Why the original plan cannot continue and what needs to change' },
       },
       required: ['currentPlanStatus', 'blockedTasks', 'reason'],
@@ -315,13 +394,18 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   // ── Cron / Scheduling ──────────────────────────────────
   {
     name: 'CronCreate',
-    description: 'Schedule a recurring or one-shot task. Uses cron syntax with minute/hour/day-of-month/month/day-of-week. Tasks fire when the app is running. Use for periodic checks, reminders, or automation triggers.',
+    description:
+      'Schedule a recurring or one-shot task. Uses cron syntax with minute/hour/day-of-month/month/day-of-week. Tasks fire when the app is running. Use for periodic checks, reminders, or automation triggers.',
     input_schema: {
       type: 'object',
       properties: {
         name: { type: 'string', description: 'Short name for this cron job' },
         prompt: { type: 'string', description: 'The prompt to execute when the cron fires' },
-        cron: { type: 'string', description: 'Standard 5-field cron expression e.g. "0 9 * * *" for daily at 9am, "*/5 * * * *" for every 5 minutes' },
+        cron: {
+          type: 'string',
+          description:
+            'Standard 5-field cron expression e.g. "0 9 * * *" for daily at 9am, "*/5 * * * *" for every 5 minutes',
+        },
         recurring: { type: 'boolean', description: 'true = fire on every match, false = fire once then delete' },
       },
       required: ['name', 'prompt', 'cron', 'recurring'],
@@ -355,7 +439,8 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   },
   {
     name: 'ScheduleCreate',
-    description: 'Create a session-local scheduled follow-up: run a prompt after a delay (after_seconds), at an absolute time (at, epoch ms), or on a fixed interval (every_seconds, bounded repeats). Delivery is session-local and only fires while the app is running; entries do not survive a restart.',
+    description:
+      'Create a session-local scheduled follow-up: run a prompt after a delay (after_seconds), at an absolute time (at, epoch ms), or on a fixed interval (every_seconds, bounded repeats). Delivery is session-local and only fires while the app is running; entries do not survive a restart.',
     input_schema: {
       type: 'object',
       properties: {
@@ -397,7 +482,8 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   // ── Task management ────────────────────────────────────
   {
     name: 'TaskOutput',
-    description: 'Read accumulated output from a running background task or sub-agent. Use to check progress without blocking.',
+    description:
+      'Read accumulated output from a running background task or sub-agent. Use to check progress without blocking.',
     input_schema: {
       type: 'object',
       properties: {
@@ -425,7 +511,8 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   // ── Plan mode gating ───────────────────────────────────
   {
     name: 'EnterPlanMode',
-    description: 'Enter planning mode — before making changes, design an implementation plan and present it for user approval. Use for non-trivial multi-file changes. The plan will be shown to the user, who can approve or reject it.',
+    description:
+      'Enter planning mode — before making changes, design an implementation plan and present it for user approval. Use for non-trivial multi-file changes. The plan will be shown to the user, who can approve or reject it.',
     input_schema: {
       type: 'object',
       properties: {
@@ -454,16 +541,34 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   // ── Notebook ───────────────────────────────────────────
   {
     name: 'NotebookEdit',
-    description: 'Read or modify cells in a Jupyter notebook (.ipynb) file. Supports read, write, insert, and delete operations on individual cells. Pass the "version" from your last Read to reject stale edits.',
+    description:
+      'Read or modify cells in a Jupyter notebook (.ipynb) file. Supports read, write, insert, and delete operations on individual cells. Pass the "version" from your last Read to reject stale edits.',
     input_schema: {
       type: 'object',
       properties: {
         file_path: { type: 'string', description: 'Path to the .ipynb file' },
-        cell_index: { type: 'number', description: '0-based cell index to target (optional for insert — appends at end)' },
-        action: { type: 'string', enum: ['read', 'write', 'insert', 'delete'], description: 'Operation: read a cell, write/replace a cell, insert a new cell, or delete a cell' },
-        source: { type: 'string', description: 'Cell source content (required for write, insert). Use \'\\n\' for line breaks.' },
-        cell_type: { type: 'string', enum: ['code', 'markdown'], description: 'Cell type (for insert). Defaults to code.' },
-        version: { type: 'string', description: 'Optional version from Read; the edit fails if the file changed since' },
+        cell_index: {
+          type: 'number',
+          description: '0-based cell index to target (optional for insert — appends at end)',
+        },
+        action: {
+          type: 'string',
+          enum: ['read', 'write', 'insert', 'delete'],
+          description: 'Operation: read a cell, write/replace a cell, insert a new cell, or delete a cell',
+        },
+        source: {
+          type: 'string',
+          description: "Cell source content (required for write, insert). Use '\\n' for line breaks.",
+        },
+        cell_type: {
+          type: 'string',
+          enum: ['code', 'markdown'],
+          description: 'Cell type (for insert). Defaults to code.',
+        },
+        version: {
+          type: 'string',
+          description: 'Optional version from Read; the edit fails if the file changed since',
+        },
       },
       required: ['file_path'],
       additionalProperties: false,
@@ -474,12 +579,19 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   // ── Git Worktree Isolation ─────────────────────────────
   {
     name: 'EnterWorktree',
-    description: 'Create an isolated Git worktree sandbox. ALL subsequent tool calls (Read, Write, Edit, Bash) will be automatically redirected to the sandbox path. This prevents the agent from modifying the main branch directly. Useful in auto mode to isolate changes.',
+    description:
+      'Create an isolated Git worktree sandbox. ALL subsequent tool calls (Read, Write, Edit, Bash) will be automatically redirected to the sandbox path. This prevents the agent from modifying the main branch directly. Useful in auto mode to isolate changes.',
     input_schema: {
       type: 'object',
       properties: {
-        task_id: { type: 'string', description: 'Unique task identifier (e.g. "fix-login-bug"). Used for sandbox directory and branch naming.' },
-        projectRoot: { type: 'string', description: 'Project root directory (optional — defaults to current project root)' },
+        task_id: {
+          type: 'string',
+          description: 'Unique task identifier (e.g. "fix-login-bug"). Used for sandbox directory and branch naming.',
+        },
+        projectRoot: {
+          type: 'string',
+          description: 'Project root directory (optional — defaults to current project root)',
+        },
       },
       required: ['task_id'],
       additionalProperties: false,
@@ -490,15 +602,26 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   // ── LSP Code Intelligence ──────────────────────────────
   {
     name: 'LSP',
-    description: 'Code intelligence tool. Actions: definition (find where a symbol is declared), references (find all usages), implementation (find implementors of an interface/class), hover (get type/signature info at a position), diagnostics (run TypeScript type checking). Prefers a real language server when available (AURAXIS_LSP_SERVER), otherwise falls back to regex + tsc. Provide file_path with line/column for position-aware actions.',
+    description:
+      'Code intelligence tool. Actions: definition (find where a symbol is declared), references (find all usages), implementation (find implementors of an interface/class), hover (get type/signature info at a position), diagnostics (run TypeScript type checking). Prefers a real language server when available (AURAXIS_LSP_SERVER), otherwise falls back to regex + tsc. Provide file_path with line/column for position-aware actions.',
     input_schema: {
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ['definition', 'references', 'implementation', 'hover', 'diagnostics'], description: 'Which LSP operation to perform' },
+        action: {
+          type: 'string',
+          enum: ['definition', 'references', 'implementation', 'hover', 'diagnostics'],
+          description: 'Which LSP operation to perform',
+        },
         symbol: { type: 'string', description: 'Symbol name to search for (required for definition and references)' },
         file_path: { type: 'string', description: 'Optional file path to scope the search or diagnostics to' },
-        line: { type: 'number', description: '1-based line number (required for hover/implementation with a real server)' },
-        column: { type: 'number', description: '1-based column number (required for hover/implementation with a real server)' },
+        line: {
+          type: 'number',
+          description: '1-based line number (required for hover/implementation with a real server)',
+        },
+        column: {
+          type: 'number',
+          description: '1-based column number (required for hover/implementation with a real server)',
+        },
       },
       required: ['action'],
       additionalProperties: false,
@@ -509,12 +632,20 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   // ── Review Artifact Quality Gate ───────────────────────
   {
     name: 'ReviewArtifact',
-    description: 'Run build, test, typecheck, or lint verification on the current project (or active worktree sandbox). Returns the command output, error output, and exit status so you can decide how to respond.',
+    description:
+      'Run build, test, typecheck, or lint verification on the current project (or active worktree sandbox). Returns the command output, error output, and exit status so you can decide how to respond.',
     input_schema: {
       type: 'object',
       properties: {
-        check_type: { type: 'string', enum: ['build', 'test', 'typecheck', 'lint'], description: 'Type of verification to run' },
-        projectRoot: { type: 'string', description: 'Project root (optional — defaults to current project root or active worktree sandbox)' },
+        check_type: {
+          type: 'string',
+          enum: ['build', 'test', 'typecheck', 'lint'],
+          description: 'Type of verification to run',
+        },
+        projectRoot: {
+          type: 'string',
+          description: 'Project root (optional — defaults to current project root or active worktree sandbox)',
+        },
         file_path: { type: 'string', description: 'Optional specific file to check (for typecheck)' },
       },
       required: ['check_type'],
@@ -526,12 +657,17 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   // ── File Deletion ────────────────────────────────────
   {
     name: 'Delete',
-    description: 'Delete a file or directory within the project. For directories, must set recursive=true. The file is backed up to the undo system before deletion so it can be restored.',
+    description:
+      'Delete a file or directory within the project. For directories, must set recursive=true. The file is backed up to the undo system before deletion so it can be restored.',
     input_schema: {
       type: 'object',
       properties: {
         file_path: { type: 'string', description: 'Absolute path to the file or directory to delete' },
-        recursive: { type: 'boolean', description: 'Set to true to delete directories recursively. Ignored for files.', default: false },
+        recursive: {
+          type: 'boolean',
+          description: 'Set to true to delete directories recursively. Ignored for files.',
+          default: false,
+        },
       },
       required: ['file_path'],
       additionalProperties: false,
@@ -542,7 +678,8 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   // ── Git Commit ──────────────────────────────────────
   {
     name: 'GitCommit',
-    description: 'Stage all changes and create a git commit with the given message. Returns the commit hash. Only works within a project directory that has a git repository.',
+    description:
+      'Stage all changes and create a git commit with the given message. Returns the commit hash. Only works within a project directory that has a git repository.',
     input_schema: {
       type: 'object',
       properties: {
@@ -557,7 +694,8 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   // ── Session Memory Query ────────────────────────────
   {
     name: 'SessionQuery',
-    description: 'Search past chat and agent session transcripts for a keyword or phrase. Returns matching sessions with title, timestamp, snippet, and relevance score. Use this to recall prior decisions, previously discussed code locations, or what was already tried — before re-reading files or asking the user to repeat context.',
+    description:
+      'Search past chat and agent session transcripts for a keyword or phrase. Returns matching sessions with title, timestamp, snippet, and relevance score. Use this to recall prior decisions, previously discussed code locations, or what was already tried — before re-reading files or asking the user to repeat context.',
     input_schema: {
       type: 'object',
       properties: {
@@ -572,7 +710,8 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
 
   {
     name: 'ReadSpill',
-    description: 'Read the full content of an oversized tool output that was spilled to disk (a tool result may contain "spill_path" when output is too large). Pass the exact spill_path value. Returns the complete original payload.',
+    description:
+      'Read the full content of an oversized tool output that was spilled to disk (a tool result may contain "spill_path" when output is too large). Pass the exact spill_path value. Returns the complete original payload.',
     input_schema: {
       type: 'object',
       properties: {
@@ -587,7 +726,8 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   // ── Ask the user a question ─────────────────────────
   {
     name: 'AskUser',
-    description: 'Ask the human a clarifying question and wait for their answer. Use this when the task is genuinely ambiguous — a required choice, missing preference, or a decision the user should make — instead of guessing. Provide concise options when the choice is bounded; otherwise the user can type a free-form answer. The tool result contains the user\'s reply.',
+    description:
+      "Ask the human a clarifying question and wait for their answer. Use this when the task is genuinely ambiguous — a required choice, missing preference, or a decision the user should make — instead of guessing. Provide concise options when the choice is bounded; otherwise the user can type a free-form answer. The tool result contains the user's reply.",
     input_schema: {
       type: 'object',
       properties: {
@@ -607,7 +747,8 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   // ── Professional document skills (Office / PDF) ──────
   {
     name: 'ReadDocument',
-    description: 'Read a professional document file (.docx/.xlsx/.pptx/.pdf) and return its text content as plain text (xlsx also returns structured sheets). Use this instead of Read for binary document formats.',
+    description:
+      'Read a professional document file (.docx/.xlsx/.pptx/.pdf) and return its text content as plain text (xlsx also returns structured sheets). Use this instead of Read for binary document formats.',
     input_schema: {
       type: 'object',
       properties: {
@@ -620,14 +761,16 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   },
   {
     name: 'WriteDocument',
-    description: 'Create or overwrite a professional document (.docx/.xlsx/.pptx/.pdf) from a structured spec. For docx/pdf: { title?, blocks: [{type:"paragraph|heading|bullet|numbered|table|pageBreak", text?, level?, rows?}] }. For xlsx: { sheets: [{ name, rows: string[][] }] }. For pptx: { slides: [{ title?, subtitle?, bullets?, notes? }] }. Returns the written path and byte size.',
+    description:
+      'Create or overwrite a professional document (.docx/.xlsx/.pptx/.pdf) from a structured spec. For docx/pdf: { title?, blocks: [{type:"paragraph|heading|bullet|numbered|table|pageBreak", text?, level?, rows?}] }. For xlsx: { sheets: [{ name, rows: string[][] }] }. For pptx: { slides: [{ title?, subtitle?, bullets?, notes? }] }. Returns the written path and byte size.',
     input_schema: {
       type: 'object',
       properties: {
         file_path: { type: 'string', description: 'Absolute output path ending in .docx/.xlsx/.pptx/.pdf' },
         spec: {
           type: 'object',
-          description: 'Structured document content (title/blocks for Word & PDF, sheets for Excel, slides for PowerPoint)',
+          description:
+            'Structured document content (title/blocks for Word & PDF, sheets for Excel, slides for PowerPoint)',
         },
       },
       required: ['file_path', 'spec'],
@@ -639,7 +782,8 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   // ── Cloud connectors (Slack / Drive / Notion) ────────
   {
     name: 'SlackListChannels',
-    description: 'List Slack channels (public + private) the configured bot/user can access. Tokens come from Settings → 连接器; do not ask the user for a token.',
+    description:
+      'List Slack channels (public + private) the configured bot/user can access. Tokens come from Settings → 连接器; do not ask the user for a token.',
     input_schema: {
       type: 'object',
       properties: {
@@ -652,7 +796,8 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   },
   {
     name: 'SlackPostMessage',
-    description: 'Post a message to a Slack channel by id (from SlackListChannels). External side effect — confirm intent before use.',
+    description:
+      'Post a message to a Slack channel by id (from SlackListChannels). External side effect — confirm intent before use.',
     input_schema: {
       type: 'object',
       properties: {
@@ -666,7 +811,8 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   },
   {
     name: 'DriveList',
-    description: 'List Google Drive files/folders the configured token can access. Optional query follows the Drive API `q` syntax (e.g. "name contains \'Report\'").',
+    description:
+      'List Google Drive files/folders the configured token can access. Optional query follows the Drive API `q` syntax (e.g. "name contains \'Report\'").',
     input_schema: {
       type: 'object',
       properties: {
@@ -680,7 +826,8 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   },
   {
     name: 'DriveRead',
-    description: 'Read a Google Drive file by id (from DriveList). Text files return text; other files return base64 content.',
+    description:
+      'Read a Google Drive file by id (from DriveList). Text files return text; other files return base64 content.',
     input_schema: {
       type: 'object',
       properties: {
@@ -707,7 +854,8 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   },
   {
     name: 'NotionCreatePage',
-    description: 'Create a Notion page under a parent page (from NotionSearch). Markdown (headings/bullets/numbered/code/paragraphs) becomes Notion blocks. External side effect — confirm intent before use.',
+    description:
+      'Create a Notion page under a parent page (from NotionSearch). Markdown (headings/bullets/numbered/code/paragraphs) becomes Notion blocks. External side effect — confirm intent before use.',
     input_schema: {
       type: 'object',
       properties: {
@@ -724,7 +872,8 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   // ── Persistent PTY terminal ─────────────────────────
   {
     name: 'Pty',
-    description: 'Manage persistent interactive terminal (PTY) sessions that keep state across tool calls. Use for interactive programs (REPLs, dev servers, prompts) where a one-shot Bash call would lose context. Actions: create (start a session), write (send input; set enter=true to press Enter), read (return output since the last read; timeout_ms up to 30000), close (end a session), list (active sessions of this task), clear (close all sessions of this task). Sessions are scoped to the current task and are NOT visible to other tasks.',
+    description:
+      'Manage persistent interactive terminal (PTY) sessions that keep state across tool calls. Use for interactive programs (REPLs, dev servers, prompts) where a one-shot Bash call would lose context. Actions: create (start a session), write (send input; set enter=true to press Enter), read (return output since the last read; timeout_ms up to 30000), close (end a session), list (active sessions of this task), clear (close all sessions of this task). Sessions are scoped to the current task and are NOT visible to other tasks.',
     input_schema: {
       type: 'object',
       properties: {
@@ -738,7 +887,11 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
         cwd: { type: 'string', description: 'Working directory for create (defaults to the project root)' },
         data: { type: 'string', description: 'Input to write to the session' },
         enter: { type: 'boolean', description: 'Append an Enter (\\r) after data for write', default: false },
-        timeout_ms: { type: 'number', description: 'How long read waits for new output (default 2000, max 30000)', default: 2000 },
+        timeout_ms: {
+          type: 'number',
+          description: 'How long read waits for new output (default 2000, max 30000)',
+          default: 2000,
+        },
       },
       required: ['action'],
       additionalProperties: false,
@@ -747,13 +900,17 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   },
   {
     name: 'TerminalOpen',
-    description: 'Open a persistent terminal session for the current task. Returns a session_id to use with the other Terminal* tools. The shell is default-shell + cwd=project root unless overridden.',
+    description:
+      'Open a persistent terminal session for the current task. Returns a session_id to use with the other Terminal* tools. The shell is default-shell + cwd=project root unless overridden.',
     input_schema: {
       type: 'object',
       properties: {
         command: { type: 'string', description: 'Program to start (defaults to the system shell)' },
         cwd: { type: 'string', description: 'Working directory (defaults to the project root)' },
-        session_id: { type: 'string', description: 'Optional stable session id; reuses the existing session when present' },
+        session_id: {
+          type: 'string',
+          description: 'Optional stable session id; reuses the existing session when present',
+        },
       },
       required: [],
       additionalProperties: false,
@@ -762,7 +919,7 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   },
   {
     name: 'TerminalList',
-    description: 'List the current task\'s open terminal sessions with their ids.',
+    description: "List the current task's open terminal sessions with their ids.",
     input_schema: {
       type: 'object',
       properties: {},
@@ -802,12 +959,17 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   },
   {
     name: 'TerminalSignal',
-    description: 'Send a control signal to a terminal session. SIGINT/SIGTSTP/SIGQUIT are written as control characters; SIGTERM/SIGKILL close the session.',
+    description:
+      'Send a control signal to a terminal session. SIGINT/SIGTSTP/SIGQUIT are written as control characters; SIGTERM/SIGKILL close the session.',
     input_schema: {
       type: 'object',
       properties: {
         session_id: { type: 'string', description: 'Session id from TerminalOpen' },
-        signal: { type: 'string', enum: ['SIGINT', 'SIGTSTP', 'SIGQUIT', 'SIGTERM', 'SIGKILL'], description: 'Signal name' },
+        signal: {
+          type: 'string',
+          enum: ['SIGINT', 'SIGTSTP', 'SIGQUIT', 'SIGTERM', 'SIGKILL'],
+          description: 'Signal name',
+        },
       },
       required: ['session_id', 'signal'],
       additionalProperties: false,
@@ -831,7 +993,8 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   // ── Bounded self-modification ───────────────────────
   {
     name: 'InspectRuntime',
-    description: 'Inspect the live agent runtime: available tools (name + summary), installed plugins (id/name/version/enabled/capabilities), and discoverable skills. Read-only — use before deciding to extend capabilities.',
+    description:
+      'Inspect the live agent runtime: available tools (name + summary), installed plugins (id/name/version/enabled/capabilities), and discoverable skills. Read-only — use before deciding to extend capabilities.',
     input_schema: {
       type: 'object',
       properties: {},
@@ -842,12 +1005,17 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   },
   {
     name: 'WriteSkill',
-    description: 'Create or overwrite a reusable skill: a markdown instruction file that becomes discoverable by ListSkills immediately. Use for repeatable workflows (review checklists, release steps, project conventions). The skill is user-owned and can be edited later.',
+    description:
+      'Create or overwrite a reusable skill: a markdown instruction file that becomes discoverable by ListSkills immediately. Use for repeatable workflows (review checklists, release steps, project conventions). The skill is user-owned and can be edited later.',
     input_schema: {
       type: 'object',
       properties: {
         name: { type: 'string', description: 'Skill name (slugified into a directory name)' },
-        content: { type: 'string', description: 'Markdown body. Optionally start with YAML frontmatter (---\nname: ...\ndescription: ...\n---). If omitted, a name/description header is added automatically.' },
+        content: {
+          type: 'string',
+          description:
+            'Markdown body. Optionally start with YAML frontmatter (---\nname: ...\ndescription: ...\n---). If omitted, a name/description header is added automatically.',
+        },
       },
       required: ['name', 'content'],
       additionalProperties: false,
@@ -858,7 +1026,8 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   // ── Sub-agent orchestration （子代理控制） ─────
   {
     name: 'ListAgents',
-    description: 'List live agents and sub-agents: id, name, status, type, parent link, and any reports they sent via the Report tool. Use before SendMessage / InterruptAgent to resolve a target id.',
+    description:
+      'List live agents and sub-agents: id, name, status, type, parent link, and any reports they sent via the Report tool. Use before SendMessage / InterruptAgent to resolve a target id.',
     input_schema: {
       type: 'object',
       properties: {},
@@ -869,7 +1038,8 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   },
   {
     name: 'SendMessage',
-    description: 'Send a follow-up instruction to a running background sub-agent (from ListAgents). The instruction is queued and delivered at the agent\'s next turn boundary; returns immediately. Useful for steering a long-running child without waiting for it to finish.',
+    description:
+      "Send a follow-up instruction to a running background sub-agent (from ListAgents). The instruction is queued and delivered at the agent's next turn boundary; returns immediately. Useful for steering a long-running child without waiting for it to finish.",
     input_schema: {
       type: 'object',
       properties: {
@@ -883,7 +1053,8 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   },
   {
     name: 'InterruptAgent',
-    description: 'Interrupt a running agent or sub-agent by id (from ListAgents). The agent stops as soon as possible; background results can still be read with TaskOutput.',
+    description:
+      'Interrupt a running agent or sub-agent by id (from ListAgents). The agent stops as soon as possible; background results can still be read with TaskOutput.',
     input_schema: {
       type: 'object',
       properties: {
@@ -897,7 +1068,8 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   },
   {
     name: 'Report',
-    description: 'Send a progress report to the agent that started you. Call this zero or more times for findings, blockers, or partial results. Reporting does not finish your work; your direct parent reads reports via ListAgents.',
+    description:
+      'Send a progress report to the agent that started you. Call this zero or more times for findings, blockers, or partial results. Reporting does not finish your work; your direct parent reads reports via ListAgents.',
     input_schema: {
       type: 'object',
       properties: {
@@ -912,7 +1084,8 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   // ── Goal management （目标管理） ────────────
   {
     name: 'GetGoal',
-    description: 'Read the current durable goal for this run: text, phase (active/paused/completed/blocked/cleared), revision, rounds started, and round cap. Returns null when no goal exists.',
+    description:
+      'Read the current durable goal for this run: text, phase (active/paused/completed/blocked/cleared), revision, rounds started, and round cap. Returns null when no goal exists.',
     input_schema: {
       type: 'object',
       properties: {},
@@ -923,11 +1096,15 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   },
   {
     name: 'CreateGoal',
-    description: 'Create a durable goal for this run. Only succeeds when no active/completed goal exists (a cleared/completed goal can be replaced). The goal is injected into the prompt and bounded by maxRounds of execution.',
+    description:
+      'Create a durable goal for this run. Only succeeds when no active/completed goal exists (a cleared/completed goal can be replaced). The goal is injected into the prompt and bounded by maxRounds of execution.',
     input_schema: {
       type: 'object',
       properties: {
-        objective: { type: 'string', description: 'The concrete completion objective inferred from the direct human request' },
+        objective: {
+          type: 'string',
+          description: 'The concrete completion objective inferred from the direct human request',
+        },
         maxRounds: { type: 'number', description: 'Optional positive round cap for automatic continuation' },
       },
       required: ['objective'],
@@ -937,13 +1114,18 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   },
   {
     name: 'UpdateGoal',
-    description: 'Update the current goal revision. Actions: edit (replace objective / maxRounds), pause, resume, complete, blocked (with reason). Requires the exact goalId and revision from GetGoal.',
+    description:
+      'Update the current goal revision. Actions: edit (replace objective / maxRounds), pause, resume, complete, blocked (with reason). Requires the exact goalId and revision from GetGoal.',
     input_schema: {
       type: 'object',
       properties: {
         goalId: { type: 'string', description: 'Exact goal id returned by GetGoal' },
         revision: { type: 'number', description: 'Exact revision returned by GetGoal' },
-        action: { type: 'string', enum: ['edit', 'pause', 'resume', 'complete', 'blocked'], description: 'Operation to perform' },
+        action: {
+          type: 'string',
+          enum: ['edit', 'pause', 'resume', 'complete', 'blocked'],
+          description: 'Operation to perform',
+        },
         objective: { type: 'string', description: 'Replacement objective; valid only with action edit' },
         maxRounds: { type: 'number', description: 'Replacement round cap; valid only with action edit' },
         reason: { type: 'string', description: 'Blocking condition; required only with action blocked' },
@@ -957,7 +1139,8 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   // ── Runtime plugin mounting （运行时插件） ────────
   {
     name: 'MountPlugin',
-    description: 'Dynamically mount a plugin into the running app: register new tools the model can call in subsequent requests. Each tool needs a name, description, optional inputSchema, and a handler as a JS function body like `(input, ctx) => ({ echo: input.value })` or `async (input, ctx) => ...`. ctx exposes projectRoot, log, sleep and agents (run/start/list/send/interrupt). Handlers run in a restricted sandbox with no require/fs/process. Use UnmountPlugin to remove the plugin.',
+    description:
+      'Dynamically mount a plugin into the running app: register new tools the model can call in subsequent requests. Each tool needs a name, description, optional inputSchema, and a handler as a JS function body like `(input, ctx) => ({ echo: input.value })` or `async (input, ctx) => ...`. ctx exposes projectRoot, log, sleep and agents (run/start/list/send/interrupt). Handlers run in a restricted sandbox with no require/fs/process. Use UnmountPlugin to remove the plugin.',
     input_schema: {
       type: 'object',
       properties: {
@@ -988,7 +1171,8 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   },
   {
     name: 'UnmountPlugin',
-    description: 'Remove a dynamically mounted plugin (id from MountPlugin or InspectRuntime) and unregister all of its tools.',
+    description:
+      'Remove a dynamically mounted plugin (id from MountPlugin or InspectRuntime) and unregister all of its tools.',
     input_schema: {
       type: 'object',
       properties: {
@@ -1003,7 +1187,8 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   // ── Fresh-agent iterative loop （迭代循环） ────
   {
     name: 'Ralph',
-    description: 'Iterate toward an objective with a fresh sub-agent each round. Every round starts a brand-new agent with no conversation seed; the shared project directory is the durable memory, and each round reports progress, completion, or a blocker. Use ONLY when the user explicitly asks for a Ralph loop / fresh-agent iterative execution. For ordinary long tasks prefer goals; for bounded delegation prefer Agent or RunWorkflow.',
+    description:
+      'Iterate toward an objective with a fresh sub-agent each round. Every round starts a brand-new agent with no conversation seed; the shared project directory is the durable memory, and each round reports progress, completion, or a blocker. Use ONLY when the user explicitly asks for a Ralph loop / fresh-agent iterative execution. For ordinary long tasks prefer goals; for bounded delegation prefer Agent or RunWorkflow.',
     input_schema: {
       type: 'object',
       properties: {
@@ -1019,7 +1204,8 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   // ── Native PowerShell （PowerShell 执行） ─────────
   {
     name: 'Pwsh',
-    description: 'Execute a PowerShell command (powershell.exe on Windows, pwsh when available elsewhere). Returns stdout, stderr, and exit code. Use for PowerShell-specific work: modules, registry, pipelines, .ps1 scripts.',
+    description:
+      'Execute a PowerShell command (powershell.exe on Windows, pwsh when available elsewhere). Returns stdout, stderr, and exit code. Use for PowerShell-specific work: modules, registry, pipelines, .ps1 scripts.',
     input_schema: {
       type: 'object',
       properties: {
@@ -1036,12 +1222,16 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   // ── Session event tracing （会话事件检索） ─
   {
     name: 'SessionEventSearch',
-    description: 'Search the raw event stream of one session (agent run or chat) for matching text, tool names, inputs, outputs, errors, and system events. Returns matching events with sequence numbers for use with SessionEventRead.',
+    description:
+      'Search the raw event stream of one session (agent run or chat) for matching text, tool names, inputs, outputs, errors, and system events. Returns matching events with sequence numbers for use with SessionEventRead.',
     input_schema: {
       type: 'object',
       properties: {
         query: { type: 'string', description: 'Keyword or phrase to search (Chinese and English both work)' },
-        sessionId: { type: 'string', description: 'Session/agent id to search (optional — searches recent sessions when omitted)' },
+        sessionId: {
+          type: 'string',
+          description: 'Session/agent id to search (optional — searches recent sessions when omitted)',
+        },
         limit: { type: 'number', description: 'Max results (1-50, default 10)' },
       },
       required: ['query'],
@@ -1051,7 +1241,8 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   },
   {
     name: 'SessionEventRead',
-    description: 'Read one full raw event from a session event stream by its sequence number, with optional neighboring events before/after. Use seq values from SessionEventSearch or SessionTrace.',
+    description:
+      'Read one full raw event from a session event stream by its sequence number, with optional neighboring events before/after. Use seq values from SessionEventSearch or SessionTrace.',
     input_schema: {
       type: 'object',
       properties: {
@@ -1067,7 +1258,8 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   },
   {
     name: 'SessionTrace',
-    description: 'Read a session\'s lineage: its parent (branchedFrom), its children (forks), event count, and a condensed event summary. Use to understand how sessions relate before digging into events.',
+    description:
+      "Read a session's lineage: its parent (branchedFrom), its children (forks), event count, and a condensed event summary. Use to understand how sessions relate before digging into events.",
     input_schema: {
       type: 'object',
       properties: {
@@ -1082,7 +1274,8 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   // ── Background task listing （后台任务） ──
   {
     name: 'TaskList',
-    description: 'List background shell tasks (run_in_background Bash) and running agents/sub-agents with ids, status, commands, and timestamps. Use TaskOutput to read a task result and TaskStop to stop one. JobList/JobOutput/JobKill are equivalent 同一运行时的兼容命名.',
+    description:
+      'List background shell tasks (run_in_background Bash) and running agents/sub-agents with ids, status, commands, and timestamps. Use TaskOutput to read a task result and TaskStop to stop one. JobList/JobOutput/JobKill are equivalent 同一运行时的兼容命名.',
     input_schema: {
       type: 'object',
       properties: {},
@@ -1093,7 +1286,8 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   },
   {
     name: 'JobList',
-    description: 'List every background job the runtime knows about: background bash commands, terminal tasks, and running sub-agents. Same source as TaskList.',
+    description:
+      'List every background job the runtime knows about: background bash commands, terminal tasks, and running sub-agents. Same source as TaskList.',
     input_schema: {
       type: 'object',
       properties: {},
@@ -1104,7 +1298,8 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   },
   {
     name: 'JobOutput',
-    description: 'Read the accumulated output of a background job (bash task, terminal task, or sub-agent) by its id without blocking the turn.',
+    description:
+      'Read the accumulated output of a background job (bash task, terminal task, or sub-agent) by its id without blocking the turn.',
     input_schema: {
       type: 'object',
       properties: {

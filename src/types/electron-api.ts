@@ -14,19 +14,29 @@ import type {
   ChatSessionSummary,
   ProjectedChatSession,
 } from '../../electron/chat-log-types';
-import type {
-  BeliefRecord,
-  BeliefRejection,
-  EvidenceRecord,
-  ReadResultRecord,
-  SignalRecord,
-} from '../../electron/ipc/memory-db';
+import type { BeliefRecord, BeliefRejection, EvidenceRecord, SignalRecord } from '../../electron/ipc/memory-db';
 import type { MemoryReadResult, ReadTrace } from '../../electron/ipc/memory-read';
-import type { AuthChangePasswordParams, AuthLoginParams, AuthPhase, AuthSetupParams, AuthStatus } from '../../electron/contracts/auth';
+import type { MemoryItem } from '../stores/useMemoryStore';
+import type {
+  AuthChangePasswordParams,
+  AuthLoginParams,
+  AuthPhase,
+  AuthSetupParams,
+  AuthStatus,
+} from '../../electron/contracts/auth';
 import type { ProjectGlobalState } from '../../electron/contracts/project';
 
 // Re-export for convenience
-export type { ApiMessage, ApplyCodePayload, ApplyCodeResult, FileSearchResult, FileResult, DirectoryEntry, ModelDefinition, WorkspaceFileDiff };
+export type {
+  ApiMessage,
+  ApplyCodePayload,
+  ApplyCodeResult,
+  FileSearchResult,
+  FileResult,
+  DirectoryEntry,
+  ModelDefinition,
+  WorkspaceFileDiff,
+};
 export type { AuthPhase, AuthStatus, AuthSetupParams, AuthLoginParams, AuthChangePasswordParams };
 
 export interface AIStreamCallbacks {
@@ -124,18 +134,27 @@ export interface ElectronAPI {
   file: {
     open: (projectRoot?: string) => Promise<{ ok: boolean; data?: FileResult[]; error?: string }>;
     read: (filePath: string, projectRoot?: string) => Promise<{ ok: boolean; data?: string; error?: string }>;
-    estimateTokens: (files: string[], projectRoot?: string) => Promise<{
+    estimateTokens: (
+      files: string[],
+      projectRoot?: string,
+    ) => Promise<{
       ok: boolean;
       data?: { path: string; bytes: number; tokens: number | null; skipped?: 'binary' | 'too-large' }[];
       error?: string;
     }>;
-    readPreview: (filePath: string, projectRoot?: string) => Promise<{
+    readPreview: (
+      filePath: string,
+      projectRoot?: string,
+    ) => Promise<{
       ok: boolean;
       data?: { path: string; mime: string; base64: string; size: number };
       error?: string;
     }>;
     write: (filePath: string, content: string) => Promise<{ ok: boolean; error?: string }>;
-    search: (keyword: string, projectRoot: string) => Promise<{ ok: boolean; data?: FileSearchResult[]; error?: string }>;
+    search: (
+      keyword: string,
+      projectRoot: string,
+    ) => Promise<{ ok: boolean; data?: FileSearchResult[]; error?: string }>;
     delete: (filePath: string, projectRoot?: string) => Promise<{ ok: boolean; error?: string }>;
     rename: (oldPath: string, newPath: string, projectRoot?: string) => Promise<{ ok: boolean; error?: string }>;
     createFolder: (dirPath: string, projectRoot?: string) => Promise<{ ok: boolean; error?: string }>;
@@ -145,24 +164,29 @@ export interface ElectronAPI {
   project: {
     getTree: (projectRoot: string) => Promise<{ ok: boolean; data?: DirectoryEntry | null; error?: string }>;
     applyCode: (payload: ApplyCodePayload) => Promise<ApplyCodeResult>;
-    previewCode: (payload: ApplyCodePayload) => Promise<{ ok: boolean; url?: string; filePath?: string; error?: string }>;
+    previewCode: (
+      payload: ApplyCodePayload,
+    ) => Promise<{ ok: boolean; url?: string; filePath?: string; error?: string }>;
     selectDirectory: () => Promise<{ ok: boolean; data?: string | null; error?: string }>;
     loadGlobalState: () => Promise<{ ok: boolean; data?: ProjectGlobalState; error?: string }>;
     saveGlobalState: (state: ProjectGlobalState) => Promise<{ ok: boolean; error?: string }>;
   };
 
   ai: {
-    chatStream: (request: {
-      model: string;
-      messages: ApiMessage[];
-      isDeepThink: boolean;
-      reasoningEffort?: 'low' | 'high' | 'max';
-      isWebSearch: boolean;
-      apiKey?: string;
-      surface?: 'chat' | 'work' | 'code';
-      /** 对话前缀续写（Beta）：强制模型从给定 assistant 前缀继续输出。 */
-      prefix?: { content: string; stop?: string[] };
-    }, callbacks: AIStreamCallbacks) => AIStreamSubscription;
+    chatStream: (
+      request: {
+        model: string;
+        messages: ApiMessage[];
+        isDeepThink: boolean;
+        reasoningEffort?: 'low' | 'high' | 'max';
+        isWebSearch: boolean;
+        apiKey?: string;
+        surface?: 'chat' | 'work' | 'code';
+        /** 对话前缀续写（Beta）：强制模型从给定 assistant 前缀继续输出。 */
+        prefix?: { content: string; stop?: string[] };
+      },
+      callbacks: AIStreamCallbacks,
+    ) => AIStreamSubscription;
     abortStream: (requestId: string) => Promise<void>;
     /** FIM 补全（Beta）：中间填充，供编辑器/行内补全使用。 */
     fim: (params: {
@@ -172,38 +196,50 @@ export interface ElectronAPI {
       suffix?: string;
       maxTokens?: number;
     }) => Promise<{ ok: boolean; data?: { text: string }; error?: string }>;
-    sendQuery: (request: {
-      sessionId?: string;
-      model: string;
-      messages: ApiMessage[];
-      memoryContext?: string;
-      isDeepThink: boolean;
-      reasoningEffort?: 'low' | 'high' | 'max';
-      projectRoot: string;
-      autoApprove?: boolean;
-      mode?: 'ask' | 'plan' | 'auto';
-      apiKey?: string;
-      maxIterations?: number;
-      approvedPlanSteps?: string[];
-      surface?: 'chat' | 'work' | 'code';
-    }, callbacks: {
-      onEvent: (event: import('./tools').ToolStreamEvent) => void;
-      onDone: () => void;
-      onError: (error: string) => void;
-    }) => AIStreamSubscription;
+    sendQuery: (
+      request: {
+        sessionId?: string;
+        model: string;
+        messages: ApiMessage[];
+        memoryContext?: string;
+        isDeepThink: boolean;
+        reasoningEffort?: 'low' | 'high' | 'max';
+        projectRoot: string;
+        autoApprove?: boolean;
+        mode?: 'ask' | 'plan' | 'auto';
+        apiKey?: string;
+        maxIterations?: number;
+        approvedPlanSteps?: string[];
+        surface?: 'chat' | 'work' | 'code';
+      },
+      callbacks: {
+        onEvent: (event: import('./tools').ToolStreamEvent) => void;
+        onDone: () => void;
+        onError: (error: string) => void;
+      },
+    ) => AIStreamSubscription;
     abortQuery: (requestId: string) => Promise<void>;
     clearQueryContext: (sessionId: string) => Promise<{ ok: boolean; error?: string }>;
     abortTool: (requestId: string, toolCallId: string) => Promise<{ ok: boolean }>;
     retryTool: (requestId: string, toolName: string) => Promise<{ ok: boolean; error?: string }>;
     setApiKey: (apiKey: string) => Promise<void>;
-    testConnection: (apiKey: string) => Promise<{ ok: boolean; data?: { message: string; models?: string[] }; error?: string }>;
+    testConnection: (
+      apiKey: string,
+    ) => Promise<{ ok: boolean; data?: { message: string; models?: string[] }; error?: string }>;
   };
 
   context: {
-    getProjectContext: (projectRoot: string) => Promise<{ ok: boolean; data?: { instructionsMd: string; fileTree: string; packageJson: string }; error?: string }>;
+    getProjectContext: (projectRoot: string) => Promise<{
+      ok: boolean;
+      data?: { instructionsMd: string; fileTree: string; packageJson: string };
+      error?: string;
+    }>;
     getFileStructure: (projectRoot: string) => Promise<{ ok: boolean; data?: string; error?: string }>;
     readFile: (filePath: string, projectRoot?: string) => Promise<{ ok: boolean; data?: string; error?: string }>;
-    compact: (projectRoot: string, messages: { role: string; content: string }[]) => Promise<{
+    compact: (
+      projectRoot: string,
+      messages: { role: string; content: string }[],
+    ) => Promise<{
       ok: boolean;
       data?: {
         messages: { role: string; content: string }[];
@@ -224,13 +260,19 @@ export interface ElectronAPI {
       data?: { relPath: string; hasOverride: boolean; hasAgents: boolean }[];
       error?: string;
     }>;
-    get: (projectRoot: string, relPath?: string) => Promise<{
+    get: (
+      projectRoot: string,
+      relPath?: string,
+    ) => Promise<{
       ok: boolean;
       data?: { path: string; content: string; relPath: string };
       error?: string;
     }>;
-    set: (projectRoot: string, relPath: string | undefined, content: string) =>
-      Promise<{ ok: boolean; error?: string }>;
+    set: (
+      projectRoot: string,
+      relPath: string | undefined,
+      content: string,
+    ) => Promise<{ ok: boolean; error?: string }>;
   };
 
   connectors: {
@@ -239,17 +281,19 @@ export interface ElectronAPI {
       data?: { kind: 'slack' | 'drive' | 'notion'; configured: boolean; tokenHint?: string }[];
       error?: string;
     }>;
-    setToken: (kind: 'slack' | 'drive' | 'notion', token: string) =>
-      Promise<{ ok: boolean; error?: string }>;
-    test: (kind: 'slack' | 'drive' | 'notion') =>
-      Promise<{ ok: boolean; data?: { ok: boolean; message: string }; error?: string }>;
+    setToken: (kind: 'slack' | 'drive' | 'notion', token: string) => Promise<{ ok: boolean; error?: string }>;
+    test: (
+      kind: 'slack' | 'drive' | 'notion',
+    ) => Promise<{ ok: boolean; data?: { ok: boolean; message: string }; error?: string }>;
   };
 
   permission: {
     respond: (requestId: string, allowed: boolean) => Promise<{ ok: boolean }>;
     addRule: (rule: import('./advanced').PermissionRule, requestId: string) => Promise<{ ok: boolean }>;
     getRules: () => Promise<{ ok: boolean; data?: import('./advanced').PermissionRule[] }>;
-    removeRule: (ruleId: string) => Promise<{ ok: boolean; data?: import('./advanced').PermissionRule[]; error?: string }>;
+    removeRule: (
+      ruleId: string,
+    ) => Promise<{ ok: boolean; data?: import('./advanced').PermissionRule[]; error?: string }>;
     clearRules: () => Promise<{ ok: boolean }>;
     onRequest: (callback: (request: import('./advanced').PermissionRequest) => void) => () => void;
   };
@@ -282,23 +326,33 @@ export interface ElectronAPI {
     disconnect: (serverId: string) => Promise<{ ok: boolean; data?: import('./advanced').MCPStatus }>;
     getStatuses: () => Promise<{ ok: boolean; data?: import('./advanced').MCPStatus[] }>;
     listTools: (serverId: string) => Promise<{ ok: boolean; data?: import('./advanced').MCPToolDef[]; error?: string }>;
-    callTool: (serverName: string, toolName: string, args: Record<string, unknown>) => Promise<{ ok: boolean; data?: unknown; error?: string }>;
+    callTool: (
+      serverName: string,
+      toolName: string,
+      args: Record<string, unknown>,
+    ) => Promise<{ ok: boolean; data?: unknown; error?: string }>;
   };
 
   agent: {
-    create: (request: import('./advanced').AgentCreateRequest) => Promise<{ ok: boolean; data?: import('./advanced').AgentInfo }>;
-    start: (config: any, projectPath: string) => Promise<{ ok: boolean; data?: { agentId: string } }>;
+    create: (
+      request: import('./advanced').AgentCreateRequest,
+    ) => Promise<{ ok: boolean; data?: import('./advanced').AgentInfo }>;
+    start: (config: unknown, projectPath: string) => Promise<{ ok: boolean; data?: { agentId: string } }>;
     stop: (agentId: string) => Promise<{ ok: boolean }>;
     schedulerStop: (agentId: string) => Promise<{ ok: boolean }>;
     pause: (agentId: string) => Promise<{ ok: boolean; data?: { paused: boolean } }>;
     resume: (agentId: string) => Promise<{ ok: boolean; data?: { resumed: boolean } }>;
-    continue: (agentId: string, instruction: string, displayInstruction?: string) => Promise<{ ok: boolean; data?: { continued: boolean }; error?: string }>;
+    continue: (
+      agentId: string,
+      instruction: string,
+      displayInstruction?: string,
+    ) => Promise<{ ok: boolean; data?: { continued: boolean }; error?: string }>;
     approveDelivery: (agentId: string) => Promise<{ ok: boolean; data?: { approved: boolean }; error?: string }>;
     setPriority: (agentId: string, priority: string) => Promise<{ ok: boolean }>;
-    getQueue: () => Promise<{ ok: boolean; data?: { running: any[]; queued: any[] } }>;
+    getQueue: () => Promise<{ ok: boolean; data?: { running: unknown[]; queued: unknown[] } }>;
     setMaxConcurrent: (n: number) => Promise<{ ok: boolean }>;
-    getAll: () => Promise<{ ok: boolean; data?: any[] }>;
-    getState: (agentId: string) => Promise<{ ok: boolean; data?: any }>;
+    getAll: () => Promise<{ ok: boolean; data?: unknown[] }>;
+    getState: (agentId: string) => Promise<{ ok: boolean; data?: unknown }>;
     list: () => Promise<{ ok: boolean; data?: import('./advanced').AgentInfo[] }>;
     get: (agentId: string) => Promise<{ ok: boolean; data?: import('./advanced').AgentInfo; error?: string }>;
     remove: (agentId: string) => Promise<{ ok: boolean }>;
@@ -309,7 +363,11 @@ export interface ElectronAPI {
   };
 
   worktree: {
-    getStatus: (sessionKey: string) => Promise<{ ok: boolean; data?: { active: boolean; sandboxPath: string | null; sessionKey: string }; error?: string }>;
+    getStatus: (sessionKey: string) => Promise<{
+      ok: boolean;
+      data?: { active: boolean; sandboxPath: string | null; sessionKey: string };
+      error?: string;
+    }>;
     onChanged: (callback: (data: { active: boolean; sandboxPath?: string; taskId?: string }) => void) => () => void;
   };
 
@@ -322,10 +380,10 @@ export interface ElectronAPI {
   };
 
   memory: {
-    extract: (sessionContext: any) => Promise<{ ok: boolean; data?: any[]; error?: string }>;
-    getByProject: (projectPath: string) => Promise<{ ok: boolean; data?: any[]; error?: string }>;
-    getByType: (projectPath: string, type: string) => Promise<{ ok: boolean; data?: any[]; error?: string }>;
-    search: (projectPath: string, query: string) => Promise<{ ok: boolean; data?: any[]; error?: string }>;
+    extract: (sessionContext: unknown) => Promise<{ ok: boolean; data?: MemoryItem[]; error?: string }>;
+    getByProject: (projectPath: string) => Promise<{ ok: boolean; data?: MemoryItem[]; error?: string }>;
+    getByType: (projectPath: string, type: string) => Promise<{ ok: boolean; data?: MemoryItem[]; error?: string }>;
+    search: (projectPath: string, query: string) => Promise<{ ok: boolean; data?: MemoryItem[]; error?: string }>;
     archive: (id: string) => Promise<{ ok: boolean; error?: string }>;
     delete: (id: string) => Promise<{ ok: boolean; error?: string }>;
     evidenceList: (projectPath: string) => Promise<{ ok: boolean; data?: EvidenceRecord[]; error?: string }>;
@@ -334,8 +392,11 @@ export interface ElectronAPI {
       data?: { evidence: EvidenceRecord; signals: SignalRecord[] } | null;
       error?: string;
     }>;
-    readForQuery: (projectPath: string, query: string, opts?: unknown) =>
-      Promise<{ ok: boolean; data?: MemoryReadResult; error?: string }>;
+    readForQuery: (
+      projectPath: string,
+      query: string,
+      opts?: unknown,
+    ) => Promise<{ ok: boolean; data?: MemoryReadResult; error?: string }>;
     beliefAudit: (id: string) => Promise<{
       ok: boolean;
       data?: {
@@ -345,7 +406,15 @@ export interface ElectronAPI {
           support_strength: number;
           signals: SignalRecord[];
         }[];
-        revisions: { id: string; belief_id: string; prev_status: string | null; next_status: string; reason: string | null; actor: string; ts: number }[];
+        revisions: {
+          id: string;
+          belief_id: string;
+          prev_status: string | null;
+          next_status: string;
+          reason: string | null;
+          actor: string;
+          ts: number;
+        }[];
       } | null;
       error?: string;
     }>;
@@ -356,43 +425,81 @@ export interface ElectronAPI {
       data?: { signals: number; beliefsChecked: number; rejected: number };
       error?: string;
     }>;
-    graph: (projectPath: string, role?: string, agent?: { id?: string; name?: string }) =>
-      Promise<{ ok: boolean; data?: any; error?: string }>;
+    graph: (
+      projectPath: string,
+      role?: string,
+      agent?: { id?: string; name?: string },
+    ) => Promise<{ ok: boolean; data?: unknown; error?: string }>;
     rejections: (projectPath: string) => Promise<{ ok: boolean; data?: BeliefRejection[]; error?: string }>;
   };
 
   conflict: {
-    getConflicts: () => Promise<{ ok: boolean; data?: any[]; error?: string }>;
-    getFileHistory: (filePath: string) => Promise<{ ok: boolean; data?: any[]; error?: string }>;
+    getConflicts: () => Promise<{
+      ok: boolean;
+      data?: import('../../electron/ipc/conflict-detector').Conflict[];
+      error?: string;
+    }>;
+    getFileHistory: (filePath: string) => Promise<{
+      ok: boolean;
+      data?: import('../../electron/ipc/conflict-detector').FileOperation[];
+      error?: string;
+    }>;
   };
 
   plan: {
     approve: (planId: string, approvedStepIds: string[]) => Promise<{ ok: boolean; error?: string }>;
     reject: (planId: string) => Promise<{ ok: boolean; error?: string }>;
-    list: (projectRoot?: string) => Promise<{ ok: boolean; data?: { path: string; name: string; relative?: string; createdAt: number }[]; error?: string }>;
-    onGenerated: (callback: (data: { planId: string; steps: { id: string; toolName: string; description: string; parameters: Record<string, unknown> }[]; filePath?: string; agentId?: string }) => void) => () => void;
+    list: (projectRoot?: string) => Promise<{
+      ok: boolean;
+      data?: { path: string; name: string; relative?: string; createdAt: number }[];
+      error?: string;
+    }>;
+    onGenerated: (
+      callback: (data: {
+        planId: string;
+        steps: { id: string; toolName: string; description: string; parameters: Record<string, unknown> }[];
+        filePath?: string;
+        agentId?: string;
+      }) => void,
+    ) => () => void;
   };
 
   undo: {
-    getHistory: (sessionId?: string) => Promise<{ ok: boolean; data?: any[]; error?: string }>;
-    getList: () => Promise<{ ok: boolean; data?: any[]; error?: string }>;
-    getSessionDiffs: (sessionId: string, projectRoot: string) => Promise<{ ok: boolean; data?: WorkspaceFileDiff[]; error?: string }>;
-    revertSessionFile: (sessionId: string, relPath: string, projectRoot: string) => Promise<{ ok: boolean; data?: { reverted: number }; error?: string }>;
+    getHistory: (sessionId?: string) => Promise<{ ok: boolean; data?: unknown[]; error?: string }>;
+    getList: () => Promise<{ ok: boolean; data?: unknown[]; error?: string }>;
+    getSessionDiffs: (
+      sessionId: string,
+      projectRoot: string,
+    ) => Promise<{ ok: boolean; data?: WorkspaceFileDiff[]; error?: string }>;
+    revertSessionFile: (
+      sessionId: string,
+      relPath: string,
+      projectRoot: string,
+    ) => Promise<{ ok: boolean; data?: { reverted: number }; error?: string }>;
     execute: (fileId: string, projectRoot: string) => Promise<{ ok: boolean; error?: string }>;
     revert: (fileId: string, projectRoot: string) => Promise<{ ok: boolean; error?: string }>;
     revertLast: (projectRoot: string) => Promise<{ ok: boolean; error?: string }>;
-    revertSessions: (sessionIds: string[], projectRoot: string) => Promise<{ ok: boolean; data?: { reverted: number }; error?: string }>;
+    revertSessions: (
+      sessionIds: string[],
+      projectRoot: string,
+    ) => Promise<{ ok: boolean; data?: { reverted: number }; error?: string }>;
   };
 
   snapshot: {
     create: (projectRoot: string, name: string) => Promise<{ ok: boolean; data?: NamedSnapshot; error?: string }>;
     list: (projectRoot: string) => Promise<{ ok: boolean; data?: NamedSnapshot[]; error?: string }>;
-    restore: (id: string, projectRoot: string) => Promise<{ ok: boolean; data?: { restored: number; skipped: number }; error?: string }>;
+    restore: (
+      id: string,
+      projectRoot: string,
+    ) => Promise<{ ok: boolean; data?: { restored: number; skipped: number }; error?: string }>;
     delete: (id: string, projectRoot: string) => Promise<{ ok: boolean; error?: string }>;
   };
 
   lint: {
-    fix: (projectRoot: string, files?: string[]) => Promise<{ ok: boolean; data?: { exitCode: number | null; output: string }; error?: string }>;
+    fix: (
+      projectRoot: string,
+      files?: string[],
+    ) => Promise<{ ok: boolean; data?: { exitCode: number | null; output: string }; error?: string }>;
   };
 
   settings: {
@@ -429,31 +536,85 @@ export interface ElectronAPI {
     }>;
   };
   goal: {
-    get: (sessionId: string) => Promise<{ ok: boolean; data?: import('./agent').AgentGoalState | null; error?: string }>;
-    create: (sessionId: string, text: string, maxRounds?: number) => Promise<{ ok: boolean; data?: import('./agent').AgentGoalState | null; error?: string }>;
-    edit: (sessionId: string, text: string) => Promise<{ ok: boolean; data?: import('./agent').AgentGoalState | null; error?: string }>;
-    pause: (sessionId: string) => Promise<{ ok: boolean; data?: import('./agent').AgentGoalState | null; error?: string }>;
-    resume: (sessionId: string) => Promise<{ ok: boolean; data?: import('./agent').AgentGoalState | null; error?: string }>;
-    complete: (sessionId: string) => Promise<{ ok: boolean; data?: import('./agent').AgentGoalState | null; error?: string }>;
-    block: (sessionId: string, reason: string) => Promise<{ ok: boolean; data?: import('./agent').AgentGoalState | null; error?: string }>;
-    clear: (sessionId: string) => Promise<{ ok: boolean; data?: import('./agent').AgentGoalState | null; error?: string }>;
-    round: (sessionId: string) => Promise<{ ok: boolean; data?: import('./agent').AgentGoalState | null; error?: string }>;
+    get: (
+      sessionId: string,
+    ) => Promise<{ ok: boolean; data?: import('./agent').AgentGoalState | null; error?: string }>;
+    create: (
+      sessionId: string,
+      text: string,
+      maxRounds?: number,
+    ) => Promise<{ ok: boolean; data?: import('./agent').AgentGoalState | null; error?: string }>;
+    edit: (
+      sessionId: string,
+      text: string,
+    ) => Promise<{ ok: boolean; data?: import('./agent').AgentGoalState | null; error?: string }>;
+    pause: (
+      sessionId: string,
+    ) => Promise<{ ok: boolean; data?: import('./agent').AgentGoalState | null; error?: string }>;
+    resume: (
+      sessionId: string,
+    ) => Promise<{ ok: boolean; data?: import('./agent').AgentGoalState | null; error?: string }>;
+    complete: (
+      sessionId: string,
+    ) => Promise<{ ok: boolean; data?: import('./agent').AgentGoalState | null; error?: string }>;
+    block: (
+      sessionId: string,
+      reason: string,
+    ) => Promise<{ ok: boolean; data?: import('./agent').AgentGoalState | null; error?: string }>;
+    clear: (
+      sessionId: string,
+    ) => Promise<{ ok: boolean; data?: import('./agent').AgentGoalState | null; error?: string }>;
+    round: (
+      sessionId: string,
+    ) => Promise<{ ok: boolean; data?: import('./agent').AgentGoalState | null; error?: string }>;
   };
   cron: {
-    create: (params: { name: string; prompt: string; cron: string; recurring: boolean }) => Promise<{ ok: boolean; data?: { jobId: string; nextFireAt: number }; error?: string }>;
+    create: (params: {
+      name: string;
+      prompt: string;
+      cron: string;
+      recurring: boolean;
+    }) => Promise<{ ok: boolean; data?: { jobId: string; nextFireAt: number }; error?: string }>;
     delete: (jobId: string) => Promise<{ ok: boolean; error?: string }>;
-    list: () => Promise<{ ok: boolean; data?: { id: string; name: string; cron: string; recurring: boolean; nextFireAt: number; firedCount: number; createdAt: number; lastRun?: { at: number; status: string; result?: string; error?: string } }[]; error?: string }>;
+    list: () => Promise<{
+      ok: boolean;
+      data?: {
+        id: string;
+        name: string;
+        cron: string;
+        recurring: boolean;
+        nextFireAt: number;
+        firedCount: number;
+        createdAt: number;
+        lastRun?: { at: number; status: string; result?: string; error?: string };
+      }[];
+      error?: string;
+    }>;
   };
   credentials: {
-    describe: (name: string, projectRoot?: string) => Promise<{ ok: boolean; data?: { configured: boolean; source?: 'env' | 'user-env' | 'project-env'; writable: boolean }; error?: string }>;
+    describe: (
+      name: string,
+      projectRoot?: string,
+    ) => Promise<{
+      ok: boolean;
+      data?: { configured: boolean; source?: 'env' | 'user-env' | 'project-env'; writable: boolean };
+      error?: string;
+    }>;
     set: (name: string, value: string) => Promise<{ ok: boolean; error?: string }>;
     unset: (name: string) => Promise<{ ok: boolean; error?: string }>;
   };
   actions: {
-    list: (projectRoot: string) => Promise<{ ok: boolean; data?: { name: string; command: string; platform?: string }[]; error?: string }>;
+    list: (
+      projectRoot: string,
+    ) => Promise<{ ok: boolean; data?: { name: string; command: string; platform?: string }[]; error?: string }>;
   };
   terminal: {
-    create: (payload: { id: string; cwd?: string; cols?: number; rows?: number }) => Promise<{ ok: boolean; error?: string }>;
+    create: (payload: {
+      id: string;
+      cwd?: string;
+      cols?: number;
+      rows?: number;
+    }) => Promise<{ ok: boolean; error?: string }>;
     input: (id: string, data: string) => Promise<{ ok: boolean }>;
     resize: (id: string, cols: number, rows: number) => Promise<{ ok: boolean }>;
     kill: (id: string) => Promise<{ ok: boolean }>;
@@ -472,22 +633,95 @@ export interface ElectronAPI {
     onExit: (agentId: string, cb: () => void) => () => void;
   };
   ssh: {
-    list: () => Promise<{ ok: boolean; data?: { id: string; name: string; host: string; port: number; username: string; keyPath?: string; useAgent?: boolean; createdAt: number }[]; error?: string }>;
-    save: (conn: { id?: string; name?: string; host: string; port?: number; username?: string; keyPath?: string; useAgent?: boolean }) => Promise<{ ok: boolean; data?: { id: string; name: string; host: string; port: number; username: string; keyPath?: string; useAgent?: boolean; createdAt: number }[]; error?: string }>;
-    remove: (id: string) => Promise<{ ok: boolean; data?: { id: string; name: string; host: string; port: number; username: string; keyPath?: string; useAgent?: boolean; createdAt: number }[]; error?: string }>;
-    test: (conn: { id?: string; name?: string; host: string; port?: number; username?: string; keyPath?: string; useAgent?: boolean }) => Promise<{ ok: boolean; data?: { output: string }; error?: string }>;
-    exec: (conn: { id?: string; name?: string; host: string; port?: number; username?: string; keyPath?: string; useAgent?: boolean }, command: string) => Promise<{ ok: boolean; data?: { output: string }; error?: string }>;
+    list: () => Promise<{
+      ok: boolean;
+      data?: {
+        id: string;
+        name: string;
+        host: string;
+        port: number;
+        username: string;
+        keyPath?: string;
+        useAgent?: boolean;
+        createdAt: number;
+      }[];
+      error?: string;
+    }>;
+    save: (conn: {
+      id?: string;
+      name?: string;
+      host: string;
+      port?: number;
+      username?: string;
+      keyPath?: string;
+      useAgent?: boolean;
+    }) => Promise<{
+      ok: boolean;
+      data?: {
+        id: string;
+        name: string;
+        host: string;
+        port: number;
+        username: string;
+        keyPath?: string;
+        useAgent?: boolean;
+        createdAt: number;
+      }[];
+      error?: string;
+    }>;
+    remove: (id: string) => Promise<{
+      ok: boolean;
+      data?: {
+        id: string;
+        name: string;
+        host: string;
+        port: number;
+        username: string;
+        keyPath?: string;
+        useAgent?: boolean;
+        createdAt: number;
+      }[];
+      error?: string;
+    }>;
+    test: (conn: {
+      id?: string;
+      name?: string;
+      host: string;
+      port?: number;
+      username?: string;
+      keyPath?: string;
+      useAgent?: boolean;
+    }) => Promise<{ ok: boolean; data?: { output: string }; error?: string }>;
+    exec: (
+      conn: {
+        id?: string;
+        name?: string;
+        host: string;
+        port?: number;
+        username?: string;
+        keyPath?: string;
+        useAgent?: boolean;
+      },
+      command: string,
+    ) => Promise<{ ok: boolean; data?: { output: string }; error?: string }>;
   };
   rules: {
-    list: (projectRoot?: string) => Promise<{ ok: boolean; data?: { pattern: string[]; decision: 'allow' | 'deny' | 'prompt'; justification?: string; source: string }[]; error?: string }>;
+    list: (projectRoot?: string) => Promise<{
+      ok: boolean;
+      data?: { pattern: string[]; decision: 'allow' | 'deny' | 'prompt'; justification?: string; source: string }[];
+      error?: string;
+    }>;
   };
   sessionLog: {
     read: (agentId: string) => Promise<{ ok: boolean; data?: Record<string, unknown>[]; error?: string }>;
     project: (agentId: string) => Promise<{ ok: boolean; data?: ProjectedChatSession | null; error?: string }>;
   };
   chatLog: {
-    append: (sessionId: string, events: Array<Omit<ChatLogEvent, 'seq'>>, projectRoot?: string) =>
-      Promise<{ ok: boolean; error?: string }>;
+    append: (
+      sessionId: string,
+      events: Array<Omit<ChatLogEvent, 'seq'>>,
+      projectRoot?: string,
+    ) => Promise<{ ok: boolean; error?: string }>;
     read: (sessionId: string) => Promise<{ ok: boolean; data?: ChatLogEvent[]; error?: string }>;
     list: () => Promise<{ ok: boolean; data?: ChatSessionSummary[]; error?: string }>;
     project: (sessionId: string) => Promise<{ ok: boolean; data?: ProjectedChatSession | null; error?: string }>;
@@ -496,19 +730,67 @@ export interface ElectronAPI {
     meta: (sessionId: string, meta: ChatSessionMeta) => Promise<{ ok: boolean; error?: string }>;
   };
   workflow: {
-    list: (projectRoot?: string) => Promise<{ ok: boolean; data?: { id: string; name: string; description?: string; steps: { id: string; name: string; agentType?: string; prompt: string; dependsOn?: string[] }[] }[]; error?: string }>;
-    run: (payload: { workflowId: string; projectRoot: string }) => Promise<{ ok: boolean; data?: { runId: string }; error?: string }>;
-    get: (runId: string) => Promise<{ ok: boolean; data?: { runId: string; workflowId: string; workflowName: string; status: string; startedAt: number; endedAt?: number; steps: Record<string, { status: string; result?: string; error?: string; agentId?: string }> }; error?: string }>;
-    runs: (workflowId?: string) => Promise<{ ok: boolean; data?: { runId: string; workflowId: string; workflowName: string; status: string; startedAt: number; endedAt?: number; steps: Record<string, { status: string; result?: string; error?: string; agentId?: string }> }[]; error?: string }>;
+    list: (projectRoot?: string) => Promise<{
+      ok: boolean;
+      data?: {
+        id: string;
+        name: string;
+        description?: string;
+        steps: { id: string; name: string; agentType?: string; prompt: string; dependsOn?: string[] }[];
+      }[];
+      error?: string;
+    }>;
+    run: (payload: {
+      workflowId: string;
+      projectRoot: string;
+    }) => Promise<{ ok: boolean; data?: { runId: string }; error?: string }>;
+    get: (runId: string) => Promise<{
+      ok: boolean;
+      data?: {
+        runId: string;
+        workflowId: string;
+        workflowName: string;
+        status: string;
+        startedAt: number;
+        endedAt?: number;
+        steps: Record<string, { status: string; result?: string; error?: string; agentId?: string }>;
+      };
+      error?: string;
+    }>;
+    runs: (workflowId?: string) => Promise<{
+      ok: boolean;
+      data?: {
+        runId: string;
+        workflowId: string;
+        workflowName: string;
+        status: string;
+        startedAt: number;
+        endedAt?: number;
+        steps: Record<string, { status: string; result?: string; error?: string; agentId?: string }>;
+      }[];
+      error?: string;
+    }>;
   };
   fts: {
-    search: (query: string, limit?: number) => Promise<{ ok: boolean; data?: { type: 'chat' | 'agent'; id: string; title: string; snippet: string; ts: number; score: number }[]; error?: string }>;
+    search: (
+      query: string,
+      limit?: number,
+    ) => Promise<{
+      ok: boolean;
+      data?: { type: 'chat' | 'agent'; id: string; title: string; snippet: string; ts: number; score: number }[];
+      error?: string;
+    }>;
     rebuild: () => Promise<{ ok: boolean; data?: { indexed: number }; error?: string }>;
   };
   feedback: {
     submit: (text: string) => Promise<{ ok: boolean; error?: string }>;
-    message: (record: { messageId: string; sessionId: string; rating: 'up' | 'down' | null; note?: string; projectPath?: string }) =>
-      Promise<{ ok: boolean; error?: string }>;
+    message: (record: {
+      messageId: string;
+      sessionId: string;
+      rating: 'up' | 'down' | null;
+      note?: string;
+      projectPath?: string;
+    }) => Promise<{ ok: boolean; error?: string }>;
     messageList: (sessionId: string) => Promise<{
       ok: boolean;
       data?: { messageId: string; sessionId: string; rating: 'up' | 'down' | null; note?: string; ts: number }[];
@@ -525,7 +807,9 @@ export interface ElectronAPI {
 
   system: {
     getStats: () => Promise<{ ok: boolean; data?: SystemStats; error?: string }>;
-    getGitBranches: (projectRoot: string) => Promise<{ ok: boolean; data?: { current: string; branches: string[] }; error?: string }>;
+    getGitBranches: (
+      projectRoot: string,
+    ) => Promise<{ ok: boolean; data?: { current: string; branches: string[] }; error?: string }>;
     getVersion: () => Promise<{ ok: boolean; data?: string; error?: string }>;
     getAccountInfo: (apiKey: string) => Promise<{
       ok: boolean;
@@ -539,7 +823,7 @@ export interface ElectronAPI {
   };
 
   browser?: {
-    onRefresh?: (callback: (data: any) => void) => () => void;
+    onRefresh?: (callback: (data: unknown) => void) => () => void;
   };
 
   app?: {

@@ -24,10 +24,7 @@ const OUTPUT_CAP = 50_000;
 
 function shellForPlatform(): string {
   if (process.platform === 'win32') {
-    const candidates = [
-      'C:\\Program Files\\Git\\bin\\bash.exe',
-      'C:\\Program Files (x86)\\Git\\bin\\bash.exe',
-    ];
+    const candidates = ['C:\\Program Files\\Git\\bin\\bash.exe', 'C:\\Program Files (x86)\\Git\\bin\\bash.exe'];
     for (const p of candidates) {
       if (existsSync(p)) return p;
     }
@@ -79,7 +76,10 @@ export async function runBashPersistent(
   command: string,
   workdir: string,
   ctx: BashSessionCtx,
-): Promise<{ output: { stdout: string; stderr: string; exitCode: number | null; durationMs: number }; error?: string } | null> {
+): Promise<{
+  output: { stdout: string; stderr: string; exitCode: number | null; durationMs: number };
+  error?: string;
+} | null> {
   const owner = ctx.agentId || ctx.requestId;
   if (!owner) return null;
   const sessionId = `bash-${owner}`;
@@ -135,7 +135,12 @@ export async function runBashPersistent(
       if (Date.now() - startedAt > MAX_WAIT_MS) {
         ptyRegistry.close(sessionId, owner);
         return {
-          output: { stdout: output.slice(0, OUTPUT_CAP), stderr: '', exitCode: null, durationMs: Date.now() - startedAt },
+          output: {
+            stdout: output.slice(0, OUTPUT_CAP),
+            stderr: '',
+            exitCode: null,
+            durationMs: Date.now() - startedAt,
+          },
           error: '命令执行超过 30 分钟，已终止持久会话',
         };
       }
@@ -143,7 +148,10 @@ export async function runBashPersistent(
 
     if (ctx.abortSignal?.aborted) {
       ptyRegistry.close(sessionId, owner);
-      return { output: { stdout: '', stderr: '', exitCode: null, durationMs: Date.now() - startedAt }, error: '用户手动中止' };
+      return {
+        output: { stdout: '', stderr: '', exitCode: null, durationMs: Date.now() - startedAt },
+        error: '用户手动中止',
+      };
     }
 
     const text = settled ? settled.text : output;
@@ -158,7 +166,11 @@ export async function runBashPersistent(
     };
   } catch {
     // Any PTY failure falls back to the one-shot executor.
-    try { ptyRegistry.close(sessionId, owner); } catch { /* best effort */ }
+    try {
+      ptyRegistry.close(sessionId, owner);
+    } catch {
+      /* best effort */
+    }
     return null;
   }
 }

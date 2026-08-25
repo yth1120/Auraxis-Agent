@@ -47,10 +47,7 @@ export async function writeSpill(
   const tool = safeSegment(meta.toolName, 'tool');
   const targetDir = path.join(dir, session);
   await fs.mkdir(targetDir, { recursive: true });
-  const file = path.join(
-    targetDir,
-    `${tool}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.txt`,
-  );
+  const file = path.join(targetDir, `${tool}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.txt`);
   await fs.writeFile(file, content, 'utf8');
   return { path: file, bytes: Buffer.byteLength(content, 'utf8') };
 }

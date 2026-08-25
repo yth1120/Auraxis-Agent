@@ -66,9 +66,8 @@ export async function getHooks(projectRoot?: string): Promise<Partial<Record<Hoo
   // 项目目录内的 hooks 默认不执行：打开不受信任仓库可能自动执行任意命令。
   // 只有显式设置 AURAXIS_TRUST_PROJECT_HOOKS=1 才加载项目层 hooks。
   const trustProjectHooks = process.env.AURAXIS_TRUST_PROJECT_HOOKS === '1';
-  const project = projectRoot && trustProjectHooks
-    ? await readHooksFile(path.join(projectRoot, '.auraxis', 'hooks.json'))
-    : null;
+  const project =
+    projectRoot && trustProjectHooks ? await readHooksFile(path.join(projectRoot, '.auraxis', 'hooks.json')) : null;
   for (const layer of [user, project]) {
     if (!layer) continue;
     for (const [event, hooks] of Object.entries(layer)) {
@@ -93,34 +92,46 @@ function hookEnv(payload: Record<string, unknown>): Record<string, string> {
 }
 
 export function runHook(config: HookConfig, payload: Record<string, unknown>, cwd?: string): Promise<HookRunResult> {
-  return getShellExecutor().run({
-    command: config.command,
-    shell: true,
-    cwd: cwd || process.cwd(),
-    env: hookEnv(payload),
-    stdin: JSON.stringify(payload),
-    timeoutMs: config.timeout ?? 10_000,
-  }).then((result) => {
-    const output = [result.stdout, result.stderr].filter(Boolean).join('\n').trim();
-    let protocol: HookRunResult['protocol'];
-    try {
-      const parsed = JSON.parse(result.stdout.trim());
-      if (parsed && typeof parsed === 'object' && (
-        parsed.decision !== undefined
-        || parsed.continue !== undefined
-        || parsed.stopReason !== undefined
-        || parsed.additionalContext !== undefined
-      )) {
-        protocol = {
-          ...(parsed.decision === 'allow' || parsed.decision === 'block' ? { decision: parsed.decision } : {}),
-          ...(typeof parsed.continue === 'boolean' ? { continue: parsed.continue } : {}),
-          ...(typeof parsed.stopReason === 'string' ? { stopReason: parsed.stopReason } : {}),
-          ...(typeof parsed.additionalContext === 'string' ? { additionalContext: parsed.additionalContext } : {}),
-        };
+  return getShellExecutor()
+    .run({
+      command: config.command,
+      shell: true,
+      cwd: cwd || process.cwd(),
+      env: hookEnv(payload),
+      stdin: JSON.stringify(payload),
+      timeoutMs: config.timeout ?? 10_000,
+    })
+    .then((result) => {
+      const output = [result.stdout, result.stderr].filter(Boolean).join('\n').trim();
+      let protocol: HookRunResult['protocol'];
+      try {
+        const parsed = JSON.parse(result.stdout.trim());
+        if (
+          parsed &&
+          typeof parsed === 'object' &&
+          (parsed.decision !== undefined ||
+            parsed.continue !== undefined ||
+            parsed.stopReason !== undefined ||
+            parsed.additionalContext !== undefined)
+        ) {
+          protocol = {
+            ...(parsed.decision === 'allow' || parsed.decision === 'block' ? { decision: parsed.decision } : {}),
+            ...(typeof parsed.continue === 'boolean' ? { continue: parsed.continue } : {}),
+            ...(typeof parsed.stopReason === 'string' ? { stopReason: parsed.stopReason } : {}),
+            ...(typeof parsed.additionalContext === 'string' ? { additionalContext: parsed.additionalContext } : {}),
+          };
+        }
+      } catch {
+        /* plain-text hook output */
       }
-    } catch { /* plain-text hook output */ }
-    return { ok: result.exitCode === 0, output, code: result.exitCode, timedOut: result.timedOut, ...(protocol ? { protocol } : {}) };
-  });
+      return {
+        ok: result.exitCode === 0,
+        output,
+        code: result.exitCode,
+        timedOut: result.timedOut,
+        ...(protocol ? { protocol } : {}),
+      };
+    });
 }
 
 export interface HooksDispatch {
@@ -130,7 +141,11 @@ export interface HooksDispatch {
 }
 
 /** Run every hook registered for an event. PreToolUse blocks on non-zero exit. */
-export async function runHooksFor(event: HookEvent, payload: Record<string, unknown>, projectRoot?: string): Promise<HooksDispatch> {
+export async function runHooksFor(
+  event: HookEvent,
+  payload: Record<string, unknown>,
+  projectRoot?: string,
+): Promise<HooksDispatch> {
   const hooks = await getHooks(projectRoot);
   const configs = hooks[event] || [];
   const dispatch: HooksDispatch = { blocked: false, outputs: [] };

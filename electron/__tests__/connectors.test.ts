@@ -60,7 +60,9 @@ describe('connectors', () => {
   });
 
   it('slackListChannels maps channels', async () => {
-    axiosGet.mockResolvedValueOnce({ data: { ok: true, channels: [{ id: 'C1', name: 'general', is_private: false, num_members: 3 }] } });
+    axiosGet.mockResolvedValueOnce({
+      data: { ok: true, channels: [{ id: 'C1', name: 'general', is_private: false, num_members: 3 }] },
+    });
     const channels = await slackListChannels(10);
     expect(channels[0]).toMatchObject({ id: 'C1', name: 'general', isPrivate: false, memberCount: 3 });
     expect(axiosGet).toHaveBeenCalledWith(
@@ -99,12 +101,14 @@ describe('connectors', () => {
   it('notionSearch returns page summaries', async () => {
     axiosPost.mockResolvedValueOnce({
       data: {
-        results: [{
-          id: 'P1',
-          object: 'page',
-          url: 'https://notion.so/P1',
-          properties: { title: { title: [{ plain_text: '周报' }] } },
-        }],
+        results: [
+          {
+            id: 'P1',
+            object: 'page',
+            url: 'https://notion.so/P1',
+            properties: { title: { title: [{ plain_text: '周报' }] } },
+          },
+        ],
       },
     });
     const results = await notionSearch('周报');

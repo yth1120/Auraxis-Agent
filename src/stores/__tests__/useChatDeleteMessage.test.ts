@@ -23,18 +23,30 @@ describe('useChatStore — 删除消息与会话一致性', () => {
     useSessionStore.getState().newSession('chat');
     const sid = useSessionStore.getState().currentSessionId!;
     useSessionStore.setState({
-      sessions: [{
-        id: sid, title: '会话', created: 1, updated: 1, model: 'm',
-        messageCount: msgs.length, messages: msgs, mode: 'chat',
-      }],
+      sessions: [
+        {
+          id: sid,
+          title: '会话',
+          created: 1,
+          updated: 1,
+          model: 'm',
+          messageCount: msgs.length,
+          messages: msgs,
+          mode: 'chat',
+        },
+      ],
     });
     useChatStore.setState({ messages: msgs });
 
     useChatStore.getState().deleteMessage('a1');
 
     expect(useChatStore.getState().messages.map((m) => m.id)).toEqual(['u1']);
-    expect(useSessionStore.getState().sessions.find((s) => s.id === sid)!.messages.map((m) => m.id))
-      .toEqual(['u1']);
+    expect(
+      useSessionStore
+        .getState()
+        .sessions.find((s) => s.id === sid)!
+        .messages.map((m) => m.id),
+    ).toEqual(['u1']);
   });
 
   it('撤销删除时同步恢复会话存储', async () => {
@@ -42,10 +54,18 @@ describe('useChatStore — 删除消息与会话一致性', () => {
     useSessionStore.getState().newSession('chat');
     const sid = useSessionStore.getState().currentSessionId!;
     useSessionStore.setState({
-      sessions: [{
-        id: sid, title: '会话', created: 1, updated: 1, model: 'm',
-        messageCount: msgs.length, messages: msgs, mode: 'chat',
-      }],
+      sessions: [
+        {
+          id: sid,
+          title: '会话',
+          created: 1,
+          updated: 1,
+          model: 'm',
+          messageCount: msgs.length,
+          messages: msgs,
+          mode: 'chat',
+        },
+      ],
     });
     useChatStore.setState({ messages: msgs });
 

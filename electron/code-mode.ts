@@ -9,6 +9,7 @@
  * mutation tools serialize. Only what the program prints or returns goes
  * back to the model.
  */
+import { errorText } from './errors';
 import { Worker } from 'worker_threads';
 import ts from 'typescript';
 import type { ApprovalPolicy } from './types';
@@ -136,7 +137,11 @@ export async function runCodeProgram(
     timeoutMs?: number;
     outputCap?: number;
     /** Test seam — defaults to the real guarded tool dispatcher. */
-    executeTool?: (name: string, input: Record<string, unknown>, ctx: Record<string, unknown>) => Promise<{ output: unknown; error?: string }>;
+    executeTool?: (
+      name: string,
+      input: Record<string, unknown>,
+      ctx: Record<string, unknown>,
+    ) => Promise<{ output: unknown; error?: string }>;
   } = {},
 ): Promise<CodeModeResult> {
   if (!unsafeCodeEnabled()) {
@@ -212,8 +217,8 @@ export async function runCodeProgram(
       entry.output = result.output;
       entry.error = result.error;
       worker.postMessage({ k: 'res', id: item.id, output: result.output, error: result.error });
-    } catch (err: any) {
-      entry.error = `子调用异常: ${err?.message ?? String(err)}`;
+    } catch (err: unknown) {
+      entry.error = `子调用异常: ${errorText(err)}`;
       worker.postMessage({ k: 'res', id: item.id, output: null, error: entry.error });
     } finally {
       entry.finishedAt = Date.now();
@@ -243,7 +248,11 @@ export async function runCodeProgram(
       settled = true;
       clearTimeout(timer);
       if (host.abortSignal) host.abortSignal.removeEventListener('abort', onAbort);
-      try { void worker.terminate(); } catch { /* gone */ }
+      try {
+        void worker.terminate();
+      } catch {
+        /* gone */
+      }
       resolve({
         stdout,
         stderr,
@@ -264,14 +273,18 @@ export async function runCodeProgram(
 
     const timer = setTimeout(() => {
       timedOut = true;
-      finish({ timedOut: true, exitCode: null, stderr: stderr ? `${stderr}\n程序超时，已强制终止` : '程序超时，已强制终止' });
+      finish({
+        timedOut: true,
+        exitCode: null,
+        stderr: stderr ? `${stderr}\n程序超时，已强制终止` : '程序超时，已强制终止',
+      });
     }, timeoutMs);
 
     worker.on('message', (m: any) => {
       if (!m) return;
       if (m.k === 'log') appendStdout(String(m.line ?? ''));
       else if (m.k === 'call' && Number.isInteger(m.id) && typeof m.name === 'string') {
-        const input = (m.input && typeof m.input === 'object' && !Array.isArray(m.input)) ? m.input : {};
+        const input = m.input && typeof m.input === 'object' && !Array.isArray(m.input) ? m.input : {};
         queue.push({ id: m.id, name: m.name, input });
         pump();
       } else if (m.k === 'done') {

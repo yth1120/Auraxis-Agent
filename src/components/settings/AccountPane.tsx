@@ -131,8 +131,7 @@ export default function AccountPane() {
   const handleAvatarFile = async (file: File | undefined) => {
     if (!file) return;
     // Windows 经常不填 MIME（file.type === ''），所以扩展名也作为有效依据。
-    const looksLikeImage =
-      file.type.startsWith('image/') || /\.(png|jpe?g|gif|webp|bmp)$/i.test(file.name);
+    const looksLikeImage = file.type.startsWith('image/') || /\.(png|jpe?g|gif|webp|bmp)$/i.test(file.name);
     if (!looksLikeImage) {
       message.error(t('auth.avatarInvalid'));
       return;
@@ -234,7 +233,12 @@ export default function AccountPane() {
                 autoComplete="new-password"
               />
             </div>
-            <Button icon={<Key size={14} />} onClick={() => void submitChange()} loading={saving} className="self-start">
+            <Button
+              icon={<Key size={14} />}
+              onClick={() => void submitChange()}
+              loading={saving}
+              className="self-start"
+            >
               {t('auth.updatePassword')}
             </Button>
           </div>

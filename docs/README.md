@@ -6,7 +6,7 @@ Related docs: [TS SDK](../packages/auraxis-sdk/README.md) · [Python SDK](../pyt
 
 ## 1. Project Overview
 
-Auraxis v3.0.1 is an Electron-based desktop agentic workbench that combines a unified ReAct step engine, multi-agent scheduling, Code Mode tool orchestration, plugin extensibility, and persistent project memory. Execution semantics follow the common convention (`end_turn` ends the turn — no scripts or forced gates), and ReviewArtifact is an optional verification tool. The backend LLM defaults to the DeepSeek API (OpenAI / Anthropic compatible formats). Web search defaults to DeepSeek's native search (falling back to DuckDuckGo, with Exa and Perplexity also supported). Official DeepSeek capabilities are integrated: reasoning effort low/high/max, strict tools (Beta), plan-generation JSON mode, conversation prefix continuation ("continue writing" from a code block), FIM completion (Beta) API, streaming usage with context-cache hit display, user_id isolation, configurable max output tokens (up to 384K), and local offline tokenizer counting.
+Auraxis v3.1.0 is an Electron-based desktop agentic workbench that combines a unified ReAct step engine, multi-agent scheduling, Code Mode tool orchestration, plugin extensibility, and persistent project memory. Execution semantics follow the common convention (`end_turn` ends the turn — no scripts or forced gates), and ReviewArtifact is an optional verification tool. The backend LLM defaults to the DeepSeek API (OpenAI / Anthropic compatible formats). Web search defaults to DeepSeek's native search (falling back to DuckDuckGo, with Exa and Perplexity also supported). Official DeepSeek capabilities are integrated: reasoning effort low/high/max, strict tools (Beta), plan-generation JSON mode, conversation prefix continuation ("continue writing" from a code block), FIM completion (Beta) API, streaming usage with context-cache hit display, user_id isolation, configurable max output tokens (up to 384K), and local offline tokenizer counting.
 
 The project follows **paper-driven development**: 7 arXiv papers' core techniques — Eywa (provenance-grounded long-term memory), MAP-Graph (multi-agent shared-memory authorization), AGORA (step-level context compression), SWE-Touch (workspace drift detection), Oversight Has a Capacity (approval fatigue guard), AutoTool (tool usage inertia), Verifier-as-Gatekeeper (skill pollution gating); plus 4 caching-oriented techniques — RadixAttention (canonical history replay / shared-prefix maximization), Prompt Cache (stable block organization), Cache-Aware Prompt Compression (dynamic content tailing), and Byte-Exact Deduplication (byte-exact dedup of memory blocks). Paper links, technical mappings, and landing modules are detailed in [Section 5](#5-research-papers--technical-implementation). Product-side additions include local account login, Chat / Work / Code modes, thinking and web-search toggles, Agent execution flow views, session event timelines, and context-cache alignment.
 
@@ -18,17 +18,17 @@ The project follows **paper-driven development**: 7 arXiv papers' core technique
 
 <img width="1198" height="776" alt="auraxis-ui" src="https://github.com/user-attachments/assets/88f118c2-fc15-4779-8be3-928cb9c04ae8" />
 
-| Layer | Technology |
-|---|---|
-| Desktop framework | Electron 43 (Node 24, built-in `node:sqlite`), frameless window, `contextIsolation: true` |
-| Frontend | React 18 + TypeScript 5.5 + Vite 7 |
-| UI components | Ant Design 5 with custom dark / light themes |
-| State management | Zustand 4; session/settings/plugin state is authoritative in the main process, localStorage is only a renderer cache |
+| Layer               | Technology                                                                                                                                            |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Desktop framework   | Electron 43 (Node 24, built-in `node:sqlite`), frameless window, `contextIsolation: true`                                                             |
+| Frontend            | React 18 + TypeScript 5.5 + Vite 7                                                                                                                    |
+| UI components       | Ant Design 5 with custom dark / light themes                                                                                                          |
+| State management    | Zustand 4; session/settings/plugin state is authoritative in the main process, localStorage is only a renderer cache                                  |
 | Storage & retrieval | Unified JSONL event logs for sessions/agents + SQLite projection cache + FTS5 full-text search + long-term memory (better-sqlite3 with JSON fallback) |
-| Markdown rendering | react-markdown + remark-gfm + rehype-highlight + rehype-katex + mermaid |
-| AI API | axios (SSE streaming), DeepSeek / OpenAI and Anthropic formats; MCP, AGENTS.md, and lifecycle hooks protocols |
-| Testing | Vitest + @testing-library/react + jsdom (renderer), node environment (main process) |
-| Build | Vite + electron-builder 26 (NSIS / DMG / AppImage; native deps require Python/VS toolchain for rebuild) |
+| Markdown rendering  | react-markdown + remark-gfm + rehype-highlight + rehype-katex + mermaid                                                                               |
+| AI API              | axios (SSE streaming), DeepSeek / OpenAI and Anthropic formats; MCP, AGENTS.md, and lifecycle hooks protocols                                         |
+| Testing             | Vitest + @testing-library/react + jsdom (renderer), node environment (main process)                                                                   |
+| Build               | Vite + electron-builder 26 (NSIS / DMG / AppImage; native deps require Python/VS toolchain for rebuild)                                               |
 
 ### Infrastructure
 
@@ -145,7 +145,7 @@ Auraxis/
 │       ├── session-store.ts     # Unified JSONL event logs (chat & agent)
 │       ├── sandbox-runner.ts    # Native sandbox dispatch (restricted/AppContainer/linux/macos)
 │       ├── acp-server.ts / sdk-server.ts / headless-run.ts  # ACP / JSON-RPC SDK / headless
-│       └── __tests__/           # Main-process tests (237 files / 1740 cases repo-wide)
+│       └── __tests__/           # Main-process tests (244 files / 1784 cases repo-wide)
 │
 ├── src/                         # Renderer code (browser environment)
 │   ├── main.tsx                 # React entry
@@ -257,6 +257,7 @@ interface IpcResponse<T = unknown> {
 ### 3.4 Streaming
 
 Streaming requests use **dedicated event channels**:
+
 - Chat stream: `ai:chunk:${requestId}`
 - Query stream: `ai:queryEvent:${requestId}`
 - Agent events: `agent:event:${agentId}`
@@ -265,91 +266,91 @@ Each channel registers its listener when the request is created and cleans up au
 
 ### 3.5 Full IPC Channel Table
 
-| Domain | Channel | Direction | Description |
-|---|---|---|---|
-| **window** | `window:minimize` | renderer→main | Minimize window |
-| | `window:maximize` | renderer→main | Maximize / restore window |
-| | `window:close` | renderer→main | Close window |
-| | `window:focus` | renderer→main | Focus window (notification click) |
-| | `window:isMaximized` | renderer→main | Query maximized state |
-| | `window:maximize-changed` | main→renderer | Maximize state change event |
-| | `window:setBackgroundMaterial` / `window:backgroundMaterialSupported` | renderer→main | Sidebar Acrylic material toggle & support check (Windows 11) |
-| **shell** | `shell:openExternal` | renderer→main | Open URL in default browser (http/https only) |
-| | `shell:openInVSCode` | renderer→main | Open project in VS Code |
-| **file** | `file:open` | renderer→main | Open file dialog |
-| | `file:read` | renderer→main | Read file content |
-| | `file:write` | renderer→main | Write file |
-| | `file:search` | renderer→main | Search files by keyword |
-| **project** | `project:getTree` | renderer→main | Get project file tree |
-| | `project:applyCode` | renderer→main | Apply code to files |
-| | `project:previewCode` | renderer→main | Preview code (HTML/images…) |
-| | `project:selectDirectory` | renderer→main | Pick project directory |
-| **context** | `context:getProjectContext` | renderer→main | Project context (instruction files, file tree, package.json) |
-| | `context:getFileStructure` | renderer→main | File structure overview |
-| | `context:readFile` | renderer→main | Read file (for context) |
-| **ai** | `ai:chatStream` | renderer→main | Start chat stream (pure conversation, no tools) |
-| | `ai:sendQuery` | renderer→main | Start query (full ReAct loop) |
-| | `ai:testConnection` | renderer→main | Test API connection |
-| | `ai:abortStream` / `ai:abortQuery` | renderer→main | Abort stream / query |
-| | `ai:abortTool` | renderer→main | Abort a single tool execution |
-| | `ai:retryTool` | renderer→main | Retry a tool execution |
-| | `ai:chunk:${requestId}` | main→renderer | Chat stream text chunks |
-| | `ai:queryEvent:${requestId}` | main→renderer | All query-stream events (tool start/end, text…) |
-| **memory** | `memory:extract` | renderer→main | Extract memory from conversation |
-| | `memory:getByProject` | renderer→main | Get memory by project |
-| | `memory:getByType` | renderer→main | Get memory by type |
-| | `memory:search` | renderer→main | Search memory |
-| | `memory:archive` / `memory:delete` | renderer→main | Archive / delete memory |
-| | `memory:evidenceList` / `memory:evidenceDetail` | renderer→main | List / view immutable evidence (Eywa M1) |
-| | `memory:readForQuery` | renderer→main | Deterministic multi-route retrieval → context + policy + facts + diagnostics (Eywa M3) |
-| | `memory:beliefAudit` | renderer→main | Belief evidence chain, signals, revision history (Eywa M4) |
-| | `memory:readTrace` | renderer→main | Per-route retrieval result by read_run |
-| | `memory:erase` | renderer→main | Cascade-erase evidence/beliefs/read traces by scope, leaving audit events |
-| | `memory:reindex` | renderer→main | Rebuild signals/beliefs from existing evidence |
-| | `memory:graph` | renderer→main | MAP-Graph typed execution graph (role authorization / lineage) |
-| **agent** | `agent:create` / `agent:start` | renderer→main | Create / start agent |
-| | `agent:stop` / `agent:schedulerStop` | renderer→main | Stop agent |
-| | `agent:pause` / `agent:resume` | renderer→main | Pause / resume agent |
-| | `agent:setPriority` | renderer→main | Set priority |
-| | `agent:getQueue` | renderer→main | Get pending queue |
-| | `agent:setMaxConcurrent` | renderer→main | Set max concurrency |
-| | `agent:getAll` / `agent:list` / `agent:get` | renderer→main | Query agent list / detail |
-| | `agent:remove` / `agent:clear` | renderer→main | Remove / clear agents |
-| | `agent:updated` | main→renderer | Agent state update event |
-| | `agent:event:${agentId}` | main→renderer | Agent execution events (tool calls…) |
-| **mcp** | `mcp:getServers` / `mcp:setServers` | renderer→main | MCP server config |
-| | `mcp:connect` / `mcp:disconnect` | renderer→main | Connect / disconnect MCP server |
-| | `mcp:getStatuses` | renderer→main | All server statuses |
-| | `mcp:listTools` / `mcp:callTool` | renderer→main | List / call MCP tools |
-| **permission** | `permission:respond` | renderer→main | User reply to a permission request |
-| | `permission:addRule` | renderer→main | Add permission rule |
-| | `permission:getRules` | renderer→main | Get all rules |
-| | `permission:request` | main→renderer | Permission request event |
-| **plan** | `plan:approve` / `plan:reject` | renderer→main | Approve / reject plan |
-| | `plan:generated` | main→renderer | Plan generated event |
-| **undo** | `undo:getHistory` / `undo:getList` | renderer→main | Get undo history |
-| | `undo:execute` / `undo:revert` / `undo:revertLast` | renderer→main | Execute undo / restore |
-| | `undo:getSessionDiffs` / `undo:revertSessionFile` / `undo:revertSessions` | renderer→main | Per-session diff view / rollback (right panel "Changes") |
-| **conflict** | `conflict:getConflicts` | renderer→main | Get conflict list |
-| | `conflict:getFileHistory` | renderer→main | Get file modification history |
-| **snapshot** | `snapshot:create` / `list` / `restore` / `delete` | renderer→main | Named snapshot management |
-| **system** | `system:getStats` | renderer→main | System stats |
-| | `system:getGitBranches` | renderer→main | Git branches |
-| | `system:getVersion` | renderer→main | App version |
-| | `system:getAccountInfo` | renderer→main | DeepSeek account balance (/user/balance) |
-| **settings** | `settings:get` / `settings:set` | renderer→main | Read / write settings |
-| | `settings:getApiKey` / `api:setKey` | renderer→main | API key management |
-| | `settings:set` (permissionPreset / sandboxMode) | renderer→main | Unified runtime-permission persistence |
-| **coverage** | `coverage:get` | renderer→main | Read coverage report (coverage/coverage-summary.json) |
-| **auth** | `auth:status` / `auth:setup` | renderer→main | Query login phase / first-run registration |
-| | `auth:login` / `auth:logout` | renderer→main | Login / logout |
-| | `auth:changePassword` | renderer→main | Change account password |
-| | `auth:setAvatar` | renderer→main | Set avatar (PNG data URL) |
-| **model** | `model:getAll` | renderer→main | All available models |
-| **app** | `app:error` | main→renderer | Uncaught exceptions / unhandled rejections |
-| **cron** | `cron:create` / `cron:delete` / `cron:list` | renderer→main | Scheduled jobs CRUD |
-| **worktree** | `worktree:getStatus` | renderer→main | Agent worktree sandbox status |
-| | `worktree:changed` | main→renderer | Worktree activate/deactivate event |
+| Domain         | Channel                                                                   | Direction     | Description                                                                            |
+| -------------- | ------------------------------------------------------------------------- | ------------- | -------------------------------------------------------------------------------------- |
+| **window**     | `window:minimize`                                                         | renderer→main | Minimize window                                                                        |
+|                | `window:maximize`                                                         | renderer→main | Maximize / restore window                                                              |
+|                | `window:close`                                                            | renderer→main | Close window                                                                           |
+|                | `window:focus`                                                            | renderer→main | Focus window (notification click)                                                      |
+|                | `window:isMaximized`                                                      | renderer→main | Query maximized state                                                                  |
+|                | `window:maximize-changed`                                                 | main→renderer | Maximize state change event                                                            |
+|                | `window:setBackgroundMaterial` / `window:backgroundMaterialSupported`     | renderer→main | Sidebar Acrylic material toggle & support check (Windows 11)                           |
+| **shell**      | `shell:openExternal`                                                      | renderer→main | Open URL in default browser (http/https only)                                          |
+|                | `shell:openInVSCode`                                                      | renderer→main | Open project in VS Code                                                                |
+| **file**       | `file:open`                                                               | renderer→main | Open file dialog                                                                       |
+|                | `file:read`                                                               | renderer→main | Read file content                                                                      |
+|                | `file:write`                                                              | renderer→main | Write file                                                                             |
+|                | `file:search`                                                             | renderer→main | Search files by keyword                                                                |
+| **project**    | `project:getTree`                                                         | renderer→main | Get project file tree                                                                  |
+|                | `project:applyCode`                                                       | renderer→main | Apply code to files                                                                    |
+|                | `project:previewCode`                                                     | renderer→main | Preview code (HTML/images…)                                                            |
+|                | `project:selectDirectory`                                                 | renderer→main | Pick project directory                                                                 |
+| **context**    | `context:getProjectContext`                                               | renderer→main | Project context (instruction files, file tree, package.json)                           |
+|                | `context:getFileStructure`                                                | renderer→main | File structure overview                                                                |
+|                | `context:readFile`                                                        | renderer→main | Read file (for context)                                                                |
+| **ai**         | `ai:chatStream`                                                           | renderer→main | Start chat stream (pure conversation, no tools)                                        |
+|                | `ai:sendQuery`                                                            | renderer→main | Start query (full ReAct loop)                                                          |
+|                | `ai:testConnection`                                                       | renderer→main | Test API connection                                                                    |
+|                | `ai:abortStream` / `ai:abortQuery`                                        | renderer→main | Abort stream / query                                                                   |
+|                | `ai:abortTool`                                                            | renderer→main | Abort a single tool execution                                                          |
+|                | `ai:retryTool`                                                            | renderer→main | Retry a tool execution                                                                 |
+|                | `ai:chunk:${requestId}`                                                   | main→renderer | Chat stream text chunks                                                                |
+|                | `ai:queryEvent:${requestId}`                                              | main→renderer | All query-stream events (tool start/end, text…)                                        |
+| **memory**     | `memory:extract`                                                          | renderer→main | Extract memory from conversation                                                       |
+|                | `memory:getByProject`                                                     | renderer→main | Get memory by project                                                                  |
+|                | `memory:getByType`                                                        | renderer→main | Get memory by type                                                                     |
+|                | `memory:search`                                                           | renderer→main | Search memory                                                                          |
+|                | `memory:archive` / `memory:delete`                                        | renderer→main | Archive / delete memory                                                                |
+|                | `memory:evidenceList` / `memory:evidenceDetail`                           | renderer→main | List / view immutable evidence (Eywa M1)                                               |
+|                | `memory:readForQuery`                                                     | renderer→main | Deterministic multi-route retrieval → context + policy + facts + diagnostics (Eywa M3) |
+|                | `memory:beliefAudit`                                                      | renderer→main | Belief evidence chain, signals, revision history (Eywa M4)                             |
+|                | `memory:readTrace`                                                        | renderer→main | Per-route retrieval result by read_run                                                 |
+|                | `memory:erase`                                                            | renderer→main | Cascade-erase evidence/beliefs/read traces by scope, leaving audit events              |
+|                | `memory:reindex`                                                          | renderer→main | Rebuild signals/beliefs from existing evidence                                         |
+|                | `memory:graph`                                                            | renderer→main | MAP-Graph typed execution graph (role authorization / lineage)                         |
+| **agent**      | `agent:create` / `agent:start`                                            | renderer→main | Create / start agent                                                                   |
+|                | `agent:stop` / `agent:schedulerStop`                                      | renderer→main | Stop agent                                                                             |
+|                | `agent:pause` / `agent:resume`                                            | renderer→main | Pause / resume agent                                                                   |
+|                | `agent:setPriority`                                                       | renderer→main | Set priority                                                                           |
+|                | `agent:getQueue`                                                          | renderer→main | Get pending queue                                                                      |
+|                | `agent:setMaxConcurrent`                                                  | renderer→main | Set max concurrency                                                                    |
+|                | `agent:getAll` / `agent:list` / `agent:get`                               | renderer→main | Query agent list / detail                                                              |
+|                | `agent:remove` / `agent:clear`                                            | renderer→main | Remove / clear agents                                                                  |
+|                | `agent:updated`                                                           | main→renderer | Agent state update event                                                               |
+|                | `agent:event:${agentId}`                                                  | main→renderer | Agent execution events (tool calls…)                                                   |
+| **mcp**        | `mcp:getServers` / `mcp:setServers`                                       | renderer→main | MCP server config                                                                      |
+|                | `mcp:connect` / `mcp:disconnect`                                          | renderer→main | Connect / disconnect MCP server                                                        |
+|                | `mcp:getStatuses`                                                         | renderer→main | All server statuses                                                                    |
+|                | `mcp:listTools` / `mcp:callTool`                                          | renderer→main | List / call MCP tools                                                                  |
+| **permission** | `permission:respond`                                                      | renderer→main | User reply to a permission request                                                     |
+|                | `permission:addRule`                                                      | renderer→main | Add permission rule                                                                    |
+|                | `permission:getRules`                                                     | renderer→main | Get all rules                                                                          |
+|                | `permission:request`                                                      | main→renderer | Permission request event                                                               |
+| **plan**       | `plan:approve` / `plan:reject`                                            | renderer→main | Approve / reject plan                                                                  |
+|                | `plan:generated`                                                          | main→renderer | Plan generated event                                                                   |
+| **undo**       | `undo:getHistory` / `undo:getList`                                        | renderer→main | Get undo history                                                                       |
+|                | `undo:execute` / `undo:revert` / `undo:revertLast`                        | renderer→main | Execute undo / restore                                                                 |
+|                | `undo:getSessionDiffs` / `undo:revertSessionFile` / `undo:revertSessions` | renderer→main | Per-session diff view / rollback (right panel "Changes")                               |
+| **conflict**   | `conflict:getConflicts`                                                   | renderer→main | Get conflict list                                                                      |
+|                | `conflict:getFileHistory`                                                 | renderer→main | Get file modification history                                                          |
+| **snapshot**   | `snapshot:create` / `list` / `restore` / `delete`                         | renderer→main | Named snapshot management                                                              |
+| **system**     | `system:getStats`                                                         | renderer→main | System stats                                                                           |
+|                | `system:getGitBranches`                                                   | renderer→main | Git branches                                                                           |
+|                | `system:getVersion`                                                       | renderer→main | App version                                                                            |
+|                | `system:getAccountInfo`                                                   | renderer→main | DeepSeek account balance (/user/balance)                                               |
+| **settings**   | `settings:get` / `settings:set`                                           | renderer→main | Read / write settings                                                                  |
+|                | `settings:getApiKey` / `api:setKey`                                       | renderer→main | API key management                                                                     |
+|                | `settings:set` (permissionPreset / sandboxMode)                           | renderer→main | Unified runtime-permission persistence                                                 |
+| **coverage**   | `coverage:get`                                                            | renderer→main | Read coverage report (coverage/coverage-summary.json)                                  |
+| **auth**       | `auth:status` / `auth:setup`                                              | renderer→main | Query login phase / first-run registration                                             |
+|                | `auth:login` / `auth:logout`                                              | renderer→main | Login / logout                                                                         |
+|                | `auth:changePassword`                                                     | renderer→main | Change account password                                                                |
+|                | `auth:setAvatar`                                                          | renderer→main | Set avatar (PNG data URL)                                                              |
+| **model**      | `model:getAll`                                                            | renderer→main | All available models                                                                   |
+| **app**        | `app:error`                                                               | main→renderer | Uncaught exceptions / unhandled rejections                                             |
+| **cron**       | `cron:create` / `cron:delete` / `cron:list`                               | renderer→main | Scheduled jobs CRUD                                                                    |
+| **worktree**   | `worktree:getStatus`                                                      | renderer→main | Agent worktree sandbox status                                                          |
+|                | `worktree:changed`                                                        | main→renderer | Worktree activate/deactivate event                                                     |
 
 ---
 
@@ -378,6 +379,7 @@ Return result to chat UI
 ```
 
 **Features**:
+
 - **No planning phase**: runs the ReAct loop directly
 - **API retries**: 429 / 5xx / network errors auto-retry 3 times with exponential backoff
 - **Context compaction**: rule-based, token threshold ~100K
@@ -410,6 +412,7 @@ Return result
 ```
 
 **Features**:
+
 - **Full planning**: LLM generates structured JSON task plans (dependencies + keyword matching)
 - **Plan approval**: in `plan` mode, waits for user approval (5-minute timeout); only approved steps execute
 - **Quality verification (optional)**: ReviewArtifact can run build / test / typecheck / lint on demand
@@ -438,32 +441,32 @@ When `RunCode` runs with `language=typescript`, the program body executes in a w
 
 Tool definitions live in `electron/tool-defs.ts` ([view file](../electron/tool-defs.ts)); **71 built-in tools** in total. The table below lists the core 24; the rest are grouped by capability family.
 
-| # | Tool | Category | Description |
-|---|------|------|------|
-| 1 | **Bash** | dangerous | Run shell commands in the project directory. Default timeout 120s, max 600s. Windows supports Git Bash / cmd / PowerShell |
-| 2 | **Read** | safe | Read file content with line offset/limit and path traversal checks. Output includes `summary` (path, lines, size) |
-| 3 | **Write** | dangerous | Create / overwrite files with extension whitelist, Windows reserved-name checks, undo backup. Output includes `summary` (path, bytes) |
-| 4 | **Edit** | dangerous | Find-and-replace in a file; match must be unique; undo backup before writing |
-| 5 | **Delete** | dangerous | Delete files or directories (recursive requires confirmation), path traversal checks, undo backup |
-| 6 | **Grep** | safe | Regex search (max depth 5, up to 50 results). Output includes `summary` (match count) |
-| 7 | **Glob** | safe | File pattern matching (max depth 6, up to 100 files). Output includes `summary` (match count) |
-| 8 | **WebFetch** | dangerous | Fetch URL content (15s timeout), blocks local / intranet addresses |
-| 9 | **WebSearch** | dangerous | DuckDuckGo HTML search (no API key required) |
-| 10 | **TodoWrite** | safe | Task list management (pending / in_progress / completed); only one in_progress at a time |
-| 11 | **Agent** | dangerous | Start a sub-agent (Explore / Plan / general-purpose), recursion depth limit 3, records parent-child links |
-| 12 | **Replan** | safe | Generate a new sub-plan (agent loop only; the query engine skips it) |
-| 13 | **CronCreate** | dangerous | Create recurring / one-shot scheduled jobs (5-field cron), fired while the app runs |
-| 14 | **CronDelete** | safe | Cancel a scheduled job by ID |
-| 15 | **CronList** | safe | List all active scheduled jobs |
-| 16 | **TaskOutput** | safe | Read accumulated output of background tasks / sub-agents (non-blocking) |
-| 17 | **TaskStop** | dangerous | Stop a running tool / sub-agent by ID |
-| 18 | **EnterPlanMode** | safe | Enter plan mode, generate an implementation plan for user approval |
-| 19 | **ExitPlanMode** | safe | Exit plan mode after approval and start implementing |
-| 20 | **NotebookEdit** | dangerous | Read / write / insert / delete Jupyter Notebook (.ipynb) cells |
-| 21 | **EnterWorktree** | dangerous | Create an isolated Git worktree sandbox; subsequent tool calls redirect to the sandbox path |
-| 22 | **LSP** | safe | Code intelligence: definition / references / diagnostics (tsc --noEmit) |
-| 23 | **ReviewArtifact** | dangerous | Optional verification tool: runs build / test / typecheck / lint |
-| 24 | **GitCommit** | dangerous | Stage all changes and create a Git commit, returning the commit hash |
+| #   | Tool               | Category  | Description                                                                                                                           |
+| --- | ------------------ | --------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | **Bash**           | dangerous | Run shell commands in the project directory. Default timeout 120s, max 600s. Windows supports Git Bash / cmd / PowerShell             |
+| 2   | **Read**           | safe      | Read file content with line offset/limit and path traversal checks. Output includes `summary` (path, lines, size)                     |
+| 3   | **Write**          | dangerous | Create / overwrite files with extension whitelist, Windows reserved-name checks, undo backup. Output includes `summary` (path, bytes) |
+| 4   | **Edit**           | dangerous | Find-and-replace in a file; match must be unique; undo backup before writing                                                          |
+| 5   | **Delete**         | dangerous | Delete files or directories (recursive requires confirmation), path traversal checks, undo backup                                     |
+| 6   | **Grep**           | safe      | Regex search (max depth 5, up to 50 results). Output includes `summary` (match count)                                                 |
+| 7   | **Glob**           | safe      | File pattern matching (max depth 6, up to 100 files). Output includes `summary` (match count)                                         |
+| 8   | **WebFetch**       | dangerous | Fetch URL content (15s timeout), blocks local / intranet addresses                                                                    |
+| 9   | **WebSearch**      | dangerous | DuckDuckGo HTML search (no API key required)                                                                                          |
+| 10  | **TodoWrite**      | safe      | Task list management (pending / in_progress / completed); only one in_progress at a time                                              |
+| 11  | **Agent**          | dangerous | Start a sub-agent (Explore / Plan / general-purpose), recursion depth limit 3, records parent-child links                             |
+| 12  | **Replan**         | safe      | Generate a new sub-plan (agent loop only; the query engine skips it)                                                                  |
+| 13  | **CronCreate**     | dangerous | Create recurring / one-shot scheduled jobs (5-field cron), fired while the app runs                                                   |
+| 14  | **CronDelete**     | safe      | Cancel a scheduled job by ID                                                                                                          |
+| 15  | **CronList**       | safe      | List all active scheduled jobs                                                                                                        |
+| 16  | **TaskOutput**     | safe      | Read accumulated output of background tasks / sub-agents (non-blocking)                                                               |
+| 17  | **TaskStop**       | dangerous | Stop a running tool / sub-agent by ID                                                                                                 |
+| 18  | **EnterPlanMode**  | safe      | Enter plan mode, generate an implementation plan for user approval                                                                    |
+| 19  | **ExitPlanMode**   | safe      | Exit plan mode after approval and start implementing                                                                                  |
+| 20  | **NotebookEdit**   | dangerous | Read / write / insert / delete Jupyter Notebook (.ipynb) cells                                                                        |
+| 21  | **EnterWorktree**  | dangerous | Create an isolated Git worktree sandbox; subsequent tool calls redirect to the sandbox path                                           |
+| 22  | **LSP**            | safe      | Code intelligence: definition / references / diagnostics (tsc --noEmit)                                                               |
+| 23  | **ReviewArtifact** | dangerous | Optional verification tool: runs build / test / typecheck / lint                                                                      |
+| 24  | **GitCommit**      | dangerous | Stage all changes and create a Git commit, returning the commit hash                                                                  |
 
 > The "Category" column is an intuitive behavioral grouping; whether a tool actually triggers the permission dialog follows the dangerous-tool set in `tool-handlers.ts`.
 
@@ -479,6 +482,7 @@ Tool definitions live in `electron/tool-defs.ts` ([view file](../electron/tool-d
 - **Cloud connectors**: SlackListChannels / SlackPostMessage, DriveList / DriveRead, NotionSearch / NotionCreatePage
 
 **Tool classification**:
+
 - **Dangerous set**: `['Bash', 'Write', 'Edit', 'Delete', 'WebFetch', 'WebSearch', 'CronCreate', 'TaskStop', 'EnterWorktree', 'ReviewArtifact', 'GitCommit', 'WriteDocument', 'SlackPostMessage', 'NotionCreatePage']` — triggers the permission dialog
 - **File-mutation tools**: `['Write', 'Edit', 'NotebookEdit', 'Delete', 'WriteDocument']` — trigger undo backups and conflict-detector file locks
 - **Read-only tools**: `['Read', 'Grep', 'Glob', 'ReadDocument', 'SlackListChannels', 'DriveList', 'DriveRead', 'NotionSearch']` — auto-approved in `ask` and `plan` modes
@@ -489,15 +493,16 @@ Tool definitions live in `electron/tool-defs.ts` ([view file](../electron/tool-d
 
 Approval policies (`electron/types.ts` → `src/types/`):
 
-| Policy | Behavior |
-|------|------|
-| `ask` (default) | Shows a permission dialog for every dangerous tool call. Read-only tools (Read/Grep/Glob) are auto-approved |
-| `plan` | Tools explicitly approved in the plan-approval step run automatically. Tools outside the plan follow `ask` mode |
+| Policy                   | Behavior                                                                                                                                  |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `ask` (default)          | Shows a permission dialog for every dangerous tool call. Read-only tools (Read/Grep/Glob) are auto-approved                               |
+| `plan`                   | Tools explicitly approved in the plan-approval step run automatically. Tools outside the plan follow `ask` mode                           |
 | `auto` (fully automatic) | Approves all tools without confirmation. Security checks still run (path checks, extension whitelist, blocked URLs) but no dialogs appear |
 
 The Composer "runtime permission" four presets (confirm each time / auto-approve / full access / read-only) map to the above policy + sandbox mode + autoApprove; see `electron/contracts/permission.ts`.
 
 Permission rules are stored in `permission-handlers.ts` with scopes:
+
 - `once` — valid for this call only
 - `session` — valid for the current session
 - `always` — permanent
@@ -542,19 +547,19 @@ Involved files: `electron/ipc/query-context.ts`, `electron/ipc/query-engine.ts`,
 
 ### 5.1 Paper Overview
 
-| # | Paper (arXiv) | arXiv ID | Core insight | Landing modules | Status |
-|---|--------------------|----------|---------|---------|------|
-| 1 | [Eywa: Provenance-Grounded Long-Term Memory for AI Agents](https://arxiv.org/abs/2605.30771) | 2605.30771 (2026-05) | Evidence before belief; zero-LLM retrieval; answer policy separated from context | memory-evidence / signal-rules / belief-validation / memory-read / memory-db / MemoryPanel | ✅ landed v1.0 |
-| 2 | [MAP-Graph: Provenance-Aware Shared Memory for Multi-Agent Workflows](https://arxiv.org/abs/2608.10509) | 2608.10509 (2026-08) | Authorization, trust, and lineage for multi-agent shared memory | memory-graph / agent-loop / tool-runner / agent-scheduler | ✅ landed (M5, opt-in) |
-| 3 | [AGORA: Adapter-Grounded Observation-Action Retention for Inference-Free Prompt Compression in LLM Agents](https://arxiv.org/abs/2605.26596) | 2605.26596 (2026-05) | Inference-free step compression that protects action grammar | step-compressor / context-manager / agent-loop / step-engine | ✅ landed (agent-loop default) |
-| 4 | [SWE-Touch: Benchmarking Coding Agents When Users Touch the Code](https://arxiv.org/abs/2608.02499) | 2608.02499 (2026-08) | Shared-workspace drift awareness and targeted verification | workspace-drift / agent-loop / tool-handlers | ✅ landed |
-| 5 | [Oversight Has a Capacity: Calibrating Agent Guards to a Subjective, Fatiguing Human](https://arxiv.org/abs/2606.08919) | 2606.08919 (2026-06) | Human oversight has limited capacity; safety vs approval rate is inverted-U | approval-fatigue / permission-handlers | ✅ landed (advisory layer) |
-| 6 | [AutoTool: Efficient Tool Selection for Large Language Model Agents](https://arxiv.org/abs/2511.14650) | 2511.14650 (AAAI 2026) | Tool-call inertia → directed-graph prediction, saving inference cost | tool-inertia / tool-runner | ✅ landed (observation + prediction) |
-| 7 | [When Self-Evolution Backfires: Pre-Commit Gating against Skill Contamination in LLM Agents](https://arxiv.org/abs/2608.05810) | 2608.05810 (2026-08) | Skill contamination is structurally irreversible; pre-commit gating required | skill-gate / tool-handlers (WriteSkill) | ✅ landed |
-| 8 | [SGLang: Efficient Execution of Structured Language Model Programs (RadixAttention)](https://arxiv.org/abs/2312.07104) | 2312.07104 (NeurIPS 2024) | Prefix-tree KV reuse; client side takes "longest shared prefix + canonical replay" | query-context / query-engine / useChatStore | ✅ landed (client-side adaptation) |
-| 9 | [Prompt Cache: Modular Attention Reuse for Low-Latency Inference](https://arxiv.org/abs/2311.04934) | 2311.04934 (MLSys 2024) | Reusable content as contiguous stable blocks; dynamic content never inserted into stable blocks | context-manager / query-context | ✅ landed |
-| 10 | [Cache-Aware Prompt Compression: A Two-Tier Cost Model for LLM API Caching](https://arxiv.org/abs/2607.15516) | 2607.15516 (2026-07) | Prefix/tail boundary by change frequency; dynamic content tailed | query-context / query-engine / useChatStore | ✅ landed |
-| 11 | [Byte-Exact Deduplication in Retrieval-Augmented Generation](https://arxiv.org/abs/2605.09611) | 2605.09611 (2026-05) | Byte-exact dedup of retrieved context to avoid bloat | query-context (memory-block dedup) | ✅ landed (dedup approach) |
+| #   | Paper (arXiv)                                                                                                                                | arXiv ID                  | Core insight                                                                                    | Landing modules                                                                            | Status                               |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------ |
+| 1   | [Eywa: Provenance-Grounded Long-Term Memory for AI Agents](https://arxiv.org/abs/2605.30771)                                                 | 2605.30771 (2026-05)      | Evidence before belief; zero-LLM retrieval; answer policy separated from context                | memory-evidence / signal-rules / belief-validation / memory-read / memory-db / MemoryPanel | ✅ landed v1.0                       |
+| 2   | [MAP-Graph: Provenance-Aware Shared Memory for Multi-Agent Workflows](https://arxiv.org/abs/2608.10509)                                      | 2608.10509 (2026-08)      | Authorization, trust, and lineage for multi-agent shared memory                                 | memory-graph / agent-loop / tool-runner / agent-scheduler                                  | ✅ landed (M5, opt-in)               |
+| 3   | [AGORA: Adapter-Grounded Observation-Action Retention for Inference-Free Prompt Compression in LLM Agents](https://arxiv.org/abs/2605.26596) | 2605.26596 (2026-05)      | Inference-free step compression that protects action grammar                                    | step-compressor / context-manager / agent-loop / step-engine                               | ✅ landed (agent-loop default)       |
+| 4   | [SWE-Touch: Benchmarking Coding Agents When Users Touch the Code](https://arxiv.org/abs/2608.02499)                                          | 2608.02499 (2026-08)      | Shared-workspace drift awareness and targeted verification                                      | workspace-drift / agent-loop / tool-handlers                                               | ✅ landed                            |
+| 5   | [Oversight Has a Capacity: Calibrating Agent Guards to a Subjective, Fatiguing Human](https://arxiv.org/abs/2606.08919)                      | 2606.08919 (2026-06)      | Human oversight has limited capacity; safety vs approval rate is inverted-U                     | approval-fatigue / permission-handlers                                                     | ✅ landed (advisory layer)           |
+| 6   | [AutoTool: Efficient Tool Selection for Large Language Model Agents](https://arxiv.org/abs/2511.14650)                                       | 2511.14650 (AAAI 2026)    | Tool-call inertia → directed-graph prediction, saving inference cost                            | tool-inertia / tool-runner                                                                 | ✅ landed (observation + prediction) |
+| 7   | [When Self-Evolution Backfires: Pre-Commit Gating against Skill Contamination in LLM Agents](https://arxiv.org/abs/2608.05810)               | 2608.05810 (2026-08)      | Skill contamination is structurally irreversible; pre-commit gating required                    | skill-gate / tool-handlers (WriteSkill)                                                    | ✅ landed                            |
+| 8   | [SGLang: Efficient Execution of Structured Language Model Programs (RadixAttention)](https://arxiv.org/abs/2312.07104)                       | 2312.07104 (NeurIPS 2024) | Prefix-tree KV reuse; client side takes "longest shared prefix + canonical replay"              | query-context / query-engine / useChatStore                                                | ✅ landed (client-side adaptation)   |
+| 9   | [Prompt Cache: Modular Attention Reuse for Low-Latency Inference](https://arxiv.org/abs/2311.04934)                                          | 2311.04934 (MLSys 2024)   | Reusable content as contiguous stable blocks; dynamic content never inserted into stable blocks | context-manager / query-context                                                            | ✅ landed                            |
+| 10  | [Cache-Aware Prompt Compression: A Two-Tier Cost Model for LLM API Caching](https://arxiv.org/abs/2607.15516)                                | 2607.15516 (2026-07)      | Prefix/tail boundary by change frequency; dynamic content tailed                                | query-context / query-engine / useChatStore                                                | ✅ landed                            |
+| 11  | [Byte-Exact Deduplication in Retrieval-Augmented Generation](https://arxiv.org/abs/2605.09611)                                               | 2605.09611 (2026-05)      | Byte-exact dedup of retrieved context to avoid bloat                                            | query-context (memory-block dedup)                                                         | ✅ landed (dedup approach)           |
 
 ### 5.2 Eywa — Provenance-Grounded Long-Term Memory (M1–M4)
 
@@ -628,20 +633,20 @@ Limitations: Chat mode (`ai:chatStream`) does not yet use the static prefix; the
 
 ### 5.10 New Feature Checklist
 
-| Feature | Description | Main modules |
-|------|------|---------|
-| Local account system | First-run registration → login gate → logout / password change; password stored only as scrypt hash; `AURAXIS_AUTH_DISABLED=1` bypasses the gate for tests only | auth-store / auth-handlers / AuthGate / AccountPane |
-| DeepSeek API key at registration | Key can be filled and connection-tested during registration, or skipped and configured in Settings | AuthGate / settings / ai-handlers |
-| Avatar & account display | Account shown in the top bar left of Settings; avatar upload (center-cropped PNG data URL); password change in Settings | Avatar / AccountPane / auth:setAvatar |
-| Chat / Work / Code modes | Three product forms under one ReAct engine; mode switches never pollute each other's state | useAppStore / useChatStore / code-mode |
-| Work agent execution flow view | Centered input + task board + execution flow (rounds, tool rows, deliverables, status) | ChatArea / WorkExecutionFlow / WorkItemView |
-| Thinking toggle & depth | Chat uses DeepSeek style: toggle only (default high, no intensity picker); Work/Code default thinking on with low/medium/high slider | ChatInput / ThinkingDepthSelector / ModeToggler |
-| Web search | Chat has a dedicated web-search button; Work/Code hide the toggle and let the model call WebSearch/WebFetch autonomously; defaults to DeepSeek native search with DuckDuckGo fallback | ChatInput / tool-handlers |
-| Per-mode state snapshots | Thinking toggle / intensity / web-search saved per mode (`modeThinkingPrefs`), restored on switch back | useChatStore |
-| Provenance memory | Evidence-before-belief, deterministic read path, evidence-chain UI, five-layer failure attribution | memory-* / MemoryPanel |
-| Session event timeline | Right-side timeline of session events and tool calls with trace / replay | ToolCallTimeline / session-log |
-| Live diff & rollback | Right-panel "Changes" view lists per-session file changes and rolls back | undo-manager / undo:getSessionDiffs |
-| Test-coverage panel | Settings reads coverage-summary.json live and shows line / branch / function coverage | coverage-handlers / settings |
+| Feature                          | Description                                                                                                                                                                           | Main modules                                        |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| Local account system             | First-run registration → login gate → logout / password change; password stored only as scrypt hash; `AURAXIS_AUTH_DISABLED=1` bypasses the gate for tests only                       | auth-store / auth-handlers / AuthGate / AccountPane |
+| DeepSeek API key at registration | Key can be filled and connection-tested during registration, or skipped and configured in Settings                                                                                    | AuthGate / settings / ai-handlers                   |
+| Avatar & account display         | Account shown in the top bar left of Settings; avatar upload (center-cropped PNG data URL); password change in Settings                                                               | Avatar / AccountPane / auth:setAvatar               |
+| Chat / Work / Code modes         | Three product forms under one ReAct engine; mode switches never pollute each other's state                                                                                            | useAppStore / useChatStore / code-mode              |
+| Work agent execution flow view   | Centered input + task board + execution flow (rounds, tool rows, deliverables, status)                                                                                                | ChatArea / WorkExecutionFlow / WorkItemView         |
+| Thinking toggle & depth          | Chat uses DeepSeek style: toggle only (default high, no intensity picker); Work/Code default thinking on with low/medium/high slider                                                  | ChatInput / ThinkingDepthSelector / ModeToggler     |
+| Web search                       | Chat has a dedicated web-search button; Work/Code hide the toggle and let the model call WebSearch/WebFetch autonomously; defaults to DeepSeek native search with DuckDuckGo fallback | ChatInput / tool-handlers                           |
+| Per-mode state snapshots         | Thinking toggle / intensity / web-search saved per mode (`modeThinkingPrefs`), restored on switch back                                                                                | useChatStore                                        |
+| Provenance memory                | Evidence-before-belief, deterministic read path, evidence-chain UI, five-layer failure attribution                                                                                    | memory-* / MemoryPanel                              |
+| Session event timeline           | Right-side timeline of session events and tool calls with trace / replay                                                                                                              | ToolCallTimeline / session-log                      |
+| Live diff & rollback             | Right-panel "Changes" view lists per-session file changes and rolls back                                                                                                              | undo-manager / undo:getSessionDiffs                 |
+| Test-coverage panel              | Settings reads coverage-summary.json live and shows line / branch / function coverage                                                                                                 | coverage-handlers / settings                        |
 
 ---
 
@@ -663,11 +668,11 @@ Tool execution (tool-handlers.ts) / sub-agents (recursion)
 
 Defined in `agent-handlers.ts` ([view file](../electron/ipc/agent-handlers.ts)); three built-in types:
 
-| Type | Capability | Disabled tools |
-|------|------|---------|
-| **Explore** | Read-only exploration: file search, code reading, web fetch/search | Write, Edit, Agent |
-| **Plan** | Read-only architect: designs implementation plans, outputs structured plans | Write, Edit, Bash, Agent (whitelist enforced) |
-| **general-purpose** | Full capability: coding, debugging, refactoring | None (all 71 tools available) |
+| Type                | Capability                                                                  | Disabled tools                                |
+| ------------------- | --------------------------------------------------------------------------- | --------------------------------------------- |
+| **Explore**         | Read-only exploration: file search, code reading, web fetch/search          | Write, Edit, Agent                            |
+| **Plan**            | Read-only architect: designs implementation plans, outputs structured plans | Write, Edit, Bash, Agent (whitelist enforced) |
+| **general-purpose** | Full capability: coding, debugging, refactoring                             | None (all 71 tools available)                 |
 
 ### 6.3 AgentScheduler
 
@@ -716,12 +721,12 @@ Workspace isolation is implemented in `tool-handlers.ts` (`worktreeSessions`):
 
 Plugins (`src/core/plugin-manager.ts`) provide the following extension points:
 
-| Extension point | Description |
-|--------|------|
-| **commands** | Slash commands (`/example`) that can manipulate chat input |
-| **tools** | AI tools (merged into the tool registry, callable by the LLM) |
-| **hooks** | Lifecycle hooks: `onToolExecute`, `onAgentStart`, `onAgentEnd` |
-| **ui** | UI extensions: `settingsPanel`, `statusBarItem` |
+| Extension point | Description                                                    |
+| --------------- | -------------------------------------------------------------- |
+| **commands**    | Slash commands (`/example`) that can manipulate chat input     |
+| **tools**       | AI tools (merged into the tool registry, callable by the LLM)  |
+| **hooks**       | Lifecycle hooks: `onToolExecute`, `onAgentStart`, `onAgentEnd` |
+| **ui**          | UI extensions: `settingsPanel`, `statusBarItem`                |
 
 ### 8.2 Security Model
 
@@ -752,17 +757,17 @@ Plugins run in the renderer; installation includes multi-layer security checks:
 
 Uses `zustand/middleware/persist` into `localStorage`:
 
-| Store | localStorage key | Persisted content |
-|-------|-----------------|-----------|
-| useChatStore | `auraxis-chat-storage` | Last 40 messages |
-| useSettingsStore | `auraxis-settings-storage` | API key, default model, project path, notification settings, sidebar transparency |
-| useAppStore | `auraxis-app-storage` | Theme, sidebar state, panel widths, right-panel view |
-| useAgentStore | `auraxis-agent-storage` | Agent list, priority, concurrency settings |
-| useSessionStore | `auraxis-session-storage` | Session list (max 40) |
-| useProjectStore | `auraxis-projects` | Project registry, current project, workspace/session ordering |
-| usePluginStore | `auraxis-plugin-storage` | Installed plugins, enabled state |
-| useAdvancedStore | `auraxis-advanced-storage` | MCP servers, legacy agent settings |
-| useKeybindingsStore | `auraxis_keybindings` | Keybinding overrides |
+| Store               | localStorage key           | Persisted content                                                                 |
+| ------------------- | -------------------------- | --------------------------------------------------------------------------------- |
+| useChatStore        | `auraxis-chat-storage`     | Last 40 messages                                                                  |
+| useSettingsStore    | `auraxis-settings-storage` | API key, default model, project path, notification settings, sidebar transparency |
+| useAppStore         | `auraxis-app-storage`      | Theme, sidebar state, panel widths, right-panel view                              |
+| useAgentStore       | `auraxis-agent-storage`    | Agent list, priority, concurrency settings                                        |
+| useSessionStore     | `auraxis-session-storage`  | Session list (max 40)                                                             |
+| useProjectStore     | `auraxis-projects`         | Project registry, current project, workspace/session ordering                     |
+| usePluginStore      | `auraxis-plugin-storage`   | Installed plugins, enabled state                                                  |
+| useAdvancedStore    | `auraxis-advanced-storage` | MCP servers, legacy agent settings                                                |
+| useKeybindingsStore | `auraxis_keybindings`      | Keybinding overrides                                                              |
 
 > **Note**: localStorage keys use the unified `auraxis-` prefix; `auraxis_keybindings` is the exception.
 
@@ -835,24 +840,24 @@ The SQLite projection cache and FTS index both carry `PRAGMA user_version = 1` f
 
 See `.env.example` ([view file](../.env.example)):
 
-| Variable | Description | Default |
-|------|------|--------|
-| `DEEPSEEK_API_KEY` | DeepSeek API key | none (required) |
-| `DEEPSEEK_BASE_URL` | OpenAI-format endpoint | `https://api.deepseek.com/beta/chat/completions` |
-| `DEEPSEEK_ANTHROPIC_BASE_URL` | Anthropic-format endpoint | `https://api.deepseek.com/anthropic/v1/messages` |
-| `ANTHROPIC_API_KEY` | Anthropic API key | none |
-| `ANTHROPIC_BASE_URL` | Anthropic endpoint | `https://api.anthropic.com/v1/messages` |
-| `OPENAI_API_KEY` | OpenAI API key | none |
-| `OPENAI_BASE_URL` | OpenAI endpoint | `https://api.openai.com/v1/chat/completions` |
-| `AURAXIS_MODELS` | Custom models (JSON array) | none |
-| `AURAXIS_ALLOW_UNSAFE_CODE` | Enable model-written arbitrary code execution (trusted dev only) | off |
-| `AURAXIS_MEMORY_RISK_GATE` | Enable MAP-Graph memory risk gating (M5) | off unless `1` |
-| `AURAXIS_MEMORY_EMBEDDINGS` | Enable R4 local deterministic vector route | off by default |
-| `AURAXIS_MEMORY_LLM_SIGNALS` | Add LLM signal detection on top of rule signals | off by default |
-| `AURAXIS_AUTH_DISABLED` | Skip login gate for tests/CI (don't set in normal desktop use) | off by default |
-| `AURAXIS_USER_DATA_DIR` | Override userData directory (account/settings isolation, tests) | none by default |
-| `AURAXIS_TELEMETRY_MODE` | Telemetry switch (opt-in) | off by default |
-| `AURAXIS_LOG_RETENTION_DAYS` / `AURAXIS_LOG_MAX_FILE_MB` | Log retention days / per-file cap | 180 / 256 |
+| Variable                                                 | Description                                                      | Default                                          |
+| -------------------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------ |
+| `DEEPSEEK_API_KEY`                                       | DeepSeek API key                                                 | none (required)                                  |
+| `DEEPSEEK_BASE_URL`                                      | OpenAI-format endpoint                                           | `https://api.deepseek.com/beta/chat/completions` |
+| `DEEPSEEK_ANTHROPIC_BASE_URL`                            | Anthropic-format endpoint                                        | `https://api.deepseek.com/anthropic/v1/messages` |
+| `ANTHROPIC_API_KEY`                                      | Anthropic API key                                                | none                                             |
+| `ANTHROPIC_BASE_URL`                                     | Anthropic endpoint                                               | `https://api.anthropic.com/v1/messages`          |
+| `OPENAI_API_KEY`                                         | OpenAI API key                                                   | none                                             |
+| `OPENAI_BASE_URL`                                        | OpenAI endpoint                                                  | `https://api.openai.com/v1/chat/completions`     |
+| `AURAXIS_MODELS`                                         | Custom models (JSON array)                                       | none                                             |
+| `AURAXIS_ALLOW_UNSAFE_CODE`                              | Enable model-written arbitrary code execution (trusted dev only) | off                                              |
+| `AURAXIS_MEMORY_RISK_GATE`                               | Enable MAP-Graph memory risk gating (M5)                         | off unless `1`                                   |
+| `AURAXIS_MEMORY_EMBEDDINGS`                              | Enable R4 local deterministic vector route                       | off by default                                   |
+| `AURAXIS_MEMORY_LLM_SIGNALS`                             | Add LLM signal detection on top of rule signals                  | off by default                                   |
+| `AURAXIS_AUTH_DISABLED`                                  | Skip login gate for tests/CI (don't set in normal desktop use)   | off by default                                   |
+| `AURAXIS_USER_DATA_DIR`                                  | Override userData directory (account/settings isolation, tests)  | none by default                                  |
+| `AURAXIS_TELEMETRY_MODE`                                 | Telemetry switch (opt-in)                                        | off by default                                   |
+| `AURAXIS_LOG_RETENTION_DAYS` / `AURAXIS_LOG_MAX_FILE_MB` | Log retention days / per-file cap                                | 180 / 256                                        |
 
 ### 10.3 Custom Model Format
 
@@ -918,6 +923,7 @@ dist-electron/ + dist/ ──→ electron-builder ──→ release/
 ### 12.2 Packaging Configuration
 
 `electron-builder.yml` targets three platforms:
+
 - **Windows**: NSIS installer
 - **macOS**: DMG (x64 + arm64)
 - **Linux**: AppImage
@@ -942,9 +948,9 @@ The app uses `dotenv` to load environment variables from `.env` at the project r
 - **Framework**: Vitest (`describe`, `it`, `expect`, `vi` injected via globals)
 - **Main-process tests**: `electron/**/__tests__/`, node environment; modules depending on `electron` are isolated with `vi.mock('electron', ...)`
 - **Renderer tests**: `src/**/__tests__/`, jsdom environment (@testing-library/react)
-- **Total**: 238 test files / 1,749 cases passing (+3 environment-skips)
+- **Total**: 244 test files / 1,784 cases passing (+3 environment-skips)
 - **Coverage scope**: the gate only counts `electron/ipc/`, `src/stores/`, `src/core/`; UI components (`src/components/`) and main-process entry points (`main.ts` / `preload.ts` etc.) are excluded from the gate and covered by component tests + Playwright E2E (`npm run test:e2e`)
-- **Coverage thresholds**: lines/statements 80%, branches 70%, functions 80% (current: 85.04% lines / 78.88% branches / 86.17% functions)
+- **Coverage thresholds**: lines/statements 80%, branches 70%, functions 80% (current: 85.18% lines / 78.86% branches / 87.78% functions)
 - **Coverage report**: `npm run test:coverage` outputs `coverage/coverage-summary.json` (gitignored dev artifact); the Settings "Test coverage" page reads it live via the `coverage:get` IPC; pure browser dev is served by a Vite middleware, and production builds copy it into `dist/coverage/`. When the report is missing, the panel shows the command to run instead of fake numbers
 - **E2E**: 15 Playwright UI flows passing (real Electron)
 - **Real-API acceptance (DeepSeek)**: chat streaming, Code auto-approve Bash, Code "confirm each time" permission card (write after one approval), Work smart-execution flow, and Work plan-approval panel all verified; sandbox scripts add cwd fallback when launching `dist-electron/main.js` directly (`electron/sandbox-runner.ts`)
@@ -997,6 +1003,7 @@ The main UI is **Chat / Work / Code three modes** (switched in the sidebar; each
 ### 13.6 Design System
 
 Aura design system — "Black is the Axis, White is the Structure, Purple is the Aura":
+
 - **Brand colors**: Auraxis Black `#111216` (dark base) / Ivory `#F1F1EE` (light text) + Aura purple-gray `#8C8AA8` at ~3% accent only; **no blue or large colorful gradients**
 - **Six corner radii**: 5 / 6 / 8 / 12 / 14 / 9999; 3/4/7/9/10px fragments forbidden
 - **Hairline borders**: `--color-border-dim` for all hairlines; no dark solid lines, no heavy shadow stacking
@@ -1036,34 +1043,34 @@ npm run build            # Production build
 
 ### Key File Index
 
-| File | Responsibility |
-|------|------|
-| [electron/main.ts](../electron/main.ts) | App entry |
-| [electron/preload.ts](../electron/preload.ts) | IPC bridge |
-| [electron/ipc/index.ts](../electron/ipc/index.ts) | IPC registration entry |
-| [electron/tool-defs.ts](../electron/tool-defs.ts) | Tool definitions |
-| [electron/ipc/step-engine.ts](../electron/ipc/step-engine.ts) | Unified ReAct step engine |
-| [electron/ipc/query-engine.ts](../electron/ipc/query-engine.ts) | Chat driver |
-| [electron/ipc/query-context.ts](../electron/ipc/query-context.ts) | Canonical context snapshots (cache-aligned replay / memory dedup / invalidation tombstones) |
-| [electron/ipc/agent-loop.ts](../electron/ipc/agent-loop.ts) | Agent driver (plan/approval/deviance/stop) |
-| [electron/ipc/agent-scheduler.ts](../electron/ipc/agent-scheduler.ts) | Multi-agent scheduling |
-| [electron/ipc/tool-handlers.ts](../electron/ipc/tool-handlers.ts) | Tool execution |
-| [electron/ipc/permission-handlers.ts](../electron/ipc/permission-handlers.ts) | Permission control |
-| [electron/code-mode.ts](../electron/code-mode.ts) | Code Mode (TS tool orchestration) |
-| [electron/step-compressor.ts](../electron/step-compressor.ts) | AGORA step compression |
-| [electron/workspace-drift.ts](../electron/workspace-drift.ts) | SWE-Touch workspace drift |
-| [electron/approval-fatigue.ts](../electron/approval-fatigue.ts) | Oversight approval fatigue |
-| [electron/tool-inertia.ts](../electron/tool-inertia.ts) | AutoTool tool inertia |
-| [electron/skill-gate.ts](../electron/skill-gate.ts) | VaG skill gate |
-| [electron/auth-store.ts](../electron/auth-store.ts) | Local account (register/login/avatar) |
-| [electron/ipc/memory-read.ts](../electron/ipc/memory-read.ts) | Eywa deterministic read path |
-| [electron/ipc/memory-graph.ts](../electron/ipc/memory-graph.ts) | MAP-Graph authorization gating |
-| [electron/contracts/](../electron/contracts/) | Cross-process type contracts |
-| [electron/session-store.ts](../electron/session-store.ts) | Unified event logs |
-| [src/App.tsx](../src/App.tsx) | React root component |
-| [src/stores/useChatStore.ts](../src/stores/useChatStore.ts) | Chat state |
-| [src/components/auth/AuthGate.tsx](../src/components/auth/AuthGate.tsx) | Login gate |
-| [src/components/work/WorkExecutionFlow.tsx](../src/components/work/WorkExecutionFlow.tsx) | Work execution flow view |
-| [src/components/input/ThinkingDepthSelector.tsx](../src/components/input/ThinkingDepthSelector.tsx) | Thinking-depth slider (magnetic streaming effect) |
-| [src/core/plugin-manager.ts](../src/core/plugin-manager.ts) | Plugin management |
-| [src/styles/theme.ts](../src/styles/theme.ts) | Theme configuration |
+| File                                                                                                | Responsibility                                                                              |
+| --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| [electron/main.ts](../electron/main.ts)                                                             | App entry                                                                                   |
+| [electron/preload.ts](../electron/preload.ts)                                                       | IPC bridge                                                                                  |
+| [electron/ipc/index.ts](../electron/ipc/index.ts)                                                   | IPC registration entry                                                                      |
+| [electron/tool-defs.ts](../electron/tool-defs.ts)                                                   | Tool definitions                                                                            |
+| [electron/ipc/step-engine.ts](../electron/ipc/step-engine.ts)                                       | Unified ReAct step engine                                                                   |
+| [electron/ipc/query-engine.ts](../electron/ipc/query-engine.ts)                                     | Chat driver                                                                                 |
+| [electron/ipc/query-context.ts](../electron/ipc/query-context.ts)                                   | Canonical context snapshots (cache-aligned replay / memory dedup / invalidation tombstones) |
+| [electron/ipc/agent-loop.ts](../electron/ipc/agent-loop.ts)                                         | Agent driver (plan/approval/deviance/stop)                                                  |
+| [electron/ipc/agent-scheduler.ts](../electron/ipc/agent-scheduler.ts)                               | Multi-agent scheduling                                                                      |
+| [electron/ipc/tool-handlers.ts](../electron/ipc/tool-handlers.ts)                                   | Tool execution                                                                              |
+| [electron/ipc/permission-handlers.ts](../electron/ipc/permission-handlers.ts)                       | Permission control                                                                          |
+| [electron/code-mode.ts](../electron/code-mode.ts)                                                   | Code Mode (TS tool orchestration)                                                           |
+| [electron/step-compressor.ts](../electron/step-compressor.ts)                                       | AGORA step compression                                                                      |
+| [electron/workspace-drift.ts](../electron/workspace-drift.ts)                                       | SWE-Touch workspace drift                                                                   |
+| [electron/approval-fatigue.ts](../electron/approval-fatigue.ts)                                     | Oversight approval fatigue                                                                  |
+| [electron/tool-inertia.ts](../electron/tool-inertia.ts)                                             | AutoTool tool inertia                                                                       |
+| [electron/skill-gate.ts](../electron/skill-gate.ts)                                                 | VaG skill gate                                                                              |
+| [electron/auth-store.ts](../electron/auth-store.ts)                                                 | Local account (register/login/avatar)                                                       |
+| [electron/ipc/memory-read.ts](../electron/ipc/memory-read.ts)                                       | Eywa deterministic read path                                                                |
+| [electron/ipc/memory-graph.ts](../electron/ipc/memory-graph.ts)                                     | MAP-Graph authorization gating                                                              |
+| [electron/contracts/](../electron/contracts/)                                                       | Cross-process type contracts                                                                |
+| [electron/session-store.ts](../electron/session-store.ts)                                           | Unified event logs                                                                          |
+| [src/App.tsx](../src/App.tsx)                                                                       | React root component                                                                        |
+| [src/stores/useChatStore.ts](../src/stores/useChatStore.ts)                                         | Chat state                                                                                  |
+| [src/components/auth/AuthGate.tsx](../src/components/auth/AuthGate.tsx)                             | Login gate                                                                                  |
+| [src/components/work/WorkExecutionFlow.tsx](../src/components/work/WorkExecutionFlow.tsx)           | Work execution flow view                                                                    |
+| [src/components/input/ThinkingDepthSelector.tsx](../src/components/input/ThinkingDepthSelector.tsx) | Thinking-depth slider (magnetic streaming effect)                                           |
+| [src/core/plugin-manager.ts](../src/core/plugin-manager.ts)                                         | Plugin management                                                                           |
+| [src/styles/theme.ts](../src/styles/theme.ts)                                                       | Theme configuration                                                                         |

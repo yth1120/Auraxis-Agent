@@ -7,8 +7,7 @@ import {
   Folder as FolderOutlined,
   GitDiff as DiffOutlined,
   Browser as ChromeOutlined,
-} from '@/components/common/icons'
-import clsx from 'clsx';
+} from '@/components/common/icons';
 import { useT } from '../../i18n';
 import { useAppStore } from '@/stores/useAppStore';
 import { useChatStore } from '@/stores/useChatStore';
@@ -45,10 +44,10 @@ export default function TabBar() {
 
   const handleAddTab = (type: WorkbenchTabType) => {
     const labels: Record<WorkbenchTabType, string> = {
-  chat: t('tab.chatN', { n: messages.length + 1 }),
-  'file-tree': t('tab.fileTree'),
-  diff: t('tab.diff'),
-  browser: t('tab.browser'),
+      chat: t('tab.chatN', { n: messages.length + 1 }),
+      'file-tree': t('tab.fileTree'),
+      diff: t('tab.diff'),
+      browser: t('tab.browser'),
     };
     addTab({
       type,
@@ -59,9 +58,14 @@ export default function TabBar() {
 
   const menu = {
     items: [
-  { key: 'chat', icon: NEW_CHAT_ICON, label: t('nav.newChat'), onClick: () => handleAddTab('chat') },
-  { key: 'file-tree', icon: <FolderOutlined />, label: t('tab.fileTree'), onClick: () => handleAddTab('file-tree') },
-  { key: 'browser', icon: <ChromeOutlined />, label: t('tab.browser'), onClick: () => handleAddTab('browser') },
+      { key: 'chat', icon: NEW_CHAT_ICON, label: t('nav.newChat'), onClick: () => handleAddTab('chat') },
+      {
+        key: 'file-tree',
+        icon: <FolderOutlined />,
+        label: t('tab.fileTree'),
+        onClick: () => handleAddTab('file-tree'),
+      },
+      { key: 'browser', icon: <ChromeOutlined />, label: t('tab.browser'), onClick: () => handleAddTab('browser') },
     ],
   };
 

@@ -1,3 +1,4 @@
+import { errorText } from '../../../electron/errors';
 import { useState } from 'react';
 import { Check, WarningCircle, X } from '@/components/common/icons';
 import { message } from 'antd';
@@ -17,9 +18,7 @@ function basename(p: string): string {
  */
 export default function PlanApprovalPanel({ plan }: { plan: PlanData }) {
   const t = useT();
-  const [selected, setSelected] = useState<Set<string>>(
-    () => new Set(plan.steps.map((s) => s.id)),
-  );
+  const [selected, setSelected] = useState<Set<string>>(() => new Set(plan.steps.map((s) => s.id)));
   const [submitting, setSubmitting] = useState(false);
 
   const toggle = (id: string) => {
@@ -37,11 +36,11 @@ export default function PlanApprovalPanel({ plan }: { plan: PlanData }) {
     setSubmitting(true);
     try {
       const res = await window.electronAPI?.plan?.approve(plan.planId, ids);
-    if (!res?.ok) throw new Error(res?.error || t('plan.approveFailed'));
-    message.success(t('plan.approved', { n: ids.length }));
+      if (!res?.ok) throw new Error(res?.error || t('plan.approveFailed'));
+      message.success(t('plan.approved', { n: ids.length }));
       useInspectorStore.getState().removePlan(plan.planId);
-    } catch (e: any) {
-    message.error(e?.message || t('plan.approveFailed'));
+    } catch (e: unknown) {
+      message.error(errorText(e) || t('plan.approveFailed'));
     } finally {
       setSubmitting(false);
     }
@@ -51,11 +50,11 @@ export default function PlanApprovalPanel({ plan }: { plan: PlanData }) {
     setSubmitting(true);
     try {
       const res = await window.electronAPI?.plan?.reject(plan.planId);
-    if (!res?.ok) throw new Error(res?.error || t('plan.denyFailed'));
-    message.info(t('plan.denied'));
+      if (!res?.ok) throw new Error(res?.error || t('plan.denyFailed'));
+      message.info(t('plan.denied'));
       useInspectorStore.getState().removePlan(plan.planId);
-    } catch (e: any) {
-    message.error(e?.message || t('plan.denyFailed'));
+    } catch (e: unknown) {
+      message.error(errorText(e) || t('plan.denyFailed'));
     } finally {
       setSubmitting(false);
     }
@@ -65,16 +64,15 @@ export default function PlanApprovalPanel({ plan }: { plan: PlanData }) {
     <div className="ax-composer relative flex flex-col w-full max-w-[var(--content-max-width)] mx-auto bg-warning-soft border border-warning/30 rounded-2xl shadow-[var(--shadow-sm)]">
       <div className="flex items-center gap-2 px-4 pt-3 pb-2">
         <WarningCircle size={16} weight="fill" className="shrink-0 text-warning" />
-    <span className="shrink-0 text-sm font-semibold text-text-primary">{t('plan.waiting')}</span>
+        <span className="shrink-0 text-sm font-semibold text-text-primary">{t('plan.waiting')}</span>
         {plan.filePath && (
-          <span
-            className="shrink-0 min-w-0 max-w-[220px] truncate text-2xs text-text-muted"
-            title={plan.filePath}
-          >
-    {t('plan.savedAt', { name: basename(plan.filePath) })}
+          <span className="shrink-0 min-w-0 max-w-[220px] truncate text-2xs text-text-muted" title={plan.filePath}>
+            {t('plan.savedAt', { name: basename(plan.filePath) })}
           </span>
         )}
-    <span className="ml-auto shrink-0 text-2xs text-text-muted">{t('plan.stepCount', { n: plan.steps.length })}</span>
+        <span className="ml-auto shrink-0 text-2xs text-text-muted">
+          {t('plan.stepCount', { n: plan.steps.length })}
+        </span>
       </div>
 
       <div className="max-h-[200px] overflow-y-auto px-3 pb-2 flex flex-col gap-0.5">
@@ -92,7 +90,7 @@ export default function PlanApprovalPanel({ plan }: { plan: PlanData }) {
               checked={selected.has(s.id)}
               onChange={() => toggle(s.id)}
               className="mt-[3px] shrink-0 accent-[var(--color-primary)]"
-    aria-label={t('plan.selectStep', { n: i + 1 })}
+              aria-label={t('plan.selectStep', { n: i + 1 })}
             />
             <span className="flex-1 min-w-0 flex items-start gap-1.5 text-xs leading-relaxed">
               <span className="shrink-0 text-2xs px-1.5 py-0.5 rounded-md bg-[var(--color-bg-inset)] text-text-muted font-mono">
@@ -112,7 +110,7 @@ export default function PlanApprovalPanel({ plan }: { plan: PlanData }) {
           onClick={approve}
         >
           <Check size={14} />
-    {t('plan.approveSelected', { n: selected.size })}
+          {t('plan.approveSelected', { n: selected.size })}
         </button>
         <button
           type="button"
@@ -121,9 +119,9 @@ export default function PlanApprovalPanel({ plan }: { plan: PlanData }) {
           onClick={reject}
         >
           <X size={14} />
-    {t('plan.deny')}
+          {t('plan.deny')}
         </button>
-    <span className="ml-auto text-2xs text-text-muted">{t('plan.hint')}</span>
+        <span className="ml-auto text-2xs text-text-muted">{t('plan.hint')}</span>
       </div>
     </div>
   );

@@ -1,8 +1,7 @@
 // @vitest-environment jsdom
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, act } from '@testing-library/react';
-import React from 'react';
+import { render } from '@testing-library/react';
 
 // Mock MarkdownRenderer to capture what content it receives
 const receivedContents: string[] = [];

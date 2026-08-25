@@ -167,12 +167,24 @@ describe('Snip-Compact — Safe Boundary Detection', () => {
     const messages = [
       { role: 'user', content: 'task' },
       // Round 1
-      { role: 'assistant', content: 'step 1', tool_calls: [{ id: 'c1', type: 'function', function: { name: 'Bash', arguments: '{}' } }] },
+      {
+        role: 'assistant',
+        content: 'step 1',
+        tool_calls: [{ id: 'c1', type: 'function', function: { name: 'Bash', arguments: '{}' } }],
+      },
       { role: 'tool', tool_call_id: 'c1', content: 'result 1' },
-      { role: 'assistant', content: 'step 1 done, now step 2', tool_calls: [{ id: 'c2', type: 'function', function: { name: 'Bash', arguments: '{}' } }] },
+      {
+        role: 'assistant',
+        content: 'step 1 done, now step 2',
+        tool_calls: [{ id: 'c2', type: 'function', function: { name: 'Bash', arguments: '{}' } }],
+      },
       { role: 'tool', tool_call_id: 'c2', content: 'result 2' },
       // Round 2
-      { role: 'assistant', content: 'step 2 done, now step 3', tool_calls: [{ id: 'c3', type: 'function', function: { name: 'Write', arguments: '{}' } }] },
+      {
+        role: 'assistant',
+        content: 'step 2 done, now step 3',
+        tool_calls: [{ id: 'c3', type: 'function', function: { name: 'Write', arguments: '{}' } }],
+      },
       { role: 'tool', tool_call_id: 'c3', content: 'result 3' },
       { role: 'assistant', content: 'All done! <FINAL_ANSWER>' },
     ];
@@ -195,7 +207,11 @@ describe('Snip-Compact — Round Counting', () => {
 
   it('counts one complete round (assistant + tool)', () => {
     const messages = [
-      { role: 'assistant', content: 'doing', tool_calls: [{ id: 'c1', type: 'function', function: { name: 'Read', arguments: '{}' } }] },
+      {
+        role: 'assistant',
+        content: 'doing',
+        tool_calls: [{ id: 'c1', type: 'function', function: { name: 'Read', arguments: '{}' } }],
+      },
       { role: 'tool', tool_call_id: 'c1', content: 'done' },
     ];
     expect(countCompleteRounds(messages)).toBe(1);
@@ -221,7 +237,11 @@ describe('Snip-Compact — Truncation', () => {
     ];
     for (let r = 0; r < roundCount; r++) {
       msgs.push({ role: 'user', content: `request ${r}` });
-      msgs.push({ role: 'assistant', content: `thinking ${r}`, tool_calls: [{ id: `c${r}`, type: 'function', function: { name: 'Read', arguments: '{}' } }] });
+      msgs.push({
+        role: 'assistant',
+        content: `thinking ${r}`,
+        tool_calls: [{ id: `c${r}`, type: 'function', function: { name: 'Read', arguments: '{}' } }],
+      });
       msgs.push({ role: 'tool', tool_call_id: `c${r}`, content: `result ${r}` });
       msgs.push({ role: 'assistant', content: `summary ${r}` });
     }
@@ -310,7 +330,7 @@ describe('Compaction triggers', () => {
   it('shouldCompactByTokens triggers at 90% threshold', () => {
     // Create enough messages to exceed threshold
     const msgs = Array.from({ length: 1000 }, (_, i) => ({
-      role: i % 2 === 0 ? 'user' as const : 'assistant' as const,
+      role: i % 2 === 0 ? ('user' as const) : ('assistant' as const),
       content: 'x'.repeat(500),
     }));
     // ~500/3 + 4 ≈ 170 tokens per message, 1000 messages ≈ 170K tokens
@@ -328,7 +348,11 @@ describe('Compaction triggers', () => {
   it('shouldCompactByRounds triggers when exceeding maxRounds', () => {
     const msgs: any[] = [];
     for (let r = 0; r < 25; r++) {
-      msgs.push({ role: 'assistant', content: `thinking ${r}`, tool_calls: [{ id: `c${r}`, type: 'function', function: { name: 'Read', arguments: '{}' } }] });
+      msgs.push({
+        role: 'assistant',
+        content: `thinking ${r}`,
+        tool_calls: [{ id: `c${r}`, type: 'function', function: { name: 'Read', arguments: '{}' } }],
+      });
       msgs.push({ role: 'tool', tool_call_id: `c${r}`, content: `result ${r}` });
     }
     expect(shouldCompactByRounds(msgs, 20)).toBe(true);

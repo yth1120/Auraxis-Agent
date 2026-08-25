@@ -25,12 +25,20 @@ export interface SlashCommand {
 export const SLASH_COMMANDS: SlashCommand[] = [
   { name: 'clear', description: '清空当前对话', usage: '/clear' },
   { name: 'model', description: '切换 AI 模型', usage: '/model <name>' },
-  { name: 'agent', description: '创建指定类型的 Agent 任务（Explore / Plan / 通用）', usage: '/agent <Explore|Plan|general-purpose>' },
+  {
+    name: 'agent',
+    description: '创建指定类型的 Agent 任务（Explore / Plan / 通用）',
+    usage: '/agent <Explore|Plan|general-purpose>',
+  },
   { name: 'goal', description: '进入目标模式，设置持续执行的目标', usage: '/goal <目标描述>' },
   { name: 'plan', description: '计划模式：先生成计划，批准后执行', usage: '/plan <任务描述>' },
   { name: 'tool', description: '指定下一个 Agent 任务的工具调用策略', usage: '/tool <auto|none|required|工具名>' },
   { name: 'review', description: '启动代码审查：只读审查 Agent + 变更面板', usage: '/review <范围>' },
-  { name: 'skill', description: '启动快捷技能（代码审查 / Bug 修复 / 重构 / 测试 / 架构 / 功能）', usage: '/skill <技能名>' },
+  {
+    name: 'skill',
+    description: '启动快捷技能（代码审查 / Bug 修复 / 重构 / 测试 / 架构 / 功能）',
+    usage: '/skill <技能名>',
+  },
   { name: 'workflow', description: '运行脚本化多 Agent 工作流', usage: '/workflow <名称>' },
   { name: 'memories', description: '控制当前对话是否使用 / 写入记忆', usage: '/memories <on|off>' },
   { name: 'feedback', description: '记录一条本地反馈（帮助改进 Auraxis）', usage: '/feedback <内容>' },
@@ -94,10 +102,12 @@ export function createAgent(params: {
         toolChoice: params.toolChoice,
         mode: params.mode,
         workTier: params.workTier,
-        workspaceRoots: params.workspaceRoots
-          ?? (activeProject?.roots && activeProject.roots.length > 0 ? activeProject.roots : undefined),
-        writableRoots: params.writableRoots
-          ?? (activeProject?.writableRoots && activeProject.writableRoots.length > 0
+        workspaceRoots:
+          params.workspaceRoots ??
+          (activeProject?.roots && activeProject.roots.length > 0 ? activeProject.roots : undefined),
+        writableRoots:
+          params.writableRoots ??
+          (activeProject?.writableRoots && activeProject.writableRoots.length > 0
             ? activeProject.writableRoots
             : undefined),
         // Explicit per-task sandbox wins; otherwise the preset's boundary is
@@ -188,16 +198,20 @@ export function executeCommand(
     }
 
     case 'skill': {
-      const skill = AGENT_SKILLS.find((s) =>
-        s.name === trimmedArgs || s.key === trimmedArgs
-        || s.name.toLowerCase() === trimmedArgs.toLowerCase()
-        || s.key.toLowerCase() === trimmedArgs.toLowerCase());
+      const skill = AGENT_SKILLS.find(
+        (s) =>
+          s.name === trimmedArgs ||
+          s.key === trimmedArgs ||
+          s.name.toLowerCase() === trimmedArgs.toLowerCase() ||
+          s.key.toLowerCase() === trimmedArgs.toLowerCase(),
+      );
       if (!skill) {
         // Fall through to the real SKILL.md registry before asking for more input.
         void (async () => {
           const list = await window.electronAPI?.skills?.list();
-          const match = (list?.data?.skills ?? []).find((s) =>
-            s.name === trimmedArgs || s.name.toLowerCase() === trimmedArgs.toLowerCase());
+          const match = (list?.data?.skills ?? []).find(
+            (s) => s.name === trimmedArgs || s.name.toLowerCase() === trimmedArgs.toLowerCase(),
+          );
           if (!match) {
             message.error(t('cmd.msg.skillNotFound', { name: trimmedArgs }));
             return;
@@ -302,7 +316,10 @@ export function executeCommand(
       void (async () => {
         const list = await window.electronAPI?.workflow?.list(projectRoot);
         const def = (list?.data || []).find((d) => d.id === trimmedArgs || d.name === trimmedArgs);
-        if (!def) { message.error(t('cmd.msg.workflowNotFound', { name: trimmedArgs })); return; }
+        if (!def) {
+          message.error(t('cmd.msg.workflowNotFound', { name: trimmedArgs }));
+          return;
+        }
         const r = await window.electronAPI?.workflow?.run({ workflowId: def.id, projectRoot });
         if (r?.ok) message.success(t('cmd.msg.workflowStarted', { id: r.data?.runId ?? '' }));
         else message.error(r?.error || t('cmd.msg.startFailed'));
@@ -354,13 +371,15 @@ export function executeCommand(
         content: createElement(
           'div',
           { className: 'flex flex-col gap-1' },
-          SLASH_COMMANDS.map((c) => createElement(
-            'div',
-            { key: c.name, className: 'text-xs text-text-secondary' },
-            createElement('span', { className: 'font-mono text-primary' }, c.usage),
-            ' — ',
-            t(slashCommandDescKey(c.name)),
-          )),
+          SLASH_COMMANDS.map((c) =>
+            createElement(
+              'div',
+              { key: c.name, className: 'text-xs text-text-secondary' },
+              createElement('span', { className: 'font-mono text-primary' }, c.usage),
+              ' — ',
+              t(slashCommandDescKey(c.name)),
+            ),
+          ),
         ),
       });
       return true;

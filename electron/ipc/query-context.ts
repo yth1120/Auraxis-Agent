@@ -12,10 +12,7 @@
  */
 
 import type { ApprovalPolicy } from '../contracts/core';
-import {
-  LLM_CONTEXT_CLEAR_EVENT,
-  LLM_CONTEXT_SNAPSHOT_EVENT,
-} from '../contracts/session-types';
+import { LLM_CONTEXT_CLEAR_EVENT, LLM_CONTEXT_SNAPSHOT_EVENT } from '../contracts/session-types';
 import { appendChatEvents, readChatLog } from '../chat-log';
 
 export const AGENTS_MD_PREFIX = '## 项目指令（AGENTS.md）';
@@ -73,26 +70,23 @@ export function tryReplayStoredContext(
   // AGENTS.md may be absent when the project has no instructions — then the
   // fresh path never injected it, so nothing to refresh.
   if (instructions.trim()) {
-    const instrIdx = messages.findIndex(
-      (m) => isUserStringMessage(m) && m.content.startsWith(AGENTS_MD_PREFIX),
-    );
+    const instrIdx = messages.findIndex((m) => isUserStringMessage(m) && m.content.startsWith(AGENTS_MD_PREFIX));
     if (instrIdx < 0) return { ok: false, messages };
     const nextInstr = buildAgentsMdMessage(instructions);
     if (messages[instrIdx].content !== nextInstr) messages[instrIdx].content = nextInstr;
   } else {
     // Project rules were removed — replaying the stale AGENTS.md block would
     // keep the model following rules that no longer exist. Rebuild fresh.
-    const instrIdx = messages.findIndex(
-      (m) => isUserStringMessage(m) && m.content.startsWith(AGENTS_MD_PREFIX),
-    );
+    const instrIdx = messages.findIndex((m) => isUserStringMessage(m) && m.content.startsWith(AGENTS_MD_PREFIX));
     if (instrIdx >= 0) return { ok: false, messages };
   }
 
   const modeIdx = messages.findIndex(
-    (m) => isUserStringMessage(m)
-      && (m.content.startsWith('当前为计划模式')
-        || m.content.startsWith('当前为全自动模式')
-        || m.content.startsWith('当前为交互模式')),
+    (m) =>
+      isUserStringMessage(m) &&
+      (m.content.startsWith('当前为计划模式') ||
+        m.content.startsWith('当前为全自动模式') ||
+        m.content.startsWith('当前为交互模式')),
   );
   if (modeIdx < 0) return { ok: false, messages };
   if (messages[modeIdx].content !== modeHint) messages[modeIdx].content = modeHint;

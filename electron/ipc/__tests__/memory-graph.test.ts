@@ -91,7 +91,9 @@ describe('buildScopeGraph / filterGraphByRole（M5）', () => {
     const action = graph.nodes.find((n) => n.kind === 'action');
     expect(action?.label).toBe('Write');
     expect(action?.risk).toBe('high');
-    expect(graph.edges.some((e) => e.from === 'agent:agent-9' && e.to === action?.id && e.kind === 'performed')).toBe(true);
+    expect(graph.edges.some((e) => e.from === 'agent:agent-9' && e.to === action?.id && e.kind === 'performed')).toBe(
+      true,
+    );
   });
 
   it('buildScopeGraphForAgent 自动推导角色并返回', () => {
@@ -122,7 +124,12 @@ describe('evaluateRiskGate（M5）', () => {
   });
 
   it('recordRiskAudit 写入审计轨迹', () => {
-    const runId = recordRiskAudit('C:/g', 'Write', { allowed: false, reason: 'trust low', trust: 0.2, evidenceCount: 0 });
+    const runId = recordRiskAudit('C:/g', 'Write', {
+      allowed: false,
+      reason: 'trust low',
+      trust: 0.2,
+      evidenceCount: 0,
+    });
     const run = getReadRun(runId);
     expect(run?.query).toBe('risk-gate:Write');
     expect(run?.scope).toBe('C:/g');

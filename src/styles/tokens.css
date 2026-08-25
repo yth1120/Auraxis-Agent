@@ -9,146 +9,154 @@
    brand black; surfaces are cool neutral whites — no warm ivory. */
 :root {
   --color-primary: #111216;
-  --color-primary-hover: #292C32;
-  --color-primary-active: #3A3E45;
+  --color-primary-hover: #292c32;
+  --color-primary-active: #3a3e45;
   --color-primary-soft: rgba(30, 35, 42, 0.07);
   --color-primary-strong: rgba(30, 35, 42, 0.12);
-  --color-primary-border: rgba(30, 35, 42, 0.20);
-  --color-accent: #6A6884;
-  --color-accent-hover: #5B5975;
-  --color-accent-active: #4D4B66;
-  --color-accent-soft: rgba(106, 104, 132, 0.10);
+  --color-primary-border: rgba(30, 35, 42, 0.2);
+  --color-accent: #6a6884;
+  --color-accent-hover: #5b5975;
+  --color-accent-active: #4d4b66;
+  --color-accent-soft: rgba(106, 104, 132, 0.1);
   --color-accent-strong: rgba(106, 104, 132, 0.16);
   --color-accent-border: rgba(106, 104, 132, 0.24);
 
   /* Subtle graphite → aura gradient — wordmark / logo accents only. */
-  --color-brand-from: #292C32;
-  --color-brand-to: #6A6884;
+  --color-brand-from: #292c32;
+  --color-brand-to: #6a6884;
 
   /* Alias kept for focus, selection and links. */
-  --color-violet: #6A6884;
-  --color-violet-hover: #5B5975;
-  --color-violet-active: #4D4B66;
-  --color-violet-soft: rgba(106, 104, 132, 0.10);
+  --color-violet: #6a6884;
+  --color-violet-hover: #5b5975;
+  --color-violet-active: #4d4b66;
+  --color-violet-soft: rgba(106, 104, 132, 0.1);
   --color-violet-strong: rgba(106, 104, 132, 0.16);
   --color-violet-border: rgba(106, 104, 132, 0.24);
 
-  --color-bg-primary: #FFFFFF;
-  --color-bg-secondary: #F5F6F8;
-  --color-bg-tertiary: #EBEDF0;
-  --color-bg-elevated: #FFFFFF;
+  --color-bg-primary: #ffffff;
+  --color-bg-secondary: #f5f6f8;
+  --color-bg-tertiary: #ebedf0;
+  --color-bg-elevated: #ffffff;
   --color-bg-inset: rgba(30, 35, 42, 0.045);
 
   --color-text-primary: #111216;
-  --color-text-secondary: #2E333A;
-  --color-text-muted: #454B53;
-  --color-text-faint: #61676F;
-  --color-text-on-accent: #FFFFFF;
+  --color-text-secondary: #2e333a;
+  --color-text-muted: #454b53;
+  --color-text-faint: #61676f;
+  --color-text-on-accent: #ffffff;
 
   --color-border-dim: rgba(30, 35, 42, 0.065);
   --color-border-default: rgba(30, 35, 42, 0.085);
   --color-border-strong: rgba(30, 35, 42, 0.13);
   --color-hover: rgba(30, 35, 42, 0.08);
 
-  --color-success: #4F7C68;
-  --color-success-soft: rgba(79, 124, 104, 0.10);
-  --color-danger: #A25B60;
-  --color-danger-soft: rgba(162, 91, 96, 0.10);
+  --color-success: #4f7c68;
+  --color-success-soft: rgba(79, 124, 104, 0.1);
+  --color-danger: #a25b60;
+  --color-danger-soft: rgba(162, 91, 96, 0.1);
   --color-danger-border: rgba(162, 91, 96, 0.22);
-  --color-danger-lighter: #B06F74;
-  --color-warning: #B97F3E;
-  --color-warning-soft: rgba(185, 127, 62, 0.10);
+  --color-danger-lighter: #b06f74;
+  --color-warning: #b97f3e;
+  --color-warning-soft: rgba(185, 127, 62, 0.1);
   --color-warning-border: rgba(185, 127, 62, 0.24);
 
-  --color-code-bg: #F5F6F8;
-  --color-surface: #FFFFFF;
-  --color-surface-hover: #EEF0F3;
-  --color-tooltip-bg: #FFFFFF;
-  --glass-switcher-thumb: rgba(255, 255, 255, 0.70);
+  --color-code-bg: #f5f6f8;
+  --color-surface: #ffffff;
+  --color-surface-hover: #eef0f3;
+  --color-tooltip-bg: #ffffff;
+  --glass-switcher-thumb: rgba(255, 255, 255, 0.7);
 }
 
 /* ── Dark theme overrides ────────────────────────────────── */
 /* Dark First: brand black base, graphite layers, ivory text. Aura Purple
    appears only in focus rings, selection and tiny status accents. */
 .dark {
-  --color-primary: #F1F1EE;
-  --color-primary-hover: #D9D9D6;
-  --color-primary-active: #C8C8C4;
+  --color-primary: #f1f1ee;
+  --color-primary-hover: #d9d9d6;
+  --color-primary-active: #c8c8c4;
   --color-primary-soft: rgba(241, 241, 238, 0.08);
   --color-primary-strong: rgba(241, 241, 238, 0.14);
   --color-primary-border: rgba(241, 241, 238, 0.22);
-  --color-accent: #8C8AA8;
-  --color-accent-hover: #A6A4C2;
-  --color-accent-active: #6F6D8E;
+  --color-accent: #8c8aa8;
+  --color-accent-hover: #a6a4c2;
+  --color-accent-active: #6f6d8e;
   --color-accent-soft: rgba(140, 138, 168, 0.14);
   --color-accent-strong: rgba(140, 138, 168, 0.22);
-  --color-accent-border: rgba(140, 138, 168, 0.30);
+  --color-accent-border: rgba(140, 138, 168, 0.3);
 
-  --color-brand-from: #8C8AA8;
-  --color-brand-to: #D9D7E8;
+  --color-brand-from: #8c8aa8;
+  --color-brand-to: #d9d7e8;
 
-  --color-violet: #8C8AA8;
-  --color-violet-hover: #A6A4C2;
-  --color-violet-active: #6F6D8E;
+  --color-violet: #8c8aa8;
+  --color-violet-hover: #a6a4c2;
+  --color-violet-active: #6f6d8e;
   --color-violet-soft: rgba(140, 138, 168, 0.14);
-  --color-violet-strong: rgba(140, 138, 168, 0.20);
-  --color-violet-border: rgba(140, 138, 168, 0.30);
+  --color-violet-strong: rgba(140, 138, 168, 0.2);
+  --color-violet-border: rgba(140, 138, 168, 0.3);
 
   --color-bg-primary: #111216;
-  --color-bg-secondary: #1B1D21;
-  --color-bg-tertiary: #23262B;
-  --color-bg-elevated: #2C3037;
-  --color-bg-inset: rgba(0, 0, 0, 0.30);
+  --color-bg-secondary: #1b1d21;
+  --color-bg-tertiary: #23262b;
+  --color-bg-elevated: #2c3037;
+  --color-bg-inset: rgba(0, 0, 0, 0.3);
 
-  --color-text-primary: #F3F3F0;
-  --color-text-secondary: #E2E5E7;
-  --color-text-muted: #C5C9CE;
-  --color-text-faint: #9DA2A9;
+  --color-text-primary: #f3f3f0;
+  --color-text-secondary: #e2e5e7;
+  --color-text-muted: #c5c9ce;
+  --color-text-faint: #9da2a9;
   --color-text-on-accent: #111216;
 
   --color-border-dim: rgba(62, 67, 76, 0.55);
-  --color-border-default: #2A2E35;
-  --color-border-strong: #383D45;
+  --color-border-default: #2a2e35;
+  --color-border-strong: #383d45;
   --color-hover: rgba(241, 241, 238, 0.09);
 
-  --color-success: #4FAE86;
+  --color-success: #4fae86;
   --color-success-soft: rgba(79, 174, 134, 0.12);
-  --color-danger: #B07177;
+  --color-danger: #b07177;
   --color-danger-soft: rgba(176, 113, 119, 0.12);
   --color-danger-border: rgba(176, 113, 119, 0.24);
-  --color-danger-lighter: #C98E92;
-  --color-warning: #B8935A;
+  --color-danger-lighter: #c98e92;
+  --color-warning: #b8935a;
   --color-warning-soft: rgba(184, 147, 90, 0.12);
   --color-warning-border: rgba(184, 147, 90, 0.24);
 
-  --color-code-bg: #1B1D21;
-  --color-surface: #1B1D21;
-  --color-surface-hover: #23262B;
-  --color-tooltip-bg: #23262B;
+  --color-code-bg: #1b1d21;
+  --color-surface: #1b1d21;
+  --color-surface-hover: #23262b;
+  --color-tooltip-bg: #23262b;
   --glass-switcher-thumb: rgba(255, 255, 255, 0.18);
 }
 
 /* ── Frosted Glass Surfaces ──────────────────────────────── */
 :root {
   /* sidebar acrylic 与既有组件引用；界面主体为实体表面。 */
-  --color-glass-header: #FFFFFF;
-  --color-glass-panel: #F6F7F9;
+  --color-glass-header: #ffffff;
+  --color-glass-panel: #f6f7f9;
   --glass-mask: rgba(17, 18, 22, 0.34);
 }
 .dark {
   --color-glass-header: #111216;
-  --color-glass-panel: #1B1D21;
+  --color-glass-panel: #1b1d21;
   --glass-mask: rgba(0, 0, 0, 0.55);
 }
 
 /* ── Content Width ───────────────────────────────────────── */
-:root { --content-max-width: 748px; }
+:root {
+  --content-max-width: 748px;
+}
 
 /* ── Spacing ─────────────────────────────────────────────── */
 :root {
-  --space-1: 4px; --space-2: 8px; --space-3: 12px;
-  --space-4: 16px; --space-5: 20px; --space-6: 24px;
-  --space-8: 32px; --space-10: 40px; --space-12: 48px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
   --space-16: 64px;
 }
 
@@ -156,18 +164,19 @@
 :root {
   /* 系统 UI 字体栈（与主流桌面应用一致）。 */
   /* Inter Variable 随应用打包（Latin 界面字），CJK 回退到系统最优黑体。 */
-  --font-heading: 'Inter Variable', 'Segoe UI Variable Text', 'Segoe UI',
-    -apple-system, BlinkMacSystemFont, 'HarmonyOS Sans SC', 'MiSans',
-    'PingFang SC', 'Hiragino Sans GB', 'Source Han Sans SC', 'Noto Sans CJK SC',
-    'Microsoft YaHei UI', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
-  --font-body: 'Inter Variable', 'Segoe UI Variable Text', 'Segoe UI',
-    -apple-system, BlinkMacSystemFont, 'HarmonyOS Sans SC', 'MiSans',
-    'PingFang SC', 'Hiragino Sans GB', 'Source Han Sans SC', 'Noto Sans CJK SC',
-    'Microsoft YaHei UI', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
+  --font-heading:
+    'Inter Variable', 'Segoe UI Variable Text', 'Segoe UI', -apple-system, BlinkMacSystemFont, 'HarmonyOS Sans SC',
+    'MiSans', 'PingFang SC', 'Hiragino Sans GB', 'Source Han Sans SC', 'Noto Sans CJK SC', 'Microsoft YaHei UI',
+    'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
+  --font-body:
+    'Inter Variable', 'Segoe UI Variable Text', 'Segoe UI', -apple-system, BlinkMacSystemFont, 'HarmonyOS Sans SC',
+    'MiSans', 'PingFang SC', 'Hiragino Sans GB', 'Source Han Sans SC', 'Noto Sans CJK SC', 'Microsoft YaHei UI',
+    'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
   /* Code stack deliberately omits a bare `monospace` tail so Windows CJK
      falls back to YaHei instead of SimSun. */
-  --font-mono: 'SF Mono', 'JetBrains Mono', 'Fira Code', 'Cascadia Code',
-    Consolas, 'Liberation Mono', Menlo, Courier, 'PingFang SC', 'Microsoft YaHei';
+  --font-mono:
+    'SF Mono', 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, 'Liberation Mono', Menlo, Courier,
+    'PingFang SC', 'Microsoft YaHei';
 
   /* 排版字号刻度。 */
   --ax-font-markdown-h1: 700 24px/34px var(--font-heading);
@@ -193,17 +202,30 @@
   --ax-font-xxxs-11: 11px/14px var(--font-heading);
   --ax-font-xxxs-strong-11: 500 11px/14px var(--font-heading);
 
-  --text-4xs: 9px; --text-3xs: 10px;
-  --text-2xs: 11px; --text-xs: 12px; --text-sm: 13px;
-  --text-base: 14px; --text-md: 15px; --text-lg: 16px;
-  --text-xl: 20px; --text-2xl: 24px; --text-3xl: 24px;
+  --text-4xs: 9px;
+  --text-3xs: 10px;
+  --text-2xs: 11px;
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-base: 14px;
+  --text-md: 15px;
+  --text-lg: 16px;
+  --text-xl: 20px;
+  --text-2xl: 24px;
+  --text-3xl: 24px;
 
-  --weight-normal: 400; --weight-medium: 500;
-  --weight-semibold: 600; --weight-bold: 700;
+  --weight-normal: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
 
-  --leading-tight: 1.25; --leading-normal: 1.5; --leading-relaxed: 1.6;
+  --leading-tight: 1.25;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.6;
   --leading-comfortable: 1.75;
-  --tracking-tight: -0.015em; --tracking-normal: 0; --tracking-wide: 0.02em;
+  --tracking-tight: -0.015em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.02em;
   --tracking-wider: 0.04em;
 
   -webkit-font-smoothing: antialiased;
@@ -229,26 +251,28 @@
   --shadow-xs: 0 2px 4px 0 rgba(0, 0, 0, 0.05);
   --shadow-sm: 0 4px 12px 0 rgba(0, 0, 0, 0.02);
   --shadow-md: 0 4px 12px 0 rgba(0, 0, 0, 0.02), 0 2px 8px 0 rgba(0, 0, 0, 0.04);
-  --shadow-lg: 0 0 1px 0 rgba(0, 0, 0, 0.20), 0 0 4px 0 rgba(0, 0, 0, 0.02), 0 12px 32px 0 rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 0 1px 0 rgba(0, 0, 0, 0.2), 0 0 4px 0 rgba(0, 0, 0, 0.02), 0 12px 32px 0 rgba(0, 0, 0, 0.08);
   --shadow-xl: 0 0 1px 0 rgba(0, 0, 0, 0.24), 0 0 4px 0 rgba(0, 0, 0, 0.03), 0 20px 48px 0 rgba(0, 0, 0, 0.12);
   --shadow-card: 0 2px 4px 0 rgba(0, 0, 0, 0.05);
   --shadow-card-hover: 0 4px 12px 0 rgba(0, 0, 0, 0.02), 0 2px 8px 0 rgba(0, 0, 0, 0.05);
 }
 
 .dark {
-  --shadow-xs: 0 2px 4px 0 rgba(0, 0, 0, 0.30);
+  --shadow-xs: 0 2px 4px 0 rgba(0, 0, 0, 0.3);
   --shadow-sm: 0 4px 12px 0 rgba(0, 0, 0, 0.28);
   --shadow-md: 0 4px 12px 0 rgba(0, 0, 0, 0.28), 0 2px 8px 0 rgba(0, 0, 0, 0.32);
-  --shadow-lg: 0 0 1px 0 rgba(0, 0, 0, 0.60), 0 0 4px 0 rgba(0, 0, 0, 0.25), 0 12px 32px 0 rgba(0, 0, 0, 0.45);
-  --shadow-xl: 0 0 1px 0 rgba(0, 0, 0, 0.65), 0 0 4px 0 rgba(0, 0, 0, 0.30), 0 20px 48px 0 rgba(0, 0, 0, 0.55);
-  --shadow-card: 0 2px 4px 0 rgba(0, 0, 0, 0.30);
+  --shadow-lg: 0 0 1px 0 rgba(0, 0, 0, 0.6), 0 0 4px 0 rgba(0, 0, 0, 0.25), 0 12px 32px 0 rgba(0, 0, 0, 0.45);
+  --shadow-xl: 0 0 1px 0 rgba(0, 0, 0, 0.65), 0 0 4px 0 rgba(0, 0, 0, 0.3), 0 20px 48px 0 rgba(0, 0, 0, 0.55);
+  --shadow-card: 0 2px 4px 0 rgba(0, 0, 0, 0.3);
   --shadow-card-hover: 0 4px 12px 0 rgba(0, 0, 0, 0.28), 0 2px 8px 0 rgba(0, 0, 0, 0.32);
 }
 
 /* ── Animation ───────────────────────────────────────────── */
 :root {
-  --duration-instant: 80ms; --duration-fast: 150ms;
-  --duration-normal: 200ms; --duration-slow: 350ms;
+  --duration-instant: 80ms;
+  --duration-fast: 150ms;
+  --duration-normal: 200ms;
+  --duration-slow: 350ms;
   --ease-out: cubic-bezier(0, 0, 0.2, 1);
   --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
   --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
@@ -256,14 +280,23 @@
 }
 
 /* ── Scrollbar — 8px 滑块、4px 圆角 ──────────────── */
-::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
 ::-webkit-scrollbar-thumb {
   background: rgba(30, 35, 42, 0.22);
   border-radius: 4px;
 }
-::-webkit-scrollbar-thumb:hover { background: rgba(30, 35, 42, 0.32); }
-::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(30, 35, 42, 0.32);
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
 
 * {
   scrollbar-width: thin;
@@ -273,12 +306,18 @@
   scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
 }
 
-.dark ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.22); }
-.dark ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.32); }
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.22);
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.32);
+}
 
 /* ── Reduced motion — performance & accessibility ────────── */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;

@@ -12,6 +12,7 @@ import { createInterface } from 'readline';
 import net from 'net';
 import crypto from 'crypto';
 import type { FtsHit } from './fts';
+import { errorRecord, errorText } from './errors';
 
 export interface SdkDeps {
   runAgent: (params: {
@@ -38,7 +39,10 @@ export interface SdkResponse {
 }
 
 class SdkError extends Error {
-  constructor(public code: number, message: string) {
+  constructor(
+    public code: number,
+    message: string,
+  ) {
     super(message);
   }
 }
@@ -88,10 +92,7 @@ export async function handleSdkRequest(
         if (typeof p.query !== 'string' || !p.query.trim()) {
           throw new SdkError(-32602, 'query 必填');
         }
-        const hits = await deps.searchSessions(
-          p.query,
-          typeof p.limit === 'number' ? p.limit : 8,
-        );
+        const hits = await deps.searchSessions(p.query, typeof p.limit === 'number' ? p.limit : 8);
         return {
           jsonrpc: '2.0',
           id: req.id,
@@ -102,11 +103,12 @@ export async function handleSdkRequest(
       default:
         throw new SdkError(-32601, `未知方法: ${req.method}`);
     }
-  } catch (e: any) {
+  } catch (e: unknown) {
+    const apiError = errorRecord(e);
     return {
       jsonrpc: '2.0',
       id: req.id,
-      error: { code: typeof e?.code === 'number' ? e.code : -32603, message: e?.message ?? String(e) },
+      error: { code: typeof apiError.code === 'number' ? apiError.code : -32603, message: errorText(e) },
     };
   }
 }
@@ -148,21 +150,27 @@ export function startSdkTcpServer(
       for (const line of lines) {
         if (!line.trim()) continue;
         if (line.length > MAX_LINE_BYTES) {
-          socket.write(`${JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: -32600, message: '请求过大（超过 1MB）' } })}\n`);
+          socket.write(
+            `${JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: -32600, message: '请求过大（超过 1MB）' } })}\n`,
+          );
           continue;
         }
         let req: unknown;
         try {
           req = JSON.parse(line);
         } catch {
-          socket.write(`${JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } })}\n`);
+          socket.write(
+            `${JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } })}\n`,
+          );
           continue;
         }
         void handleSdkRequest(deps, req, { token }).then((res) => socket.write(`${JSON.stringify(res)}\n`));
       }
       if (buffer.length > MAX_LINE_BYTES) buffer = '';
     });
-    socket.on('error', () => { /* client disconnected */ });
+    socket.on('error', () => {
+      /* client disconnected */
+    });
   });
 
   return new Promise((resolve, reject) => {

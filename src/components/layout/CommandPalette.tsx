@@ -11,7 +11,7 @@ import {
   ChatCircle,
   GearSix,
   FileText,
-} from '@/components/common/icons'
+} from '@/components/common/icons';
 import clsx from 'clsx';
 import { useT, slashCommandDescKey } from '../../i18n';
 import { useChatStore } from '../../stores/useChatStore';
@@ -29,7 +29,7 @@ function parseTreePaths(treeText: string): string[] {
   const dirStack: { name: string; depth: number }[] = [];
   for (const line of lines) {
     const stripped = line.replace(/^[│\s]+/, '');
-    const depth = (line.match(/^(?:│   |    )*/)?.[0]?.length ?? 0) / 4;
+    const depth = (line.match(/^(?:│ {3}| {4})*/)?.[0]?.length ?? 0) / 4;
     const name = stripped.replace(/^[├└]── /, '');
     if (!name) continue;
     while (dirStack.length > 0 && dirStack[dirStack.length - 1].depth >= depth) dirStack.pop();
@@ -63,7 +63,9 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState(0);
   const [filePaths, setFilePaths] = useState<string[]>([]);
-  const [fileHits, setFileHits] = useState<{ name: string; path: string; isDirectory: boolean; snippet?: string; matchType?: 'name' | 'content' }[]>([]);
+  const [fileHits, setFileHits] = useState<
+    { name: string; path: string; isDirectory: boolean; snippet?: string; matchType?: 'name' | 'content' }[]
+  >([]);
   const inputRef = useRef<any>(null);
 
   useEffect(() => {
@@ -84,12 +86,17 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
       setFilePaths([]);
       return;
     }
-    window.electronAPI?.context?.getFileStructure(projectPath)
+    window.electronAPI?.context
+      ?.getFileStructure(projectPath)
       .then((r) => {
         if (!cancelled && r.ok && r.data) setFilePaths(parseTreePaths(r.data).slice(0, 200));
       })
-      .catch(() => { if (!cancelled) setFilePaths([]); });
-    return () => { cancelled = true; };
+      .catch(() => {
+        if (!cancelled) setFilePaths([]);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [open]);
 
   // 文件内容搜索：查询 >=2 字符时按内容/文件名搜索项目（防抖 250ms）。
@@ -102,7 +109,8 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
       return;
     }
     const timer = setTimeout(() => {
-      window.electronAPI?.file?.search(q, projectPath)
+      window.electronAPI?.file
+        ?.search(q, projectPath)
         .then((r) => setFileHits(r.ok ? (r.data ?? []) : []))
         .catch(() => setFileHits([]));
     }, 250);
@@ -146,7 +154,11 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
           let executed = executeCommand(cmd.name, '', execCtx);
           if (!executed) {
             const pluginCmd = findPluginCommand(cmd.name);
-            try { if (pluginCmd) executed = pluginCmd.execute('', execCtx); } catch { /* surface as fill-in */ }
+            try {
+              if (pluginCmd) executed = pluginCmd.execute('', execCtx);
+            } catch {
+              /* surface as fill-in */
+            }
           }
           if (!executed) {
             useChatStore.getState().setInputValue(`/${cmd.name} `);
@@ -160,18 +172,99 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
     // ── Agent actions (hidden in chat mode — pure conversation surface) ──
     if (useAppStore.getState().sidebarMode !== 'chat') {
       all.push(
-        { id: 'agent-create-explore', icon: <PlusCircleOutlined />, title: t('palette.createExplore'), description: t('palette.createExplore.desc'), searchText: t('palette.createExplore.search'), action: () => { void createAgent({ name: 'Explore Agent', type: 'Explore' }).then((id) => { if (id) useAgentStore.getState().setCurrentAgent(id); }); onClose(); } },
-        { id: 'agent-create-plan', icon: <PlusCircleOutlined />, title: t('palette.createPlan'), description: t('palette.createPlan.desc'), searchText: t('palette.createPlan.search'), action: () => { void createAgent({ name: 'Plan Agent', type: 'Plan' }).then((id) => { if (id) useAgentStore.getState().setCurrentAgent(id); }); onClose(); } },
-        { id: 'agent-create-gp', icon: <PlusCircleOutlined />, title: t('palette.createGeneral'), description: t('palette.createGeneral.desc'), searchText: t('palette.createGeneral.search'), action: () => { void createAgent({ name: 'General Agent', type: 'general-purpose' }).then((id) => { if (id) useAgentStore.getState().setCurrentAgent(id); }); onClose(); } },
+        {
+          id: 'agent-create-explore',
+          icon: <PlusCircleOutlined />,
+          title: t('palette.createExplore'),
+          description: t('palette.createExplore.desc'),
+          searchText: t('palette.createExplore.search'),
+          action: () => {
+            void createAgent({ name: 'Explore Agent', type: 'Explore' }).then((id) => {
+              if (id) useAgentStore.getState().setCurrentAgent(id);
+            });
+            onClose();
+          },
+        },
+        {
+          id: 'agent-create-plan',
+          icon: <PlusCircleOutlined />,
+          title: t('palette.createPlan'),
+          description: t('palette.createPlan.desc'),
+          searchText: t('palette.createPlan.search'),
+          action: () => {
+            void createAgent({ name: 'Plan Agent', type: 'Plan' }).then((id) => {
+              if (id) useAgentStore.getState().setCurrentAgent(id);
+            });
+            onClose();
+          },
+        },
+        {
+          id: 'agent-create-gp',
+          icon: <PlusCircleOutlined />,
+          title: t('palette.createGeneral'),
+          description: t('palette.createGeneral.desc'),
+          searchText: t('palette.createGeneral.search'),
+          action: () => {
+            void createAgent({ name: 'General Agent', type: 'general-purpose' }).then((id) => {
+              if (id) useAgentStore.getState().setCurrentAgent(id);
+            });
+            onClose();
+          },
+        },
       );
     }
 
     // ── Keyboard shortcuts ──
     all.push(
-      { id: 'shortcut-clear', icon: <ThunderboltOutlined />, title: t('palette.clearChat'), description: t('palette.clearChat.desc'), shortcut: 'Ctrl+L', searchText: t('palette.clearChat.search'), action: () => { useChatStore.getState().clearMessages(); onClose(); } },
-      { id: 'shortcut-sidebar', icon: <MenuFoldOutlined />, title: t('palette.toggleSidebar'), description: t('palette.toggleSidebar.desc'), shortcut: 'Ctrl+B', searchText: t('palette.toggleSidebar.search'), action: () => { useAppStore.getState().toggleSidebar(); onClose(); } },
-      { id: 'shortcut-undo', icon: <UndoOutlined />, title: t('palette.undo'), description: t('palette.undo.desc'), shortcut: 'Ctrl+Z', searchText: t('palette.undo.search'), action: () => { const { undoLast, undos } = useUndoStore.getState(); if (undos.length > 0) undoLast(); onClose(); } },
-      { id: 'shortcut-stop', icon: <StopOutlined />, title: t('palette.stop'), description: t('palette.stop.desc'), shortcut: 'Esc', searchText: t('palette.stop.search'), action: () => { useChatStore.getState().stopStreaming(); onClose(); } },
+      {
+        id: 'shortcut-clear',
+        icon: <ThunderboltOutlined />,
+        title: t('palette.clearChat'),
+        description: t('palette.clearChat.desc'),
+        shortcut: 'Ctrl+L',
+        searchText: t('palette.clearChat.search'),
+        action: () => {
+          useChatStore.getState().clearMessages();
+          onClose();
+        },
+      },
+      {
+        id: 'shortcut-sidebar',
+        icon: <MenuFoldOutlined />,
+        title: t('palette.toggleSidebar'),
+        description: t('palette.toggleSidebar.desc'),
+        shortcut: 'Ctrl+B',
+        searchText: t('palette.toggleSidebar.search'),
+        action: () => {
+          useAppStore.getState().toggleSidebar();
+          onClose();
+        },
+      },
+      {
+        id: 'shortcut-undo',
+        icon: <UndoOutlined />,
+        title: t('palette.undo'),
+        description: t('palette.undo.desc'),
+        shortcut: 'Ctrl+Z',
+        searchText: t('palette.undo.search'),
+        action: () => {
+          const { undoLast, undos } = useUndoStore.getState();
+          if (undos.length > 0) undoLast();
+          onClose();
+        },
+      },
+      {
+        id: 'shortcut-stop',
+        icon: <StopOutlined />,
+        title: t('palette.stop'),
+        description: t('palette.stop.desc'),
+        shortcut: 'Esc',
+        searchText: t('palette.stop.search'),
+        action: () => {
+          useChatStore.getState().stopStreaming();
+          onClose();
+        },
+      },
     );
 
     // ── 会话（本地历史） ──
@@ -293,20 +386,23 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
     setSelected(0);
   }, [filtered]);
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      setSelected((p) => Math.min(p + 1, filtered.length - 1));
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setSelected((p) => Math.max(p - 1, 0));
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      filtered[selected]?.action();
-    } else if (e.key === 'Escape') {
-      onClose();
-    }
-  }, [filtered, selected, onClose]);
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelected((p) => Math.min(p + 1, filtered.length - 1));
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelected((p) => Math.max(p - 1, 0));
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        filtered[selected]?.action();
+      } else if (e.key === 'Escape') {
+        onClose();
+      }
+    },
+    [filtered, selected, onClose],
+  );
 
   const modal = (
     <Modal
@@ -336,23 +432,22 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
       </div>
       <div className="max-h-[320px] overflow-y-auto p-2 pb-4">
         {filtered.length === 0 ? (
-          <div className="text-center p-6 text-muted text-sm">
-            {t('palette.empty')}
-          </div>
+          <div className="text-center p-6 text-muted text-sm">{t('palette.empty')}</div>
         ) : (
           filtered.map((item, i) => {
             const prefix = item.id.split('-')[0] ?? '';
-            const groupKey = prefix === 'cmd'
-              ? t('palette.group.commands')
-              : prefix === 'agent'
-                ? t('palette.group.agents')
-                : prefix === 'session'
-                  ? t('palette.group.sessions')
-                  : prefix === 'settings'
-                    ? t('palette.group.settings')
-                    : prefix === 'file'
-                      ? t('palette.group.files')
-                      : t('palette.group.shortcuts');
+            const groupKey =
+              prefix === 'cmd'
+                ? t('palette.group.commands')
+                : prefix === 'agent'
+                  ? t('palette.group.agents')
+                  : prefix === 'session'
+                    ? t('palette.group.sessions')
+                    : prefix === 'settings'
+                      ? t('palette.group.settings')
+                      : prefix === 'file'
+                        ? t('palette.group.files')
+                        : t('palette.group.shortcuts');
             const showHeader = i === 0 || filtered[i - 1]?.id.split('-')[0] !== prefix;
             return (
               <Fragment key={item.id}>
@@ -369,16 +464,10 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
                     i === selected ? 'bg-accent-soft' : 'hover:bg-accent-soft',
                   )}
                 >
-                  <span className="text-lg text-secondary w-[22px] text-center shrink-0">
-                    {item.icon}
-                  </span>
+                  <span className="text-lg text-secondary w-[22px] text-center shrink-0">{item.icon}</span>
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-text-primary">
-                      {item.title}
-                    </div>
-                    <div className="text-2xs text-muted mt-1">
-                      {item.description}
-                    </div>
+                    <div className="text-sm font-medium text-text-primary">{item.title}</div>
+                    <div className="text-2xs text-muted mt-1">{item.description}</div>
                   </div>
                   {item.shortcut && (
                     <span className="font-mono text-2xs text-muted bg-primary-soft py-1 px-2 rounded-md whitespace-nowrap">
@@ -392,9 +481,15 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
         )}
       </div>
       <div className="border-t border-dim p-2 px-4 flex gap-4 text-2xs text-muted">
-        <span><kbd className="bg-primary-soft px-1.5 py-0.5 rounded-md">↑↓</kbd> {t('palette.nav')}</span>
-        <span><kbd className="bg-primary-soft px-1.5 py-0.5 rounded-md">Enter</kbd> {t('palette.select')}</span>
-        <span><kbd className="bg-primary-soft px-1.5 py-0.5 rounded-md">Esc</kbd> {t('palette.close')}</span>
+        <span>
+          <kbd className="bg-primary-soft px-1.5 py-0.5 rounded-md">↑↓</kbd> {t('palette.nav')}
+        </span>
+        <span>
+          <kbd className="bg-primary-soft px-1.5 py-0.5 rounded-md">Enter</kbd> {t('palette.select')}
+        </span>
+        <span>
+          <kbd className="bg-primary-soft px-1.5 py-0.5 rounded-md">Esc</kbd> {t('palette.close')}
+        </span>
       </div>
     </Modal>
   );

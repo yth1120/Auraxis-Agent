@@ -33,12 +33,7 @@ const CLOSE_DELAY_MS = 180;
  * lists every prompt; Enter/Space or a click smooth-scrolls the transcript,
  * Escape dismisses, and the active prompt stays highlighted as you scroll.
  */
-export default function TimelineScrubber({
-  ticks,
-  scrollRatio = 0,
-  onScrubTo,
-  className,
-}: TimelineScrubberProps) {
+export default function TimelineScrubber({ ticks, scrollRatio = 0, onScrubTo, className }: TimelineScrubberProps) {
   const tScrub = useT();
   const railRef = useRef<HTMLButtonElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
@@ -85,15 +80,18 @@ export default function TimelineScrubber({
     return Math.min(ticks.length - 1, Math.max(0, Math.round(scrollRatio * (ticks.length - 1))));
   }, [ticks.length, scrollRatio]);
 
-  const jump = useCallback((i: number) => {
-    const tick = ticks[i];
-    if (!tick) return;
-    onScrubTo(tick.index, 'click');
-    setCursor(i);
-    setOpen(false);
-    clearTimers();
-    railRef.current?.focus();
-  }, [ticks, onScrubTo]);
+  const jump = useCallback(
+    (i: number) => {
+      const tick = ticks[i];
+      if (!tick) return;
+      onScrubTo(tick.index, 'click');
+      setCursor(i);
+      setOpen(false);
+      clearTimers();
+      railRef.current?.focus();
+    },
+    [ticks, onScrubTo],
+  );
 
   // Keep the keyboard cursor visible inside the flyout.
   useEffect(() => {
@@ -109,9 +107,7 @@ export default function TimelineScrubber({
       clearTimers();
       setCursor((c) => {
         const base = c ?? (activeIndex >= 0 ? activeIndex : 0);
-        return e.key === 'ArrowDown'
-          ? Math.min(ticks.length - 1, base + 1)
-          : Math.max(0, base - 1);
+        return e.key === 'ArrowDown' ? Math.min(ticks.length - 1, base + 1) : Math.max(0, base - 1);
       });
     } else if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
@@ -156,9 +152,7 @@ export default function TimelineScrubber({
             )}
           />
         ))}
-        {overflow && (
-          <span className="w-[2px] h-2 rounded-full bg-[var(--color-text-muted)] opacity-40" />
-        )}
+        {overflow && <span className="w-[2px] h-2 rounded-full bg-[var(--color-text-muted)] opacity-40" />}
       </button>
 
       {open && (

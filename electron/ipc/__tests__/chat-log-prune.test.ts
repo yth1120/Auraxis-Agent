@@ -34,16 +34,9 @@ afterEach(async () => {
 describe('pruneChatCache', () => {
   it('removes projection rows for chat sessions whose log file is gone', async () => {
     const { appendChatEvents, listChatSessions, pruneChatCache } = await loadChatLog();
-    await appendChatEvents('session-chat-keep', [
-      { type: 'user', ts: 1, data: { text: 'keep me' } },
-    ]);
-    await appendChatEvents('session-chat-drop', [
-      { type: 'user', ts: 2, data: { text: 'drop me' } },
-    ]);
-    expect((await listChatSessions()).map((s) => s.id).sort()).toEqual([
-      'session-chat-drop',
-      'session-chat-keep',
-    ]);
+    await appendChatEvents('session-chat-keep', [{ type: 'user', ts: 1, data: { text: 'keep me' } }]);
+    await appendChatEvents('session-chat-drop', [{ type: 'user', ts: 2, data: { text: 'drop me' } }]);
+    expect((await listChatSessions()).map((s) => s.id).sort()).toEqual(['session-chat-drop', 'session-chat-keep']);
 
     await fs.unlink(path.join(root, 'session-chat-drop.jsonl'));
     const removed = await pruneChatCache();

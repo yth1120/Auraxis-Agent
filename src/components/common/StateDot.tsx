@@ -4,7 +4,14 @@ export type StateDotState = 'done' | 'warning' | 'ongoing' | 'error';
 
 /** Outer 3x3 matrix cells (2px pixels on a 10px grid), clockwise from top-left. */
 const MATRIX_CELLS: readonly (readonly [number, number])[] = [
-  [0, 0], [4, 0], [8, 0], [8, 4], [8, 8], [4, 8], [0, 8], [0, 4],
+  [0, 0],
+  [4, 0],
+  [8, 0],
+  [8, 4],
+  [8, 8],
+  [4, 8],
+  [0, 8],
+  [0, 4],
 ];
 
 /**

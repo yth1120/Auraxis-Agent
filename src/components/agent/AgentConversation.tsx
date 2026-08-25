@@ -1,4 +1,4 @@
-import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode, RefObject } from 'react';
 import { Modal, message, notification } from 'antd';
 import {
@@ -14,11 +14,8 @@ import { t, useT } from '../../i18n';
 import type { AgentInfo, AgentLogEntry } from '../../types/agent';
 import { PERMISSION_PRESETS } from '../../types/advanced';
 import type { PermissionRequest } from '../../types/advanced';
-import type { Message } from '../../types/chat';
-import { getContentText } from '../../types/chat';
 import { useAgentStore } from '../../stores/useAgentStore';
 import { useAppStore } from '../../stores/useAppStore';
-import { useSessionStore } from '../../stores/useSessionStore';
 import { useSettingsStore } from '../../stores/useSettingsStore';
 import { createAgent } from '../../constants/commands';
 import InlinePermissionCard from '../permissions/InlinePermissionCard';
@@ -79,14 +76,18 @@ try {
       toolRowOpenState.set(k, v);
     }
   }
-} catch { /* storage unavailable */ }
+} catch {
+  /* storage unavailable */
+}
 
 function persistToolRowOpenState() {
   try {
     const obj: Record<string, boolean> = {};
     for (const [k, v] of toolRowOpenState) obj[k] = v;
     sessionStorage.setItem('__ax_tool_row_open__', JSON.stringify(obj));
-  } catch { /* storage unavailable */ }
+  } catch {
+    /* storage unavailable */
+  }
 }
 
 interface TurnGroup {
@@ -144,7 +145,11 @@ function summarizeInput(toolName: string | undefined, input: Record<string, unkn
     case 'Glob':
       return typeof input.pattern === 'string' ? `"${input.pattern}"` : '';
     case 'WebFetch': {
-      try { return new URL(String(input.url)).hostname; } catch { return String(input.url || ''); }
+      try {
+        return new URL(String(input.url)).hostname;
+      } catch {
+        return String(input.url || '');
+      }
     }
     case 'WebSearch':
       return typeof input.query === 'string' ? `"${input.query}"` : '';
@@ -152,7 +157,9 @@ function summarizeInput(toolName: string | undefined, input: Record<string, unkn
       return typeof input.description === 'string' ? input.description : '';
     case 'AskUser':
       return typeof input.question === 'string'
-        ? (input.question.length > 48 ? input.question.slice(0, 48) + '…' : input.question)
+        ? input.question.length > 48
+          ? input.question.slice(0, 48) + '…'
+          : input.question
         : '';
     case 'TodoWrite':
       return t('conv.updateTodos');
@@ -189,11 +196,7 @@ function isFileTool(toolName: string | undefined): boolean {
 
 function readCardProps(entry: AgentLogEntry) {
   const o = (entry.output ?? {}) as Record<string, unknown>;
-  const content = typeof o.content === 'string'
-    ? o.content
-    : typeof entry.output === 'string'
-      ? entry.output
-      : '';
+  const content = typeof o.content === 'string' ? o.content : typeof entry.output === 'string' ? entry.output : '';
   return {
     label: typeof o.file_path === 'string' ? o.file_path : undefined,
     content,
@@ -227,7 +230,10 @@ function searchCardProps(entry: AgentLogEntry) {
       group = { path, matches: [] };
       byFile.set(path, group);
     }
-    group.matches.push({ lineNumber: typeof r.line === 'number' ? r.line : 0, line: typeof r.content === 'string' ? r.content : '' });
+    group.matches.push({
+      lineNumber: typeof r.line === 'number' ? r.line : 0,
+      line: typeof r.content === 'string' ? r.content : '',
+    });
   }
   return {
     kind: 'matches' as const,
@@ -251,7 +257,8 @@ function webCardProps(entry: AgentLogEntry) {
   return {
     kind: 'fetch' as const,
     url: typeof o.url === 'string' ? o.url : typeof input.url === 'string' ? input.url : '',
-    statusCode: typeof o.status_code === 'number' ? o.status_code : typeof o.statusCode === 'number' ? o.statusCode : undefined,
+    statusCode:
+      typeof o.status_code === 'number' ? o.status_code : typeof o.statusCode === 'number' ? o.statusCode : undefined,
     truncated: false,
   };
 }
@@ -265,7 +272,12 @@ function renderToolBody(entry: AgentLogEntry): React.ReactNode {
     return <AgentWebCard {...webCardProps(entry)} />;
   }
   if (entry.toolName === 'RunCode') {
-    const o = (entry.output ?? {}) as { stdout?: string; stderr?: string; exitCode?: number | null; timedOut?: boolean };
+    const o = (entry.output ?? {}) as {
+      stdout?: string;
+      stderr?: string;
+      exitCode?: number | null;
+      timedOut?: boolean;
+    };
     return (
       <AgentRunCodeCard
         code={typeof entry.input?.code === 'string' ? entry.input.code : ''}
@@ -300,7 +312,12 @@ function renderToolBody(entry: AgentLogEntry): React.ReactNode {
       {(entry.output != null || entry.error) && (
         <div className="grid grid-cols-[max-content_1fr] gap-x-3.5 px-3 py-2 max-h-[200px] overflow-y-auto">
           <span className="sticky top-0 text-2xs font-semibold text-text-faint">{entry.error ? 'ERR' : 'OUT'}</span>
-          <pre className={clsx('m-0 text-2xs leading-relaxed whitespace-pre-wrap break-all font-mono', entry.error ? 'text-danger' : 'text-text-secondary')}>
+          <pre
+            className={clsx(
+              'm-0 text-2xs leading-relaxed whitespace-pre-wrap break-all font-mono',
+              entry.error ? 'text-danger' : 'text-text-secondary',
+            )}
+          >
             {entry.error || outputText(entry.toolName, entry.output)}
           </pre>
         </div>
@@ -314,19 +331,31 @@ function Checklist({ todos }: { todos: NonNullable<AgentLogEntry['todos']> }) {
     <div className="my-1 mb-1.5">
       {todos.map((t, i) => (
         <div key={i} className="flex items-start gap-2 py-0.5 text-xs">
-          <span className={clsx(
-            'shrink-0 mt-1 text-xs text-[var(--color-text-faint)]',
-            t.status === 'completed' && '!text-text-secondary',
-            t.status === 'in_progress' && '!text-accent',
-          )}>
-            {t.status === 'completed' ? <CheckIcon /> : t.status === 'in_progress' ? <ExecutingIndicator size={14} /> : <CircleIcon />}
+          <span
+            className={clsx(
+              'shrink-0 mt-1 text-xs text-[var(--color-text-faint)]',
+              t.status === 'completed' && '!text-text-secondary',
+              t.status === 'in_progress' && '!text-accent',
+            )}
+          >
+            {t.status === 'completed' ? (
+              <CheckIcon />
+            ) : t.status === 'in_progress' ? (
+              <ExecutingIndicator size={14} />
+            ) : (
+              <CircleIcon />
+            )}
           </span>
-          <span className={clsx(
-            'leading-relaxed text-[var(--color-text-secondary)]',
-            t.status === 'pending' && 'text-[var(--color-text-muted)]',
-            t.status === 'completed' && 'text-[var(--color-text-muted)] line-through',
-            t.status === 'in_progress' && 'text-[var(--color-text-primary)] font-medium',
-          )}>{t.content}</span>
+          <span
+            className={clsx(
+              'leading-relaxed text-[var(--color-text-secondary)]',
+              t.status === 'pending' && 'text-[var(--color-text-muted)]',
+              t.status === 'completed' && 'text-[var(--color-text-muted)] line-through',
+              t.status === 'in_progress' && 'text-[var(--color-text-primary)] font-medium',
+            )}
+          >
+            {t.content}
+          </span>
         </div>
       ))}
     </div>
@@ -345,25 +374,31 @@ function AgentToolRow({
   const currentAgentId = useAgentStore((s) => s.currentAgentId);
   const rowKey = entry.toolCallId || `${entry.toolName}-${entry.timestamp}`;
   const [open, setOpenState] = useState<boolean>(() => toolRowOpenState.get(rowKey) ?? false);
-  const setOpen = useCallback((next: boolean) => {
-    toolRowOpenState.set(rowKey, next);
-    persistToolRowOpenState();
-    setOpenState(next);
-  }, [rowKey]);
+  const setOpen = useCallback(
+    (next: boolean) => {
+      toolRowOpenState.set(rowKey, next);
+      persistToolRowOpenState();
+      setOpenState(next);
+    },
+    [rowKey],
+  );
   const failed = entry.type === 'tool_error';
-  const todoCounts = entry.toolName === 'TodoWrite' && entry.todos
-    ? {
-        total: entry.todos.length,
-        done: entry.todos.filter((t) => t.status === 'completed').length,
-        active: entry.todos.filter((t) => t.status === 'in_progress').length,
-      }
-    : null;
+  const todoCounts =
+    entry.toolName === 'TodoWrite' && entry.todos
+      ? {
+          total: entry.todos.length,
+          done: entry.todos.filter((t) => t.status === 'completed').length,
+          active: entry.todos.filter((t) => t.status === 'in_progress').length,
+        }
+      : null;
   const summary = todoCounts
     ? t('conv.todoProgress', { done: todoCounts.done, total: todoCounts.total })
     : summarizeInput(entry.toolName, entry.input);
   const isBash = entry.toolName === 'Bash';
   const inputPath = isFileTool(entry.toolName)
-    ? (typeof entry.input?.file_path === 'string' ? entry.input.file_path : undefined)
+    ? typeof entry.input?.file_path === 'string'
+      ? entry.input.file_path
+      : undefined
     : undefined;
 
   const bashTerm = (() => {
@@ -386,41 +421,34 @@ function AgentToolRow({
   // Trailing constant fragment (工具行后缀): TodoWrite keeps
   // its parallel-active count and the Agent row its sub-agent count visible
   // even when the summary is clipped.
-  const suffix = todoCounts && todoCounts.active > 0
-    ? `+${todoCounts.active}`
-    : entry.toolName === 'Agent' && subagents.length > 0
-      ? `+${subagents.length}`
-      : null;
+  const suffix =
+    todoCounts && todoCounts.active > 0
+      ? `+${todoCounts.active}`
+      : entry.toolName === 'Agent' && subagents.length > 0
+        ? `+${subagents.length}`
+        : null;
 
   // the 16px leading slot carries the tool icon (running keeps the
   // icon — the row sweep carries the in-flight signal; an error yields to the
   // red state dot). Hover previews the chevron by crossfading over the icon,
   // and an open row shows the chevron outright.
-  const leading = open
-    ? <CaretDownOutlined size={14} className="ax-tool-row-chevron" />
-    : (
-      <>
-        <span className="ax-tool-row-icon">
-          {failed
-            ? <StateDot state="error" />
-            : <ToolIcon toolName={entry.toolName} size={14} />}
-        </span>
-        <CaretDownOutlined
-          size={14}
-          className="ax-tool-row-chevron ax-tool-row-chevron-hover"
-        />
-      </>
-    );
+  const leading = open ? (
+    <CaretDownOutlined size={14} className="ax-tool-row-chevron" />
+  ) : (
+    <>
+      <span className="ax-tool-row-icon">
+        {failed ? <StateDot state="error" /> : <ToolIcon toolName={entry.toolName} size={14} />}
+      </span>
+      <CaretDownOutlined size={14} className="ax-tool-row-chevron ax-tool-row-chevron-hover" />
+    </>
+  );
 
   const failureLine = failed && entry.error ? entry.error.split('\n')[0] : null;
   const summaryText = failureLine ?? summary;
   const statusLabel = running ? t('tl.running') : failed ? t('tl.failed') : null;
 
   return (
-    <div
-      className="m-0 group/row ax-tool-row"
-      data-state={running ? 'running' : failed ? 'error' : 'ok'}
-    >
+    <div className="m-0 group/row ax-tool-row" data-state={running ? 'running' : failed ? 'error' : 'ok'}>
       <div
         className={clsx('ax-tool-row-head', running && 'ax-tool-row-running')}
         role="button"
@@ -452,14 +480,15 @@ function AgentToolRow({
                 type="button"
                 className="ax-tool-row-link"
                 title={inputPath}
-                onClick={(e) => { e.stopPropagation(); useAppStore.getState().requestOpenFile(inputPath); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  useAppStore.getState().requestOpenFile(inputPath);
+                }}
               >
                 {summaryText || inputPath}
               </button>
             ) : (
-              <span className={clsx('ax-tool-row-summary', failureLine && 'ax-tool-row-error')}>
-                {summaryText}
-              </span>
+              <span className={clsx('ax-tool-row-summary', failureLine && 'ax-tool-row-error')}>{summaryText}</span>
             )}
             {suffix !== null && <span className="ax-tool-row-summary-suffix">{suffix}</span>}
           </>
@@ -498,8 +527,19 @@ function AgentToolRow({
                     onClick={() => useAgentStore.getState().setCurrentAgent(sa.id)}
                     title={`${sa.description || sa.name} · ${sa.status}`}
                   >
-                    <span className={clsx('shrink-0 flex items-center justify-center w-4 h-4', saRunning ? 'text-primary' : saFailed ? 'text-danger' : 'text-success')}>
-                      {saRunning ? <ExecutingIndicator size={12} /> : saFailed ? <ExclamationCircleOutlined /> : <CheckIcon />}
+                    <span
+                      className={clsx(
+                        'shrink-0 flex items-center justify-center w-4 h-4',
+                        saRunning ? 'text-primary' : saFailed ? 'text-danger' : 'text-success',
+                      )}
+                    >
+                      {saRunning ? (
+                        <ExecutingIndicator size={12} />
+                      ) : saFailed ? (
+                        <ExclamationCircleOutlined />
+                      ) : (
+                        <CheckIcon />
+                      )}
                     </span>
                     <span className="min-w-0 flex-1 truncate text-xs text-text-secondary">
                       {sa.name.split(':')[1]?.trim() || sa.name}
@@ -534,14 +574,19 @@ function AgentToolRow({
  *  Backend filters per-chunk; this catches blocks split across chunks. */
 function cleanText(t: string | undefined): string {
   if (!t) return '';
-  return t
-    .replace(/<function>[\s\S]*?(<\/function>|$)/gi, '')
-    .replace(/<\/?FINAL_ANSWER>/gi, '')
-    .replace(/^\s*<\/[A-Za-z_]+>\s*$/gm, '') // orphaned closing tags
-    // Internal stop-decision markers the backend used to append to the
-    // accumulated result text — never user-facing content.
-    .replace(/[ \t]*[✅⚠️][ \t]*(模型已完成回答[^\n]*|LLM 发送了 <FINAL_ANSWER> 信号[^\n]*|已达到业务迭代上限[^\n]*|已达到目标轮次上限[^\n]*|达到安全硬上限[^\n]*|Agent 连续[^\n]*)/g, '')
-    .trim();
+  return (
+    t
+      .replace(/<function>[\s\S]*?(<\/function>|$)/gi, '')
+      .replace(/<\/?FINAL_ANSWER>/gi, '')
+      .replace(/^\s*<\/[A-Za-z_]+>\s*$/gm, '') // orphaned closing tags
+      // Internal stop-decision markers the backend used to append to the
+      // accumulated result text — never user-facing content.
+      .replace(
+        /[ \t]*[✅⚠️][ \t]*(模型已完成回答[^\n]*|LLM 发送了 <FINAL_ANSWER> 信号[^\n]*|已达到业务迭代上限[^\n]*|已达到目标轮次上限[^\n]*|达到安全硬上限[^\n]*|Agent 连续[^\n]*)/g,
+        '',
+      )
+      .trim()
+  );
 }
 
 const LogEntry = memo(function LogEntry({
@@ -631,10 +676,15 @@ const LogEntry = memo(function LogEntry({
 
 function turnSummary(turn: TurnGroup): string {
   const textEntry = turn.entries.find(
-    (e) => e.type === 'text' && typeof (e as { text?: unknown }).text === 'string' && String((e as { text?: unknown }).text).trim(),
+    (e) =>
+      e.type === 'text' &&
+      typeof (e as { text?: unknown }).text === 'string' &&
+      String((e as { text?: unknown }).text).trim(),
   );
   if (textEntry) {
-    const s = String((textEntry as { text?: unknown }).text ?? '').replace(/\s+/g, ' ').trim();
+    const s = String((textEntry as { text?: unknown }).text ?? '')
+      .replace(/\s+/g, ' ')
+      .trim();
     return s.length > 80 ? `${s.slice(0, 80)}…` : s;
   }
   const toolEntry = turn.entries.find((e) => ['tool_start', 'tool_end', 'tool_error'].includes(e.type));
@@ -643,25 +693,20 @@ function turnSummary(turn: TurnGroup): string {
 
 /** Agent-mode turn timeline: one tick per execution turn, mirrors the
  *  chat-mode prompt dock on the right of the centered content column. */
-function AgentTurnTimeline({
-  turns,
-  scrollerRef,
-}: {
-  turns: TurnGroup[];
-  scrollerRef: RefObject<HTMLElement | null>;
-}) {
+function AgentTurnTimeline({ turns, scrollerRef }: { turns: TurnGroup[]; scrollerRef: RefObject<HTMLElement | null> }) {
   const tTimeline = useT();
   const [scrollRatio, setScrollRatio] = useState(0);
   const rafRef = useRef(0);
 
   const ticks = useMemo<TimelineTick[]>(
-    () => turns.map((turn, i) => ({
-      id: `turn-${turn.iteration}`,
-      title: tTimeline('timeline.round', { n: turn.iteration }),
-      summary: turnSummary(turn) || tTimeline('timeline.round', { n: turn.iteration }),
-      timestamp: turn.startTs ?? turn.entries[0]?.timestamp,
-      index: i,
-    })),
+    () =>
+      turns.map((turn, i) => ({
+        id: `turn-${turn.iteration}`,
+        title: tTimeline('timeline.round', { n: turn.iteration }),
+        summary: turnSummary(turn) || tTimeline('timeline.round', { n: turn.iteration }),
+        timestamp: turn.startTs ?? turn.entries[0]?.timestamp,
+        index: i,
+      })),
     [turns, tTimeline],
   );
 
@@ -693,21 +738,31 @@ function AgentTurnTimeline({
     };
   }, [scrollerRef]);
 
-  const onScrubTo = useCallback((index: number, mode: 'click' | 'drag') => {
-    const viewer = scrollerRef.current;
-    const turn = turns[index];
-    if (!viewer || !turn) return;
-    const el = viewer.querySelector(`[data-agent-turn="${turn.iteration}"]`);
-    if (!el) return;
-    const top = (el as HTMLElement).getBoundingClientRect().top - viewer.getBoundingClientRect().top + viewer.scrollTop;
-    viewer.scrollTo({ top: Math.max(0, top - 12), behavior: mode === 'click' ? 'smooth' : 'auto' });
-  }, [scrollerRef, turns]);
+  const onScrubTo = useCallback(
+    (index: number, mode: 'click' | 'drag') => {
+      const viewer = scrollerRef.current;
+      const turn = turns[index];
+      if (!viewer || !turn) return;
+      const el = viewer.querySelector(`[data-agent-turn="${turn.iteration}"]`);
+      if (!el) return;
+      const top =
+        (el as HTMLElement).getBoundingClientRect().top - viewer.getBoundingClientRect().top + viewer.scrollTop;
+      viewer.scrollTo({ top: Math.max(0, top - 12), behavior: mode === 'click' ? 'smooth' : 'auto' });
+    },
+    [scrollerRef, turns],
+  );
 
   if (turns.length === 0) return null;
   return <TimelineScrubber ticks={ticks} scrollRatio={scrollRatio} onScrubTo={onScrubTo} />;
 }
 
-export default function AgentConversation({ headerInset = 0, bottomInset = 0 }: { headerInset?: number; bottomInset?: number }) {
+export default function AgentConversation({
+  headerInset = 0,
+  bottomInset = 0,
+}: {
+  headerInset?: number;
+  bottomInset?: number;
+}) {
   const tConv = useT();
   const currentAgentId = useAgentStore((s) => s.currentAgentId);
   const agentLogFocusRequest = useAppStore((s) => s.agentLogFocusRequest);
@@ -722,10 +777,7 @@ export default function AgentConversation({ headerInset = 0, bottomInset = 0 }: 
   const autoScrolledTextRef = useRef(false);
   const [rawLogOpen, setRawLogOpen] = useState(false);
   const setCurrentAgent = useAgentStore((s) => s.setCurrentAgent);
-  const agent = useAgentStore(
-    (s) => s.agents.find((a) => a.id === currentAgentId),
-    shallow,
-  );
+  const agent = useAgentStore((s) => s.agents.find((a) => a.id === currentAgentId), shallow);
   const pendingPerms = useAgentStore(
     (s) => (currentAgentId ? s.agentPermissions[currentAgentId] : undefined) || NO_PERMS,
     shallow,
@@ -756,15 +808,20 @@ export default function AgentConversation({ headerInset = 0, bottomInset = 0 }: 
     const api = window.electronAPI?.sessionLog;
     if (!api?.read) return;
     restoredLogsRef.current.add(agent.id);
-    void api.read(agent.id)
+    void api
+      .read(agent.id)
       .then((r) => {
         if (!r?.ok || !Array.isArray(r.data) || r.data.length === 0) return;
-        const entries = sessionEventsToLogEntries(r.data as { type: string; ts: number; data: Record<string, unknown> }[]);
+        const entries = sessionEventsToLogEntries(
+          r.data as { type: string; ts: number; data: Record<string, unknown> }[],
+        );
         if (entries.length > 0) {
           useAgentStore.getState().appendAgentLog(agent.id, entries);
         }
       })
-      .catch(() => { /* log unavailable — header/result still render */ });
+      .catch(() => {
+        /* log unavailable — header/result still render */
+      });
   }, [agent]);
 
   const implementPlan = useCallback(async () => {
@@ -792,7 +849,7 @@ export default function AgentConversation({ headerInset = 0, bottomInset = 0 }: 
   };
 
   const logEndRef = useRef<HTMLDivElement>(null);
-  const log = agent?.log || [];
+  const log = useMemo(() => [...(agent?.log ?? [])], [agent?.log]);
   const logLen = log.length;
   const lastEntry = log[logLen - 1];
 
@@ -929,9 +986,7 @@ export default function AgentConversation({ headerInset = 0, bottomInset = 0 }: 
       return;
     }
     if (autoScrolledTextRef.current) return;
-    const first = turnGroups
-      .flatMap((t) => t.entries)
-      .find((e) => e.type === 'text' || e.type === 'thinking');
+    const first = turnGroups.flatMap((t) => t.entries).find((e) => e.type === 'text' || e.type === 'thinking');
     if (first) {
       autoScrolledTextRef.current = true;
       requestAnimationFrame(() => {
@@ -1024,173 +1079,178 @@ export default function AgentConversation({ headerInset = 0, bottomInset = 0 }: 
                 stream slides beneath it exactly like chat mode. */}
             <div style={{ height: headerInset }} aria-hidden="true" />
             <div className="w-full min-w-0 max-w-[var(--content-max-width)] mx-auto">
-          {/* 会话流: one flat 16px flow — right-aligned user
+              {/* 会话流: one flat 16px flow — right-aligned user
               bubble → assistant markdown → inline tool rows → a quiet per-turn
               tail. No round cards, no round headers. */}
-          <div className="flex flex-col gap-4">
-            {!isSubagent && agent.description && (
-              <div className="group flex flex-col items-end gap-1.5" data-time-hover-root>
-                <div className="max-w-[525px] whitespace-pre-wrap break-words rounded-2xl bg-[var(--color-bg-secondary)] px-4 py-2.5 text-base leading-6 text-text-primary">
-                  {projectUserText(agent.description)}
-                </div>
-                <div className="ax-flow-actions" data-align="end">
-                  <button
-                    type="button"
-                    className="ax-flow-action"
-                    aria-label={tConv('msg.copy')}
-                    title={tConv('msg.copy')}
-                    onClick={() => copyFlowText(agent.description)}
-                  >
-                    <CopyIcon size={16} />
-                  </button>
-                </div>
-              </div>
-            )}
-            {turnGroups.map((turn) => {
-              const runningFilterActive = agentRunningOnly && agent.status === 'running';
-              // Lifecycle markers render nothing — they must not exist as flow
-              // items either, or each empty wrapper would consume a 16px gap
-              // and stretch the vertical rhythm 更宽松的.
-              const flowEntries = turn.entries.filter((e) => {
-                switch (e.type) {
-                  case 'iteration_start':
-                  case 'iteration_end':
-                  case 'turn_start':
-                  case 'turn_end':
-                    return false;
-                  case 'text':
-                  case 'user_message':
-                    return cleanText(e.text) !== '';
-                  case 'thinking':
-                    return (e.text ?? '').trim() !== '';
-                  case 'context':
-                    return e.disclosure != null;
-                  case 'plan':
-                    return e.todos != null && e.todos.length > 0;
-                  default:
-                    return true;
-                }
-              });
-              const visibleTurnEntries = agentErrorsOnly
-                ? flowEntries.filter(
-                    (e) => e.type === 'tool_error' || e.type === 'warning' || e.type === 'error',
-                  )
-                : agentTextOnly
-                  ? flowEntries.filter((e) => e.type === 'text' || e.type === 'thinking')
-                  : runningFilterActive
-                  ? flowEntries.filter((e) => e.type === 'tool_start')
-                  : flowEntries;
-              if ((agentErrorsOnly || agentTextOnly || runningFilterActive) && visibleTurnEntries.length === 0) return null;
-              const stats = turnStats(turn.metricsEnd ?? turn.end);
-              const turnText = turn.entries
-                .filter((e) => e.type === 'text' && (e.text ?? '').trim())
-                .map((e) => e.text as string)
-                .join('\n');
-              const durationMs = turn.startTs != null && turn.end?.timestamp != null
-                ? Math.max(0, turn.end.timestamp - turn.startTs)
-                : undefined;
-              const tailTime = turn.end?.timestamp
-                ?? turn.entries[turn.entries.length - 1]?.timestamp;
-              // the tail (copy + clock + run stats) belongs to a
-              // settled turn only — the live turn carries no actions chrome.
-              const hasTail = turn.end != null
-                && (turnText !== '' || stats !== '' || tailTime != null || durationMs != null);
-              return (
-                <div key={turn.iteration} data-agent-turn={turn.iteration} className="group flex flex-col gap-4">
-                  {visibleTurnEntries.map((entry, i) => (
-                    <div
-                      key={i}
-                      data-agent-log-entry={entry.toolCallId}
-                      data-agent-entry-type={entry.type}
-                      className={clsx(
-                        'transition-colors duration-200',
-                        highlightedToolId === entry.toolCallId && 'bg-primary-soft ring-2 ring-primary/30',
-                      )}
-                    >
-                      <LogEntry
-                        entry={entry}
-                        isStreaming={agent.status === 'running' && entry === lastEntry}
-                        subagents={subagents}
-                      />
+              <div className="flex flex-col gap-4">
+                {!isSubagent && agent.description && (
+                  <div className="group flex flex-col items-end gap-1.5" data-time-hover-root>
+                    <div className="max-w-[525px] whitespace-pre-wrap break-words rounded-2xl bg-[var(--color-bg-secondary)] px-4 py-2.5 text-base leading-6 text-text-primary">
+                      {projectUserText(agent.description)}
                     </div>
-                  ))}
-                  {hasTail && (
-                    <div className="ax-flow-actions" data-time-hover-root>
-                      {turnText && (
-                        <button
-                          type="button"
-                          className="ax-flow-action"
-                          aria-label={tConv('msg.copy')}
-                          title={tConv('msg.copy')}
-                          onClick={() => copyFlowText(turnText)}
+                    <div className="ax-flow-actions" data-align="end">
+                      <button
+                        type="button"
+                        className="ax-flow-action"
+                        aria-label={tConv('msg.copy')}
+                        title={tConv('msg.copy')}
+                        onClick={() => copyFlowText(agent.description)}
+                      >
+                        <CopyIcon size={16} />
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {turnGroups.map((turn) => {
+                  const runningFilterActive = agentRunningOnly && agent.status === 'running';
+                  // Lifecycle markers render nothing — they must not exist as flow
+                  // items either, or each empty wrapper would consume a 16px gap
+                  // and stretch the vertical rhythm 更宽松的.
+                  const flowEntries = turn.entries.filter((e) => {
+                    switch (e.type) {
+                      case 'iteration_start':
+                      case 'iteration_end':
+                      case 'turn_start':
+                      case 'turn_end':
+                        return false;
+                      case 'text':
+                      case 'user_message':
+                        return cleanText(e.text) !== '';
+                      case 'thinking':
+                        return (e.text ?? '').trim() !== '';
+                      case 'context':
+                        return e.disclosure != null;
+                      case 'plan':
+                        return e.todos != null && e.todos.length > 0;
+                      default:
+                        return true;
+                    }
+                  });
+                  const visibleTurnEntries = agentErrorsOnly
+                    ? flowEntries.filter((e) => e.type === 'tool_error' || e.type === 'warning' || e.type === 'error')
+                    : agentTextOnly
+                      ? flowEntries.filter((e) => e.type === 'text' || e.type === 'thinking')
+                      : runningFilterActive
+                        ? flowEntries.filter((e) => e.type === 'tool_start')
+                        : flowEntries;
+                  if ((agentErrorsOnly || agentTextOnly || runningFilterActive) && visibleTurnEntries.length === 0)
+                    return null;
+                  const stats = turnStats(turn.metricsEnd ?? turn.end);
+                  const turnText = turn.entries
+                    .filter((e) => e.type === 'text' && (e.text ?? '').trim())
+                    .map((e) => e.text as string)
+                    .join('\n');
+                  const durationMs =
+                    turn.startTs != null && turn.end?.timestamp != null
+                      ? Math.max(0, turn.end.timestamp - turn.startTs)
+                      : undefined;
+                  const tailTime = turn.end?.timestamp ?? turn.entries[turn.entries.length - 1]?.timestamp;
+                  // the tail (copy + clock + run stats) belongs to a
+                  // settled turn only — the live turn carries no actions chrome.
+                  const hasTail =
+                    turn.end != null && (turnText !== '' || stats !== '' || tailTime != null || durationMs != null);
+                  return (
+                    <div key={turn.iteration} data-agent-turn={turn.iteration} className="group flex flex-col gap-4">
+                      {visibleTurnEntries.map((entry, i) => (
+                        <div
+                          key={i}
+                          data-agent-log-entry={entry.toolCallId}
+                          data-agent-entry-type={entry.type}
+                          className={clsx(
+                            'transition-colors duration-200',
+                            highlightedToolId === entry.toolCallId && 'bg-primary-soft ring-2 ring-primary/30',
+                          )}
                         >
-                          <CopyIcon size={16} />
-                        </button>
+                          <LogEntry
+                            entry={entry}
+                            isStreaming={agent.status === 'running' && entry === lastEntry}
+                            subagents={subagents}
+                          />
+                        </div>
+                      ))}
+                      {hasTail && (
+                        <div className="ax-flow-actions" data-time-hover-root>
+                          {turnText && (
+                            <button
+                              type="button"
+                              className="ax-flow-action"
+                              aria-label={tConv('msg.copy')}
+                              title={tConv('msg.copy')}
+                              onClick={() => copyFlowText(turnText)}
+                            >
+                              <CopyIcon size={16} />
+                            </button>
+                          )}
+                          <span className="ax-flow-time tabular-nums" data-side="end">
+                            {tailTime != null && (
+                              <>
+                                {formatTime(tailTime)}
+                                {durationMs != null || stats !== '' ? (
+                                  <span className="ax-flow-dot" aria-hidden>
+                                    ·
+                                  </span>
+                                ) : null}
+                              </>
+                            )}
+                            {durationMs != null && (
+                              <>
+                                {runDurationLabel(durationMs)}
+                                {stats !== '' ? (
+                                  <span className="ax-flow-dot" aria-hidden>
+                                    ·
+                                  </span>
+                                ) : null}
+                              </>
+                            )}
+                            {stats}
+                          </span>
+                        </div>
                       )}
-                      <span className="ax-flow-time tabular-nums" data-side="end">
-                        {tailTime != null && (
-                          <>
-                            {formatTime(tailTime)}
-                            {durationMs != null || stats !== '' ? <span className="ax-flow-dot" aria-hidden>·</span> : null}
-                          </>
-                        )}
-                        {durationMs != null && (
-                          <>
-                            {runDurationLabel(durationMs)}
-                            {stats !== '' ? <span className="ax-flow-dot" aria-hidden>·</span> : null}
-                          </>
-                        )}
-                        {stats}
-                      </span>
                     </div>
-                  )}
-                </div>
-              );
-            })}
-            {agent.status === 'running' && (
-              <DeepDiveStatus startTime={agent.startTime} />
-            )}
-          </div>
-          {/* 会话尾部: one dim, centered stats strip plus the few
+                  );
+                })}
+                {agent.status === 'running' && <DeepDiveStatus startTime={agent.startTime} />}
+              </div>
+              {/* 会话尾部: one dim, centered stats strip plus the few
               actions that have no home in the right panel. 复制结果 lives on
               each turn tail; 回退/变更 live in the right-panel 概览/变更. */}
-          {isTerminal && !hasTextOutput && (agent.result || agent.error) && (
-            <div className="mt-4 text-base leading-7 text-[var(--color-text-primary)]">
-              <MarkdownRenderer content={cleanText(agent.result || agent.error)} />
-            </div>
-          )}
-          {isTerminal && agent.planFile && (
-            <div className="ax-session-tail">
-              <div className="ax-session-actions">
-                <button type="button" className="ax-session-action" onClick={implementPlan}>
-                  {tConv('conv.implementPlan')}
-                </button>
-              </div>
-            </div>
-          )}
-          {agent.error && (
-            <div className="flex items-start gap-2 mt-4 py-0.5 text-xs leading-5 text-[var(--color-danger)]">
-              <StateDot state="error" className="mt-1 shrink-0" />
-              <span className="min-w-0">{agent.error}</span>
-            </div>
-          )}
-          {/* Approval cards live inside the stream — they scroll with the log
+              {isTerminal && !hasTextOutput && (agent.result || agent.error) && (
+                <div className="mt-4 text-base leading-7 text-[var(--color-text-primary)]">
+                  <MarkdownRenderer content={cleanText(agent.result || agent.error)} />
+                </div>
+              )}
+              {isTerminal && agent.planFile && (
+                <div className="ax-session-tail">
+                  <div className="ax-session-actions">
+                    <button type="button" className="ax-session-action" onClick={implementPlan}>
+                      {tConv('conv.implementPlan')}
+                    </button>
+                  </div>
+                </div>
+              )}
+              {agent.error && (
+                <div className="flex items-start gap-2 mt-4 py-0.5 text-xs leading-5 text-[var(--color-danger)]">
+                  <StateDot state="error" className="mt-1 shrink-0" />
+                  <span className="min-w-0">{agent.error}</span>
+                </div>
+              )}
+              {/* Approval cards live inside the stream — they scroll with the log
               instead of carving a fixed slab out of the viewport. */}
-          {pendingPerms.map((req) => (
-            <InlinePermissionCard
-              key={req.requestId}
-              request={req}
-              onResolved={() => {
-                useAgentStore.getState().removeAgentPermission(agent.id, req.requestId);
-                notification.destroy(req.requestId);
-              }}
-            />
-          ))}
-          <div ref={logEndRef} />
+              {pendingPerms.map((req) => (
+                <InlinePermissionCard
+                  key={req.requestId}
+                  request={req}
+                  onResolved={() => {
+                    useAgentStore.getState().removeAgentPermission(agent.id, req.requestId);
+                    notification.destroy(req.requestId);
+                  }}
+                />
+              ))}
+              <div ref={logEndRef} />
+            </div>
           </div>
         </div>
-      </div>
-      <AgentTurnTimeline turns={turnGroups} scrollerRef={logViewerRef} />
+        <AgentTurnTimeline turns={turnGroups} scrollerRef={logViewerRef} />
       </div>
       <Modal
         title={tConv('conv.rawLog')}

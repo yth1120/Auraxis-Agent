@@ -43,13 +43,13 @@ await client.close();
 
 ## API
 
-| 方法 | 说明 |
-|---|---|
-| `createAuraxis(options?)` | 启动 runtime 并返回已连接的客户端 |
-| `client.ping()` | 连通性探测，返回 `{ pong, time }` |
-| `client.runAgent(params)` | 无头执行一个 Agent 任务（`prompt`、`description`、`subagentType`、`projectRoot`） |
-| `client.searchSessions(query, limit?)` | 全文检索历史会话 |
-| `client.close()` | 关闭连接并终止 runtime 进程 |
+| 方法                                   | 说明                                                                              |
+| -------------------------------------- | --------------------------------------------------------------------------------- |
+| `createAuraxis(options?)`              | 启动 runtime 并返回已连接的客户端                                                 |
+| `client.ping()`                        | 连通性探测，返回 `{ pong, time }`                                                 |
+| `client.runAgent(params)`              | 无头执行一个 Agent 任务（`prompt`、`description`、`subagentType`、`projectRoot`） |
+| `client.searchSessions(query, limit?)` | 全文检索历史会话                                                                  |
+| `client.close()`                       | 关闭连接并终止 runtime 进程                                                       |
 
 ### 选项与环境变量
 

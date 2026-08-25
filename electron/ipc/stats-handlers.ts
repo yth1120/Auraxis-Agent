@@ -4,11 +4,11 @@
  * helpers at the right hook points; the renderer reads everything via
  * `stats:get`.
  */
+import { errorText } from '../errors';
 import { app } from 'electron';
 import { secureHandle } from './trust';
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import path from 'path';
-import { ipcMain } from 'electron';
 
 /* ── Types ──────────────────────────────────────────────── */
 
@@ -20,7 +20,7 @@ export interface StatsData {
   toolSuccesses: number;
   toolFailures: number;
   linesGenerated: number;
-  activeDays: string[];          // ISO date strings YYYY-MM-DD
+  activeDays: string[]; // ISO date strings YYYY-MM-DD
   totalDurationMs: number;
   /** Per-day activity heatmap data: date → intensity level 0-4 */
   dailyActivity: Record<string, number>;
@@ -121,12 +121,8 @@ export async function trackLinesGenerated(lines: number): Promise<void> {
 /* ── Derived helpers (for renderer consumption) ─────────── */
 
 function formatStats(s: StatsData) {
-  const successRate = s.toolCalls > 0
-    ? Math.round((s.toolSuccesses / s.toolCalls) * 100)
-    : 0;
-  const avgDurationMs = s.toolCalls > 0
-    ? Math.round(s.totalDurationMs / s.toolCalls)
-    : 0;
+  const successRate = s.toolCalls > 0 ? Math.round((s.toolSuccesses / s.toolCalls) * 100) : 0;
+  const avgDurationMs = s.toolCalls > 0 ? Math.round(s.totalDurationMs / s.toolCalls) : 0;
 
   // Convert dailyActivity to heatmap data for the last 53 weeks (GitHub-style)
   const heatmapDays: { date: string; level: number }[] = [];
@@ -169,8 +165,8 @@ export function registerStatsHandlers(): void {
     try {
       const s = await loadStats();
       return { ok: true, data: formatStats(s) };
-    } catch (e: any) {
-      return { ok: false, error: e.message };
+    } catch (e: unknown) {
+      return { ok: false, error: errorText(e) };
     }
   });
 
@@ -178,8 +174,8 @@ export function registerStatsHandlers(): void {
     try {
       await saveStats({ ...DEFAULT_STATS });
       return { ok: true };
-    } catch (e: any) {
-      return { ok: false, error: e.message };
+    } catch (e: unknown) {
+      return { ok: false, error: errorText(e) };
     }
   });
 }

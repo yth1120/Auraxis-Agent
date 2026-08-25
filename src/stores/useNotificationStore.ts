@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { AppNotification, NotificationStore } from '@/types/notifications';
+import type { NotificationStore } from '@/types/notifications';
 
 const MAX_ITEMS = 100;
 

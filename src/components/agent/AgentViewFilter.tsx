@@ -20,10 +20,12 @@ export default function AgentViewFilter({ agent }: { agent: AgentInfo }) {
 
   return (
     <div className="flex items-center rounded-full bg-[var(--color-bg-inset)] p-0.5">
-      {([
-        ['all', t('agentFilter.all')],
-        ['errors', `${t('agentFilter.errors')}${failed > 0 ? ` (${failed})` : ''}`],
-      ] as const).map(([key, label]) => {
+      {(
+        [
+          ['all', t('agentFilter.all')],
+          ['errors', `${t('agentFilter.errors')}${failed > 0 ? ` (${failed})` : ''}`],
+        ] as const
+      ).map(([key, label]) => {
         const active = key === 'errors' ? agentErrorsOnly : !agentErrorsOnly;
         return (
           <button

@@ -108,7 +108,8 @@ describe('web-search providers', () => {
   });
 
   it('falls back to DuckDuckGo when the preferred provider fails', async () => {
-    const fetchMock = vi.fn()
+    const fetchMock = vi
+      .fn()
       .mockRejectedValueOnce(new Error('exa down'))
       .mockResolvedValueOnce({
         ok: true,

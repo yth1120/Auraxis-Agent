@@ -78,8 +78,12 @@ export function validateSkill(name: string, content: string): SkillGateResult {
   else if (desc === trimmedName || desc.endsWith(' 技能')) {
     warnings.push('description 疑似占位符，建议描述具体使用场景');
   }
-  if (desc && trimmedName && !desc.toLowerCase().includes(trimmedName.toLowerCase()) &&
-      !trimmedName.toLowerCase().includes(desc.toLowerCase())) {
+  if (
+    desc &&
+    trimmedName &&
+    !desc.toLowerCase().includes(trimmedName.toLowerCase()) &&
+    !trimmedName.toLowerCase().includes(desc.toLowerCase())
+  ) {
     warnings.push('description 与名称语义不一致，请确认描述准确');
   }
 
@@ -117,9 +121,7 @@ export function selectSkillSubset(skills: SkillLike[], max: number): string[] {
     for (let i = 0; i < pool.length; i++) {
       const s = pool[i];
       const tokens = tokenSet(s);
-      const maxSim = selected.length === 0
-        ? 0
-        : Math.max(...selected.map((sel) => jaccard(tokens, tokenSet(sel))));
+      const maxSim = selected.length === 0 ? 0 : Math.max(...selected.map((sel) => jaccard(tokens, tokenSet(sel))));
       const diversity = 1 - maxSim;
       const recency = (ts[i] - minTs) / (maxTs - minTs || 1);
       const score = 0.7 * diversity + 0.3 * recency;

@@ -19,23 +19,33 @@ const ICON: Record<TaskStatus, React.ReactNode> = {
 
 function statusIconClass(status: TaskStatus): string {
   switch (status) {
-    case 'running': return 'text-primary';
-    case 'done': return 'text-text-secondary';
-    case 'error': return 'text-text-secondary';
+    case 'running':
+      return 'text-primary';
+    case 'done':
+      return 'text-text-secondary';
+    case 'error':
+      return 'text-text-secondary';
     case 'pending':
     case 'skipped':
-    default: return 'text-muted';
+    default:
+      return 'text-muted';
   }
 }
 
 function statusTitleClass(status: TaskStatus): string {
   switch (status) {
-    case 'running': return 'font-semibold text-primary';
-    case 'done': return 'text-muted line-through';
-    case 'error': return 'text-text-secondary';
-    case 'pending': return 'text-secondary';
-    case 'skipped': return 'text-muted';
-    default: return 'text-primary';
+    case 'running':
+      return 'font-semibold text-primary';
+    case 'done':
+      return 'text-muted line-through';
+    case 'error':
+      return 'text-text-secondary';
+    case 'pending':
+      return 'text-secondary';
+    case 'skipped':
+      return 'text-muted';
+    default:
+      return 'text-primary';
   }
 }
 
@@ -60,10 +70,12 @@ export default function TaskChecklist({ tasks, activeTaskId, onSelect, onRedo }:
   const pct = Math.round((done / tasks.length) * 100);
 
   return (
-  <section className="px-4 py-3 mb-3 rounded-xl bg-[var(--color-bg-secondary)]" aria-label={tPanel('checklist.aria')}>
+    <section className="px-4 py-3 mb-3 rounded-xl bg-[var(--color-bg-secondary)]" aria-label={tPanel('checklist.aria')}>
       <header className="flex items-center justify-between mb-2">
-    <span className="text-2xs font-semibold text-muted tracking-wide">{tPanel('checklist.title')}</span>
-        <span className="text-2xs tabular-nums text-muted">{done}/{tasks.length}</span>
+        <span className="text-2xs font-semibold text-muted tracking-wide">{tPanel('checklist.title')}</span>
+        <span className="text-2xs tabular-nums text-muted">
+          {done}/{tasks.length}
+        </span>
       </header>
       <div className="h-1 rounded-full bg-[var(--color-bg-inset)] overflow-hidden mb-2.5">
         <div className="h-full rounded-full bg-primary [transition:width_0.35s_ease]" style={{ width: `${pct}%` }} />
@@ -83,23 +95,22 @@ export default function TaskChecklist({ tasks, activeTaskId, onSelect, onRedo }:
             tabIndex={onSelect ? 0 : undefined}
             onKeyDown={onSelect ? (e) => (e.key === 'Enter' || e.key === ' ') && onSelect(t) : undefined}
           >
-            <span className={clsx('text-sm leading-[18px] shrink-0', statusIconClass(t.status))}>
-              {ICON[t.status]}
-            </span>
+            <span className={clsx('text-sm leading-[18px] shrink-0', statusIconClass(t.status))}>{ICON[t.status]}</span>
             <span className="flex flex-col min-w-0">
-              <span className={clsx('text-xs leading-[18px] break-words', statusTitleClass(t.status))}>
-                {t.title}
-              </span>
+              <span className={clsx('text-xs leading-[18px] break-words', statusTitleClass(t.status))}>{t.title}</span>
               {t.detail && <span className="text-2xs text-muted">{t.detail}</span>}
             </span>
             {onRedo && t.status !== 'done' && (
               <button
                 type="button"
                 className="ml-auto shrink-0 text-2xs text-text-muted px-1.5 py-[2px] rounded-md cursor-pointer hover:bg-[var(--color-hover)] hover:text-text-secondary"
-                onClick={(e) => { e.stopPropagation(); onRedo(t); }}
-      title={tPanel('checklist.redoTip')}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRedo(t);
+                }}
+                title={tPanel('checklist.redoTip')}
               >
-      {tPanel('checklist.redo')}
+                {tPanel('checklist.redo')}
               </button>
             )}
           </li>

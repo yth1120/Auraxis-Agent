@@ -13,22 +13,20 @@ interface PermissionRule {
   createdAt: number;
 }
 
-interface PermissionRequest {
-  requestId: string;
-  toolName: string;
-  input: Record<string, unknown>;
-  message: string;
-  timestamp: number;
-}
-
 function summarizeInput(toolName: string, input: Record<string, unknown>): string {
   switch (toolName) {
-    case 'Bash': return `执行命令: ${(input.command as string)?.slice(0, 80) || '?'}`;
-    case 'Read': return `读取文件: ${(input.file_path as string)?.slice(0, 80) || '?'}`;
-    case 'Write': return `写入文件: ${(input.file_path as string)?.slice(0, 80) || '?'}`;
-    case 'Edit': return `编辑文件: ${(input.file_path as string)?.slice(0, 60) || '?'}`;
-    case 'Grep': return `搜索: /${(input.pattern as string)?.slice(0, 60) || '?'}/`;
-    default: return `调用工具: ${toolName}`;
+    case 'Bash':
+      return `执行命令: ${(input.command as string)?.slice(0, 80) || '?'}`;
+    case 'Read':
+      return `读取文件: ${(input.file_path as string)?.slice(0, 80) || '?'}`;
+    case 'Write':
+      return `写入文件: ${(input.file_path as string)?.slice(0, 80) || '?'}`;
+    case 'Edit':
+      return `编辑文件: ${(input.file_path as string)?.slice(0, 60) || '?'}`;
+    case 'Grep':
+      return `搜索: /${(input.pattern as string)?.slice(0, 60) || '?'}/`;
+    default:
+      return `调用工具: ${toolName}`;
   }
 }
 
@@ -90,9 +88,7 @@ describe('Permission — auto‑allow safe tools', () => {
 
 describe('Permission — rule matching', () => {
   it('精确匹配工具名', () => {
-    const rules: PermissionRule[] = [
-      { id: 'r1', toolName: 'Bash', action: 'allow', scope: 'always', createdAt: 1 },
-    ];
+    const rules: PermissionRule[] = [{ id: 'r1', toolName: 'Bash', action: 'allow', scope: 'always', createdAt: 1 }];
     expect(checkPermission('Bash', { command: 'ls' }, rules)).toBe('allow');
     expect(checkPermission('Write', { file_path: 'a.ts' }, rules)).toBe('ask');
   });
@@ -117,24 +113,22 @@ describe('Permission — rule matching', () => {
   });
 
   it('once 规则匹配后自动移除', () => {
-    const rules: PermissionRule[] = [
-      { id: 'r1', toolName: 'Bash', action: 'allow', scope: 'once', createdAt: 1 },
-    ];
+    const rules: PermissionRule[] = [{ id: 'r1', toolName: 'Bash', action: 'allow', scope: 'once', createdAt: 1 }];
     expect(checkPermission('Bash', { command: 'ls' }, rules)).toBe('allow');
     expect(rules).toHaveLength(0); // consumed
   });
 
   it('session 规则持久保留', () => {
-    const rules: PermissionRule[] = [
-      { id: 'r1', toolName: 'Write', action: 'allow', scope: 'session', createdAt: 1 },
-    ];
+    const rules: PermissionRule[] = [{ id: 'r1', toolName: 'Write', action: 'allow', scope: 'session', createdAt: 1 }];
     expect(checkPermission('Write', { file_path: 'a.ts' }, rules)).toBe('allow');
     expect(rules).toHaveLength(1); // still present
   });
 });
 
 describe('Permission — timeout auto‑deny', () => {
-  beforeEach(() => { vi.useFakeTimers(); });
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
 
   it('超时未响应自动拒绝', async () => {
     const pending = new Map<string, { resolve: (v: boolean) => void }>();
@@ -151,7 +145,10 @@ describe('Permission — timeout auto‑deny', () => {
         pending.delete(requestId);
         resolve(false);
       }, 120_000);
-    }).then((v) => { resolved = true; resolvedValue = v; });
+    }).then((v) => {
+      resolved = true;
+      resolvedValue = v;
+    });
 
     // Advance past timeout
     vi.advanceTimersByTime(120_001);
@@ -212,11 +209,7 @@ interface PermissionContext {
 
 const SAFE_READONLY_TOOLS = new Set(['Read', 'Grep', 'Glob']);
 
-function shouldAutoApprove(
-  toolName: string,
-  toolCallId: string | undefined,
-  ctx: PermissionContext,
-): boolean {
+function shouldAutoApprove(toolName: string, toolCallId: string | undefined, ctx: PermissionContext): boolean {
   if (ctx.mode === 'auto') return true;
   if (ctx.mode === 'plan') {
     // Plan approval carries approved task ids — any non-empty approval
@@ -390,18 +383,14 @@ describe('shouldAutoApprove — 模式切换', () => {
 describe('完整权限流水线（shouldAutoApprove + checkPermission）', () => {
   it('Ask 模式：安全工具在 Step 0 自动通过，不检查规则', () => {
     const ctx: PermissionContext = { mode: 'ask' };
-    const rules: PermissionRule[] = [
-      { id: 'r1', toolName: 'Read', action: 'deny', scope: 'always', createdAt: 1 },
-    ];
+    const rules: PermissionRule[] = [{ id: 'r1', toolName: 'Read', action: 'deny', scope: 'always', createdAt: 1 }];
     // shouldAutoApprove returns true before rules are checked
     expect(fullPermissionCheck('Read', { file_path: 'a.ts' }, rules, 'tc-1', ctx)).toBe('auto_allow');
   });
 
   it('Ask 模式：危险工具在 Step 0 返回 false，进入 Step 1 规则检查', () => {
     const ctx: PermissionContext = { mode: 'ask' };
-    const rules: PermissionRule[] = [
-      { id: 'r1', toolName: 'Bash', action: 'deny', scope: 'always', createdAt: 1 },
-    ];
+    const rules: PermissionRule[] = [{ id: 'r1', toolName: 'Bash', action: 'deny', scope: 'always', createdAt: 1 }];
     expect(fullPermissionCheck('Bash', { command: 'rm -rf /' }, rules, 'tc-1', ctx)).toBe('deny');
   });
 
@@ -412,18 +401,14 @@ describe('完整权限流水线（shouldAutoApprove + checkPermission）', () =>
 
   it('Plan 模式：已批准步骤在 Step 0 自动通过，跳过规则', () => {
     const ctx: PermissionContext = { mode: 'plan', approvedPlanSteps: ['tc-1'] };
-    const rules: PermissionRule[] = [
-      { id: 'r1', toolName: 'Bash', action: 'deny', scope: 'always', createdAt: 1 },
-    ];
+    const rules: PermissionRule[] = [{ id: 'r1', toolName: 'Bash', action: 'deny', scope: 'always', createdAt: 1 }];
     // approved step bypasses deny rule
     expect(fullPermissionCheck('Bash', { command: 'ls' }, rules, 'tc-1', ctx)).toBe('auto_allow');
   });
 
   it('Plan 模式：批准计划后整个执行解锁（跳过规则）', () => {
     const ctx: PermissionContext = { mode: 'plan', approvedPlanSteps: ['step-2'] };
-    const rules: PermissionRule[] = [
-      { id: 'r1', toolName: 'Bash', action: 'deny', scope: 'always', createdAt: 1 },
-    ];
+    const rules: PermissionRule[] = [{ id: 'r1', toolName: 'Bash', action: 'deny', scope: 'always', createdAt: 1 }];
     expect(fullPermissionCheck('Bash', { command: 'rm -rf /' }, rules, 'tc-1', ctx)).toBe('auto_allow');
   });
 

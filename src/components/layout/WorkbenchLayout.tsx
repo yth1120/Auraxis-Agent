@@ -57,25 +57,38 @@ function relativeSearchTime(ts: number): string {
   if (diff < 3_600_000) return t('time.minutesAgo', { n: Math.floor(diff / 60_000) });
   if (diff < 86_400_000) return t('time.hoursAgo', { n: Math.floor(diff / 3_600_000) });
   const d = new Date(ts);
-  return new Intl.DateTimeFormat(useI18nStore.getState().locale === 'en-US' ? 'en-US' : 'zh-CN', { month: 'numeric', day: 'numeric' }).format(d);
+  return new Intl.DateTimeFormat(useI18nStore.getState().locale === 'en-US' ? 'en-US' : 'zh-CN', {
+    month: 'numeric',
+    day: 'numeric',
+  }).format(d);
 }
 
 const PANEL_LABELS: Record<string, I18nKey> = {
   'file-tree': 'workbench.files',
-  'diff': 'workbench.diff',
-  'browser': 'workbench.preview',
-  'inspector': 'workbench.execution',
-  'timeline': 'workbench.timeline',
-  'review': 'workbench.review',
-  'preview': 'workbench.preview',
+  diff: 'workbench.diff',
+  browser: 'workbench.preview',
+  inspector: 'workbench.execution',
+  timeline: 'workbench.timeline',
+  review: 'workbench.review',
+  preview: 'workbench.preview',
 };
 
 /** Right-panel "cockpit" tabs — 文件 / 执行详情 / 时间线 / 审查 / 预览。
  *  快捷键与 App.tsx 的全局处理一一对应，避免“打开了面板但标签未选中”。 */
-const COCKPIT_TABS: { key: 'file-tree' | 'inspector' | 'timeline' | 'review' | 'preview'; labelKey: I18nKey; shortcut: string; icon: React.ReactNode }[] = [
+const COCKPIT_TABS: {
+  key: 'file-tree' | 'inspector' | 'timeline' | 'review' | 'preview';
+  labelKey: I18nKey;
+  shortcut: string;
+  icon: React.ReactNode;
+}[] = [
   { key: 'file-tree', labelKey: 'workbench.files', shortcut: '', icon: <FolderOpen size={14} /> },
   { key: 'inspector', labelKey: 'workbench.execution', shortcut: 'Ctrl+Shift+1', icon: <LayoutIcon size={14} /> },
-  { key: 'timeline', labelKey: 'workbench.timeline', shortcut: 'Ctrl+Shift+2', icon: <ClockCounterClockwise size={14} /> },
+  {
+    key: 'timeline',
+    labelKey: 'workbench.timeline',
+    shortcut: 'Ctrl+Shift+2',
+    icon: <ClockCounterClockwise size={14} />,
+  },
   { key: 'review', labelKey: 'workbench.review', shortcut: 'Ctrl+Shift+3', icon: <ShieldCheck size={14} /> },
   { key: 'preview', labelKey: 'workbench.preview', shortcut: 'Ctrl+Shift+4', icon: <Browser size={14} /> },
 ];
@@ -94,14 +107,12 @@ export default function WorkbenchLayout() {
     setRightPanelView,
     rightPanelWidth,
     setRightPanelWidth,
-    paneSizes,
     setPaneSizes,
     activeToolView,
     openToolView,
     sidebarMode,
     globalSearchOpen,
     setGlobalSearchOpen,
-    toggleRightPanel,
     goBack,
     goForward,
     canGoBack,
@@ -110,13 +121,13 @@ export default function WorkbenchLayout() {
     setTerminalHeight,
   } = useAppStore();
 
-  const unreadNotifications = useNotificationStore(
-    (s) => s.items.filter((i) => !i.read).length,
-  );
+  const unreadNotifications = useNotificationStore((s) => s.items.filter((i) => !i.read).length);
   const showSettings = useAppStore((s) => s.showSettings);
 
   const isElectron = typeof window !== 'undefined' && !!window.electronAPI;
-  const [searchResults, setSearchResults] = useState<{ type: 'chat' | 'agent' | 'session'; id: string; title: string; snippet: string; ts: number; score: number }[]>([]);
+  const [searchResults, setSearchResults] = useState<
+    { type: 'chat' | 'agent' | 'session'; id: string; title: string; snippet: string; ts: number; score: number }[]
+  >([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchIndex, setSearchIndex] = useState(-1);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -187,7 +198,10 @@ export default function WorkbenchLayout() {
   }, [openFileRequest]);
   useEffect(() => {
     if (!isElectron) return;
-    window.electronAPI!.isMaximized().then(setIsMaximized).catch(() => {});
+    window
+      .electronAPI!.isMaximized()
+      .then(setIsMaximized)
+      .catch(() => {});
     return window.electronAPI!.onMaximizeChange?.(setIsMaximized);
   }, [isElectron]);
 
@@ -275,7 +289,7 @@ export default function WorkbenchLayout() {
     {
       key: 'about',
       label: t('menu.about'),
-      onClick: () => message.info('Auraxis v3.0.0'),
+      onClick: () => message.info('Auraxis v3.1.0'),
     },
   ];
 
@@ -290,9 +304,7 @@ export default function WorkbenchLayout() {
   // never be squeezed below a comfortable width. Its max is therefore derived
   // from the live container width instead of a fixed pixel cap.
   const MAIN_MIN = 480;
-  const [containerW, setContainerW] = useState(() =>
-    typeof window !== 'undefined' ? window.innerWidth : 1280,
-  );
+  const [containerW, setContainerW] = useState(() => (typeof window !== 'undefined' ? window.innerWidth : 1280));
   useEffect(() => {
     // Calibrate to the actual body width once mounted (excludes window chrome).
     const w = bodyRef.current?.clientWidth;
@@ -317,7 +329,7 @@ export default function WorkbenchLayout() {
     const sider = sidebarCollapsed ? 0 : Math.max(260, sidebarWidth);
     const w = containerW || (typeof window !== 'undefined' ? window.innerWidth : 1280);
     return [Math.max(MAIN_MIN, w - sider)];
-  }, [containerW]);
+  }, [containerW, sidebarCollapsed, sidebarWidth]);
 
   const openSearchResult = (r: { type: 'chat' | 'agent' | 'session'; id: string }) => {
     setGlobalSearchOpen(false);
@@ -336,7 +348,6 @@ export default function WorkbenchLayout() {
     }
   };
 
-
   // ── Resize helper — sync correction for Allotment's proportional defaultSizes ──
   const resizePanes = useCallback(() => {
     const handle = allotmentRef.current;
@@ -350,7 +361,9 @@ export default function WorkbenchLayout() {
   // ── Pin sidebar pixel width across window & panel toggles ──
   // useLayoutEffect fires synchronously after DOM commit, before paint —
   // corrects Allotment's proportional defaultSizes before the user sees anything.
-  useLayoutEffect(() => { resizePanes(); }, [resizePanes]);
+  useLayoutEffect(() => {
+    resizePanes();
+  }, [resizePanes]);
   useEffect(() => {
     const handler = () => resizePanes();
     window.addEventListener('resize', handler);
@@ -426,26 +439,64 @@ export default function WorkbenchLayout() {
     if (!activeTab) return <ChatArea />;
     if (activeTab.type === 'chat') return <ChatArea />;
     if (activeTab.type === 'file-tree') {
-      return <Suspense fallback={null}><FileTreePanel variant="embedded" /></Suspense>;
+      return (
+        <Suspense fallback={null}>
+          <FileTreePanel variant="embedded" />
+        </Suspense>
+      );
     }
     if (activeTab.type === 'diff') {
-      return <Suspense fallback={null}><DiffPanel tabId={activeTab.id} /></Suspense>;
+      return (
+        <Suspense fallback={null}>
+          <DiffPanel tabId={activeTab.id} />
+        </Suspense>
+      );
     }
     if (activeTab.type === 'browser') {
-      return <Suspense fallback={null}><PreviewBrowser tabId={activeTab.id} /></Suspense>;
+      return (
+        <Suspense fallback={null}>
+          <PreviewBrowser tabId={activeTab.id} />
+        </Suspense>
+      );
     }
     return null;
   };
 
   const renderRightPanel = () => {
     switch (rightPanelView) {
-      case 'file-tree': return <Suspense fallback={null}><FileTreePanel variant="tabs" /></Suspense>;
-      case 'inspector': return <Suspense fallback={null}><WorkspaceInspector /></Suspense>;
-      case 'timeline': return <Suspense fallback={null}><TimelinePanel /></Suspense>;
-      case 'review': return <Suspense fallback={null}><ReviewPanel /></Suspense>;
-      case 'preview': return <Suspense fallback={null}><PreviewBrowser tabId="right-preview" /></Suspense>;
+      case 'file-tree':
+        return (
+          <Suspense fallback={null}>
+            <FileTreePanel variant="tabs" />
+          </Suspense>
+        );
+      case 'inspector':
+        return (
+          <Suspense fallback={null}>
+            <WorkspaceInspector />
+          </Suspense>
+        );
+      case 'timeline':
+        return (
+          <Suspense fallback={null}>
+            <TimelinePanel />
+          </Suspense>
+        );
+      case 'review':
+        return (
+          <Suspense fallback={null}>
+            <ReviewPanel />
+          </Suspense>
+        );
+      case 'preview':
+        return (
+          <Suspense fallback={null}>
+            <PreviewBrowser tabId="right-preview" />
+          </Suspense>
+        );
       case 'none':
-      default: return null;
+      default:
+        return null;
     }
   };
 
@@ -455,12 +506,14 @@ export default function WorkbenchLayout() {
   };
 
   return (
-    <Layout className={clsx(
-      'workbench-layout !h-screen !overflow-hidden',
-      // !important 是必须的：antd 会给 Layout 注入默认底色，普通 bg-transparent
-      // 优先级不够，会把 Acrylic 桌面整个盖住。
-      glassSurfaceOn ? '!bg-transparent' : '!bg-[var(--color-glass-header)]',
-    )}>
+    <Layout
+      className={clsx(
+        'workbench-layout !h-screen !overflow-hidden',
+        // !important 是必须的：antd 会给 Layout 注入默认底色，普通 bg-transparent
+        // 优先级不够，会把 Acrylic 桌面整个盖住。
+        glassSurfaceOn ? '!bg-transparent' : '!bg-[var(--color-glass-header)]',
+      )}
+    >
       {/* 顶栏在 Aqua 模式下悬浮成圆角卡片，窗口顶部留出的 10px 沟槽
           需要这条透明热区维持无边框窗口的拖拽能力。 */}
       {aquaGlassOn && <div aria-hidden className="ax-aqua-drag-strip" />}
@@ -468,243 +521,296 @@ export default function WorkbenchLayout() {
       <Header className="ax-header !h-10 !pl-0 !pr-3 shrink-0">
         <div className="ax-header-group flex-1 min-w-0 gap-2.5">
           <div className="ax-header-group shrink-0">
-          <button
-            className={clsx(
-              "ax-header-action text-sm",
-              !canGoBack() && "ax-header-action:disabled"
-            )}
-            onClick={goBack} disabled={!canGoBack()} title={t('header.back')}
-          >
-            <ArrowLeft weight="bold" />
-          </button>
-          <button
-            className={clsx(
-              "ax-header-action text-sm",
-              !canGoForward() && "ax-header-action:disabled"
-            )}
-            onClick={goForward} disabled={!canGoForward()} title={t('header.forward')}
-          >
-            <ArrowRight weight="bold" />
-          </button>
-        </div>
-
-        <div className="ax-header-group shrink-0 !gap-1.5">
-          <Dropdown menu={{ items: fileMenuItems }} trigger={['click']} placement="bottomLeft" overlayClassName="ax-top-menu-popup" transitionName="">
-            <button className="ax-header-action !w-auto !px-1.5 text-sm">
-              {t('menu.file')}
+            <button
+              className={clsx('ax-header-action text-sm', !canGoBack() && 'ax-header-action:disabled')}
+              onClick={goBack}
+              disabled={!canGoBack()}
+              title={t('header.back')}
+            >
+              <ArrowLeft weight="bold" />
             </button>
-          </Dropdown>
-          <Dropdown menu={{ items: editMenuItems }} trigger={['click']} placement="bottomLeft" overlayClassName="ax-top-menu-popup" transitionName="">
-            <button className="ax-header-action !w-auto !px-1.5 text-sm">
-              {t('menu.edit')}
+            <button
+              className={clsx('ax-header-action text-sm', !canGoForward() && 'ax-header-action:disabled')}
+              onClick={goForward}
+              disabled={!canGoForward()}
+              title={t('header.forward')}
+            >
+              <ArrowRight weight="bold" />
             </button>
-          </Dropdown>
-          <Dropdown menu={{ items: viewMenuItems }} trigger={['click']} placement="bottomLeft" overlayClassName="ax-top-menu-popup" transitionName="">
-            <button className="ax-header-action !w-auto !px-1.5 text-sm">
-              {t('menu.view')}
-            </button>
-          </Dropdown>
-          <Dropdown menu={{ items: helpMenuItems }} trigger={['click']} placement="bottomLeft" overlayClassName="ax-top-menu-popup" transitionName="">
-            <button className="ax-header-action !w-auto !px-1.5 text-sm">
-              {t('menu.help')}
-            </button>
-          </Dropdown>
-        </div>
-
-        <HeaderStatusInfo />
-
-        <Modal
-          open={globalSearchOpen}
-          onCancel={() => setGlobalSearchOpen(false)}
-          footer={null}
-          width={640}
-          centered
-          closable={false}
-          className="global-search-modal"
-          transitionName=""
-          maskTransitionName=""
-          destroyOnHidden
-          styles={{ mask: { background: 'var(--glass-mask)' }, body: { padding: 0 }, content: { padding: 0 } }}
-        >
-          <div className="flex flex-col overflow-hidden rounded-2xl border border-[var(--color-border-dim)] bg-[var(--color-bg-elevated)] shadow-[var(--shadow-lg)]">
-            {/* 搜索输入栏 */}
-            <div className="flex items-center gap-3 shrink-0 h-14 px-4 border-b border-[var(--color-border-dim)]">
-              <MagnifyingGlass size={18} className="shrink-0 text-text-muted" />
-              <input
-                ref={searchInputRef}
-                id="global-search-input"
-                type="search"
-                placeholder={t('search.placeholder')}
-                value={searchQuery}
-                onChange={(e) => {
-                  const q = e.target.value;
-                  const seq = ++searchSeq.current;
-                  setSearchQuery(q);
-                  setSearchIndex(-1);
-                  if (searchTimer.current) clearTimeout(searchTimer.current);
-                  if (!q.trim()) { setSearchResults([]); searchSeq.current++; return; }
-                  searchTimer.current = setTimeout(() => {
-                    const ql = q.trim().toLowerCase();
-                    const local = useSessionStore.getState().sessions
-                      .filter(
-                        (s) =>
-                          s.title.toLowerCase().includes(ql) ||
-                          s.messages.some((m) => getContentText(m.content).toLowerCase().includes(ql)),
-                      )
-                      .slice(0, 6)
-                      .map((s) => {
-                        const last = s.messages[s.messages.length - 1];
-                        return {
-                          type: 'session' as const,
-                          id: s.id,
-                          title: s.title,
-                          snippet: last ? getContentText(last.content).replace(/\s+/g, ' ').slice(0, 90) : '',
-                          ts: s.updated,
-                          score: 1,
-                        };
-                      });
-                    const fts = window.electronAPI?.fts?.search;
-                    if (fts) {
-                      void fts(q, 8).then((r) => {
-                        if (seq !== searchSeq.current) return;
-                        setSearchResults([...local, ...(r.ok && r.data ? r.data : [])]);
-                        setSearchIndex(0);
-                      }).catch(() => { if (seq === searchSeq.current) setSearchResults(local); });
-                    } else {
-                      setSearchResults(local);
-                      setSearchIndex(0);
-                    }
-                  }, 250);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'ArrowDown') {
-                    e.preventDefault();
-                    setSearchIndex((i) => (searchResults.length ? (i + 1) % searchResults.length : 0));
-                  } else if (e.key === 'ArrowUp') {
-                    e.preventDefault();
-                    setSearchIndex((i) => (searchResults.length ? (i - 1 + searchResults.length) % searchResults.length : 0));
-                  } else if (e.key === 'Enter') {
-                    const target = searchResults[searchIndex >= 0 ? searchIndex : 0];
-                    if (target) openSearchResult(target);
-                  } else if (e.key === 'Escape') {
-                    setGlobalSearchOpen(false);
-                    (e.target as HTMLInputElement).blur();
-                  }
-                }}
-                style={{ borderRadius: 0 }}
-                className="flex-1 min-w-0 h-full rounded-none bg-transparent text-base text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] outline-none [&::-webkit-search-cancel-button]:hidden"
-              />
-              {searchQuery.trim() && (
-                <span className="shrink-0 text-2xs text-text-faint tabular-nums">{t('search.results', { n: searchResults.length })}</span>
-              )}
-              {searchQuery && (
-                <button
-                  type="button"
-                  aria-label={t('search.clear')}
-                  className="shrink-0 flex items-center justify-center w-5 h-5 rounded-full text-text-muted hover:text-text-primary hover:bg-[var(--color-hover)]"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => {
-                    searchSeq.current++;
-                    setSearchQuery('');
-                    setSearchResults([]);
-                    setSearchIndex(-1);
-                  }}
-                >
-                  <X size={10} weight="bold" />
-                </button>
-              )}
-            </div>
-
-            {/* 结果区 */}
-            <div className="min-h-[200px] max-h-[400px] overflow-y-auto p-2">
-              {!searchQuery.trim() ? (
-                <div className="flex flex-col items-center justify-center gap-2.5 px-4 py-10 text-center">
-                  <span className="flex items-center justify-center w-12 h-12 text-text-faint">
-                    <MagnifyingGlass size={20} />
-                  </span>
-                  <span className="text-sm font-medium text-text-secondary">{t('search.start')}</span>
-                  <span className="text-2xs text-text-faint leading-[1.6]">{t('search.scope')}</span>
-                </div>
-              ) : searchResults.length === 0 ? (
-                <div className="flex flex-col items-center justify-center gap-2.5 px-4 py-10 text-center">
-                  <span className="flex items-center justify-center w-12 h-12 text-text-faint">
-                    <MagnifyingGlass size={20} />
-                  </span>
-                  <span className="text-sm font-medium text-text-secondary">{t('search.noResults')}</span>
-                  <span className="text-2xs text-text-faint leading-[1.6]">{t('search.tryAgain')}</span>
-                </div>
-              ) : (
-                <div role="listbox" aria-label={t('search.placeholder')} className="flex flex-col gap-2">
-                  {(['session', 'chat', 'agent'] as const).map((group) => {
-                    const groupItems = searchResults.filter((r) => r.type === group);
-                    if (groupItems.length === 0) return null;
-                    const groupLabel = group === 'session' ? t('search.groupSession') : group === 'chat' ? t('search.groupChat') : 'Code';
-                    return (
-                      <div key={group} className="flex flex-col gap-0.5">
-                        <div className="flex items-center gap-1.5 px-2.5 pt-1.5 pb-1">
-                          <span className="text-2xs font-semibold text-text-faint tracking-[0.06em]">{groupLabel}</span>
-                          <span className="text-2xs text-text-faint tabular-nums">{groupItems.length}</span>
-                        </div>
-                        {groupItems.map((r, gi) => {
-                          const idx = searchResults.indexOf(r);
-                          const icon = group === 'session' ? <ChatTeardropDots size={14} weight="regular" /> : group === 'chat' ? <ChatCircle size={14} weight="regular" /> : <Robot size={14} weight="regular" />;
-                          const iconCls = group === 'session'
-                            ? 'text-[var(--color-violet)]'
-                            : group === 'chat'
-                              ? 'text-[var(--color-primary)]'
-                              : 'text-[var(--color-violet)]';
-                          return (
-                            <button
-                              key={`${group}-${r.id}-${gi}`}
-                              type="button"
-                              role="option"
-                              aria-selected={idx === searchIndex}
-                              className={clsx(
-                                'flex items-center gap-3 w-full h-11 px-3 rounded-lg text-left cursor-pointer transition-colors duration-100',
-                                idx === searchIndex ? 'bg-primary-soft' : 'hover:bg-[var(--color-hover)]',
-                              )}
-                              onMouseDown={(e) => { e.preventDefault(); openSearchResult(r); }}
-                              onMouseEnter={() => setSearchIndex(idx)}
-                            >
-                              <span className={`shrink-0 flex items-center justify-center w-8 h-8 ${iconCls}`}>
-                                {icon}
-                              </span>
-                              <span className="min-w-0 flex-1 flex flex-col gap-[2px]">
-                                <span className="flex items-baseline gap-2 min-w-0">
-                                  <span className="flex-1 min-w-0 text-sm font-medium text-text-primary truncate">{r.title}</span>
-                                  <span className="shrink-0 text-2xs text-text-faint tabular-nums">{relativeSearchTime(r.ts)}</span>
-                                </span>
-                                {r.snippet && (
-                                  <span className="text-xs text-text-muted truncate">{r.snippet}</span>
-                                )}
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* 快捷键提示 */}
-            <div className="flex items-center gap-4 shrink-0 h-10 px-4 border-t border-[var(--color-border-dim)] text-2xs text-text-faint">
-              <span className="flex items-center gap-1.5">
-                <kbd className="inline-flex items-center justify-center min-w-5 h-5 px-1 rounded-md bg-[var(--color-bg-inset)] border border-[var(--color-border-dim)] text-2xs font-medium text-text-secondary">↑↓</kbd>
-                {t('search.upDown')}
-              </span>
-              <span className="flex items-center gap-1.5">
-                <kbd className="inline-flex items-center justify-center min-w-5 h-5 px-1 rounded-md bg-[var(--color-bg-inset)] border border-[var(--color-border-dim)] text-2xs font-medium text-text-secondary">Enter</kbd>
-                {t('search.enter')}
-              </span>
-              <span className="flex items-center gap-1.5">
-                <kbd className="inline-flex items-center justify-center min-w-5 h-5 px-1 rounded-md bg-[var(--color-bg-inset)] border border-[var(--color-border-dim)] text-2xs font-medium text-text-secondary">Esc</kbd>
-                {t('search.esc')}
-              </span>
-            </div>
           </div>
-        </Modal>
+
+          <div className="ax-header-group shrink-0 !gap-1.5">
+            <Dropdown
+              menu={{ items: fileMenuItems }}
+              trigger={['click']}
+              placement="bottomLeft"
+              overlayClassName="ax-top-menu-popup"
+              transitionName=""
+            >
+              <button className="ax-header-action !w-auto !px-1.5 text-sm">{t('menu.file')}</button>
+            </Dropdown>
+            <Dropdown
+              menu={{ items: editMenuItems }}
+              trigger={['click']}
+              placement="bottomLeft"
+              overlayClassName="ax-top-menu-popup"
+              transitionName=""
+            >
+              <button className="ax-header-action !w-auto !px-1.5 text-sm">{t('menu.edit')}</button>
+            </Dropdown>
+            <Dropdown
+              menu={{ items: viewMenuItems }}
+              trigger={['click']}
+              placement="bottomLeft"
+              overlayClassName="ax-top-menu-popup"
+              transitionName=""
+            >
+              <button className="ax-header-action !w-auto !px-1.5 text-sm">{t('menu.view')}</button>
+            </Dropdown>
+            <Dropdown
+              menu={{ items: helpMenuItems }}
+              trigger={['click']}
+              placement="bottomLeft"
+              overlayClassName="ax-top-menu-popup"
+              transitionName=""
+            >
+              <button className="ax-header-action !w-auto !px-1.5 text-sm">{t('menu.help')}</button>
+            </Dropdown>
+          </div>
+
+          <HeaderStatusInfo />
+
+          <Modal
+            open={globalSearchOpen}
+            onCancel={() => setGlobalSearchOpen(false)}
+            footer={null}
+            width={640}
+            centered
+            closable={false}
+            className="global-search-modal"
+            transitionName=""
+            maskTransitionName=""
+            destroyOnHidden
+            styles={{ mask: { background: 'var(--glass-mask)' }, body: { padding: 0 }, content: { padding: 0 } }}
+          >
+            <div className="flex flex-col overflow-hidden rounded-2xl border border-[var(--color-border-dim)] bg-[var(--color-bg-elevated)] shadow-[var(--shadow-lg)]">
+              {/* 搜索输入栏 */}
+              <div className="flex items-center gap-3 shrink-0 h-14 px-4 border-b border-[var(--color-border-dim)]">
+                <MagnifyingGlass size={18} className="shrink-0 text-text-muted" />
+                <input
+                  ref={searchInputRef}
+                  id="global-search-input"
+                  type="search"
+                  placeholder={t('search.placeholder')}
+                  value={searchQuery}
+                  onChange={(e) => {
+                    const q = e.target.value;
+                    const seq = ++searchSeq.current;
+                    setSearchQuery(q);
+                    setSearchIndex(-1);
+                    if (searchTimer.current) clearTimeout(searchTimer.current);
+                    if (!q.trim()) {
+                      setSearchResults([]);
+                      searchSeq.current++;
+                      return;
+                    }
+                    searchTimer.current = setTimeout(() => {
+                      const ql = q.trim().toLowerCase();
+                      const local = useSessionStore
+                        .getState()
+                        .sessions.filter(
+                          (s) =>
+                            s.title.toLowerCase().includes(ql) ||
+                            s.messages.some((m) => getContentText(m.content).toLowerCase().includes(ql)),
+                        )
+                        .slice(0, 6)
+                        .map((s) => {
+                          const last = s.messages[s.messages.length - 1];
+                          return {
+                            type: 'session' as const,
+                            id: s.id,
+                            title: s.title,
+                            snippet: last ? getContentText(last.content).replace(/\s+/g, ' ').slice(0, 90) : '',
+                            ts: s.updated,
+                            score: 1,
+                          };
+                        });
+                      const fts = window.electronAPI?.fts?.search;
+                      if (fts) {
+                        void fts(q, 8)
+                          .then((r) => {
+                            if (seq !== searchSeq.current) return;
+                            setSearchResults([...local, ...(r.ok && r.data ? r.data : [])]);
+                            setSearchIndex(0);
+                          })
+                          .catch(() => {
+                            if (seq === searchSeq.current) setSearchResults(local);
+                          });
+                      } else {
+                        setSearchResults(local);
+                        setSearchIndex(0);
+                      }
+                    }, 250);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'ArrowDown') {
+                      e.preventDefault();
+                      setSearchIndex((i) => (searchResults.length ? (i + 1) % searchResults.length : 0));
+                    } else if (e.key === 'ArrowUp') {
+                      e.preventDefault();
+                      setSearchIndex((i) =>
+                        searchResults.length ? (i - 1 + searchResults.length) % searchResults.length : 0,
+                      );
+                    } else if (e.key === 'Enter') {
+                      const target = searchResults[searchIndex >= 0 ? searchIndex : 0];
+                      if (target) openSearchResult(target);
+                    } else if (e.key === 'Escape') {
+                      setGlobalSearchOpen(false);
+                      (e.target as HTMLInputElement).blur();
+                    }
+                  }}
+                  style={{ borderRadius: 0 }}
+                  className="flex-1 min-w-0 h-full rounded-none bg-transparent text-base text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] outline-none [&::-webkit-search-cancel-button]:hidden"
+                />
+                {searchQuery.trim() && (
+                  <span className="shrink-0 text-2xs text-text-faint tabular-nums">
+                    {t('search.results', { n: searchResults.length })}
+                  </span>
+                )}
+                {searchQuery && (
+                  <button
+                    type="button"
+                    aria-label={t('search.clear')}
+                    className="shrink-0 flex items-center justify-center w-5 h-5 rounded-full text-text-muted hover:text-text-primary hover:bg-[var(--color-hover)]"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      searchSeq.current++;
+                      setSearchQuery('');
+                      setSearchResults([]);
+                      setSearchIndex(-1);
+                    }}
+                  >
+                    <X size={10} weight="bold" />
+                  </button>
+                )}
+              </div>
+
+              {/* 结果区 */}
+              <div className="min-h-[200px] max-h-[400px] overflow-y-auto p-2">
+                {!searchQuery.trim() ? (
+                  <div className="flex flex-col items-center justify-center gap-2.5 px-4 py-10 text-center">
+                    <span className="flex items-center justify-center w-12 h-12 text-text-faint">
+                      <MagnifyingGlass size={20} />
+                    </span>
+                    <span className="text-sm font-medium text-text-secondary">{t('search.start')}</span>
+                    <span className="text-2xs text-text-faint leading-[1.6]">{t('search.scope')}</span>
+                  </div>
+                ) : searchResults.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center gap-2.5 px-4 py-10 text-center">
+                    <span className="flex items-center justify-center w-12 h-12 text-text-faint">
+                      <MagnifyingGlass size={20} />
+                    </span>
+                    <span className="text-sm font-medium text-text-secondary">{t('search.noResults')}</span>
+                    <span className="text-2xs text-text-faint leading-[1.6]">{t('search.tryAgain')}</span>
+                  </div>
+                ) : (
+                  <div role="listbox" aria-label={t('search.placeholder')} className="flex flex-col gap-2">
+                    {(['session', 'chat', 'agent'] as const).map((group) => {
+                      const groupItems = searchResults.filter((r) => r.type === group);
+                      if (groupItems.length === 0) return null;
+                      const groupLabel =
+                        group === 'session'
+                          ? t('search.groupSession')
+                          : group === 'chat'
+                            ? t('search.groupChat')
+                            : 'Code';
+                      return (
+                        <div key={group} className="flex flex-col gap-0.5">
+                          <div className="flex items-center gap-1.5 px-2.5 pt-1.5 pb-1">
+                            <span className="text-2xs font-semibold text-text-faint tracking-[0.06em]">
+                              {groupLabel}
+                            </span>
+                            <span className="text-2xs text-text-faint tabular-nums">{groupItems.length}</span>
+                          </div>
+                          {groupItems.map((r, gi) => {
+                            const idx = searchResults.indexOf(r);
+                            const icon =
+                              group === 'session' ? (
+                                <ChatTeardropDots size={14} weight="regular" />
+                              ) : group === 'chat' ? (
+                                <ChatCircle size={14} weight="regular" />
+                              ) : (
+                                <Robot size={14} weight="regular" />
+                              );
+                            const iconCls =
+                              group === 'session'
+                                ? 'text-[var(--color-violet)]'
+                                : group === 'chat'
+                                  ? 'text-[var(--color-primary)]'
+                                  : 'text-[var(--color-violet)]';
+                            return (
+                              <button
+                                key={`${group}-${r.id}-${gi}`}
+                                type="button"
+                                role="option"
+                                aria-selected={idx === searchIndex}
+                                className={clsx(
+                                  'flex items-center gap-3 w-full h-11 px-3 rounded-lg text-left cursor-pointer transition-colors duration-100',
+                                  idx === searchIndex ? 'bg-primary-soft' : 'hover:bg-[var(--color-hover)]',
+                                )}
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  openSearchResult(r);
+                                }}
+                                onMouseEnter={() => setSearchIndex(idx)}
+                              >
+                                <span className={`shrink-0 flex items-center justify-center w-8 h-8 ${iconCls}`}>
+                                  {icon}
+                                </span>
+                                <span className="min-w-0 flex-1 flex flex-col gap-[2px]">
+                                  <span className="flex items-baseline gap-2 min-w-0">
+                                    <span className="flex-1 min-w-0 text-sm font-medium text-text-primary truncate">
+                                      {r.title}
+                                    </span>
+                                    <span className="shrink-0 text-2xs text-text-faint tabular-nums">
+                                      {relativeSearchTime(r.ts)}
+                                    </span>
+                                  </span>
+                                  {r.snippet && <span className="text-xs text-text-muted truncate">{r.snippet}</span>}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* 快捷键提示 */}
+              <div className="flex items-center gap-4 shrink-0 h-10 px-4 border-t border-[var(--color-border-dim)] text-2xs text-text-faint">
+                <span className="flex items-center gap-1.5">
+                  <kbd className="inline-flex items-center justify-center min-w-5 h-5 px-1 rounded-md bg-[var(--color-bg-inset)] border border-[var(--color-border-dim)] text-2xs font-medium text-text-secondary">
+                    ↑↓
+                  </kbd>
+                  {t('search.upDown')}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <kbd className="inline-flex items-center justify-center min-w-5 h-5 px-1 rounded-md bg-[var(--color-bg-inset)] border border-[var(--color-border-dim)] text-2xs font-medium text-text-secondary">
+                    Enter
+                  </kbd>
+                  {t('search.enter')}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <kbd className="inline-flex items-center justify-center min-w-5 h-5 px-1 rounded-md bg-[var(--color-bg-inset)] border border-[var(--color-border-dim)] text-2xs font-medium text-text-secondary">
+                    Esc
+                  </kbd>
+                  {t('search.esc')}
+                </span>
+              </div>
+            </div>
+          </Modal>
 
           {worktreeActive && (
             <span className="ax-badge" title={t('header.sandbox', { id: worktreeTaskId || 'active' })}>
@@ -714,8 +820,8 @@ export default function WorkbenchLayout() {
           )}
         </div>
 
-          {/* ── Top-right feature actions — notifications / terminal / workbench ── */}
-          <div className="ax-header-group shrink-0 gap-2">
+        {/* ── Top-right feature actions — notifications / terminal / workbench ── */}
+        <div className="ax-header-group shrink-0 gap-2">
           <button
             className={clsx(
               'ax-header-action relative text-sm',
@@ -749,17 +855,25 @@ export default function WorkbenchLayout() {
         <div className="ax-header-group">
           {isElectron && (
             <>
-              <button className="ax-header-action text-sm" onClick={() => window.electronAPI?.minimize()} title={t('header.minimize')}>
+              <button
+                className="ax-header-action text-sm"
+                onClick={() => window.electronAPI?.minimize()}
+                title={t('header.minimize')}
+              >
                 <Minus size={12} weight="bold" />
               </button>
-              <button className="ax-header-action text-sm" onClick={() => window.electronAPI?.maximize()} title={isMaximized ? t('header.restore') : t('header.maximize')}>
-                {isMaximized ? (
-                  <Copy size={12} />
-                ) : (
-                  <Square size={12} />
-                )}
+              <button
+                className="ax-header-action text-sm"
+                onClick={() => window.electronAPI?.maximize()}
+                title={isMaximized ? t('header.restore') : t('header.maximize')}
+              >
+                {isMaximized ? <Copy size={12} /> : <Square size={12} />}
               </button>
-              <button className="ax-header-action text-sm hover:!bg-danger-soft hover:!text-text-secondary" onClick={() => window.electronAPI?.close()} title={t('header.close')}>
+              <button
+                className="ax-header-action text-sm hover:!bg-danger-soft hover:!text-text-secondary"
+                onClick={() => window.electronAPI?.close()}
+                title={t('header.close')}
+              >
                 <X size={12} weight="bold" />
               </button>
             </>
@@ -808,11 +922,7 @@ export default function WorkbenchLayout() {
         </aside>
 
         <div className="main-pane-wrap flex-1 min-w-0 h-full">
-          <Allotment
-            ref={allotmentRef}
-            defaultSizes={initialSizes}
-            onDragEnd={handleDragEnd}
-          >
+          <Allotment ref={allotmentRef} defaultSizes={initialSizes} onDragEnd={handleDragEnd}>
             <Allotment.Pane minSize={MAIN_MIN} className="!overflow-hidden">
               <div
                 data-pane="main"
@@ -823,9 +933,7 @@ export default function WorkbenchLayout() {
                   aquaGlassOn ? '!bg-transparent' : '!bg-bg-primary',
                 )}
               >
-                <div className="flex-1 min-h-0 relative">
-                  {renderTabContent()}
-                </div>
+                <div className="flex-1 min-h-0 relative">{renderTabContent()}</div>
                 {sidebarMode !== 'chat' && (
                   <TerminalDrawer
                     open={activeToolView === 'terminal'}
@@ -836,7 +944,6 @@ export default function WorkbenchLayout() {
                 )}
               </div>
             </Allotment.Pane>
-
           </Allotment>
         </div>
 
@@ -892,9 +999,7 @@ export default function WorkbenchLayout() {
                   ))}
                 </div>
               </div>
-              <div className="ax-right-panel-content flex-1 overflow-y-auto min-h-0">
-                {renderRightPanel()}
-              </div>
+              <div className="ax-right-panel-content flex-1 overflow-y-auto min-h-0">{renderRightPanel()}</div>
             </div>
           )}
         </aside>

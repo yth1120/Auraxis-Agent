@@ -13,7 +13,9 @@ export function useModels(): AIModel[] {
       cached = list;
       setModels(list);
     });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return models;

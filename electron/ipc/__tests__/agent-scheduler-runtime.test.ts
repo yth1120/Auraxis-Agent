@@ -121,7 +121,9 @@ beforeEach(async () => {
   await new Promise((r) => setTimeout(r, 0));
   h.loops.length = 0;
   h.windows.length = 0;
-  vi.mocked(readSettings).mockReset().mockResolvedValue(null as any);
+  vi.mocked(readSettings)
+    .mockReset()
+    .mockResolvedValue(null as any);
   vi.mocked(loadAgentSnapshots).mockReset().mockResolvedValue([]);
   vi.mocked(getSubAgentStates).mockReset().mockReturnValue([]);
   vi.mocked(getAgentDef).mockClear();
@@ -207,8 +209,14 @@ describe('AgentScheduler — 并发与队列', () => {
   it('达到并发上限后入队，完成后按优先级出队', async () => {
     scheduler.setMaxConcurrent(1);
     const a1 = scheduler.startAgent(makeCfg({ name: 'A1', description: 'A1', systemPrompt: undefined }), projectRoot);
-    scheduler.startAgent(makeCfg({ name: 'A2', description: 'A2', priority: 'low', systemPrompt: undefined }), projectRoot);
-    const a3 = scheduler.startAgent(makeCfg({ name: 'A3', description: 'A3', priority: 'high', systemPrompt: undefined }), projectRoot);
+    scheduler.startAgent(
+      makeCfg({ name: 'A2', description: 'A2', priority: 'low', systemPrompt: undefined }),
+      projectRoot,
+    );
+    const a3 = scheduler.startAgent(
+      makeCfg({ name: 'A3', description: 'A3', priority: 'high', systemPrompt: undefined }),
+      projectRoot,
+    );
     await vi.waitFor(() => expect(h.loops).toHaveLength(1));
 
     expect(scheduler.getQueueLength()).toBe(2);
@@ -223,9 +231,7 @@ describe('AgentScheduler — 并发与队列', () => {
     await vi.waitFor(() => expect(h.loops).toHaveLength(3));
     expect(h.loops[2].opts.systemPrompt).toBe('SYS:A2');
 
-    expect(scheduler.getAgentInstances().map((a) => a.agentId)).toEqual(
-      expect.arrayContaining([a1, a3]),
-    );
+    expect(scheduler.getAgentInstances().map((a) => a.agentId)).toEqual(expect.arrayContaining([a1, a3]));
   });
 
   it('setMaxConcurrent 提高后立即清空队列', async () => {
@@ -424,8 +430,14 @@ describe('AgentScheduler — 消息/优先级/状态查询', () => {
   it('getAllAgentStates 合并子代理状态并转换 TaskPlan 计划', async () => {
     vi.mocked(getSubAgentStates).mockReturnValue([
       {
-        id: 'sub-1', name: '子代理', description: 'd', status: 'completed', priority: 'normal',
-        startTime: Date.now(), endTime: Date.now(), toolCallCount: 0,
+        id: 'sub-1',
+        name: '子代理',
+        description: 'd',
+        status: 'completed',
+        priority: 'normal',
+        startTime: Date.now(),
+        endTime: Date.now(),
+        toolCallCount: 0,
       } as any,
     ]);
     scheduler.startAgent(makeCfg(), projectRoot);
@@ -494,18 +506,35 @@ describe('AgentScheduler — 清理与持久化', () => {
     const inst = scheduler.getAgentInstances()[0];
     expect(inst.status).toBe('stopped');
     expect(inst.endTime).toBeDefined();
-    expect(vi.mocked(saveAgentSnapshot)).toHaveBeenCalledWith(
-      expect.objectContaining({ id, status: 'stopped' }),
-    );
+    expect(vi.mocked(saveAgentSnapshot)).toHaveBeenCalledWith(expect.objectContaining({ id, status: 'stopped' }));
   });
 
   it('restoreSnapshots 恢复持久化检查点并跳过重复 id', async () => {
     const rec = {
-      id: 'agent-restored', name: 'R1', description: 'd', displayDescription: 'R1', type: 'general-purpose',
-      model: 'deepseek-v4-pro', projectPath: projectRoot, priority: 'normal' as const, autoApprove: true,
-      mode: 'ask', maxIterations: 20, status: 'paused' as const, startTime: Date.now(),
-      iteration: 1, toolCallCount: 1, messagesCount: 1, log: [],
-      savedState: { messages: [{ role: 'user', content: 'x' }], plan: null, iteration: 1, toolCallCount: 1, allText: '' },
+      id: 'agent-restored',
+      name: 'R1',
+      description: 'd',
+      displayDescription: 'R1',
+      type: 'general-purpose',
+      model: 'deepseek-v4-pro',
+      projectPath: projectRoot,
+      priority: 'normal' as const,
+      autoApprove: true,
+      mode: 'ask',
+      maxIterations: 20,
+      status: 'paused' as const,
+      startTime: Date.now(),
+      iteration: 1,
+      toolCallCount: 1,
+      messagesCount: 1,
+      log: [],
+      savedState: {
+        messages: [{ role: 'user', content: 'x' }],
+        plan: null,
+        iteration: 1,
+        toolCallCount: 1,
+        allText: '',
+      },
     };
     vi.mocked(loadAgentSnapshots).mockResolvedValue([rec as any]);
 
@@ -524,9 +553,7 @@ describe('registerSchedulerIpc — 通道路由与校验', () => {
   const fakeEvent = { sender: { isDestroyed: () => false, send: vi.fn() } };
 
   it('agent:start 校验参数/目录/对话模式隔离', async () => {
-    await expect(handler('agent:start')(fakeEvent, null)).resolves.toEqual(
-      expect.objectContaining({ ok: false }),
-    );
+    await expect(handler('agent:start')(fakeEvent, null)).resolves.toEqual(expect.objectContaining({ ok: false }));
     await expect(
       handler('agent:start')(fakeEvent, { config: makeCfg(), projectPath: '/does/not/exist' }),
     ).resolves.toEqual(expect.objectContaining({ ok: false, error: expect.stringContaining('项目目录不存在') }));

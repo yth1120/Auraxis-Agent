@@ -1,7 +1,7 @@
+import { errorText } from '../errors';
 import crypto from 'crypto';
 import path from 'path';
 import { readdir } from 'fs/promises';
-import axios from 'axios';
 import { executeToolCall } from './tool-handlers';
 import { runHooksFor } from '../hooks';
 import { loadAgentInstructions } from '../agent-instructions';
@@ -19,7 +19,11 @@ import { makeTurnId } from './engine-events';
 import type { DeepSeekToolChoice } from '../contracts/advanced';
 
 function safeStringify(v: unknown): string {
-  try { return JSON.stringify(v); } catch { return String(v).slice(0, 500); }
+  try {
+    return JSON.stringify(v);
+  } catch {
+    return String(v).slice(0, 500);
+  }
 }
 
 /** Read error response body when axios responseType='stream' — the body is a Readable, not parsed JSON. */
@@ -31,15 +35,29 @@ export async function readErrorBody(err: any): Promise<string> {
       return await new Promise<string>((resolve) => {
         let body = '';
         const t = setTimeout(() => resolve(body), 2000);
-        data.on('data', (chunk: Buffer) => { body += chunk.toString(); if (body.length > 2000) { clearTimeout(t); data.destroy(); resolve(body); } });
-        data.on('end', () => { clearTimeout(t); resolve(body); });
-        data.on('error', () => { clearTimeout(t); resolve(body); });
+        data.on('data', (chunk: Buffer) => {
+          body += chunk.toString();
+          if (body.length > 2000) {
+            clearTimeout(t);
+            data.destroy();
+            resolve(body);
+          }
+        });
+        data.on('end', () => {
+          clearTimeout(t);
+          resolve(body);
+        });
+        data.on('error', () => {
+          clearTimeout(t);
+          resolve(body);
+        });
       });
     }
     return safeStringify(data);
-  } catch { return ''; }
+  } catch {
+    return '';
+  }
 }
-import { stripModelArtifacts, createStreamFilter } from './text-filter';
 import type { AgentLogEntry } from '../advanced-defs';
 import type { ApprovalPolicy } from '../types';
 import type { WorkAutonomyTier } from '../types';
@@ -70,8 +88,7 @@ export interface ToolResult {
 export interface AssistantMessage {
   /** Chronological content blocks (text ↔ tool_use interleaved in order) */
   contentTimeline: Array<
-    | { type: 'text'; text: string }
-    | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> }
+    { type: 'text'; text: string } | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> }
   >;
   toolCalls: ToolCall[];
   rawText: string;
@@ -227,16 +244,52 @@ export type AgentLoopEvent =
   | { type: 'text_chunk'; text: string }
   | { type: 'thinking_chunk'; chunk: string; isNewBlock: boolean }
   | { type: 'tool_start'; toolCallId: string; toolName: string; input: Record<string, unknown>; stepGroupId: string }
-  | { type: 'tool_end'; toolCallId: string; toolName: string; output: unknown; durationMs: number; stepGroupId: string; input?: Record<string, unknown>; summary?: Record<string, unknown> }
-  | { type: 'tool_error'; toolCallId: string; toolName: string; input: Record<string, unknown>; error: string; stepGroupId: string }
-  | { type: 'tool_progress'; toolCallId: string; toolName: string; progress: string; stepGroupId: string; input?: Record<string, unknown> }
+  | {
+      type: 'tool_end';
+      toolCallId: string;
+      toolName: string;
+      output: unknown;
+      durationMs: number;
+      stepGroupId: string;
+      input?: Record<string, unknown>;
+      summary?: Record<string, unknown>;
+    }
+  | {
+      type: 'tool_error';
+      toolCallId: string;
+      toolName: string;
+      input: Record<string, unknown>;
+      error: string;
+      stepGroupId: string;
+    }
+  | {
+      type: 'tool_progress';
+      toolCallId: string;
+      toolName: string;
+      progress: string;
+      stepGroupId: string;
+      input?: Record<string, unknown>;
+    }
   | { type: 'iteration_start'; iteration: number; timestamp?: number }
-  | { type: 'iteration_end'; iteration: number; toolsThisIteration?: number; llmLatencyMs?: number; firstTokenMs?: number; outputTokens?: number }
+  | {
+      type: 'iteration_end';
+      iteration: number;
+      toolsThisIteration?: number;
+      llmLatencyMs?: number;
+      firstTokenMs?: number;
+      outputTokens?: number;
+    }
   | { type: 'plan_created'; plan: TaskPlan }
   | { type: 'plan_updated'; plan: TaskPlan }
   | { type: 'deviance_warning'; message: string }
   | { type: 'context_injected'; source: 'instructions' | 'memory' | 'workspace'; producer: string; detail?: string }
-  | { type: 'context_compressed'; tokensBefore: number; tokensAfter: number; messagesRemoved?: number; tokensSaved?: number }
+  | {
+      type: 'context_compressed';
+      tokensBefore: number;
+      tokensAfter: number;
+      messagesRemoved?: number;
+      tokensSaved?: number;
+    }
   | {
       type: 'usage';
       inputTokens: number;
@@ -248,7 +301,14 @@ export type AgentLoopEvent =
   | { type: 'done' }
   | { type: 'error'; error: string }
   // ── Unified engine lifecycle (engine-events contract) ──
-  | { type: 'tool_aborted'; toolCallId: string; toolName: string; input: Record<string, unknown>; error: string; stepGroupId: string }
+  | {
+      type: 'tool_aborted';
+      toolCallId: string;
+      toolName: string;
+      input: Record<string, unknown>;
+      error: string;
+      stepGroupId: string;
+    }
   | { type: 'system_message'; level: 'warning' | 'info'; content: string }
   | {
       type: 'usage_update';
@@ -380,7 +440,7 @@ function matchScore(toolName: string, toolInput: Record<string, unknown>, task: 
 
   // Penalty for mismatched tool type vs expected action
   const expectedAction = (task.toolMatches || []).some((k) =>
-    ['Read', 'Write', 'Edit', 'Grep', 'Glob', 'Bash', 'WebFetch'].includes(k)
+    ['Read', 'Write', 'Edit', 'Grep', 'Glob', 'Bash', 'WebFetch'].includes(k),
   );
   if (expectedAction && !(task.toolMatches || []).includes(toolName)) {
     score -= 0.2;
@@ -391,7 +451,12 @@ function matchScore(toolName: string, toolInput: Record<string, unknown>, task: 
 
 export const Planner = {
   /** Try to auto-match a completed tool call to a plan task and mark it done */
-  markCompleted(plan: TaskPlan, toolName: string, toolInput: Record<string, unknown>, toolSuccess: boolean): { updated: boolean; taskId?: string } {
+  markCompleted(
+    plan: TaskPlan,
+    toolName: string,
+    toolInput: Record<string, unknown>,
+    toolSuccess: boolean,
+  ): { updated: boolean; taskId?: string } {
     if (!plan) return { updated: false };
 
     const pendingTasks = plan.tasks.filter((t) => t.status === 'pending' || t.status === 'in_progress');
@@ -516,45 +581,48 @@ export function createDevianceDetector() {
   return {
     failureTracker,
 
-  checkFailures(plan: TaskPlan, toolName: string, toolInput: Record<string, unknown>, error: string): DevianceResult {
-    let bestTask: PlanTask | null = null;
-    let bestScore = 0.2;
-    for (const task of plan.tasks.filter((t) => t.status !== 'completed')) {
-      const score = matchScore(toolName, toolInput, task);
-      if (score > bestScore) { bestScore = score; bestTask = task; }
-    }
+    checkFailures(plan: TaskPlan, toolName: string, toolInput: Record<string, unknown>, error: string): DevianceResult {
+      let bestTask: PlanTask | null = null;
+      let bestScore = 0.2;
+      for (const task of plan.tasks.filter((t) => t.status !== 'completed')) {
+        const score = matchScore(toolName, toolInput, task);
+        if (score > bestScore) {
+          bestScore = score;
+          bestTask = task;
+        }
+      }
 
-    if (bestTask) {
-      const key = `${bestTask.id}`;
-      const prev = this.failureTracker.get(key);
-      const count = (prev?.count || 0) + 1;
-      this.failureTracker.set(key, { count, lastError: error.slice(0, 120), taskDescription: bestTask.description });
+      if (bestTask) {
+        const key = `${bestTask.id}`;
+        const prev = this.failureTracker.get(key);
+        const count = (prev?.count || 0) + 1;
+        this.failureTracker.set(key, { count, lastError: error.slice(0, 120), taskDescription: bestTask.description });
 
-      if (count >= 2) {
-        bestTask.status = 'blocked';
+        if (count >= 2) {
+          bestTask.status = 'blocked';
+          return {
+            shouldWarn: true,
+            message: `任务 [${bestTask.id}] "${bestTask.description}" 已连续失败 ${count} 次，已自动标记为 blocked。请更换策略或跳过此任务，继续执行其他任务。`,
+            blockedTaskId: bestTask.id,
+          };
+        }
         return {
           shouldWarn: true,
-          message: `任务 [${bestTask.id}] "${bestTask.description}" 已连续失败 ${count} 次，已自动标记为 blocked。请更换策略或跳过此任务，继续执行其他任务。`,
-          blockedTaskId: bestTask.id,
+          message: `工具 ${toolName} 执行失败（第 ${count} 次）。请分析错误原因并重试: ${error.slice(0, 200)}`,
         };
       }
-      return {
-        shouldWarn: true,
-        message: `工具 ${toolName} 执行失败（第 ${count} 次）。请分析错误原因并重试: ${error.slice(0, 200)}`,
-      };
-    }
 
-    return { shouldWarn: false, message: '' };
-  },
+      return { shouldWarn: false, message: '' };
+    },
 
-  reset() {
-    failureTracker.clear();
-  },
+    reset() {
+      failureTracker.clear();
+    },
 
-  /** Remove failure records for a specific task (called when task is unblocked via replan) */
-  clearFailureRecord(taskId: string) {
-    failureTracker.delete(taskId);
-  },
+    /** Remove failure records for a specific task (called when task is unblocked via replan) */
+    clearFailureRecord(taskId: string) {
+      failureTracker.delete(taskId);
+    },
   };
 }
 
@@ -632,7 +700,6 @@ export async function toolExecutorExecute(params: {
   requestId: string;
   checkPermission?: (toolName: string, input: Record<string, unknown>, toolCallId?: string) => Promise<boolean>;
   autoApprove?: boolean;
-  toolCallId?: string;
   abortSignal?: AbortSignal;
   mode: ApprovalPolicy;
   approvedPlanSteps?: string[];
@@ -641,8 +708,17 @@ export async function toolExecutorExecute(params: {
   writableRoots?: string[];
 }): Promise<ToolResults> {
   const {
-    toolCalls, projectRoot, requestId, checkPermission, autoApprove, toolCallId,
-    abortSignal, mode, approvedPlanSteps, workTier, workspaceRoots, writableRoots,
+    toolCalls,
+    projectRoot,
+    requestId,
+    checkPermission,
+    autoApprove,
+    abortSignal,
+    mode,
+    approvedPlanSteps,
+    workTier,
+    workspaceRoots,
+    writableRoots,
   } = params;
   const results: ToolResult[] = [];
   let hasErrors = false;
@@ -668,8 +744,8 @@ export async function toolExecutorExecute(params: {
       });
       output = result.output;
       error = result.error;
-    } catch (execErr: any) {
-      error = `工具执行异常: ${execErr.message}`;
+    } catch (execErr: unknown) {
+      error = `工具执行异常: ${errorText(execErr)}`;
     }
 
     if (error) hasErrors = true;
@@ -711,10 +787,7 @@ const estimateTokens = estimateTokensForMessages;
 export { estimateTokens };
 
 /** Determine if a tool_result is critical (must not be compressed away) */
-export function isCriticalResult(
-  toolResultMsg: any,
-  plan: TaskPlan | null,
-): boolean {
+export function isCriticalResult(toolResultMsg: any, plan: TaskPlan | null): boolean {
   if (!plan) return false;
 
   const content = toolResultMsg.content;
@@ -723,7 +796,11 @@ export function isCriticalResult(
   // Try parsing string content as JSON first (OpenAI-format: role: 'tool' + JSON string)
   if (typeof content === 'string') {
     let parsed: any = null;
-    try { parsed = JSON.parse(content); } catch { return false; }
+    try {
+      parsed = JSON.parse(content);
+    } catch {
+      return false;
+    }
     if (!parsed) return false;
     if (parsed.file_path && parsed.content && parsed.total_lines && parsed.total_lines > 10) {
       return matchesPlanTask(parsed.file_path, plan);
@@ -742,7 +819,11 @@ export function isCriticalResult(
   for (const block of resultBlocks) {
     const resultText = typeof block.content === 'string' ? block.content : JSON.stringify(block.content);
     let parsed: any = null;
-    try { parsed = JSON.parse(resultText); } catch { continue; }
+    try {
+      parsed = JSON.parse(resultText);
+    } catch {
+      continue;
+    }
     if (!parsed) continue;
 
     if (parsed.file_path && parsed.content && parsed.total_lines && parsed.total_lines > 10) {
@@ -783,7 +864,8 @@ async function llmSummarize(
       if (Array.isArray(content)) {
         for (const block of content) {
           if (block.type === 'text' && block.text) contextParts.push(`[助手]: ${block.text.slice(0, 500)}`);
-          if (block.type === 'tool_use') contextParts.push(`[工具调用]: ${block.name}(${JSON.stringify(block.input).slice(0, 200)})`);
+          if (block.type === 'tool_use')
+            contextParts.push(`[工具调用]: ${block.name}(${JSON.stringify(block.input).slice(0, 200)})`);
         }
       } else if (typeof content === 'string') {
         contextParts.push(`[助手]: ${content.slice(0, 500)}`);
@@ -793,7 +875,10 @@ async function llmSummarize(
       if (Array.isArray(content)) {
         for (const block of content) {
           if (block.type === 'tool_result') {
-            const rc = typeof block.content === 'string' ? block.content.slice(0, 300) : JSON.stringify(block.content).slice(0, 300);
+            const rc =
+              typeof block.content === 'string'
+                ? block.content.slice(0, 300)
+                : JSON.stringify(block.content).slice(0, 300);
             contextParts.push(`[工具结果]: ${rc}`);
           }
         }
@@ -808,8 +893,11 @@ async function llmSummarize(
 
   try {
     const result = await invokeLlm({
-      model: llm.model, apiKey: llm.apiKey, apiBase: llm.apiBase,
-      systemPrompt: 'You are a concise summarizer. Output a single paragraph in the same language as the input, covering all key actions, findings, file changes, command results, and remaining tasks. Keep it under 300 tokens.',
+      model: llm.model,
+      apiKey: llm.apiKey,
+      apiBase: llm.apiBase,
+      systemPrompt:
+        'You are a concise summarizer. Output a single paragraph in the same language as the input, covering all key actions, findings, file changes, command results, and remaining tasks. Keep it under 300 tokens.',
       messages: [{ role: 'user', content: prompt }],
       tools: [],
       signal: llm.signal || new AbortController().signal,
@@ -817,7 +905,9 @@ async function llmSummarize(
     if (result?.rawText && result.rawText.trim().length > 20) {
       return `[历史上下文摘要] ${result.rawText.trim()}\n\n（以上为 LLM 生成的上下文摘要。当前计划状态: ${plan ? Planner.getSummary(plan) : '无计划'}）`;
     }
-  } catch { /* fall through to rule-based */ }
+  } catch {
+    /* fall through to rule-based */
+  }
   return null;
 }
 
@@ -859,20 +949,28 @@ function buildSummary(messagesToCompress: any[], plan: TaskPlan | null): string 
         for (const tc of msg.tool_calls) {
           const fn = tc.function || tc;
           if (fn.name === 'Read' && fn.arguments) {
-            try { const args = typeof fn.arguments === 'string' ? JSON.parse(fn.arguments) : fn.arguments;
-            if (args.file_path) filesRead.add(args.file_path); } catch {}
+            try {
+              const args = typeof fn.arguments === 'string' ? JSON.parse(fn.arguments) : fn.arguments;
+              if (args.file_path) filesRead.add(args.file_path);
+            } catch {}
           }
           if (fn.name === 'Edit' && fn.arguments) {
-            try { const args = typeof fn.arguments === 'string' ? JSON.parse(fn.arguments) : fn.arguments;
-            if (args.file_path) filesEdited.add(args.file_path); } catch {}
+            try {
+              const args = typeof fn.arguments === 'string' ? JSON.parse(fn.arguments) : fn.arguments;
+              if (args.file_path) filesEdited.add(args.file_path);
+            } catch {}
           }
           if (fn.name === 'Write' && fn.arguments) {
-            try { const args = typeof fn.arguments === 'string' ? JSON.parse(fn.arguments) : fn.arguments;
-            if (args.file_path) filesWritten.add(args.file_path); } catch {}
+            try {
+              const args = typeof fn.arguments === 'string' ? JSON.parse(fn.arguments) : fn.arguments;
+              if (args.file_path) filesWritten.add(args.file_path);
+            } catch {}
           }
           if (fn.name === 'Bash' && fn.arguments) {
-            try { const args = typeof fn.arguments === 'string' ? JSON.parse(fn.arguments) : fn.arguments;
-            if (args.command) commandsRun.push(args.command); } catch {}
+            try {
+              const args = typeof fn.arguments === 'string' ? JSON.parse(fn.arguments) : fn.arguments;
+              if (args.command) commandsRun.push(args.command);
+            } catch {}
           }
         }
       }
@@ -891,7 +989,9 @@ function buildSummary(messagesToCompress: any[], plan: TaskPlan | null): string 
   if (plan) {
     const completed = plan.tasks.filter((t) => t.status === 'completed').map((t) => t.description);
     const blocked = plan.tasks.filter((t) => t.status === 'blocked').map((t) => t.description);
-    const pending = plan.tasks.filter((t) => t.status === 'pending' || t.status === 'in_progress').map((t) => t.description);
+    const pending = plan.tasks
+      .filter((t) => t.status === 'pending' || t.status === 'in_progress')
+      .map((t) => t.description);
     if (completed.length > 0) parts.push(`已完成任务: ${completed.join('; ')}`);
     if (blocked.length > 0) parts.push(`已阻塞任务: ${blocked.join('; ')}`);
     if (pending.length > 0) parts.push(`待完成任务: ${pending.join('; ')}`);
@@ -1014,7 +1114,10 @@ export const ContextManager = {
       if (found && boundaryIdx > idx && messages[boundaryIdx]?.role !== 'assistant') {
         let aligned = boundaryIdx;
         for (let j = boundaryIdx - 1; j >= idx; j--) {
-          if (messages[j].role === 'assistant') { aligned = j; break; }
+          if (messages[j].role === 'assistant') {
+            aligned = j;
+            break;
+          }
         }
         if (aligned !== boundaryIdx) {
           const displaced = new Set(messages.slice(aligned, boundaryIdx));
@@ -1127,7 +1230,11 @@ export function stopPolicyEvaluate(state: {
   // Empty response guard
   if (!state.hasText && !state.hasTools) {
     if (state.emptyResponseCount >= 2) {
-      return { shouldStop: true, reason: '连续收到空 API 响应，可能原因：API 限流、模型不支持工具调用、或请求格式异常', isError: true };
+      return {
+        shouldStop: true,
+        reason: '连续收到空 API 响应，可能原因：API 限流、模型不支持工具调用、或请求格式异常',
+        isError: true,
+      };
     }
     return { shouldStop: false, reason: '', isError: false };
   }
@@ -1137,9 +1244,7 @@ export function stopPolicyEvaluate(state: {
   // The only exception is a max_tokens truncation — the loop must continue
   // so the model can finish the cut-off reply instead of repeating it.
   if (state.hasText && !state.hasTools && state.completionStopReason !== 'max_tokens') {
-    const confirmInfo = state.completionStopReason
-      ? `（API stop_reason: ${state.completionStopReason}）`
-      : '';
+    const confirmInfo = state.completionStopReason ? `（API stop_reason: ${state.completionStopReason}）` : '';
     return { shouldStop: true, reason: `模型已完成回答，未调用工具${confirmInfo}`, isError: false };
   }
 
@@ -1154,9 +1259,7 @@ export function stopPolicyEvaluate(state: {
     // 以模型的完成信号为准. Plan
     // tracking is display-only — we never hold the model hostage to a
     // pending checklist or lecture it about unfinished steps.
-    const confirmInfo = state.completionStopReason
-      ? `（API stop_reason: ${state.completionStopReason}）`
-      : '';
+    const confirmInfo = state.completionStopReason ? `（API stop_reason: ${state.completionStopReason}）` : '';
     return { shouldStop: true, reason: `LLM 发送了 <FINAL_ANSWER> 信号${confirmInfo}`, isError: false };
   }
 
@@ -1164,10 +1267,15 @@ export function stopPolicyEvaluate(state: {
   // Only reachable for text-only replies that were truncated by max_tokens
   // and kept looping without completing.
   if (state.hasText && !state.hasTools && state.consecutiveTextOnly >= 5) {
-    const planInfo = state.plan && !Planner.isAllDone(state.plan)
-      ? `（计划仍有 ${Planner.getPending(state.plan).length} 个任务未完成）`
-      : '';
-    return { shouldStop: true, reason: `Agent 连续 ${state.consecutiveTextOnly} 轮未调用工具且回复被截断，强制中止${planInfo}`, isError: true };
+    const planInfo =
+      state.plan && !Planner.isAllDone(state.plan)
+        ? `（计划仍有 ${Planner.getPending(state.plan).length} 个任务未完成）`
+        : '';
+    return {
+      shouldStop: true,
+      reason: `Agent 连续 ${state.consecutiveTextOnly} 轮未调用工具且回复被截断，强制中止${planInfo}`,
+      isError: true,
+    };
   }
 
   // Has tool calls → continue
@@ -1218,7 +1326,13 @@ async function runPlanningPhase(params: {
   const planningUserMsg = systemPrompt.includes('Your Task') ? systemPrompt : `Task: ${systemPrompt}`;
   // Planning LLM output is raw JSON for parsePlanFromLLMText — never stream it
   // to the UI as text. Surface a single quiet progress line instead.
-  observer.emit({ type: 'tool_progress', toolCallId: 'planning', toolName: 'Planning', progress: '正在分析需求并生成执行计划…', stepGroupId: 'planning' });
+  observer.emit({
+    type: 'tool_progress',
+    toolCallId: 'planning',
+    toolName: 'Planning',
+    progress: '正在分析需求并生成执行计划…',
+    stepGroupId: 'planning',
+  });
   const planningStartedAt = Date.now();
   const planningTimer = setInterval(() => {
     const waited = Math.floor((Date.now() - planningStartedAt) / 1000);
@@ -1226,15 +1340,16 @@ async function runPlanningPhase(params: {
       type: 'tool_progress',
       toolCallId: 'planning',
       toolName: 'Planning',
-      progress: waited >= 6
-        ? `正在生成执行计划…（已等待 ${waited}s）`
-        : '正在分析任务与项目上下文…',
+      progress: waited >= 6 ? `正在生成执行计划…（已等待 ${waited}s）` : '正在分析任务与项目上下文…',
       stepGroupId: 'planning',
     });
   }, 3000);
   try {
     const planAssistant = await invokeLlm({
-      model, apiKey, apiBase, adapter,
+      model,
+      apiKey,
+      apiBase,
+      adapter,
       systemPrompt: PLANNING_SYSTEM_PROMPT,
       messages: [{ role: 'user', content: planningUserMsg }],
       tools: [],
@@ -1256,8 +1371,9 @@ async function runPlanningPhase(params: {
         return parsed;
       }
     }
-  } catch { /* fall through */ }
-  finally {
+  } catch {
+    /* fall through */
+  } finally {
     clearInterval(planningTimer);
   }
   return null;
@@ -1276,17 +1392,26 @@ function setupInitialMessages(systemPrompt: string, activePlan: TaskPlan | null,
   msgs.push({ role: 'system', content: systemPrompt });
   msgs.push({ role: 'user', content: workGuide });
   if (activePlan) {
-    msgs.push({ role: 'user', content: `你的任务计划:\n${Planner.getSummary(activePlan)}\n\n请按批准的计划逐项推进；完成一项后继续下一项。` });
+    msgs.push({
+      role: 'user',
+      content: `你的任务计划:\n${Planner.getSummary(activePlan)}\n\n请按批准的计划逐项推进；完成一项后继续下一项。`,
+    });
   }
   return msgs;
 }
 
 export function appendAssistantToHistory(messages: any[], msg: AssistantMessage): void {
   const m: any = {
-    role: 'assistant', content: msg.rawText || null,
-    tool_calls: msg.toolCalls.length > 0 ? msg.toolCalls.map((tc) => ({
-      id: tc.id, type: 'function' as const, function: { name: tc.name, arguments: JSON.stringify(tc.input) },
-    })) : undefined,
+    role: 'assistant',
+    content: msg.rawText || null,
+    tool_calls:
+      msg.toolCalls.length > 0
+        ? msg.toolCalls.map((tc) => ({
+            id: tc.id,
+            type: 'function' as const,
+            function: { name: tc.name, arguments: JSON.stringify(tc.input) },
+          }))
+        : undefined,
   };
   // DeepSeek V4 thinking mode: must pass reasoning_content back to the API
   if (msg.thinkingText) {
@@ -1307,7 +1432,11 @@ const ts = () => new Date().toISOString().slice(11, 23);
  *  this function only updates the plan, emits deviance warnings and surfaces
  *  Replan plan updates. */
 /** Build structured summary from tool output for frontend rendering */
-function buildToolSummary(toolName: string, output: unknown, input: Record<string, unknown>): Record<string, unknown> | undefined {
+function buildToolSummary(
+  toolName: string,
+  output: unknown,
+  input: Record<string, unknown>,
+): Record<string, unknown> | undefined {
   try {
     switch (toolName) {
       case 'Read': {
@@ -1315,7 +1444,10 @@ function buildToolSummary(toolName: string, output: unknown, input: Record<strin
         return { filePath: input.file_path, lines: text.split('\n').length, size: text.length };
       }
       case 'Write':
-        return { filePath: input.file_path, bytesWritten: typeof input.content === 'string' ? input.content.length : 0 };
+        return {
+          filePath: input.file_path,
+          bytesWritten: typeof input.content === 'string' ? input.content.length : 0,
+        };
       case 'Edit':
         return { filePath: input.file_path, replaced: true };
       case 'Grep': {
@@ -1329,7 +1461,11 @@ function buildToolSummary(toolName: string, output: unknown, input: Record<strin
         return { exitCode: o?.exitCode, stdoutLen: o?.stdout?.length || 0, stderrLen: o?.stderr?.length || 0 };
       }
       case 'ReviewArtifact':
-        return { checkType: input.check_type, passed: true, output: typeof output === 'string' ? output.slice(0, 300) : '' };
+        return {
+          checkType: input.check_type,
+          passed: true,
+          output: typeof output === 'string' ? output.slice(0, 300) : '',
+        };
       case 'Delete':
         return { filePath: input.file_path, deleted: true };
       case 'GitCommit':
@@ -1339,7 +1475,9 @@ function buildToolSummary(toolName: string, output: unknown, input: Record<strin
       default:
         return undefined;
     }
-  } catch { return undefined; }
+  } catch {
+    return undefined;
+  }
 }
 
 function emitToolObserverForResult(
@@ -1349,11 +1487,12 @@ function emitToolObserverForResult(
   // dd is REQUIRED — callers must pass a per-loop DevianceDetector instance so
   // failure tracking is isolated to a single query/agent run.
   dd: ReturnType<typeof createDevianceDetector>,
-  stepGroupId?: string,
   toolName?: string,
 ): void {
   if (r.error) {
-    console.error(`[AURAXIS] [${ts()}] [TOOL:FAIL] tool=${r.toolName} toolCallId=${r.toolUseId} error=${r.error.slice(0, 200)} duration=${r.durationMs}ms`);
+    console.error(
+      `[AURAXIS] [${ts()}] [TOOL:FAIL] tool=${r.toolName} toolCallId=${r.toolUseId} error=${r.error.slice(0, 200)} duration=${r.durationMs}ms`,
+    );
     if (activePlan && toolName !== 'Replan') {
       const dv = dd.checkFailures(activePlan, r.toolName, r.input, r.error);
       if (dv.shouldWarn) {
@@ -1380,7 +1519,19 @@ function emitToolObserverForResult(
 // ─── AgentLoop ──────────────────────────────────────────
 
 export async function agentLoopRun(config: AgentLoopConfig): Promise<AgentLoopResult> {
-  const { model, apiKey, apiBase, systemPrompt, projectRoot, tools, checkPermission, autoApprove, signal, observer, onPlanGenerated } = config;
+  const {
+    model,
+    apiKey,
+    apiBase,
+    systemPrompt,
+    projectRoot,
+    tools,
+    checkPermission,
+    autoApprove,
+    signal,
+    observer,
+    onPlanGenerated,
+  } = config;
   let { mode, approvedPlanSteps } = config;
   let effectiveSystemPrompt = systemPrompt;
   if (!config.resumeFrom) {
@@ -1420,9 +1571,11 @@ export async function agentLoopRun(config: AgentLoopConfig): Promise<AgentLoopRe
     }
   }
   void runHooksFor('SessionStart', { projectRoot, model }, projectRoot).catch(() => {});
-  const baseContextConfig = config.contextConfig || (model.startsWith('deepseek-v4')
-    ? { maxRounds: 20, compressRatio: 0.5, maxTokensBeforeCompress: 900_000 }
-    : DEFAULT_CONTEXT_CONFIG);
+  const baseContextConfig =
+    config.contextConfig ||
+    (model.startsWith('deepseek-v4')
+      ? { maxRounds: 20, compressRatio: 0.5, maxTokensBeforeCompress: 900_000 }
+      : DEFAULT_CONTEXT_CONFIG);
   // AGORA 步骤级压缩作为 agent 循环默认策略；显式指定 compressMode 时尊重调用方。
   const contextConfig: ContextConfig = {
     ...baseContextConfig,
@@ -1439,7 +1592,9 @@ export async function agentLoopRun(config: AgentLoopConfig): Promise<AgentLoopRe
 
   // ── [NODE 1] Agent received input ─────────────────────
   const isResume = !!config.resumeFrom;
-  devLog(`[AURAXIS] [${ts()}] [AGENT:${isResume ? 'RESUME' : 'START'}] model=${model} project=${projectRoot} mode=${mode} tools=${tools.length}`);
+  devLog(
+    `[AURAXIS] [${ts()}] [AGENT:${isResume ? 'RESUME' : 'START'}] model=${model} project=${projectRoot} mode=${mode} tools=${tools.length}`,
+  );
 
   // Phase 0: Planning + setup — SKIPPED when resuming from a paused state.
   // The saved messages array already contains the system prompt, plan info,
@@ -1470,7 +1625,8 @@ export async function agentLoopRun(config: AgentLoopConfig): Promise<AgentLoopRe
         const dirContents = await readdir(projectRoot).catch(() => [] as string[]);
         const isEmpty = dirContents.filter((n) => !n.startsWith('.')).length === 0;
         if (isEmpty || !dirContents.some((n) => n.endsWith('.json') || n.endsWith('.ts') || n.endsWith('.js'))) {
-          projectInitHint = '该项目目录尚未初始化（没有 package.json）。请根据实际需要决定是否先初始化项目（如 npm init -y）或安装依赖，再开始工作。';
+          projectInitHint =
+            '该项目目录尚未初始化（没有 package.json）。请根据实际需要决定是否先初始化项目（如 npm init -y）或安装依赖，再开始工作。';
         }
       }
     }
@@ -1482,8 +1638,12 @@ export async function agentLoopRun(config: AgentLoopConfig): Promise<AgentLoopRe
     if (shouldPlan) {
       activePlan = await runPlanningPhase({
         model: config.planModel || model,
-        apiKey, apiBase, adapter: config.adapter,
-        systemPrompt: effectiveSystemPrompt, signal, observer,
+        apiKey,
+        apiBase,
+        adapter: config.adapter,
+        systemPrompt: effectiveSystemPrompt,
+        signal,
+        observer,
       });
     }
 
@@ -1515,7 +1675,9 @@ export async function agentLoopRun(config: AgentLoopConfig): Promise<AgentLoopRe
   }
 
   // ── [NODE 2] Final prompt constructed ──────────────────
-  devLog(`[AURAXIS] [${ts()}] [PROMPT:BUILT] messages=${messages.length} planTasks=${activePlan?.tasks.length ?? 0} systemPromptLen=${systemPrompt.length} startIter=${startIter}`);
+  devLog(
+    `[AURAXIS] [${ts()}] [PROMPT:BUILT] messages=${messages.length} planTasks=${activePlan?.tasks.length ?? 0} systemPromptLen=${systemPrompt.length} startIter=${startIter}`,
+  );
   // ══ Unified loop ══
   // step-engine owns ONE ReAct iteration (LLM + retry + tool batch + stop
   // policy + compaction); this driver owns planning/resume, termination caps,
@@ -1525,7 +1687,11 @@ export async function agentLoopRun(config: AgentLoopConfig): Promise<AgentLoopRe
   state.toolCallCount = toolCallCount;
   state.allText = allText;
   /** Auto tier: a failed ReviewArtifact pauses the loop for a human check. */
-  interface ReviewGate { toolCallId: string; checkType: string; summary: string; }
+  interface ReviewGate {
+    toolCallId: string;
+    checkType: string;
+    summary: string;
+  }
   let reviewGate: ReviewGate | null = null;
   // Read through a function so TS does not narrow the closure-assigned
   // variable to `null` at the consumption site below.
@@ -1535,7 +1701,9 @@ export async function agentLoopRun(config: AgentLoopConfig): Promise<AgentLoopRe
   const engineConfig: StepEngineConfig = {
     requestId: agentSessionId,
     sessionId: stableSessionId,
-    model, apiKey, apiBase,
+    model,
+    apiKey,
+    apiBase,
     systemPrompt: effectiveSystemPrompt,
     projectRoot,
     tools,
@@ -1584,13 +1752,13 @@ export async function agentLoopRun(config: AgentLoopConfig): Promise<AgentLoopRe
           for (const out of hook.outputs) {
             if (!out.trim()) continue;
             const m = { role: 'user' as const, content: `[Hook 补充]\n${out}` };
-            markInjected(m); msgs.push(m);
+            markInjected(m);
+            msgs.push(m);
           }
         }
       }
     },
-    onAssistantReady: (msg) => {
-    },
+    onAssistantReady: () => undefined,
     interceptTool: async (tc) => {
       // 规划是模型可自主选择的工具.
       // EnterPlanMode generates a plan, waits for approval, and binds the
@@ -1602,8 +1770,12 @@ export async function agentLoopRun(config: AgentLoopConfig): Promise<AgentLoopRe
         }
         const generated = await runPlanningPhase({
           model: config.planModel || model,
-          apiKey, apiBase, adapter: config.adapter,
-          systemPrompt: effectiveSystemPrompt, signal, observer,
+          apiKey,
+          apiBase,
+          adapter: config.adapter,
+          systemPrompt: effectiveSystemPrompt,
+          signal,
+          observer,
         });
         if (!generated || generated.tasks.length === 0) {
           return { output: null, error: '规划失败：未能生成有效计划。请直接说明方案后继续执行。' };
@@ -1630,7 +1802,8 @@ export async function agentLoopRun(config: AgentLoopConfig): Promise<AgentLoopRe
             role: 'user' as const,
             content: `你的任务计划已获批准：\n${Planner.getSummary(activePlan!)}\n\n请按批准后的计划逐项执行，不要执行未包含在计划中的步骤。`,
           };
-          markInjected(planMsg); messages.push(planMsg);
+          markInjected(planMsg);
+          messages.push(planMsg);
           return {
             output: {
               entered: true,
@@ -1643,7 +1816,8 @@ export async function agentLoopRun(config: AgentLoopConfig): Promise<AgentLoopRe
           role: 'user' as const,
           content: '用户未批准该计划。请继续以交互方式执行任务；修改类工具需要用户逐次确认。',
         };
-        markInjected(deniedMsg); messages.push(deniedMsg);
+        markInjected(deniedMsg);
+        messages.push(deniedMsg);
         return { output: { entered: false, approved: false, message: '计划未获批准，继续交互执行。' } };
       }
       if (tc.name === 'ExitPlanMode') {
@@ -1657,7 +1831,10 @@ export async function agentLoopRun(config: AgentLoopConfig): Promise<AgentLoopRe
       const replanPrompt = `以下是任务执行中途的状态。部分任务已完成，部分受阻。请基于当前情况生成一个新的子计划，仅包含剩余待完成的任务。\n\n当前计划状态: ${(tc.input as any).currentPlanStatus || '未知'}\n受阻任务: ${JSON.stringify((tc.input as any).blockedTasks || [])}\n重新规划原因: ${(tc.input as any).reason || '原始计划无法继续'}\n\n请输出 JSON 格式的新计划（仅包含还需要执行的任务）:\n{"tasks": [{"id": "1", "description": "...", "dependencies": []}]}`;
       try {
         const replanResult = await invokeLlm({
-          model, apiKey, apiBase, adapter: config.adapter,
+          model,
+          apiKey,
+          apiBase,
+          adapter: config.adapter,
           systemPrompt: PLANNING_SYSTEM_PROMPT,
           messages: [{ role: 'user', content: replanPrompt }],
           tools: [],
@@ -1666,17 +1843,27 @@ export async function agentLoopRun(config: AgentLoopConfig): Promise<AgentLoopRe
         });
         if (!replanResult?.rawText) return { output: null, error: '重规划失败：LLM 返回空响应。' };
         const parsed = parsePlanFromLLMText(replanResult.rawText);
-        if (!parsed || parsed.tasks.length === 0) return { output: null, error: '重规划失败：LLM 未返回有效的 JSON 计划。' };
-        const merged = Planner.mergePlan(activePlan, parsed.tasks.map((t) => ({ description: t.description, dependencies: t.dependencies || [] })));
+        if (!parsed || parsed.tasks.length === 0)
+          return { output: null, error: '重规划失败：LLM 未返回有效的 JSON 计划。' };
+        const merged = Planner.mergePlan(
+          activePlan,
+          parsed.tasks.map((t) => ({ description: t.description, dependencies: t.dependencies || [] })),
+        );
         activePlan.tasks.length = 0;
         activePlan.tasks.push(...merged.tasks);
-        return { output: { message: `重规划完成。新增 ${parsed.tasks.length} 个任务。当前共 ${activePlan.tasks.length} 个任务。`, newTasks: parsed.tasks.map((t) => ({ id: t.id, description: t.description })), planSummary: Planner.getSummary(activePlan) } };
-      } catch (replanErr: any) {
-        return { output: null, error: `重规划异常: ${replanErr.message}` };
+        return {
+          output: {
+            message: `重规划完成。新增 ${parsed.tasks.length} 个任务。当前共 ${activePlan.tasks.length} 个任务。`,
+            newTasks: parsed.tasks.map((t) => ({ id: t.id, description: t.description })),
+            planSummary: Planner.getSummary(activePlan),
+          },
+        };
+      } catch (replanErr: unknown) {
+        return { output: null, error: `重规划异常: ${errorText(replanErr)}` };
       }
     },
     onToolResult: (r, tc, toolCallId) => {
-      emitToolObserverForResult(r, observer, activePlan, dd, '', tc.name);
+      emitToolObserverForResult(r, observer, activePlan, dd, tc.name);
       // Auto tier only: full access intentionally skips the gate, ask/plan
       // already involve the user. ReviewArtifact reports `passed:false`
       // inside its output (not as a tool error), so detect it here.
@@ -1763,18 +1950,28 @@ export async function agentLoopRun(config: AgentLoopConfig): Promise<AgentLoopRe
             detail: `检测到 ${drifted.length} 个文件被外部修改：${drifted.map((d) => d.filePath).join('、')}`,
           });
         }
-      } catch { /* 漂移检测不允许影响主循环 */ }
+      } catch {
+        /* 漂移检测不允许影响主循环 */
+      }
     }
     observer.emit({ type: 'iteration_start', iteration: iter });
-    observer.onStateChange({ iteration: iter, toolCallCount: state.toolCallCount, messagesCount: messages.length, plan: activePlan });
+    observer.onStateChange({
+      iteration: iter,
+      toolCallCount: state.toolCallCount,
+      messagesCount: messages.length,
+      plan: activePlan,
+    });
 
     const outcome = await runStep(engineConfig, state, stepGroupId);
 
-    observer.emit({ type: 'iteration_end', iteration: iter,
+    observer.emit({
+      type: 'iteration_end',
+      iteration: iter,
       toolsThisIteration: state.toolCallCount - toolsBeforeIter,
       llmLatencyMs: Date.now() - iterStartTime,
       firstTokenMs: outcome.metrics?.firstTokenMs,
-      outputTokens: outcome.metrics?.outputTokens });
+      outputTokens: outcome.metrics?.outputTokens,
+    });
 
     // ── Auto-review gate (auto tier) ─────────────────────
     // A failed ReviewArtifact pauses after the iteration completes so the
@@ -1789,16 +1986,21 @@ export async function agentLoopRun(config: AgentLoopConfig): Promise<AgentLoopRe
         content: `质量门未通过（${gate.checkType}），正在等待你确认是否继续修复。`,
       });
       const allowed = config.checkPermission
-        ? await config.checkPermission('ReviewArtifact', {
-            action: 'continue_after_failed_review',
-            check_type: gate.checkType,
-            summary: gate.summary.slice(0, 300),
-          }, gate.toolCallId)
+        ? await config.checkPermission(
+            'ReviewArtifact',
+            {
+              action: 'continue_after_failed_review',
+              check_type: gate.checkType,
+              summary: gate.summary.slice(0, 300),
+            },
+            gate.toolCallId,
+          )
         : true;
       if (allowed) {
         const m = {
           role: 'user' as const,
-          content: '[用户] 已确认继续修复质量门失败项。请根据 ReviewArtifact 的失败输出修复，完成后再次调用 ReviewArtifact 验证通过。',
+          content:
+            '[用户] 已确认继续修复质量门失败项。请根据 ReviewArtifact 的失败输出修复，完成后再次调用 ReviewArtifact 验证通过。',
         };
         markInjected(m);
         messages.push(m);
@@ -1824,6 +2026,15 @@ export async function agentLoopRun(config: AgentLoopConfig): Promise<AgentLoopRe
 
   observer.emit({ type: 'turn_end', turnId, reason: signal?.aborted ? 'aborted' : 'completed', timestamp: Date.now() });
   observer.emit({ type: 'done' });
-  void runHooksFor('Stop', { iterations: lastIteration, toolCallCount: state.toolCallCount }, projectRoot).catch(() => {});
-  return { allText: state.allText, toolCallCount: state.toolCallCount, iterations: lastIteration, log: [], plan: activePlan, messages };
+  void runHooksFor('Stop', { iterations: lastIteration, toolCallCount: state.toolCallCount }, projectRoot).catch(
+    () => {},
+  );
+  return {
+    allText: state.allText,
+    toolCallCount: state.toolCallCount,
+    iterations: lastIteration,
+    log: [],
+    plan: activePlan,
+    messages,
+  };
 }

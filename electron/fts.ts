@@ -91,12 +91,11 @@ function ftsDb(): SqliteLike | null {
   if (db) {
     try {
       db.exec(
-        "CREATE VIRTUAL TABLE IF NOT EXISTS fts USING fts5("
-        + "doc_type, doc_id UNINDEXED, title, body, search, tokenize='unicode61')",
+        'CREATE VIRTUAL TABLE IF NOT EXISTS fts USING fts5(' +
+          "doc_type, doc_id UNINDEXED, title, body, search, tokenize='unicode61')",
       );
       db.exec(
-        'CREATE TABLE IF NOT EXISTS fts_docs ('
-        + 'doc_id TEXT PRIMARY KEY, doc_type TEXT, title TEXT, ts INTEGER)',
+        'CREATE TABLE IF NOT EXISTS fts_docs (' + 'doc_id TEXT PRIMARY KEY, doc_type TEXT, title TEXT, ts INTEGER)',
       );
       const row = db.prepare('PRAGMA user_version').get() as { user_version?: number } | undefined;
       if (typeof row?.user_version !== 'number' || row.user_version < 1) {
@@ -147,12 +146,19 @@ export async function addFtsDoc(doc: FtsDoc): Promise<void> {
     try {
       db.prepare('DELETE FROM fts WHERE doc_id = ?').run(doc.id);
       db.prepare('DELETE FROM fts_docs WHERE doc_id = ?').run(doc.id);
-      db.prepare(
-        'INSERT INTO fts_docs (doc_id, doc_type, title, ts) VALUES (?, ?, ?, ?)',
-      ).run(doc.id, doc.type, doc.title, doc.ts);
-      db.prepare(
-        'INSERT INTO fts (doc_type, doc_id, title, body, search) VALUES (?, ?, ?, ?, ?)',
-      ).run(doc.type, doc.id, doc.title, doc.text, tokenize(doc.text).join(' '));
+      db.prepare('INSERT INTO fts_docs (doc_id, doc_type, title, ts) VALUES (?, ?, ?, ?)').run(
+        doc.id,
+        doc.type,
+        doc.title,
+        doc.ts,
+      );
+      db.prepare('INSERT INTO fts (doc_type, doc_id, title, body, search) VALUES (?, ?, ?, ?, ?)').run(
+        doc.type,
+        doc.id,
+        doc.title,
+        doc.text,
+        tokenize(doc.text).join(' '),
+      );
     } catch {
       /* keep legacy index in sync below */
     }
@@ -180,7 +186,9 @@ export async function removeFtsDoc(id: string): Promise<void> {
     try {
       db.prepare('DELETE FROM fts WHERE doc_id = ?').run(id);
       db.prepare('DELETE FROM fts_docs WHERE doc_id = ?').run(id);
-    } catch { /* noop */ }
+    } catch {
+      /* noop */
+    }
   }
   await ensureLoaded();
   const old = index.docs[id];
@@ -197,14 +205,18 @@ export async function removeFtsDoc(id: string): Promise<void> {
 }
 
 /** Shared JSONL → searchable text builder (chat + agent logs). */
-export function sessionDocFromJsonl(raw: string, type: FtsDocType): { parts: string[]; ts: number } {
+export function sessionDocFromJsonl(raw: string, _type: FtsDocType): { parts: string[]; ts: number } {
   const parts: string[] = [];
   let ts = 0;
   for (const line of raw.split('\n')) {
     if (!line.trim()) continue;
     try {
       const e = JSON.parse(line) as {
-        type?: string; ts?: number; timestamp?: number; text?: string; toolName?: string;
+        type?: string;
+        ts?: number;
+        timestamp?: number;
+        text?: string;
+        toolName?: string;
         data?: { text?: string; toolName?: string };
       };
       const eventTs = typeof e.ts === 'number' ? e.ts : typeof e.timestamp === 'number' ? e.timestamp : 0;
@@ -251,10 +263,13 @@ export function scheduleSessionFtsRefresh(id: string, type: FtsDocType): void {
   const key = `${type}:${id}`;
   const existing = ftsRefreshTimers.get(key);
   if (existing) clearTimeout(existing);
-  ftsRefreshTimers.set(key, setTimeout(() => {
-    ftsRefreshTimers.delete(key);
-    void refreshSessionFts(id, type).catch(() => {});
-  }, 600));
+  ftsRefreshTimers.set(
+    key,
+    setTimeout(() => {
+      ftsRefreshTimers.delete(key);
+      void refreshSessionFts(id, type).catch(() => {});
+    }, 600),
+  );
 }
 
 export async function flushFts(): Promise<void> {
@@ -270,14 +285,19 @@ export async function searchFts(query: string, limit = 20): Promise<FtsHit[]> {
     try {
       const rows = db
         .prepare(
-          'SELECT d.doc_id AS id, d.doc_type AS type, d.title, d.ts, '
-          + "snippet(fts, 3, '…', '…', '…', 24) AS snip, rank "
-          + 'FROM fts JOIN fts_docs d ON d.doc_id = fts.doc_id '
-          + 'WHERE fts MATCH ? ORDER BY rank LIMIT ?',
+          'SELECT d.doc_id AS id, d.doc_type AS type, d.title, d.ts, ' +
+            "snippet(fts, 3, '…', '…', '…', 24) AS snip, rank " +
+            'FROM fts JOIN fts_docs d ON d.doc_id = fts.doc_id ' +
+            'WHERE fts MATCH ? ORDER BY rank LIMIT ?',
         )
         .all(match, Math.min(limit, 50)) as Array<{
-          id: string; type: string; title: string; ts: number; snip?: string; rank: number;
-        }>;
+        id: string;
+        type: string;
+        title: string;
+        ts: number;
+        snip?: string;
+        rank: number;
+      }>;
       return rows.map((r) => ({
         type: r.type as FtsDocType,
         id: r.id,
@@ -308,7 +328,9 @@ export async function searchFts(query: string, limit = 20): Promise<FtsHit[]> {
       const score = scores.get(id) || 0;
       const idx = doc.text.toLowerCase().indexOf(query.trim().toLowerCase());
       const start = idx >= 0 ? Math.max(0, idx - 40) : 0;
-      const snippet = (idx >= 0 ? doc.text.slice(start, start + 140) : doc.text.slice(0, 140)).replace(/\s+/g, ' ').trim();
+      const snippet = (idx >= 0 ? doc.text.slice(start, start + 140) : doc.text.slice(0, 140))
+        .replace(/\s+/g, ' ')
+        .trim();
       return { type: doc.type, id: doc.id, title: doc.title, snippet, ts: doc.ts, score };
     })
     .sort((a, b) => b.score - a.score || b.ts - a.ts)
@@ -332,13 +354,19 @@ export async function rebuildFts(): Promise<number> {
     try {
       db.exec('DELETE FROM fts');
       db.exec('DELETE FROM fts_docs');
-    } catch { /* noop */ }
+    } catch {
+      /* noop */
+    }
   }
   let count = 0;
 
   // Chat logs: aggregate each session's user + assistant text.
   let files: string[] = [];
-  try { files = await fs.readdir(chatLogRoot()); } catch { /* no logs */ }
+  try {
+    files = await fs.readdir(chatLogRoot());
+  } catch {
+    /* no logs */
+  }
   for (const file of files) {
     if (!file.endsWith('.jsonl')) continue;
     const id = file.slice(0, -6);
@@ -353,17 +381,25 @@ export async function rebuildFts(): Promise<number> {
           if (typeof e.ts === 'number' && e.ts > ts) ts = e.ts;
           const text = e.data?.text;
           if (text) parts.push(e.type === 'user' ? `用户：${text}` : text);
-        } catch { /* skip */ }
+        } catch {
+          /* skip */
+        }
       }
       if (parts.length > 0) {
         await addFtsDoc({ type: 'chat', id, title: `会话 ${id}`, text: parts.join('\n').slice(-50_000), ts });
         count++;
       }
-    } catch { /* skip */ }
+    } catch {
+      /* skip */
+    }
   }
 
   // Agent session logs: text chunks.
-  try { files = await fs.readdir(sessionLogRoot()); } catch { files = []; }
+  try {
+    files = await fs.readdir(sessionLogRoot());
+  } catch {
+    files = [];
+  }
   for (const file of files) {
     if (!file.startsWith('agent-') || !file.endsWith('.jsonl')) continue;
     const id = file.slice(0, -6);
@@ -388,17 +424,25 @@ export async function rebuildFts(): Promise<number> {
           if (text) parts.push(e.type === 'user' ? `用户：${text}` : text);
           const toolName = e.data?.toolName ?? e.toolName;
           if (toolName) parts.push(`工具：${toolName}`);
-        } catch { /* skip */ }
+        } catch {
+          /* skip */
+        }
       }
       if (parts.length > 0) {
         await addFtsDoc({ type: 'agent', id, title: `Agent ${id}`, text: parts.join('\n').slice(-50_000), ts });
         count++;
       }
-    } catch { /* skip */ }
+    } catch {
+      /* skip */
+    }
   }
 
   // Agent snapshots: result summaries (title + result).
-  try { files = await fs.readdir(snapshotRoot()); } catch { files = []; }
+  try {
+    files = await fs.readdir(snapshotRoot());
+  } catch {
+    files = [];
+  }
   for (const file of files) {
     if (!file.endsWith('.json')) continue;
     const id = file.slice(0, -5);
@@ -407,10 +451,18 @@ export async function rebuildFts(): Promise<number> {
       const snap = JSON.parse(raw) as { name?: string; result?: string; error?: string; startTime?: number };
       const text = `${snap.name || id}\n${snap.result || ''}\n${snap.error || ''}`;
       if (text.trim()) {
-        await addFtsDoc({ type: 'agent', id, title: snap.name || id, text: text.slice(0, 20_000), ts: snap.startTime || 0 });
+        await addFtsDoc({
+          type: 'agent',
+          id,
+          title: snap.name || id,
+          text: text.slice(0, 20_000),
+          ts: snap.startTime || 0,
+        });
         count++;
       }
-    } catch { /* skip */ }
+    } catch {
+      /* skip */
+    }
   }
 
   await persist();

@@ -48,7 +48,8 @@ export default function App() {
 
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [systemDark, setSystemDark] = useState(
-    () => typeof window !== 'undefined' && !!window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches,
+    () =>
+      typeof window !== 'undefined' && !!window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches,
   );
 
   useEffect(() => {
@@ -89,7 +90,8 @@ export default function App() {
   useEffect(() => {
     if (!window.electronAPI?.getGlassState) return;
     let alive = true;
-    window.electronAPI.getGlassState()
+    window.electronAPI
+      .getGlassState()
       .then((r) => {
         if (!alive) return;
         useSettingsStore.setState({
@@ -106,7 +108,9 @@ export default function App() {
   // Prefetch SettingsModal chunk on idle so the first click feels instant.
   useEffect(() => {
     const win = window as Window & { requestIdleCallback?: (cb: () => void) => number };
-    const prefetch = () => { import('./components/settings/SettingsModal'); };
+    const prefetch = () => {
+      import('./components/settings/SettingsModal');
+    };
     if (typeof win.requestIdleCallback === 'function') {
       win.requestIdleCallback(prefetch);
     } else {
@@ -132,7 +136,9 @@ export default function App() {
       message.error({ content: t('app.mainErrorPrefix', { text }), duration: 6 });
       console.error('[main-process error]', err?.stack || err?.message);
     });
-    return () => { unsub?.(); };
+    return () => {
+      unsub?.();
+    };
   }, []);
 
   // ── Plan approval IPC — plan:generated → inspector store (composer takeover) ──
@@ -187,14 +193,17 @@ export default function App() {
       useChatStore.setState((s) => {
         if (s.messages.find((m) => m.id === permMsgId)) return s;
         return {
-          messages: [...s.messages, {
-            id: permMsgId,
-            role: 'system' as const,
-            content: request.message,
-            timestamp: Date.now(),
-            permissionRequest: request,
-            tags: ['system'],
-          }],
+          messages: [
+            ...s.messages,
+            {
+              id: permMsgId,
+              role: 'system' as const,
+              content: request.message,
+              timestamp: Date.now(),
+              permissionRequest: request,
+              tags: ['system'],
+            },
+          ],
         };
       });
     });
@@ -212,30 +221,32 @@ export default function App() {
       const settings = useSettingsStore.getState();
       // notificationMode is the UI truth: always / background-only / never.
       // Legacy persisted states without it fall back to the old boolean.
-      const notifMode = settings.notificationMode
-        ?? (settings.notifyOnAgentComplete ? 'always' : 'never');
+      const notifMode = settings.notificationMode ?? (settings.notifyOnAgentComplete ? 'always' : 'never');
       const inForeground = typeof document !== 'undefined' && document.hasFocus();
-      const shouldNotify =
-        notifMode === 'always' ||
-        (notifMode === 'background' && !inForeground);
+      const shouldNotify = notifMode === 'always' || (notifMode === 'background' && !inForeground);
       if (shouldNotify && prev !== agent.status && (agent.status === 'completed' || agent.status === 'error')) {
         try {
-          const n = new Notification(
-            agent.status === 'completed' ? t('app.agentDone') : t('app.agentError'),
-            {
-              body: agent.status === 'completed'
+          const n = new Notification(agent.status === 'completed' ? t('app.agentDone') : t('app.agentError'), {
+            body:
+              agent.status === 'completed'
                 ? t('app.agentCompletedMsg', { name: agent.name })
                 : t('app.agentErrorMsg', { name: agent.name, error: agent.error || t('app.unknownError') }),
-              silent: false,
-            },
-          );
-          n.onclick = () => { window.electronAPI?.focusWindow(); n.close(); };
-        } catch { /* noop */ }
+            silent: false,
+          });
+          n.onclick = () => {
+            window.electronAPI?.focusWindow();
+            n.close();
+          };
+        } catch {
+          /* noop */
+        }
       }
       prevStatuses.set(agent.id, agent.status);
     });
 
-    return () => { unsubUpdated(); };
+    return () => {
+      unsubUpdated();
+    };
   }, []);
 
   // ── Plugin bootstrap ──
@@ -287,12 +298,14 @@ export default function App() {
       const s = useChatStore.getState();
       const sid = useSessionStore.getState().currentSessionId;
       if (sid && !s.isStreaming && s.messages.length > 0) {
-        useSessionStore.getState().saveSession(
-          s.messages,
-          s.selectedModel,
-          s.currentProjectPath || useSettingsStore.getState().projectPath || undefined,
-          useAppStore.getState().sidebarMode,
-        );
+        useSessionStore
+          .getState()
+          .saveSession(
+            s.messages,
+            s.selectedModel,
+            s.currentProjectPath || useSettingsStore.getState().projectPath || undefined,
+            useAppStore.getState().sidebarMode,
+          );
       }
     };
     window.addEventListener('pagehide', onPageHide);
@@ -444,10 +457,22 @@ export default function App() {
         if (binding.key === 'Escape') {
           const chatState = useChatStore.getState();
           const appState = useAppStore.getState();
-          if (chatState.isStreaming) { chatState.stopStreaming(); return; }
-          if (appState.showRightPanel) { appState.toggleRightPanel(); return; }
-          if (appState.activeToolView !== 'none') { appState.setActiveToolView('none'); return; }
-          if (appState.showSettings) { appState.setShowSettings(false); return; }
+          if (chatState.isStreaming) {
+            chatState.stopStreaming();
+            return;
+          }
+          if (appState.showRightPanel) {
+            appState.toggleRightPanel();
+            return;
+          }
+          if (appState.activeToolView !== 'none') {
+            appState.setActiveToolView('none');
+            return;
+          }
+          if (appState.showSettings) {
+            appState.setShowSettings(false);
+            return;
+          }
           return;
         }
         break;
@@ -477,22 +502,35 @@ export default function App() {
     if (!api?.zoom) return;
 
     const applyZoom = (delta: number | null) => {
-      api.zoom(delta).then((level) => {
-        useSettingsStore.getState().setZoomLevel(level);
-      }).catch(() => {});
+      api
+        .zoom(delta)
+        .then((level) => {
+          useSettingsStore.getState().setZoomLevel(level);
+        })
+        .catch(() => {});
     };
 
     // Restore persisted level (zoom(null) resets to 0, then step to target).
     const saved = useSettingsStore.getState().zoomLevel;
     if (saved !== 0) {
-      api.zoom(null).then(() => api.zoom(saved)).catch(() => {});
+      api
+        .zoom(null)
+        .then(() => api.zoom(saved))
+        .catch(() => {});
     }
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
-      if (e.key === '=' || e.key === '+') { e.preventDefault(); applyZoom(0.5); }
-      else if (e.key === '-') { e.preventDefault(); applyZoom(-0.5); }
-      else if (e.key === '0') { e.preventDefault(); applyZoom(null); }
+      if (e.key === '=' || e.key === '+') {
+        e.preventDefault();
+        applyZoom(0.5);
+      } else if (e.key === '-') {
+        e.preventDefault();
+        applyZoom(-0.5);
+      } else if (e.key === '0') {
+        e.preventDefault();
+        applyZoom(null);
+      }
     };
     const onWheel = (e: WheelEvent) => {
       if (!e.ctrlKey) return;
@@ -518,11 +556,7 @@ export default function App() {
             {/* Wallpaper backdrop: fixed behind the glass surfaces. It only
                 becomes visible where the app is transparent (Aqua / acrylic). */}
             {wallpaper && (
-              <div
-                aria-hidden
-                className="ax-wallpaper"
-                style={{ backgroundImage: `url("${wallpaper}")` }}
-              />
+              <div aria-hidden className="ax-wallpaper" style={{ backgroundImage: `url("${wallpaper}")` }} />
             )}
             <WorkbenchLayout />
             {showSettings && (

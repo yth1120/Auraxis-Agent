@@ -3,8 +3,15 @@ import { promises as fs } from 'fs';
 import os from 'os';
 import path from 'path';
 import {
-  getGoal, createGoal, editGoal, pauseGoal, resumeGoal,
-  completeGoal, blockGoal, clearGoal, recordGoalRound,
+  getGoal,
+  createGoal,
+  editGoal,
+  pauseGoal,
+  resumeGoal,
+  completeGoal,
+  blockGoal,
+  clearGoal,
+  recordGoalRound,
 } from '../../goal-store';
 
 let root: string;
