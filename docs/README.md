@@ -45,7 +45,7 @@ The project follows **paper-driven development**: 7 arXiv papers' core technique
 - **Cloud connectors**: Slack (list channels / post messages), Google Drive (search / read), Notion (search / create pages); tokens encrypted with safeStorage, configured in Settings → Connectors
 - **Session titles**: LLM-generated with rule fallback; **per-message ratings**, **attachment gallery / lightbox**, **image draft bar**
 - **Appearance**: theme mode (system / light / dark), Chinese & English UI, sidebar transparency (native Windows 11 Acrylic); Settings includes a live test-coverage report (`coverage/coverage-summary.json`)
-- **Login & account**: local-first account (password stored only as scrypt hash), first-run registration → login gate → avatar upload; DeepSeek API key can be filled during registration or configured later in Settings
+- **Login & account**: local-first account (password stored only as scrypt hash), first-run registration → login gate → avatar upload; registration never auto-unlocks, and "remember me" takes effect only after a successful login; DeepSeek API key can be filled during registration or configured later in Settings
 - **Research-driven modules**: AGORA step compression, SWE-Touch workspace drift, Oversight approval fatigue, AutoTool tool inertia, VaG skill gating — consumed internally by step-engine / agent-loop / tool-runner
 - **Telemetry**: opt-in (`AURAXIS_TELEMETRY_MODE`), strictly whitelisted and sanitized, NDJSON reporting
 
@@ -952,7 +952,7 @@ The app uses `dotenv` to load environment variables from `.env` at the project r
 - **Coverage scope**: the gate only counts `electron/ipc/`, `src/stores/`, `src/core/`; UI components (`src/components/`) and main-process entry points (`main.ts` / `preload.ts` etc.) are excluded from the gate and covered by component tests + Playwright E2E (`npm run test:e2e`)
 - **Coverage thresholds**: lines/statements 80%, branches 70%, functions 80% (current: 85.18% lines / 78.86% branches / 87.78% functions)
 - **Coverage report**: `npm run test:coverage` outputs `coverage/coverage-summary.json` (gitignored dev artifact); the Settings "Test coverage" page reads it live via the `coverage:get` IPC; pure browser dev is served by a Vite middleware, and production builds copy it into `dist/coverage/`. When the report is missing, the panel shows the command to run instead of fake numbers
-- **E2E**: 15 Playwright UI flows passing (real Electron)
+- **E2E**: 16 Playwright UI flows passing (real Electron, including register → login → remember-me persistence)
 - **Real-API acceptance (DeepSeek)**: chat streaming, Code auto-approve Bash, Code "confirm each time" permission card (write after one approval), Work smart-execution flow, and Work plan-approval panel all verified; sandbox scripts add cwd fallback when launching `dist-electron/main.js` directly (`electron/sandbox-runner.ts`)
 - **Stress testing (local mock LLM + real Electron)**: 200 sessions cold start ~1.4s, session switch ~155ms, FTS rebuild ~178ms; 18 agents (6 concurrent) and 30 agents (8 concurrent) all completed without failure; under extreme load (30 tasks + 200 sidebar rows) fast mode switches occasionally stalled 8–11s with one >15s, recovering automatically after load; no issue at the default 3-concurrency setting
 - **Environment limits**: no real Python on this machine (only Microsoft Store placeholder), so `npm run sdk:test:py` cannot run; JS SDK 7 cases pass

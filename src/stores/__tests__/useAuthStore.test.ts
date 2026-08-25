@@ -65,7 +65,7 @@ describe('useAuthStore — 账户名修改', () => {
       phase: 'locked',
       name: 'B',
       email: 'x@y.com',
-      rememberMe: true,
+      rememberMe: false,
       notice: 'created',
     });
 

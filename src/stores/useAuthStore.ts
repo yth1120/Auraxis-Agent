@@ -62,7 +62,7 @@ export const useAuthStore = create<AuthStore>((set) => ({
           name: params.name.trim(),
           email: params.email.trim().toLowerCase(),
           avatar: '',
-          rememberMe: !!params.rememberMe,
+          rememberMe: false,
           notice: 'created',
         });
       }

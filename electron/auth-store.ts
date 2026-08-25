@@ -171,7 +171,10 @@ export async function setupAccount(params: AuthSetupParams): Promise<{ ok: boole
     salt,
     hash: derive(params.password, salt),
     createdAt: Date.now(),
-    rememberMe: !!params.rememberMe,
+    // 注册只是创建本地账户，不是一次通过密码验证的登录。
+    // “记住我”只能在 loginAccount 成功校验密码后落盘，避免设置页勾选后
+    // 无需密码就在下次启动自动解锁。
+    rememberMe: false,
   };
   await writeAccount(account);
   // 注册不等于登录：创建成功后仍处于 locked，用户需要先登录一次。

@@ -45,7 +45,7 @@ Auraxis v3.1.0 是一款基于 Electron 的桌面端智能体工作台，融合�
 - **云连接器**：Slack（列频道/发消息）、Google Drive（检索/读取）、Notion（搜索/建页），Token 经 safeStorage 加密保存，设置 → 连接器 配置
 - **会话标题**：LLM 生成 + 规则回退；**逐消息评分**、**附件画廊/灯箱**、**图片草稿栏**
 - **外观设置**：主题模式（跟随系统/浅/深）、中英双语、侧边栏透明度（Windows 11 原生 Acrylic 磨砂透出桌面）；设置面板内置真实测试覆盖率报告（`coverage/coverage-summary.json`）
-- **登录与账户**：本地优先账户（密码仅存 scrypt 哈希，不落明文），首启注册 → 登录门 → 头像上传；注册流程可直接填写 DeepSeek API Key，也可跳过后在设置面板配置
+- **登录与账户**：本地优先账户（密码仅存 scrypt 哈希，不落明文），首启注册 → 登录门 → 头像上传；注册不会自动解锁，“记住我”仅在成功登录后生效；注册流程可直接填写 DeepSeek API Key，也可跳过后在设置面板配置
 - **研究驱动模块**：AGORA 步骤级压缩、SWE-Touch 工作区漂移、Oversight 审批疲劳、AutoTool 工具惯性、VaG 技能门禁，统一由 step-engine / agent-loop / tool-runner 等内部消费
 - **遥测**：opt-in（`AURAXIS_TELEMETRY_MODE`），严格白名单脱敏，NDJSON 上报
 
@@ -951,7 +951,7 @@ dist-electron/ + dist/ ──→ electron-builder ──→ release/
 - **覆盖率口径**：门槛统计范围仅为 `electron/ipc/`、`src/stores/`、`src/core/`；UI 组件（`src/components/`）与主进程入口（`main.ts` / `preload.ts` 等）不计入该门槛，另有组件级测试与 Playwright 端到端测试（`npm run test:e2e`）覆盖
 - **覆盖率阈值**：行/语句 80%，分支 70%，函数 80%（scope: `electron/ipc/`, `src/stores/`, `src/core/`；当前实际 85.18% 行/语句、78.86% 分支、87.78% 函数）
 - **覆盖率报告**：`npm run test:coverage` 同时输出 `coverage/coverage-summary.json`（gitignore 的开发期产物）；设置面板「测试覆盖率」页经 `coverage:get` IPC 实时读取，纯浏览器 dev 由 Vite 中间件提供同一路径，生产构建将其拷入 `dist/coverage/`。报告缺失时面板提示运行命令，不显示伪造数字。
-- **端到端测试**：15 条 Playwright UI 链路通过（真实 Electron）
+- **端到端测试**：16 条 Playwright UI 链路通过（真实 Electron，含本地注册 → 登录 → 记住我持久化）
 - **实战验收（DeepSeek 真实 API）**：Chat 流式回答、Code 自动代批 Bash、Code「每次确认」权限卡（允许一次后写入文件）、Work 智能放行执行流、Work 计划审批面板均跑通；沙箱脚本直启 `dist-electron/main.js` 时增加 cwd 回退（`electron/sandbox-runner.ts`）。
 - **压力测试（本地 mock LLM + 真实 Electron）**：200 会话冷启动约 1.4s、会话切换约 155ms、FTS 重建约 178ms；18 个 Agent（6 并发）与 30 个 Agent（8 并发）全部完成、无失败；极端负载（30 个任务 + 200 行侧栏同时渲染）下快速模式切换偶发 8–11s 卡顿并有一次超过 15s，负载结束后自动恢复；默认 3 并发下无此现象。
 - **环境限制**：本机未安装真实 Python（仅 Microsoft Store 占位符），`npm run sdk:test:py` 无法执行；JS SDK 7 个用例通过。

@@ -74,9 +74,13 @@ describe('auth-store — 本地账户登录系统', () => {
     expect(again.ok).toBe(false);
   });
 
-  it('注册时勾选记住我：下次启动自动进入 unlocked，退出后清除', async () => {
+  it('注册时勾选记住我：创建后仍锁定，成功登录后才持久化并自动解锁；退出后清除', async () => {
     await setupAccount({ name: 'A', email: 'a@b.com', password: 'secret1', rememberMe: true });
+    expect((await getAuthStatus()).phase).toBe('locked');
+
+    expect((await loginAccount({ email: 'a@b.com', password: 'secret1', rememberMe: true })).ok).toBe(true);
     expect((await getAuthStatus()).phase).toBe('unlocked');
+
     await logoutAccount();
     const status = await getAuthStatus();
     expect(status.phase).toBe('locked');
