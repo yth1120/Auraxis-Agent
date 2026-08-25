@@ -35,6 +35,9 @@
 - Fixed dev-mode IPC trust validation: Vite's `http://localhost:5173/`
   (with trailing slash) is now accepted, preventing all IPC calls from being
   rejected as "Untrusted IPC sender".
+- Fixed Windows userData corruption caused by relocating Chromium cache before
+  Electron had resolved `userData`; the app now keeps account/settings in the
+  standard Roaming profile and migrates legacy account files from Local cache.
 - E2E suite expanded to 16/16 real-Electron flows (register/login is now part
   of the gate instead of relying only on store unit tests).
 - Added API endpoint and network-policy regression tests, plus MCP server-ID

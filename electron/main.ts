@@ -3,6 +3,7 @@ import { secureHandle } from './ipc/trust';
 import path from 'path';
 import os from 'os';
 import { existsSync, mkdtempSync } from 'fs';
+import { copyFile, cp } from 'fs/promises';
 import { registerIpcHandlers, isWindows11, markAcrylicWindowReady } from './ipc';
 import { cleanupWindowStreams } from './ipc/ai-handlers';
 import { setMainWindowRef, clearMainWindowRef } from './ipc/window-ref';
@@ -51,17 +52,6 @@ if (headlessMode) {
   const cliUserData = mkdtempSync(path.join(os.tmpdir(), 'auraxis-cli-'));
   process.env.AURAXIS_CLI_USER_DATA = cliUserData;
   app.setPath('userData', cliUserData);
-}
-
-// Chromium 的磁盘缓存（网络 / Code Cache / GPU 着色器）是纯可再生数据。
-// Windows 上 Roaming 配置目录偶尔会被上次实例残留的文件锁或杀软短暂占
-// 用，Chromium 启动时移动旧缓存目录就会报 0x5「拒绝访问」，进而丢失 GPU
-// 着色器缓存（表现为启动后界面闪烁）。桌面模式下把缓存挪到 LocalAppData：
-// 同一用户可写、不参与配置同步，也从根源上避开旧缓存锁。测试/E2E 的隔离
-// userData 场景保持原样，避免与开发实例共享缓存目录。
-if (process.platform === 'win32' && !headlessMode && !process.env.AURAXIS_USER_DATA_DIR) {
-  const localAppData = process.env.LOCALAPPDATA || path.join(app.getPath('appData'), '..', 'Local');
-  app.setPath('cache', path.join(localAppData, app.getName(), 'Cache'));
 }
 
 if (!headlessMode) {
@@ -233,6 +223,55 @@ process.on('unhandledRejection', (reason) => {
 
 app.setName('Auraxis');
 app.whenReady().then(async () => {
+  // 旧版本错误地在 Windows 上把 cache 路径写入后，userData 被解析到了
+  // Local\auraxis\Cache\auraxis。这里一次性把持久化账户/设置/记忆数据
+  // 带回标准 Roaming userData；只复制不移动，旧目录保留作为回退。
+  if (!headlessMode && !process.env.AURAXIS_USER_DATA_DIR && process.env.LOCALAPPDATA) {
+    try {
+      const currentUserData = app.getPath('userData');
+      const legacyUserData = path.join(process.env.LOCALAPPDATA, 'auraxis', 'Cache', 'auraxis');
+      if (legacyUserData !== currentUserData && existsSync(legacyUserData)) {
+        const files = [
+          'auraxis-auth.json',
+          'auraxis-settings.json',
+          'auraxis-global-state.json',
+          'auraxis-memory.db',
+          'auraxis-memory.db-shm',
+          'auraxis-memory.db-wal',
+          '.env',
+          'plugin-state.json',
+        ];
+        const dirs = [
+          'agent-snapshots',
+          'agent-workspaces',
+          'chat-logs',
+          'session-logs',
+          'session-cache',
+          'fts',
+          'feedback',
+          'hooks',
+          'skills',
+          'spill',
+        ];
+        for (const name of files) {
+          const legacyPath = path.join(legacyUserData, name);
+          const currentPath = path.join(currentUserData, name);
+          if (existsSync(legacyPath) && !existsSync(currentPath)) {
+            await copyFile(legacyPath, currentPath);
+          }
+        }
+        for (const name of dirs) {
+          const legacyPath = path.join(legacyUserData, name);
+          const currentPath = path.join(currentUserData, name);
+          if (existsSync(legacyPath) && !existsSync(currentPath)) {
+            await cp(legacyPath, currentPath, { recursive: true });
+          }
+        }
+      }
+    } catch {
+      /* migration is best-effort; existing data remains in the legacy folder */
+    }
+  }
   registerIpcHandlers();
 
   // Restore persisted undo history for the saved project (fresh app start
