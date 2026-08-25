@@ -1,13 +1,10 @@
 import { errorText } from '../../../electron/errors';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Modal, message } from 'antd';
-import clsx from 'clsx';
 import { shallow } from 'zustand/shallow';
 import { useStoreWithEqualityFn } from 'zustand/traditional';
 import {
   TreeStructure as ApartmentOutlined,
-  Check,
-  X,
   FileText,
   MagnifyingGlass,
   Terminal,
@@ -24,15 +21,21 @@ import TaskChecklist from './TaskChecklist';
 import ContextManifest, { type ContextGroup } from './ContextManifest';
 import ExecutingIndicator from '../common/ExecutingIndicator';
 import { useT, type I18nKey } from '../../i18n';
-import DeliverablesRow from '../common/DeliverablesRow';
 import AgentTasksCard from './AgentTasksCard';
 import SnapshotCard from './SnapshotCard';
+import {
+  AgentInspectorHeader,
+  AgentSummaryCard,
+  DeliverablesCard,
+  NextStepsCard,
+  QualityGateCard,
+  RollbackCard,
+  SystemMessagesList,
+} from './WorkspaceInspectorSections';
 import {
   AGENT_STATUS_META,
   agentToolInvocations,
   basename,
-  formatElapsed,
-  formatTokens,
   latestAgentTodos,
   latestChatToolInvocations,
   type ToolInvocation,
@@ -362,55 +365,15 @@ export default function WorkspaceInspector() {
   return (
     <div className="h-full overflow-y-auto px-3 pb-6 pt-3">
       {isCode && agent && (
-        <div className="sticky top-0 z-10 -mx-3 px-3 pt-2 pb-2.5 mb-3 bg-[var(--color-bg-primary)] border-b border-[var(--color-border-dim)]">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="inline-flex items-center gap-1.5 text-2xs px-2 py-[2px] rounded-full bg-[var(--color-bg-inset)] text-text-secondary shrink-0">
-              <span className={clsx('w-1.5 h-1.5 rounded-full', statusMeta?.cls)} />
-              {statusLabel}
-            </span>
-            <span className="flex-1 min-w-0 truncate text-xs font-medium text-text-primary">
-              {agent.description || agent.name}
-            </span>
-            <span className="shrink-0 text-2xs text-text-muted tabular-nums">{formatElapsed(elapsed)}</span>
-            {(agent.status === 'running' || agent.status === 'paused') && (
-              <span className="shrink-0 flex items-center gap-0.5">
-                <button
-                  type="button"
-                  className="text-2xs text-text-muted px-1.5 py-[2px] rounded-md cursor-pointer hover:bg-[var(--color-hover)] hover:text-text-secondary"
-                  onClick={pauseResume}
-                >
-                  {agent.status === 'running' ? tPanel('inspector.pause') : tPanel('inspector.resume')}
-                </button>
-                <button
-                  type="button"
-                  className="text-2xs text-text-muted px-1.5 py-[2px] rounded-md cursor-pointer hover:bg-[var(--color-hover)] hover:text-text-secondary"
-                  onClick={stopAgent}
-                >
-                  {tPanel('inspector.stop')}
-                </button>
-              </span>
-            )}
-          </div>
-          <div className="mt-1.5 flex flex-wrap gap-1.5">
-            <span className="inline-flex items-center h-5 px-2 rounded-full bg-[var(--color-bg-inset)] text-2xs text-text-muted">
-              {tPanel('inspector.rounds', { n: agent.iteration ?? 0 })}
-            </span>
-            <span className="inline-flex items-center h-5 px-2 rounded-full bg-[var(--color-bg-inset)] text-2xs text-text-muted">
-              {tPanel('inspector.tools', { n: agent.toolCallCount ?? 0 })}
-            </span>
-            <span className="inline-flex items-center h-5 px-2 rounded-full bg-[var(--color-bg-inset)] text-2xs text-text-muted tabular-nums">
-              {formatTokens(totalTokens)} tokens
-            </span>
-            {agent.goal && (
-              <span
-                className="inline-flex items-center h-5 max-w-[220px] px-2 rounded-full bg-[var(--color-bg-inset)] text-2xs text-text-muted truncate"
-                title={tPanel('inspector.goalTip', { text: agent.goal.text, n: agent.goal.maxRounds })}
-              >
-                {tPanel('inspector.goal', { text: agent.goal.text })}
-              </span>
-            )}
-          </div>
-        </div>
+        <AgentInspectorHeader
+          agent={agent}
+          statusMeta={statusMeta}
+          statusLabel={statusLabel}
+          elapsed={elapsed}
+          totalTokens={totalTokens}
+          onPauseResume={pauseResume}
+          onStop={stopAgent}
+        />
       )}
 
       {isCode && agents.length > 1 && agent && <AgentTasksCard now={now} />}
@@ -424,120 +387,19 @@ export default function WorkspaceInspector() {
         </div>
       )}
 
-      {isCode && agent && (
-        <section className="px-3.5 py-2.5 mb-2.5 rounded-xl bg-[var(--color-bg-secondary)]">
-          <header className="text-2xs font-semibold text-text-muted tracking-wide mb-1.5">
-            {tPanel('inspector.taskSummary')}
-          </header>
-          <div className="text-xs text-text-secondary leading-[1.5] line-clamp-3">
-            {agent.description || agent.name}
-          </div>
-          {(agent.result || agent.error) && (
-            <div className="mt-1.5 text-xs text-text-secondary leading-[1.5] line-clamp-3">
-              {agent.result || agent.error}
-            </div>
-          )}
-        </section>
-      )}
+      {isCode && agent && <AgentSummaryCard agent={agent} />}
 
       {isCode && agent && qualityRuns.length > 0 && (
-        <section className="px-3.5 py-2.5 mb-2.5 rounded-xl bg-[var(--color-bg-secondary)]">
-          <header className="text-2xs font-semibold text-text-muted tracking-wide mb-1.5">
-            {tPanel('inspector.qualityGate')}
-          </header>
-          {qualityRuns.every((r) => r.passed) ? (
-            <div className="flex items-center gap-2 text-xs text-text-secondary">
-              <Check size={14} className="text-[var(--color-success)] shrink-0" />
-              {tPanel('inspector.qualityAllPassed', { n: qualityRuns.length })}
-            </div>
-          ) : (
-            <ul className="list-none m-0 p-0 flex flex-col gap-1">
-              {qualityRuns.map((r, idx) => (
-                <li key={`${r.checkType}-${idx}`} className="rounded-md bg-[var(--color-bg-inset)] px-2 py-[5px]">
-                  <div className="flex items-center gap-2 min-w-0">
-                    {r.passed ? (
-                      <Check size={14} className="text-[var(--color-success)] shrink-0" />
-                    ) : (
-                      <X size={14} className="text-danger shrink-0" />
-                    )}
-                    <span className="text-xs font-medium text-text-primary shrink-0">
-                      {tPanel('inspector.checkLabel', { type: r.checkType })}
-                    </span>
-                    {r.command && (
-                      <code className="flex-1 min-w-0 truncate text-2xs text-text-muted font-mono">{r.command}</code>
-                    )}
-                    <span className={`shrink-0 text-2xs ${r.passed ? 'text-[var(--color-success)]' : 'text-danger'}`}>
-                      {r.passed ? tPanel('inspector.checkPassed') : tPanel('inspector.checkFailed')}
-                    </span>
-                  </div>
-                  {!r.passed && (r.error || r.output) && (
-                    <pre className="mt-1 mb-0 text-2xs text-text-muted font-mono leading-[1.5] whitespace-pre-wrap line-clamp-3 overflow-hidden">
-                      {(r.error || r.output || '').slice(0, 800)}
-                    </pre>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-          {latestFailure && (
-            <button
-              type="button"
-              className="mt-2.5 h-7 px-3 rounded-full text-xs font-medium text-[var(--color-primary)] bg-primary-soft border-none cursor-pointer transition-colors duration-150 hover:bg-[var(--color-primary-strong)]"
-              onClick={() =>
-                backfillComposer(
-                  `请修复当前任务的问题：\n\n【${latestFailure.title}】\n${latestFailure.detail.slice(0, 1200)}\n\n请先读取相关文件定位原因，修复后重新运行验证。`,
-                  agent.id,
-                )
-              }
-              title={tPanel('inspector.fixButtonTip')}
-            >
-              {tPanel('inspector.fixButton')}
-            </button>
-          )}
-          {latestFailure && /^lint\b/i.test(latestFailure.title) && (
-            <button
-              type="button"
-              className="ml-2 mt-2.5 h-7 px-3 rounded-full text-xs font-medium text-[var(--color-primary)] bg-primary-soft border-none cursor-pointer transition-colors duration-150 enabled:hover:bg-[var(--color-primary-strong)] disabled:opacity-50 disabled:cursor-not-allowed"
-              onClick={() => void autoFixLint()}
-              disabled={lintFixing}
-              title={tPanel('inspector.autoFixLintTip')}
-            >
-              {lintFixing ? tPanel('inspector.fixingLint') : tPanel('inspector.autoFixLint')}
-            </button>
-          )}
-        </section>
+        <QualityGateCard
+          agent={agent}
+          runs={qualityRuns}
+          failure={latestFailure}
+          lintFixing={lintFixing}
+          onAutoFixLint={() => void autoFixLint()}
+        />
       )}
 
-      {isCode && agent && nextSteps.length > 0 && (
-        <section className="px-3.5 py-2.5 mb-2.5 rounded-xl bg-[var(--color-bg-secondary)]">
-          <header className="text-2xs font-semibold text-text-muted tracking-wide mb-1.5">
-            {tPanel('inspector.nextSteps')}
-          </header>
-          <div className="flex flex-col gap-1.5">
-            {nextSteps.map((step) => (
-              <button
-                key={step.label}
-                type="button"
-                className="flex items-center gap-2 px-3 py-[7px] rounded-lg bg-[var(--color-bg-inset)] text-left text-xs text-text-secondary border-none cursor-pointer transition-colors duration-150 hover:bg-[var(--color-hover)] hover:text-text-primary"
-                onClick={() => {
-                  if (step.kind === 'view' && step.view === 'diff') {
-                    useAppStore.getState().setRightPanelView('review');
-                    if (!useAppStore.getState().showRightPanel) useAppStore.getState().toggleRightPanel();
-                  } else if (step.prompt) {
-                    backfillComposer(step.prompt, agent.id);
-                  }
-                }}
-              >
-                <span className="shrink-0 w-[5px] h-[5px] rounded-full bg-[var(--color-primary)] opacity-70" />
-                <span className="flex-1 min-w-0">{step.label}</span>
-                <span className="shrink-0 text-2xs text-text-faint">
-                  {step.kind === 'view' ? tPanel('inspector.view') : tPanel('inspector.continue')}
-                </span>
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
+      {isCode && agent && nextSteps.length > 0 && <NextStepsCard agent={agent} steps={nextSteps} />}
 
       <TaskChecklist tasks={tasks} onRedo={isCode && agent ? redoTask : undefined} />
 
@@ -547,55 +409,15 @@ export default function WorkspaceInspector() {
 
       <ContextManifest groups={groups} fileTokens={fileTokens} maxFileTokens={maxFileTokens} />
 
-      {isCode && agent && deliverables.length > 0 && (
-        <section className="px-3.5 py-2.5 mb-2.5 rounded-xl bg-[var(--color-bg-secondary)]">
-          <header className="text-2xs font-semibold text-text-muted tracking-wide mb-1.5">
-            {tPanel('inspector.deliverables')}
-          </header>
-          <DeliverablesRow files={deliverables} onPreview={openPreview} />
-        </section>
-      )}
+      {isCode && agent && deliverables.length > 0 && <DeliverablesCard files={deliverables} onPreview={openPreview} />}
 
       {isCode && agent && (agent.status === 'completed' || agent.status === 'error' || agent.status === 'stopped') && (
-        <section className="px-3.5 py-2.5 mb-2.5 rounded-xl bg-[var(--color-bg-secondary)]">
-          <header className="text-2xs font-semibold text-text-muted tracking-wide mb-1.5">
-            {tPanel('inspector.rollback')}
-          </header>
-          <p className="text-2xs text-text-muted leading-[1.5] mb-2">{tPanel('inspector.rollbackBody')}</p>
-          <button
-            type="button"
-            className="h-7 px-3 rounded-full text-xs font-medium text-[var(--color-primary)] bg-primary-soft border-none cursor-pointer transition-colors duration-150 hover:bg-[var(--color-primary-strong)]"
-            onClick={rollbackAgent}
-          >
-            {tPanel('rollback.label')}
-          </button>
-        </section>
+        <RollbackCard onRollback={rollbackAgent} />
       )}
 
       <SnapshotCard projectRoot={projectRoot} now={now} />
 
-      {sysMessages.length > 0 && (
-        <section className="px-0.5 pt-[10px] border-t border-[var(--color-border-dim)] mt-1">
-          <header className="text-2xs font-semibold text-muted tracking-wide mb-[6px]">
-            {tPanel('inspector.systemPrompt')}
-          </header>
-          <ul className="list-none m-0 p-0 flex flex-col gap-1">
-            {sysMessages.slice(-8).map((m) => (
-              <li
-                key={m.id}
-                className={clsx(
-                  'text-xs leading-[1.5] px-2 py-[5px] rounded-md border border-transparent bg-dim text-secondary break-words',
-                  m.level === 'info' && 'bg-primary-soft border-primary',
-                  m.level === 'warning' && 'bg-warning-soft border-warning',
-                  m.level === 'error' && 'bg-danger-soft border-danger text-text-secondary',
-                )}
-              >
-                {m.content}
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+      {sysMessages.length > 0 && <SystemMessagesList messages={sysMessages} />}
 
       <Modal
         open={!!preview}
