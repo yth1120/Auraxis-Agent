@@ -32,6 +32,9 @@
 - Fixed local auth: "remember me" is no longer persisted during account
   creation, so the first unlock always requires password verification; added
   a real-Electron register → login → restart persistence E2E.
+- Fixed dev-mode IPC trust validation: Vite's `http://localhost:5173/`
+  (with trailing slash) is now accepted, preventing all IPC calls from being
+  rejected as "Untrusted IPC sender".
 - E2E suite expanded to 16/16 real-Electron flows (register/login is now part
   of the gate instead of relying only on store unit tests).
 - Added API endpoint and network-policy regression tests, plus MCP server-ID

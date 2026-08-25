@@ -8,11 +8,13 @@ function isTesting(): boolean {
 }
 
 function isTrustedUrl(value: string): boolean {
-  if (DEV_ORIGINS.has(value)) return true;
-  if (!value.startsWith('file://')) return false;
   try {
     const url = new URL(value);
-    return url.pathname.endsWith('/dist/index.html') || url.pathname.endsWith('/index.html');
+    if (DEV_ORIGINS.has(url.origin)) return true;
+    if (url.protocol === 'file:') {
+      return url.pathname.endsWith('/dist/index.html') || url.pathname.endsWith('/index.html');
+    }
+    return false;
   } catch {
     return false;
   }

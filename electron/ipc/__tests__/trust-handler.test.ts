@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { IpcMainInvokeEvent } from 'electron';
 
 const electronMock = vi.hoisted(() => ({
@@ -14,6 +14,7 @@ vi.mock('electron', () => ({
 import { isTrustedIpcSender, secureHandle } from '../trust';
 
 beforeEach(() => vi.clearAllMocks());
+afterEach(() => vi.unstubAllEnvs());
 
 describe('trusted IPC wrapper', () => {
   it('passes runtime payloads through and returns handler results', async () => {
@@ -26,5 +27,31 @@ describe('trusted IPC wrapper', () => {
   it('accepts unit-test events under Vitest', () => {
     expect(isTrustedIpcSender({})).toBe(true);
     expect(isTrustedIpcSender(undefined)).toBe(true);
+  });
+
+  it('trusts dev-server URLs even with a trailing slash', () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('VITEST', 'false');
+    electronMock.fromWebContents.mockReturnValue({ isDestroyed: () => false });
+    const sender = { getURL: () => 'http://localhost:5173/' };
+    expect(
+      isTrustedIpcSender({
+        sender,
+        senderFrame: { url: 'http://localhost:5173/' },
+      }),
+    ).toBe(true);
+  });
+
+  it('rejects non-devtool origins in production', () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('VITEST', 'false');
+    electronMock.fromWebContents.mockReturnValue({ isDestroyed: () => false });
+    const sender = { getURL: () => 'https://evil.example/' };
+    expect(
+      isTrustedIpcSender({
+        sender,
+        senderFrame: { url: 'https://evil.example/' },
+      }),
+    ).toBe(false);
   });
 });
