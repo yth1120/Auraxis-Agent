@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Modal, message } from 'antd';
 import clsx from 'clsx';
 import { shallow } from 'zustand/shallow';
+import { useStoreWithEqualityFn } from 'zustand/traditional';
 import {
   TreeStructure as ApartmentOutlined,
   Check,
@@ -56,7 +57,7 @@ export default function WorkspaceInspector() {
 
   // Selected-agent data (code mode).
   const currentAgentId = useAgentStore((s) => s.currentAgentId);
-  const agent = useAgentStore((s) => s.agents.find((a) => a.id === currentAgentId), shallow);
+  const agent = useStoreWithEqualityFn(useAgentStore, (s) => s.agents.find((a) => a.id === currentAgentId), shallow);
   const agents = useAgentStore((s) => s.agents);
 
   const statusMeta = agent

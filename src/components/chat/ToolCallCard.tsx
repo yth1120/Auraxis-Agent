@@ -6,6 +6,7 @@ import {
   CaretDown as CaretDownOutlined,
 } from '@/components/common/icons';
 import { shallow } from 'zustand/shallow';
+import { useStoreWithEqualityFn } from 'zustand/traditional';
 import type { ToolCall, ToolName } from '../../types/tools';
 import clsx from 'clsx';
 import { cleanOutput } from '../../utils/output-cleaner';
@@ -383,7 +384,7 @@ const ToolCallCard = memo(function ToolCallCard({ toolCall }: ToolCallCardProps)
  * content hasn't changed, even though the parent's messages array is new.
  */
 export default function ToolCallCardWrapper({ toolCallId }: ToolCallCardWrapperProps) {
-  const toolCall = useChatStore((s) => s.toolCallMap[toolCallId], shallow);
+  const toolCall = useStoreWithEqualityFn(useChatStore, (s) => s.toolCallMap[toolCallId], shallow);
   if (!toolCall) return null;
   return <ToolCallCard toolCall={toolCall} />;
 }

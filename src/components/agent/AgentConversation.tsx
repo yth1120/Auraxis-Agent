@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Modal, message, notification } from 'antd';
 import { Copy as CopyIcon } from '@/components/common/icons';
 import { shallow } from 'zustand/shallow';
+import { useStoreWithEqualityFn } from 'zustand/traditional';
 import { t, useT } from '../../i18n';
 import type { AgentLogEntry } from '../../types/agent';
 import { PERMISSION_PRESETS } from '../../types/advanced';
@@ -41,12 +42,14 @@ export default function AgentConversation({
   const autoScrolledTextRef = useRef(false);
   const [rawLogOpen, setRawLogOpen] = useState(false);
   const setCurrentAgent = useAgentStore((s) => s.setCurrentAgent);
-  const agent = useAgentStore((s) => s.agents.find((a) => a.id === currentAgentId), shallow);
-  const pendingPerms = useAgentStore(
+  const agent = useStoreWithEqualityFn(useAgentStore, (s) => s.agents.find((a) => a.id === currentAgentId), shallow);
+  const pendingPerms = useStoreWithEqualityFn(
+    useAgentStore,
     (s) => (currentAgentId ? s.agentPermissions[currentAgentId] : undefined) || NO_PERMS,
     shallow,
   );
-  const subagents = useAgentStore(
+  const subagents = useStoreWithEqualityFn(
+    useAgentStore,
     (s) => (currentAgentId ? s.agents.filter((a) => a.parentAgentId === currentAgentId) : []),
     shallow,
   );
