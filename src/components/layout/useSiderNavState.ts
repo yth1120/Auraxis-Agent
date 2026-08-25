@@ -9,7 +9,7 @@ import { useSessionStore } from '../../stores/useSessionStore';
 import { useChatStore } from '../../stores/useChatStore';
 import { useAppStore } from '../../stores/useAppStore';
 import { useSettingsStore } from '../../stores/useSettingsStore';
-import type { SiderDragState } from './SiderCodePanel';
+import type { SiderDragState } from './SiderCodePanelTypes';
 
 type Translate = (key: I18nKey, vars?: Record<string, string | number>) => string;
 
