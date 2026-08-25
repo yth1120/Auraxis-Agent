@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Dropdown, Layout } from 'antd';
 import { ArrowLeft, ArrowRight, Cube, PanelBottom, Bell, Minus, Square, Copy, X } from '@/components/common/icons';
 import { Allotment } from 'allotment';
@@ -12,7 +12,6 @@ import { useT } from '../../i18n';
 
 import SiderNav from './SiderNav';
 import TabBar from './TabBar';
-import ChatArea from './ChatArea';
 import WorkbenchActionsButton from './WorkbenchActionsButton';
 import TerminalDrawer from './TerminalDrawer';
 import HeaderStatusInfo from './HeaderStatusInfo';
@@ -20,13 +19,7 @@ import { COCKPIT_TABS, PANEL_LABELS } from './WorkbenchLayoutData';
 import GlobalSearchModal from './GlobalSearchModal';
 import { buildEditMenuItems, buildFileMenuItems, buildHelpMenuItems, buildViewMenuItems } from './WorkbenchMenus';
 import { useWorkbenchPaneResize, WORKBENCH_MAIN_MIN } from './useWorkbenchPaneResize';
-
-const DiffPanel = lazy(() => import('./DiffPanel'));
-const PreviewBrowser = lazy(() => import('./PreviewBrowser'));
-const FileTreePanel = lazy(() => import('../preview/FileTreePanel'));
-const WorkspaceInspector = lazy(() => import('../inspector/WorkspaceInspector'));
-const TimelinePanel = lazy(() => import('../inspector/TimelinePanel'));
-const ReviewPanel = lazy(() => import('../inspector/ReviewPanel'));
+import { WorkbenchRightPanel, WorkbenchTabContent } from './WorkbenchContent';
 
 const { Header } = Layout;
 
@@ -164,71 +157,6 @@ export default function WorkbenchLayout() {
     setRightPanelWidth,
     setPaneSizes,
   });
-
-  const renderTabContent = () => {
-    if (!activeTab) return <ChatArea />;
-    if (activeTab.type === 'chat') return <ChatArea />;
-    if (activeTab.type === 'file-tree') {
-      return (
-        <Suspense fallback={null}>
-          <FileTreePanel variant="embedded" />
-        </Suspense>
-      );
-    }
-    if (activeTab.type === 'diff') {
-      return (
-        <Suspense fallback={null}>
-          <DiffPanel tabId={activeTab.id} />
-        </Suspense>
-      );
-    }
-    if (activeTab.type === 'browser') {
-      return (
-        <Suspense fallback={null}>
-          <PreviewBrowser tabId={activeTab.id} />
-        </Suspense>
-      );
-    }
-    return null;
-  };
-
-  const renderRightPanel = () => {
-    switch (rightPanelView) {
-      case 'file-tree':
-        return (
-          <Suspense fallback={null}>
-            <FileTreePanel variant="tabs" />
-          </Suspense>
-        );
-      case 'inspector':
-        return (
-          <Suspense fallback={null}>
-            <WorkspaceInspector />
-          </Suspense>
-        );
-      case 'timeline':
-        return (
-          <Suspense fallback={null}>
-            <TimelinePanel />
-          </Suspense>
-        );
-      case 'review':
-        return (
-          <Suspense fallback={null}>
-            <ReviewPanel />
-          </Suspense>
-        );
-      case 'preview':
-        return (
-          <Suspense fallback={null}>
-            <PreviewBrowser tabId="right-preview" />
-          </Suspense>
-        );
-      case 'none':
-      default:
-        return null;
-    }
-  };
 
   const headerToolActive = (key: 'terminal' | 'notifications') => {
     if (key === 'notifications') return activeToolView === 'notifications';
@@ -433,7 +361,9 @@ export default function WorkbenchLayout() {
                   aquaGlassOn ? '!bg-transparent' : '!bg-bg-primary',
                 )}
               >
-                <div className="flex-1 min-h-0 relative">{renderTabContent()}</div>
+                <div className="flex-1 min-h-0 relative">
+                  <WorkbenchTabContent activeTab={activeTab} />
+                </div>
                 {sidebarMode !== 'chat' && (
                   <TerminalDrawer
                     open={activeToolView === 'terminal'}
@@ -499,7 +429,9 @@ export default function WorkbenchLayout() {
                   ))}
                 </div>
               </div>
-              <div className="ax-right-panel-content flex-1 overflow-y-auto min-h-0">{renderRightPanel()}</div>
+              <div className="ax-right-panel-content flex-1 overflow-y-auto min-h-0">
+                <WorkbenchRightPanel rightPanelView={rightPanelView} />
+              </div>
             </div>
           )}
         </aside>
