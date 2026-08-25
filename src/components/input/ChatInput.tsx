@@ -59,29 +59,7 @@ import { useAgentStore } from '../../stores/useAgentStore';
 import { AGENT_SKILLS, type AgentSkill } from '../../core/skills';
 import { useAuthStore } from '../../stores/useAuthStore';
 import logoPng from '../../assets/auraxis-logo.png';
-
-interface SpeechRecognitionEventLike {
-  results: ArrayLike<ArrayLike<{ transcript?: string }>>;
-}
-
-interface SpeechRecognitionInstanceLike {
-  lang: string;
-  interimResults: boolean;
-  onerror?: () => void;
-  onresult?: (event: SpeechRecognitionEventLike) => void;
-  start: () => void;
-}
-
-type SpeechRecognitionConstructor = new () => SpeechRecognitionInstanceLike;
-
-function speechRecognitionConstructor(): SpeechRecognitionConstructor | undefined {
-  if (typeof window === 'undefined') return undefined;
-  const w = window as typeof window & {
-    SpeechRecognition?: SpeechRecognitionConstructor;
-    webkitSpeechRecognition?: SpeechRecognitionConstructor;
-  };
-  return w.SpeechRecognition || w.webkitSpeechRecognition;
-}
+import { speechRecognitionConstructor } from './SpeechRecognition';
 export default function ChatInput({ position, heroSubtitleKey }: ChatInputProps) {
   const t = useT();
   const accountName = useAuthStore((s) => s.name);
