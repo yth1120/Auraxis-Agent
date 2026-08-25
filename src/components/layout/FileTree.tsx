@@ -1,5 +1,5 @@
-import { useCallback, useState, useEffect } from 'react';
-import { Tooltip, Popconfirm, Input, message } from 'antd';
+import { useCallback } from 'react';
+import { Tooltip, Popconfirm, Input } from 'antd';
 import {
   CaretRight as RightOutlined,
   Folder as FolderOutlined,
@@ -21,6 +21,7 @@ import type { FileActivity } from '../../types/chat';
 import { useFileTreeStore } from '../../stores/useFileTreeStore';
 import { useSettingsStore } from '../../stores/useSettingsStore';
 import { useT, type I18nKey } from '../../i18n';
+import { useFileTreeActions } from './useFileTreeActions';
 
 /* ── Agent activity badges (state-aware tree) ─────────── */
 const STATUS_BADGE: Record<FileActivity, { textKey: I18nKey; color: string }> = {
@@ -75,14 +76,6 @@ function fileIcon(name: string, isDir: boolean) {
   return <FileOutlined className="text-2xs text-faint" />;
 }
 
-/* ── Types ────────────────────────────────────────────── */
-
-interface ActiveOp {
-  type: 'createFile' | 'createFolder' | 'rename';
-  parentPath: string;
-  oldName?: string;
-}
-
 /* ── FileTree root ────────────────────────────────────── */
 
 interface FileTreeProps {
@@ -92,105 +85,26 @@ interface FileTreeProps {
 
 export default function FileTree({ onFileSelect }: FileTreeProps) {
   const t = useT();
-  const tree = useFileTreeStore((s) => s.tree);
   const loading = useFileTreeStore((s) => s.loading);
   const error = useFileTreeStore((s) => s.error);
-  const fetchTree = useFileTreeStore((s) => s.fetchTree);
   const expandedPaths = useFileTreeStore((s) => s.expandedPaths);
   const toggleExpand = useFileTreeStore((s) => s.toggleExpand);
   const fileStatus = useFileTreeStore((s) => s.fileStatus);
   const projectRoot = useSettingsStore((s) => s.projectPath);
-
-  const [hoveredPath, setHoveredPath] = useState<string | null>(null);
-  const [activeOp, setActiveOp] = useState<ActiveOp | null>(null);
-  const [inputValue, setInputValue] = useState('');
-
-  const refresh = useCallback(() => {
-    if (projectRoot) fetchTree(projectRoot);
-  }, [projectRoot, fetchTree]);
-
-  /* ── CRUD handlers ─────────────────────────────────── */
-
-  const handleDelete = useCallback(
-    async (targetPath: string) => {
-      const result = await window.electronAPI?.file.delete(targetPath, projectRoot ?? undefined);
-      if (result?.ok) {
-        message.success(t('ft.deletedMsg', { name: targetPath.split(/[/\\]/).pop() ?? '' }));
-        refresh();
-      } else {
-        message.error(result?.error || t('ft.deleteFailed'));
-      }
-    },
-    [refresh, projectRoot, t],
-  );
-
-  const handleStartRename = useCallback((targetPath: string, name: string) => {
-    setActiveOp({ type: 'rename', parentPath: targetPath, oldName: name });
-    setInputValue(name);
-  }, []);
-
-  const handleStartCreate = useCallback(
-    (parentPath: string, type: 'createFile' | 'createFolder') => {
-      // Ensure parent is expanded
-      if (!expandedPaths.has(parentPath)) {
-        toggleExpand(parentPath);
-      }
-      setActiveOp({ type, parentPath });
-      setInputValue('');
-    },
-    [expandedPaths, toggleExpand],
-  );
-
-  const handleFinishOp = useCallback(async () => {
-    if (!activeOp || !projectRoot || !inputValue.trim()) {
-      setActiveOp(null);
-      setInputValue('');
-      return;
-    }
-
-    const sep = projectRoot.includes('\\') ? '\\' : '/';
-    const newPath = `${activeOp.parentPath}${sep}${inputValue.trim()}`;
-
-    try {
-      if (activeOp.type === 'rename' && activeOp.oldName) {
-        const oldPath = `${activeOp.parentPath}${sep}${activeOp.oldName}`;
-        const result = await window.electronAPI?.file.rename(oldPath, newPath, projectRoot ?? undefined);
-        if (!result?.ok) {
-          message.error(result?.error || t('ft.renameFailed'));
-        }
-      } else if (activeOp.type === 'createFolder') {
-        const result = await window.electronAPI?.file.createFolder(newPath, projectRoot ?? undefined);
-        if (!result?.ok) {
-          message.error(result?.error || t('ft.createFolderFailed'));
-        }
-      } else if (activeOp.type === 'createFile') {
-        const result = await window.electronAPI?.file.createFile(newPath, projectRoot ?? undefined);
-        if (!result?.ok) {
-          message.error(result?.error || t('ft.createFileFailed'));
-        }
-      }
-    } finally {
-      setActiveOp(null);
-      setInputValue('');
-      refresh();
-    }
-  }, [activeOp, inputValue, projectRoot, refresh, t]);
-
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter') handleFinishOp();
-      if (e.key === 'Escape') {
-        setActiveOp(null);
-        setInputValue('');
-      }
-    },
-    [handleFinishOp],
-  );
-
-  /* ── Auto-fetch on mount and when projectRoot changes ── */
-  useEffect(() => {
-    if (projectRoot) fetchTree(projectRoot);
-  }, [projectRoot, fetchTree]);
+  const {
+    tree,
+    hoveredPath,
+    setHoveredPath,
+    activeOp,
+    inputValue,
+    setInputValue,
+    refresh,
+    handleDelete,
+    handleStartRename,
+    handleStartCreate,
+    handleFinishOp,
+    handleKeyDown,
+  } = useFileTreeActions(t);
 
   /* ── Render helpers ────────────────────────────────── */
 
@@ -396,6 +310,8 @@ export default function FileTree({ onFileSelect }: FileTreeProps) {
       handleKeyDown,
       onFileSelect,
       renderActions,
+      setHoveredPath,
+      setInputValue,
       t,
     ],
   );
