@@ -93,7 +93,7 @@ export function createAgent(params: {
         projectRoot: projectPath,
         priority: params.priority ?? 'normal',
         maxIterations: params.maxIterations ?? 200,
-        customTools: params.tools as any,
+        customTools: params.tools,
         // All agent creation paths honor the selected permission preset;
         // the legacy chatState.autoApprove flag no longer drives tasks.
         autoApprove: params.autoApprove ?? PERMISSION_PRESETS[settingsState.permissionPreset].autoApprove,

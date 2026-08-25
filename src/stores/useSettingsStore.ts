@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, type PersistOptions } from 'zustand/middleware';
 import {
   DEFAULT_PERMISSION_PRESET,
   PERMISSION_PRESETS,
@@ -9,6 +9,10 @@ import {
 } from '../types/advanced';
 
 export type CostCurrency = 'RMB' | 'USD';
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
 
 /** Hard sandbox boundary for Agent tasks (mirrors electron SandboxMode). */
 export type SandboxMode = 'read' | 'workspace-write' | 'full';
@@ -236,15 +240,14 @@ export const useSettingsStore = create<SettingsStore>()(
       name: 'auraxis-settings-storage',
       version: 2,
       // v2：联网搜索统一到 DeepSeek 官方原生搜索（旧默认 duckduckgo 迁移，用户显式选择的 exa/perplexity 保留）。
-      migrate: (persisted: any) => {
-        const state = persisted?.state ?? persisted ?? {};
-        if (!state.webSearchProvider || state.webSearchProvider === 'duckduckgo') {
+      migrate: (persisted: unknown) => {
+        const record = isRecord(persisted) ? persisted : {};
+        const stored = isRecord(record.state) ? record.state : record;
+        const state: Partial<SettingsStore> = { ...stored };
+        if (typeof state.webSearchProvider !== 'string' || state.webSearchProvider === 'duckduckgo') {
           state.webSearchProvider = 'deepseek';
         }
-        return {
-          ...(persisted ?? {}),
-          state,
-        };
+        return state;
       },
       partialize: (state) => ({
         defaultModel: state.defaultModel,
@@ -401,7 +404,7 @@ export const useSettingsStore = create<SettingsStore>()(
           }
         }
       },
-    },
+    } as PersistOptions<SettingsStore, Partial<SettingsStore>>,
   ),
 );
 

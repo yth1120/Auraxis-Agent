@@ -9,6 +9,7 @@ import { errorText } from '../errors';
 import { spawn, type ChildProcessWithoutNullStreams } from 'child_process';
 import { EventEmitter } from 'events';
 import { safeProcessEnv } from '../safe-env';
+import type { IPty } from 'node-pty';
 
 export interface PtySessionLike {
   write(data: string): void;
@@ -33,14 +34,15 @@ function defaultShell(): string {
 
 /** node-pty when available; pipe-based child process otherwise. */
 export const defaultPtyFactory: PtyFactory = (opts) => {
-  let PTY: any = null;
+  type PtyModule = { spawn: typeof import('node-pty').spawn };
+  let PTY: PtyModule | null = null;
   try {
-    PTY = require('node-pty');
+    PTY = require('node-pty') as PtyModule;
   } catch {
     PTY = null;
   }
   if (PTY) {
-    const pty = PTY.spawn(opts.command, [], {
+    const pty: IPty = PTY.spawn(opts.command, [], {
       name: 'xterm-256color',
       cols: opts.cols ?? 80,
       rows: opts.rows ?? 24,

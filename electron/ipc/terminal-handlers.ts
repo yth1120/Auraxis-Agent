@@ -5,10 +5,13 @@ import { errorText } from '../errors';
 import { BrowserWindow } from 'electron';
 import { secureHandle } from './trust';
 import { spawn, type ChildProcessWithoutNullStreams } from 'child_process';
+import type { IPty } from 'node-pty';
 import { safeProcessEnv } from '../safe-env';
 import { ptyRegistry } from './pty-tool';
 
-let PTY: any = null;
+type PtyModule = { spawn: typeof import('node-pty').spawn };
+
+let PTY: PtyModule | null = null;
 try {
   PTY = require('node-pty');
 } catch {
@@ -17,12 +20,12 @@ try {
 
 /** 测试注入：单元测试用可控的假 PTY 替换 node-pty，避免依赖真实系统 shell。 */
 export function setPtyModuleForTests(ptyModule: unknown): void {
-  PTY = ptyModule;
+  PTY = ptyModule as PtyModule | null;
 }
 
 interface TerminalSession {
   kind: 'pty' | 'pipe';
-  proc?: any;
+  proc?: IPty;
   child?: ChildProcessWithoutNullStreams;
   win: BrowserWindow;
 }
@@ -123,14 +126,14 @@ export function registerTerminalHandlers() {
   secureHandle('terminal:input', (_e, id: string, data: string) => {
     const s = sessions.get(id);
     if (!s) return { ok: false };
-    if (s.kind === 'pty') s.proc.write(data);
+    if (s.kind === 'pty') s.proc?.write(data);
     else s.child!.stdin.write(data);
     return { ok: true };
   });
 
   secureHandle('terminal:resize', (_e, id: string, cols: number, rows: number) => {
     const s = sessions.get(id);
-    if (s?.kind === 'pty') s.proc.resize(cols, rows);
+    if (s?.kind === 'pty') s.proc?.resize(cols, rows);
     return { ok: true };
   });
 
@@ -138,7 +141,7 @@ export function registerTerminalHandlers() {
     const s = sessions.get(id);
     if (!s) return { ok: false };
     try {
-      if (s.kind === 'pty') s.proc.kill();
+      if (s.kind === 'pty') s.proc?.kill();
       else s.child!.kill();
     } catch {
       /* best-effort */
@@ -213,7 +216,7 @@ export function cleanupTerminalSessions(): void {
   for (const id of [...sessions.keys()]) {
     try {
       const s = sessions.get(id)!;
-      if (s.kind === 'pty') s.proc.kill();
+      if (s.kind === 'pty') s.proc?.kill();
       else s.child!.kill();
     } catch {
       /* best-effort */

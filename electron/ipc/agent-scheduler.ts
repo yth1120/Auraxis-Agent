@@ -129,7 +129,9 @@ export function registerSchedulerIpc() {
 
   secureHandle('agent:setPriority', async (_e, agentId: string, priority: string) => {
     try {
-      return { ok: true, data: { set: scheduler.setPriority(agentId, priority as any) } };
+      const normalizedPriority =
+        priority === 'high' || priority === 'normal' || priority === 'low' ? priority : 'normal';
+      return { ok: true, data: { set: scheduler.setPriority(agentId, normalizedPriority) } };
     } catch (error: unknown) {
       return { ok: false, error: errorText(error) };
     }

@@ -277,7 +277,7 @@ export const useAppStore = create<AppStore>()(
       version: 3,
       // Version bumps must never brick hydration: keep old persisted values
       // (partialize defines what is persisted).
-      migrate: (persisted) => persisted as any,
+      migrate: (persisted) => persisted,
       partialize: (state) => ({
         sidebarCollapsed: state.sidebarCollapsed,
         sidebarMode: state.sidebarMode,

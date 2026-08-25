@@ -32,9 +32,11 @@ export function validatePlugin(obj: unknown): { valid: boolean; warnings: string
   }
   // Check tools have valid schema
   if (Array.isArray(p.tools)) {
-    for (const t of p.tools as any[]) {
+    for (const value of p.tools) {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) continue;
+      const t = value as Record<string, unknown>;
       if (!t.name || !t.description || !t.input_schema) {
-        warnings.push(`工具 "${t.name || '(未命名)'}" 缺少必填字段`);
+        warnings.push(`工具 "${String(t.name ?? '(未命名)')}" 缺少必填字段`);
       }
     }
   }

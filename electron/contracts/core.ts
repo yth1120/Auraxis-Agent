@@ -142,7 +142,8 @@ const API_IMAGE_PART_TYPES = new Set(['image_url', 'image', 'file']);
 const DEEPSEEK_IMAGE_MIME_TYPES = new Set(['jpeg', 'png', 'gif', 'webp']);
 
 function isApiImagePart(part: unknown): boolean {
-  return !!part && typeof part === 'object' && API_IMAGE_PART_TYPES.has(String((part as any).type));
+  const record = part && typeof part === 'object' && !Array.isArray(part) ? (part as Record<string, unknown>) : {};
+  return API_IMAGE_PART_TYPES.has(String(record.type ?? ''));
 }
 
 export function apiMessageText(content: ApiMessageContent): string {

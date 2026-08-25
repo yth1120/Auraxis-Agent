@@ -34,17 +34,25 @@ function parseEnvModels(): ModelDefinition[] {
       return [];
     }
     _cachedEnvModels = parsed
-      .filter((m: any) => m?.id && m?.name)
-      .map((m: any) => ({
-        id: m.id,
-        name: m.name,
+      .filter(
+        (m): m is Record<string, unknown> =>
+          !!m && typeof m === 'object' && !Array.isArray(m) && typeof m.id === 'string' && typeof m.name === 'string',
+      )
+      .map((m) => ({
+        id: m.id as string,
+        name: m.name as string,
         provider: 'deepseek' as const,
-        maxTokens: m.maxTokens,
-        contextWindow: m.contextWindow ?? m.context_window,
-        supportsImages: m.supportsImages ?? m.supports_images,
-        experimental: m.experimental ?? false,
-        apiBase: m.apiBase || m.api_base,
-        apiKey: m.apiKey || m.api_key,
+        maxTokens: typeof m.maxTokens === 'number' ? m.maxTokens : undefined,
+        contextWindow:
+          typeof m.contextWindow === 'number'
+            ? m.contextWindow
+            : typeof m.context_window === 'number'
+              ? m.context_window
+              : undefined,
+        supportsImages: m.supportsImages === true || m.supports_images === true,
+        experimental: m.experimental === true,
+        apiBase: typeof m.apiBase === 'string' ? m.apiBase : typeof m.api_base === 'string' ? m.api_base : undefined,
+        apiKey: typeof m.apiKey === 'string' ? m.apiKey : typeof m.api_key === 'string' ? m.api_key : undefined,
       }));
     return _cachedEnvModels;
   } catch {

@@ -28,7 +28,7 @@ function getMcpToolDefs(): ToolDef[] {
 
   const mcpTools = getAllMcpTools();
   cachedMcpTools = mcpTools.map((t) => ({
-    name: `${MCP_PREFIX}${t.name}` as any,
+    name: `${MCP_PREFIX}${t.name}`,
     description: `[MCP:${t.serverName}] ${t.description || `MCP tool: ${t.name}`}`,
     input_schema: (t.inputSchema || { type: 'object', properties: {}, required: [] }) as ToolDef['input_schema'],
     isConcurrencySafe: false,
@@ -269,7 +269,7 @@ export async function executeBatch(
         toolName: tc.name,
         input: tc.input,
         output: null,
-        error: `并发工具执行崩溃: ${(s.reason as any)?.message || String(s.reason)}`,
+        error: `并发工具执行崩溃: ${s.reason instanceof Error ? s.reason.message : String(s.reason)}`,
         durationMs: 0,
       });
     }

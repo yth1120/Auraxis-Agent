@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback, Fragment } from 'react';
 import { createPortal } from 'react-dom';
 import { Input, Modal } from 'antd';
+import type { InputRef } from 'antd';
 import {
   MagnifyingGlass as SearchOutlined,
   Lightning as ThunderboltOutlined,
@@ -66,7 +67,7 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
   const [fileHits, setFileHits] = useState<
     { name: string; path: string; isDirectory: boolean; snippet?: string; matchType?: 'name' | 'content' }[]
   >([]);
-  const inputRef = useRef<any>(null);
+  const inputRef = useRef<InputRef | null>(null);
 
   useEffect(() => {
     if (open) {

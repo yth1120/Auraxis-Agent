@@ -179,8 +179,10 @@ function formatOutput(name: ToolName, output: unknown): string {
     if (o.results && Array.isArray(o.results)) {
       return o.results
         .slice(0, 10)
-        .map((r: any) => {
-          if (typeof r === 'string') return r;
+        .map((value: unknown) => {
+          if (typeof value === 'string') return value;
+          const r =
+            value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
           return r.file ? `${r.file}:${r.line || ''} ${r.content || r.snippet || ''}` : JSON.stringify(r);
         })
         .join('\n');

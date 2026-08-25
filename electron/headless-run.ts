@@ -76,15 +76,16 @@ function toolSummary(toolName: string, input: Record<string, unknown>): string {
 }
 
 export async function runHeadlessTask(opts: HeadlessRunOptions): Promise<number> {
-  const settings = (await readSettings().catch(() => ({}))) as Record<string, any>;
+  const settings = (await readSettings().catch(() => ({}))) as Record<string, unknown>;
 
-  const model = opts.model || settings.defaultModel || 'deepseek-v4-pro';
+  const model =
+    opts.model || (typeof settings.defaultModel === 'string' ? settings.defaultModel : undefined) || 'deepseek-v4-pro';
   const apiKey =
     opts.apiKey ||
     (await resolveModelApiKey(model)) ||
     process.env.DEEPSEEK_API_KEY ||
     (await resolveCredential('DEEPSEEK_API_KEY').catch(() => undefined))?.value ||
-    settings.deepseekApiKey ||
+    (typeof settings.deepseekApiKey === 'string' ? settings.deepseekApiKey : undefined) ||
     '';
   if (!apiKey) {
     process.stderr.write(
@@ -94,16 +95,18 @@ export async function runHeadlessTask(opts: HeadlessRunOptions): Promise<number>
   }
 
   const apiBase = opts.apiBase || (await resolveModelApiBase(model));
-  const projectRoot = opts.project || settings.projectPath || process.cwd();
-  const preset = isPermissionPreset(settings.permissionPreset)
-    ? PERMISSION_PRESETS[settings.permissionPreset]
-    : undefined;
+  const projectRoot =
+    opts.project || (typeof settings.projectPath === 'string' ? settings.projectPath : undefined) || process.cwd();
+  const preset =
+    typeof settings.permissionPreset === 'string' && isPermissionPreset(settings.permissionPreset)
+      ? PERMISSION_PRESETS[settings.permissionPreset]
+      : undefined;
   const mode = opts.mode || preset?.mode || 'auto';
   const sandboxMode: SandboxMode =
     opts.sandbox ||
     preset?.sandboxMode ||
     (settings.sandboxMode === 'read' || settings.sandboxMode === 'workspace-write' || settings.sandboxMode === 'full'
-      ? settings.sandboxMode
+      ? (settings.sandboxMode as SandboxMode)
       : 'workspace-write');
   const autoApprove = opts.autoApprove !== undefined ? opts.autoApprove : preset ? preset.autoApprove : mode === 'auto';
   const json = opts.json === true;

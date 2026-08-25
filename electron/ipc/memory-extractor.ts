@@ -35,6 +35,10 @@ export interface ExtractorConfig {
   apiBase: string;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
 // ─── Helpers ───────────────────────────────────────────
 
 function buildConversationSummary(messages: { role: string; content: string }[]): string {
@@ -163,8 +167,8 @@ function parseExtractedJson(raw: string): ExtractedMemory[] {
     if (!Array.isArray(arr)) return [];
 
     return arr
-      .filter((item: any) => item && item.type && item.title && item.content)
-      .map((item: any) => ({
+      .filter((item): item is Record<string, unknown> => isRecord(item) && !!item.title && !!item.content)
+      .map((item) => ({
         type: item.type as ExtractedMemory['type'],
         title: String(item.title).slice(0, 100),
         content: String(item.content).slice(0, 500),

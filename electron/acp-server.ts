@@ -32,9 +32,13 @@ export interface AcpRpcMessage {
   jsonrpc: '2.0';
   id?: string | number | null;
   method?: string;
-  params?: any;
+  params?: Record<string, unknown>;
   result?: unknown;
   error?: { code: number; message: string };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
 interface AcpSession {
@@ -97,11 +101,12 @@ export class AcpServer {
         }
         case 'session/new': {
           const id = `acp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+          const params = msg.params ?? {};
           this.sessions.set(id, {
             id,
             seq: 0,
             abort: new AbortController(),
-            projectRoot: typeof msg.params?.cwd === 'string' ? msg.params.cwd : undefined,
+            projectRoot: typeof params.cwd === 'string' ? params.cwd : undefined,
           });
           this.send({ jsonrpc: '2.0', id: msg.id ?? null, result: { sessionId: id } });
           return;
@@ -113,8 +118,9 @@ export class AcpServer {
             this.send({ jsonrpc: '2.0', id: msg.id ?? null, error: { code: -32001, message: 'Session not found' } });
             return;
           }
-          const text = typeof p.prompt?.text === 'string' ? p.prompt.text : '';
-          const promptType: 'text' | 'plan' = p.prompt?.type === 'plan' ? 'plan' : 'text';
+          const prompt = isRecord(p.prompt) ? p.prompt : {};
+          const text = typeof prompt.text === 'string' ? prompt.text : '';
+          const promptType: 'text' | 'plan' = prompt.type === 'plan' ? 'plan' : 'text';
           if (!text.trim()) {
             this.send({
               jsonrpc: '2.0',
@@ -137,7 +143,7 @@ export class AcpServer {
             this.send({ jsonrpc: '2.0', id: msg.id ?? null, error: { code: -32001, message: 'Session not found' } });
             return;
           }
-          const filePath = this.resolveFilePath(session, p.filePath);
+          const filePath = this.resolveFilePath(session, typeof p.filePath === 'string' ? p.filePath : '');
           const content = await fs.readFile(filePath, 'utf8');
           this.send({ jsonrpc: '2.0', id: msg.id ?? null, result: { content } });
           return;
@@ -149,7 +155,7 @@ export class AcpServer {
             this.send({ jsonrpc: '2.0', id: msg.id ?? null, error: { code: -32001, message: 'Session not found' } });
             return;
           }
-          const filePath = this.resolveFilePath(session, p.filePath);
+          const filePath = this.resolveFilePath(session, typeof p.filePath === 'string' ? p.filePath : '');
           if (typeof p.content !== 'string') {
             this.send({ jsonrpc: '2.0', id: msg.id ?? null, error: { code: -32602, message: 'content is required' } });
             return;

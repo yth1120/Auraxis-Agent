@@ -395,13 +395,13 @@ export function registerCronIpc(): void {
 
   secureHandle(
     'cron:create',
-    async (_e: any, params: { name: string; prompt: string; cron: string; recurring: boolean }) => {
+    async (_e, params: { name: string; prompt: string; cron: string; recurring: boolean }) => {
       const result = createCronJob(params);
       return result;
     },
   );
 
-  secureHandle('cron:delete', async (_e: any, jobId: string) => {
+  secureHandle('cron:delete', async (_e, jobId: string) => {
     const result = deleteCronJob(jobId);
     return result;
   });

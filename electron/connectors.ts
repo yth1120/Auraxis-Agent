@@ -11,6 +11,10 @@ import { readSettings, writeSettings } from './ipc/settings-store';
 
 export type ConnectorKind = 'slack' | 'drive' | 'notion';
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
 export const CONNECTOR_KINDS: ConnectorKind[] = ['slack', 'drive', 'notion'];
 
 const CONNECTOR_FIELD: Record<ConnectorKind, string> = {
@@ -128,9 +132,9 @@ export async function slackListChannels(limit = 100): Promise<SlackChannel[]> {
   });
   if (r.data?.ok === false) throw new Error(r.data.error || 'Slack API 返回错误');
   const channels: unknown[] = Array.isArray(r.data?.channels) ? r.data.channels : [];
-  return channels.map((c: any) => ({
-    id: String(c.id || ''),
-    name: String(c.name || ''),
+  return channels.filter(isRecord).map((c) => ({
+    id: String(c.id ?? ''),
+    name: String(c.name ?? ''),
     isPrivate: c.is_private === true,
     memberCount: typeof c.num_members === 'number' ? c.num_members : undefined,
   }));
@@ -177,9 +181,9 @@ export async function driveList(query?: string, pageSize = 50): Promise<DriveFil
     timeout: 20_000,
   });
   const files: unknown[] = Array.isArray(r.data?.files) ? r.data.files : [];
-  return files.map((f: any) => ({
-    id: String(f.id || ''),
-    name: String(f.name || ''),
+  return files.filter(isRecord).map((f) => ({
+    id: String(f.id ?? ''),
+    name: String(f.name ?? ''),
     mimeType: typeof f.mimeType === 'string' ? f.mimeType : undefined,
     modifiedTime: typeof f.modifiedTime === 'string' ? f.modifiedTime : undefined,
   }));
@@ -241,11 +245,17 @@ export interface NotionPageSummary {
   objectType?: string;
 }
 
-function notionTitleOf(result: any): string {
+function notionTitleOf(result: unknown): string {
   try {
-    const titleProp = result?.properties?.title;
-    const arr = titleProp?.title ?? titleProp?.rich_text ?? [];
-    return arr.map((t: any) => t?.plain_text ?? '').join('');
+    if (!isRecord(result)) return '';
+    const properties = isRecord(result.properties) ? result.properties : {};
+    const titleProp = isRecord(properties.title) ? properties.title : {};
+    const arr = Array.isArray(titleProp.title)
+      ? titleProp.title
+      : Array.isArray(titleProp.rich_text)
+        ? titleProp.rich_text
+        : [];
+    return arr.map((item) => (isRecord(item) && typeof item.plain_text === 'string' ? item.plain_text : '')).join('');
   } catch {
     return '';
   }
@@ -266,9 +276,9 @@ export async function notionSearch(query?: string, pageSize = 10): Promise<Notio
     },
   );
   const results: unknown[] = Array.isArray(r.data?.results) ? r.data.results : [];
-  return results.map((x: any) => ({
-    id: String(x.id || ''),
-    title: notionTitleOf(x) || String(x.object || ''),
+  return results.filter(isRecord).map((x) => ({
+    id: String(x.id ?? ''),
+    title: notionTitleOf(x) || String(x.object ?? ''),
     url: typeof x.url === 'string' ? x.url : undefined,
     objectType: typeof x.object === 'string' ? x.object : undefined,
   }));

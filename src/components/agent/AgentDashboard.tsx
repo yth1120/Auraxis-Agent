@@ -235,7 +235,7 @@ function AgentCard({ agent }: { agent: AgentInfo }) {
         {activeTask && (
           <div className="text-xs text-text-secondary flex items-center overflow-hidden text-ellipsis whitespace-nowrap">
             <ExecutingIndicator size={14} className="mr-1" />
-            {(activeTask as any).activeForm || (activeTask as any).content}
+            {activeTask.activeForm || activeTask.content}
           </div>
         )}
 
@@ -341,7 +341,7 @@ export default function AgentDashboard() {
   const setMaxConcurrent = useAgentStore((s) => s.setMaxConcurrent);
   const maxConcurrent = useAgentStore((s) => s.maxConcurrent);
 
-  const [conflicts, setConflicts] = useState<any[]>([]);
+  const [conflicts, setConflicts] = useState<{ filePath?: string; agentIds?: string[] }[]>([]);
 
   useEffect(() => {
     refreshStates();
@@ -355,7 +355,7 @@ export default function AgentDashboard() {
       window.electronAPI?.conflict
         ?.getConflicts()
         .then((r) => {
-          if (r.ok) setConflicts((r.data as any[]) || []);
+          if (r.ok) setConflicts((r.data as { filePath?: string; agentIds?: string[] }[]) || []);
         })
         .catch((err) => {
           console.error('[AgentDashboard] getConflicts failed:', err?.message || err);

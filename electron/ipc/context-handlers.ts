@@ -56,11 +56,17 @@ export function registerContextHandlers() {
     ) => {
       assertTrustedIpcSender(event);
       try {
-        const settings: Record<string, any> = await readSettings();
-        const model = settings.selectedModel || 'deepseek-v4-pro';
+        const settings = await readSettings();
+        const model =
+          typeof settings.selectedModel === 'string' && settings.selectedModel
+            ? settings.selectedModel
+            : 'deepseek-v4-pro';
         const apiBase = await resolveModelApiBase(model);
         const apiKey =
-          (await resolveModelApiKey(model)) || settings.deepseekApiKey || process.env.DEEPSEEK_API_KEY || '';
+          (await resolveModelApiKey(model)) ||
+          (typeof settings.deepseekApiKey === 'string' ? settings.deepseekApiKey : '') ||
+          process.env.DEEPSEEK_API_KEY ||
+          '';
 
         const normalized = (params.messages ?? []).map((m) => ({
           role: m.role,

@@ -14,6 +14,10 @@ import crypto from 'crypto';
 import type { FtsHit } from './fts';
 import { errorRecord, errorText } from './errors';
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
 export interface SdkDeps {
   runAgent: (params: {
     prompt: string;
@@ -28,7 +32,7 @@ export interface SdkRequest {
   jsonrpc: '2.0';
   id: number | string;
   method: string;
-  params?: any;
+  params?: unknown;
 }
 
 export interface SdkResponse {
@@ -58,9 +62,10 @@ export async function handleSdkRequest(
   }
   // TCP 服务默认生成随机 token 并强制鉴权；stdio 模式仍可由父进程管控。
   const expectedToken = opts.token ?? process.env.AURAXIS_SDK_TOKEN;
-  const authorize = (params: any): boolean => {
+  const authorize = (params: unknown): boolean => {
     if (!expectedToken) return true;
-    const got = typeof params?.token === 'string' ? params.token : '';
+    const record = isRecord(params) ? params : {};
+    const got = typeof record.token === 'string' ? record.token : '';
     const a = Buffer.from(got);
     const b = Buffer.from(expectedToken);
     return a.length === b.length && crypto.timingSafeEqual(a, b);
@@ -71,7 +76,7 @@ export async function handleSdkRequest(
         return { jsonrpc: '2.0', id: req.id, result: { pong: true, time: Date.now() } };
 
       case 'agent.run': {
-        const p = req.params ?? {};
+        const p = isRecord(req.params) ? req.params : {};
         if (!authorize(p)) throw new SdkError(-32603, '未授权：缺少或错误的 SDK token');
         if (typeof p.prompt !== 'string' || !p.prompt.trim()) {
           throw new SdkError(-32602, 'prompt 必填');
@@ -87,7 +92,7 @@ export async function handleSdkRequest(
       }
 
       case 'session.search': {
-        const p = req.params ?? {};
+        const p = isRecord(req.params) ? req.params : {};
         if (!authorize(p)) throw new SdkError(-32603, '未授权：缺少或错误的 SDK token');
         if (typeof p.query !== 'string' || !p.query.trim()) {
           throw new SdkError(-32602, 'query 必填');

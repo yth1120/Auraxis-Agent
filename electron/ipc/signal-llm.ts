@@ -53,8 +53,17 @@ export async function detectLlmSignals(
     );
     if (!Array.isArray(parsed)) return [];
     return parsed
-      .filter((x: any) => x && VALID_TYPES.includes(x.type) && typeof x.value === 'string' && x.value)
-      .map((x: any) => ({
+      .filter(
+        (x): x is Record<string, unknown> =>
+          !!x &&
+          typeof x === 'object' &&
+          !Array.isArray(x) &&
+          typeof x.type === 'string' &&
+          VALID_TYPES.includes(x.type as SignalType) &&
+          typeof x.value === 'string' &&
+          !!x.value,
+      )
+      .map((x) => ({
         id: signalId(evidenceId, x.type as SignalType, String(x.value)),
         evidence_id: evidenceId,
         signal_type: x.type as SignalType,

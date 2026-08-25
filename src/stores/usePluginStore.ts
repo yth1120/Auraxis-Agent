@@ -58,7 +58,7 @@ export const usePluginStore = create<PluginStore>()(
     {
       name: 'auraxis-plugin-storage',
       version: 1,
-      migrate: (persisted) => persisted as any,
+      migrate: (persisted) => persisted,
       partialize: (s) => ({
         installedPlugins: s.installedPlugins,
         seededBuiltins: s.seededBuiltins,

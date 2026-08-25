@@ -69,12 +69,24 @@ async function loadGitignore(rootDir: string): Promise<string[]> {
   }
 }
 
-async function buildDirectoryTree(dirPath: string, depth: number, basePath: string, ignorePatterns: string[]) {
+interface DirectoryTree {
+  name: string;
+  path: string;
+  isDirectory: boolean;
+  children?: DirectoryTree[];
+}
+
+async function buildDirectoryTree(
+  dirPath: string,
+  depth: number,
+  basePath: string,
+  ignorePatterns: string[],
+): Promise<DirectoryTree | null> {
   if (depth > 6) return null;
 
   try {
     const entries = await readdir(dirPath, { withFileTypes: true });
-    const children: any[] = [];
+    const children: DirectoryTree[] = [];
 
     const sorted = entries.sort((a, b) => {
       if (a.isDirectory() && !b.isDirectory()) return -1;

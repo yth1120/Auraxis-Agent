@@ -204,7 +204,7 @@ async function connectServer(serverId: string): Promise<MCPStatus> {
 
     // Discover tools
     const toolsResult = (await sendJsonRpc(conn, 'tools/list')) as { tools?: MCPToolDef[] };
-    conn.tools = (toolsResult.tools || []).map((t: any) => ({
+    conn.tools = (toolsResult.tools || []).map((t) => ({
       name: t.name,
       description: t.description || '',
       inputSchema: t.inputSchema || {},

@@ -22,6 +22,10 @@ interface CoverageData {
   modules: Record<string, ModuleCoverage>;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
 function getColor(pct: number): string {
   if (pct > 80) return 'var(--color-success)';
   if (pct > 60) return 'var(--color-warning)';
@@ -30,21 +34,31 @@ function getColor(pct: number): string {
 
 /** vitest v8 json-summary 结构：{ total: { lines/statements/... }, <file>: {...} } */
 function extractSummary(d: unknown): CoverageData | null {
-  const obj = (d ?? {}) as Record<string, any>;
-  const total = obj.total && typeof obj.total === 'object' ? obj.total : null;
-  if (!total?.lines || typeof total.lines.pct !== 'number') return null;
+  const obj = d && typeof d === 'object' && !Array.isArray(d) ? (d as Record<string, unknown>) : {};
+  const total = isRecord(obj.total) ? obj.total : {};
+  const metric = (value: unknown): MetricCoverage | undefined =>
+    value &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    typeof (value as Record<string, unknown>).pct === 'number'
+      ? (value as MetricCoverage)
+      : undefined;
+  const lines = metric(total.lines);
+  if (!lines) return null;
   const modules: Record<string, ModuleCoverage> = {};
   for (const [name, m] of Object.entries(obj)) {
     if (name === 'total') continue;
-    if (m?.lines && typeof m.lines.pct === 'number') {
-      modules[name] = { lines: m.lines };
+    const module = m && typeof m === 'object' && !Array.isArray(m) ? (m as Record<string, unknown>) : {};
+    const moduleLines = metric(module.lines);
+    if (moduleLines) {
+      modules[name] = { lines: moduleLines };
     }
   }
   return {
-    lines: total.lines,
-    statements: total.statements,
-    branches: total.branches,
-    functions: total.functions,
+    lines,
+    statements: metric(total.statements),
+    branches: metric(total.branches),
+    functions: metric(total.functions),
     modules,
   };
 }

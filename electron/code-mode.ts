@@ -115,9 +115,10 @@ parentPort.on('message', (m) => {
 (async () => {
   try {
     try {
-      (globalThis as any).require = undefined;
-      (globalThis as any).process = undefined;
-      (globalThis as any).Buffer = undefined;
+      const runtimeGlobal = globalThis as typeof globalThis & { require?: unknown; process?: unknown; Buffer?: unknown };
+      runtimeGlobal.require = undefined;
+      runtimeGlobal.process = undefined;
+      runtimeGlobal.Buffer = undefined;
     } catch { /* best-effort */ }
     const fn = new Function('tools', 'console', '"use strict"; return (async () => {\\n' + ${body} + '\\n})();');
     const result = await fn(tools, console);
@@ -280,11 +281,13 @@ export async function runCodeProgram(
       });
     }, timeoutMs);
 
-    worker.on('message', (m: any) => {
-      if (!m) return;
+    worker.on('message', (message: unknown) => {
+      if (!message || typeof message !== 'object' || Array.isArray(message)) return;
+      const m = message as Record<string, unknown>;
       if (m.k === 'log') appendStdout(String(m.line ?? ''));
-      else if (m.k === 'call' && Number.isInteger(m.id) && typeof m.name === 'string') {
-        const input = m.input && typeof m.input === 'object' && !Array.isArray(m.input) ? m.input : {};
+      else if (m.k === 'call' && typeof m.id === 'number' && Number.isInteger(m.id) && typeof m.name === 'string') {
+        const input =
+          m.input && typeof m.input === 'object' && !Array.isArray(m.input) ? (m.input as Record<string, unknown>) : {};
         queue.push({ id: m.id, name: m.name, input });
         pump();
       } else if (m.k === 'done') {

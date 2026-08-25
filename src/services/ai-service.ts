@@ -14,8 +14,8 @@ interface ChatRequest {
 
 function getApiUrl(): string {
   try {
-    const viteEnv = (import.meta as any).env;
-    if (viteEnv?.VITE_DEEPSEEK_API_BASE) return viteEnv.VITE_DEEPSEEK_API_BASE;
+    const viteEnv = (import.meta as ImportMeta & { env?: Record<string, unknown> }).env;
+    if (typeof viteEnv?.VITE_DEEPSEEK_API_BASE === 'string') return viteEnv.VITE_DEEPSEEK_API_BASE;
   } catch {
     /* not Vite */
   }
@@ -28,7 +28,9 @@ export async function streamChat(
   signal?: AbortSignal,
   onThinking?: (text: string) => void,
 ): Promise<void> {
-  const apiKey = getApiKeyFromStore() || ((import.meta as any).env?.VITE_DEEPSEEK_API_KEY as string | undefined) || '';
+  const viteEnv = (import.meta as ImportMeta & { env?: Record<string, unknown> }).env;
+  const viteKey = typeof viteEnv?.VITE_DEEPSEEK_API_KEY === 'string' ? viteEnv.VITE_DEEPSEEK_API_KEY : undefined;
+  const apiKey = getApiKeyFromStore() || viteKey || '';
 
   if (!apiKey) {
     throw new Error('Missing DeepSeek API key. Please set it in settings.');

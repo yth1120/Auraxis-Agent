@@ -91,8 +91,12 @@ export function runForkedSubagent(opts: ForkedSubagentOptions): Promise<ForkedSu
     child.stdout?.on('data', (d: Buffer) => append(out, d.toString('utf8')));
     child.stderr?.on('data', (d: Buffer) => append(err, d.toString('utf8')));
 
-    child.on('error', (e: any) => {
-      finish({ ok: false, unavailable: true, error: `分叉子代理启动失败: ${e?.message ?? String(e)}` });
+    child.on('error', (e: unknown) => {
+      finish({
+        ok: false,
+        unavailable: true,
+        error: `分叉子代理启动失败: ${e instanceof Error ? e.message : String(e)}`,
+      });
     });
 
     child.on('close', (code) => {

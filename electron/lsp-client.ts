@@ -51,6 +51,18 @@ export interface LspQueryResult {
   unavailable?: boolean;
 }
 
+interface LspRpcMessage {
+  id?: string | number | null;
+  result?: unknown;
+  error?: unknown;
+  method?: string;
+  params?: unknown;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
 function parseServerCommand(envValue: string | undefined): string[] | null {
   if (!envValue) return null;
   try {
@@ -62,7 +74,7 @@ function parseServerCommand(envValue: string | undefined): string[] | null {
   return envValue.split(/\s+/).filter(Boolean);
 }
 
-function createMessageReader(onMessage: (msg: any) => void): (chunk: Buffer) => void {
+function createMessageReader(onMessage: (msg: LspRpcMessage) => void): (chunk: Buffer) => void {
   let buf = Buffer.alloc(0);
   return (chunk: Buffer) => {
     buf = Buffer.concat([buf, chunk]);
@@ -88,19 +100,30 @@ function createMessageReader(onMessage: (msg: any) => void): (chunk: Buffer) => 
   };
 }
 
-function normalize(action: LspAction, result: any): LspQueryResult {
+function normalize(action: LspAction, result: unknown): LspQueryResult {
+  const record = isRecord(result) ? result : {};
   if (action === 'hover') {
-    const contents = Array.isArray(result?.contents)
-      ? result.contents.map((c: any) => (typeof c === 'string' ? c : (c?.value ?? ''))).join('\n')
-      : typeof result?.contents === 'string'
-        ? result.contents
-        : (result?.contents?.value ?? '');
-    return { ok: true, hover: { contents, range: result?.range } };
+    const contents = Array.isArray(record.contents)
+      ? record.contents
+          .map((item) => {
+            if (typeof item === 'string') return item;
+            return isRecord(item) && typeof item.value === 'string' ? item.value : '';
+          })
+          .join('\n')
+      : typeof record.contents === 'string'
+        ? record.contents
+        : isRecord(record.contents) && typeof record.contents.value === 'string'
+          ? record.contents.value
+          : '';
+    const range = isRecord(record.range) ? (record.range as unknown as LspRange) : undefined;
+    return { ok: true, hover: { contents, range } };
   }
   const raw = Array.isArray(result) ? result : result ? [result] : [];
   const locations: LspLocation[] = raw
-    .filter((l: any) => l && l.uri && l.range)
-    .map((l: any) => ({ uri: l.uri, range: l.range }));
+    .filter(
+      (item): item is Record<string, unknown> => isRecord(item) && typeof item.uri === 'string' && isRecord(item.range),
+    )
+    .map((item) => ({ uri: item.uri as string, range: item.range as unknown as LspRange }));
   return { ok: true, locations };
 }
 
@@ -142,7 +165,7 @@ export function queryLsp(input: LspQueryInput): Promise<LspQueryResult> {
     }, input.timeoutMs ?? 10_000);
 
     const uri = pathToFileURL(input.filePath).href;
-    const send = (obj: any) => {
+    const send = (obj: Record<string, unknown>) => {
       try {
         const body = JSON.stringify(obj);
         child.stdin.write(`Content-Length: ${Buffer.byteLength(body, 'utf8')}\r\n\r\n${body}`);
@@ -151,7 +174,7 @@ export function queryLsp(input: LspQueryInput): Promise<LspQueryResult> {
       }
     };
 
-    const onMessage = (msg: any) => {
+    const onMessage = (msg: LspRpcMessage) => {
       if (msg?.id === 1 && msg?.result) {
         send({ jsonrpc: '2.0', method: 'initialized', params: {} });
         send({
@@ -174,15 +197,19 @@ export function queryLsp(input: LspQueryInput): Promise<LspQueryResult> {
               : input.action === 'implementation'
                 ? 'textDocument/implementation'
                 : 'textDocument/hover';
-        const params: any = { textDocument: { uri }, position: input.position };
+        const params: Record<string, unknown> = { textDocument: { uri }, position: input.position };
         if (input.action === 'references') params.context = { includeDeclaration: true };
         send({ jsonrpc: '2.0', id: 2, method, params });
       } else if (msg?.id === 2) {
         if (settled) return;
         settled = true;
         if (msg.error) {
+          const errorValue = isRecord(msg.error) ? msg.error : {};
           cleanup();
-          resolve({ ok: false, error: msg.error.message ?? 'LSP 请求失败' });
+          resolve({
+            ok: false,
+            error: typeof errorValue.message === 'string' ? errorValue.message : 'LSP 请求失败',
+          });
           return;
         }
         const normalized = normalize(input.action, msg.result);
@@ -192,14 +219,15 @@ export function queryLsp(input: LspQueryInput): Promise<LspQueryResult> {
     };
 
     child.stdout.on('data', createMessageReader(onMessage));
-    child.on('error', (e: any) => {
+    child.on('error', (e: unknown) => {
       if (settled) return;
       settled = true;
       cleanup();
+      const code = e instanceof Error ? (e as NodeJS.ErrnoException).code : undefined;
       resolve({
         ok: false,
-        unavailable: e?.code === 'ENOENT',
-        error: e?.message ?? String(e),
+        unavailable: code === 'ENOENT',
+        error: e instanceof Error ? e.message : String(e),
       });
     });
     child.on('exit', () => {

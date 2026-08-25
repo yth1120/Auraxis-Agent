@@ -498,7 +498,7 @@ export const useSessionStore = create<SessionStore>()(
     {
       name: 'auraxis-session-storage',
       version: 1,
-      migrate: (persisted) => persisted as any,
+      migrate: (persisted) => persisted,
       partialize: (state) => ({
         // SQLite projection cache makes larger local caches cheap; keep more
         // history so the sidebar and offline mode stay useful.

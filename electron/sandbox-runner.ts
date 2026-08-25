@@ -4,7 +4,7 @@
  * streamed through the inherited stdio pipes so the existing Bash UX works.
  */
 import { errorText } from './errors';
-import { spawn } from 'child_process';
+import { spawn, type ChildProcess } from 'child_process';
 import { existsSync } from 'fs';
 import { promises as fs } from 'fs';
 import os from 'os';
@@ -61,7 +61,8 @@ export function sandboxScriptPath(backend: SandboxBackend = sandboxBackend()): s
         : backend === 'linux'
           ? 'sandbox-linux.sh'
           : 'sandbox-macos.sh';
-  const appPath = (app as any)?.getAppPath?.() ?? process.cwd();
+  const appPath =
+    typeof app !== 'undefined' && app && typeof app.getAppPath === 'function' ? app.getAppPath() : process.cwd();
   const dev = path.join(appPath, 'electron', fileName);
   if (existsSync(dev)) return dev;
   // Direct-main.js launches (Playwright smoke/e2e) resolve appPath to
@@ -69,7 +70,8 @@ export function sandboxScriptPath(backend: SandboxBackend = sandboxBackend()): s
   // still available without an env override.
   const cwdDev = path.join(process.cwd(), 'electron', fileName);
   if (cwdDev !== dev && existsSync(cwdDev)) return cwdDev;
-  const packaged = path.join((process as any).resourcesPath ?? '', 'sandbox', fileName);
+  const runtimeProcess = process as NodeJS.Process & { resourcesPath?: string };
+  const packaged = path.join(runtimeProcess.resourcesPath ?? '', 'sandbox', fileName);
   if (existsSync(packaged)) return packaged;
   return null;
 }
@@ -171,7 +173,7 @@ export async function runSandboxedCommand(opts: SandboxCommandOptions): Promise<
 
       // Fail closed: if the native launcher cannot start, the command must be
       // rejected instead of silently falling back to an unsandboxed spawn.
-      let currentChild = child;
+      let currentChild: ChildProcess | null = child;
 
       let stdout = '';
       let stderr = '';
@@ -185,24 +187,24 @@ export async function runSandboxedCommand(opts: SandboxCommandOptions): Promise<
         if (settled) return;
         timedOut = true;
         try {
-          if (process.platform !== 'win32' && currentChild.pid) {
-            process.kill(-currentChild.pid, 'SIGKILL');
+          if (process.platform !== 'win32' && currentChild!.pid) {
+            process.kill(-currentChild!.pid, 'SIGKILL');
           } else {
-            currentChild.kill();
+            currentChild!.kill();
           }
         } catch {
           /* gone */
         }
         forceKillTimer = setTimeout(() => {
           try {
-            if (currentChild.pid && isWinBackend) {
+            if (currentChild!.pid && isWinBackend) {
               // AppContainer backend: the Job Object already kills the whole
               // tree when the launcher dies, and /T would also kill the
               // detached ACL-restore watcher. Only force-kill the launcher.
               const taskkillArgs =
                 backend === 'appcontainer'
-                  ? ['/F', '/PID', String(currentChild.pid)]
-                  : ['/F', '/PID', String(currentChild.pid), '/T'];
+                  ? ['/F', '/PID', String(currentChild!.pid)]
+                  : ['/F', '/PID', String(currentChild!.pid), '/T'];
               spawn('taskkill', taskkillArgs, { windowsHide: true, shell: true });
             }
           } catch {
@@ -229,7 +231,7 @@ export async function runSandboxedCommand(opts: SandboxCommandOptions): Promise<
         void cleanupWriteDir().then(() => resolve(res));
       };
 
-      const attachChild = (proc: any) => {
+      const attachChild = (proc: ChildProcess) => {
         currentChild = proc;
         proc.stdout?.on('data', (d: Buffer) => {
           const chunk = stdoutDecoder.decode(d);
@@ -241,11 +243,11 @@ export async function runSandboxedCommand(opts: SandboxCommandOptions): Promise<
           if (stderr.length < 50_000) stderr += chunk;
           opts.onStderr?.(chunk);
         });
-        proc.on('error', (e: any) =>
+        proc.on('error', (e: unknown) =>
           finish({
             supported: true,
             exitCode: null,
-            error: `沙箱启动失败: ${e?.message ?? e}`,
+            error: `沙箱启动失败: ${e instanceof Error ? e.message : String(e)}`,
           }),
         );
         proc.on('close', (code: number | null) => {
@@ -279,10 +281,10 @@ export async function runSandboxedCommand(opts: SandboxCommandOptions): Promise<
         () => {
           if (settled) return;
           try {
-            if (process.platform !== 'win32' && currentChild.pid) {
-              process.kill(-currentChild.pid, 'SIGKILL');
+            if (process.platform !== 'win32' && currentChild!.pid) {
+              process.kill(-currentChild!.pid, 'SIGKILL');
             } else {
-              currentChild.kill();
+              currentChild!.kill();
             }
           } catch {
             /* gone */

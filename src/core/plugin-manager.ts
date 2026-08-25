@@ -16,6 +16,10 @@ import { loadPlugin, scanForRisks, validatePlugin, getCapabilitySummary } from '
 
 const extraHooks: NonNullable<Plugin['hooks']>[] = [];
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
 // ─── Plugin Manager ────────────────────────────────────
 
 class PluginManager {
@@ -43,7 +47,7 @@ class PluginManager {
     if (!valid) riskLines.push(...warnings.map((w) => `⚠ ${w}`));
 
     // Scan for dangerous patterns (from source at install-time)
-    const risks = (plugin as any).__scannedRisks as string[] | undefined;
+    const risks = plugin.__scannedRisks;
     if (risks && risks.length > 0) {
       riskLines.push('检测到潜在风险:');
       riskLines.push(...risks.map((r) => `• ${r}`));
@@ -90,7 +94,7 @@ class PluginManager {
     if (!plugin) return false;
 
     // Attach scanned risks to the plugin for the install dialog
-    (plugin as any).__scannedRisks = risks;
+    plugin.__scannedRisks = risks;
 
     return this.install(plugin, filePath);
   }
@@ -123,8 +127,11 @@ class PluginManager {
     for (const info of store.installedPlugins) {
       if (!info.enabled) continue;
       try {
-        const mod = (window as any).__pluginModules?.[info.id];
-        if (mod?.default) {
+        const pluginWindow = window as typeof window & {
+          __pluginModules?: Record<string, { default?: unknown }>;
+        };
+        const mod = pluginWindow.__pluginModules?.[info.id];
+        if (isRecord(mod) && mod.default) {
           const plugin = mod.default as Plugin;
           store.setActivePlugins([...store.activePlugins.filter((p) => p.id !== plugin.id), plugin]);
           this.activatePlugin(plugin);
@@ -152,10 +159,10 @@ class PluginManager {
     ...args: Parameters<NonNullable<NonNullable<Plugin['hooks']>[K]>>
   ) {
     for (const h of extraHooks) {
-      const fn = h[hook] as any;
-      if (fn) {
+      const fn = h[hook];
+      if (typeof fn === 'function') {
         try {
-          fn(...args);
+          (fn as (...args: unknown[]) => void)(...args);
         } catch {
           /* non-fatal */
         }

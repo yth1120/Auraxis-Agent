@@ -38,7 +38,7 @@ import {
 import { captureEvidenceFromSession } from './memory-evidence';
 import { detectAndStoreSignals } from './signal-rules';
 import { validateBeliefAnchors } from './belief-validation';
-import { getReadTrace, readForQuery } from './memory-read';
+import { getReadTrace, readForQuery, type ReadQueryOptions } from './memory-read';
 import { buildScopeGraph, filterGraphByRole, roleForAgent, type AgentRole } from './memory-graph';
 import { resolveModelApiBase, resolveModelApiKey } from './model-config';
 import { readSettings } from './settings-store';
@@ -284,7 +284,7 @@ export function registerMemoryIpc() {
     }
   });
 
-  secureHandle('memory:readForQuery', async (_event, projectPath: string, query: string, opts?: any) => {
+  secureHandle('memory:readForQuery', async (_event, projectPath: string, query: string, opts?: ReadQueryOptions) => {
     try {
       return { ok: true, data: readForQuery(query, projectPath, opts) };
     } catch (error: unknown) {

@@ -136,24 +136,36 @@ export async function runInlineWorkflow(
     const onAbort = () => settle({ ok: false, error: '工作流脚本被取消' });
     ctx.abortSignal?.addEventListener('abort', onAbort, { once: true });
 
-    worker.on('message', (msg: any) => {
+    worker.on('message', (message: unknown) => {
+      if (!message || typeof message !== 'object' || Array.isArray(message)) return;
+      const msg = message as Record<string, unknown>;
       if (msg?.type === 'rpc') {
-        const fn = (api as Record<string, unknown>)[msg.method];
+        const method = typeof msg.method === 'string' ? msg.method : '';
+        const fn = (api as Record<string, unknown>)[method];
         if (typeof fn !== 'function') {
-          worker.postMessage({ id: msg.id, ok: false, error: `未知工作流方法: ${msg.method}` });
+          worker.postMessage({ id: msg.id, ok: false, error: `未知工作流方法: ${method}` });
           return;
         }
-        Promise.resolve((fn as (...args: unknown[]) => unknown)(...(msg.args || [])))
+        const args = Array.isArray(msg.args) ? msg.args : [];
+        Promise.resolve((fn as (...args: unknown[]) => unknown)(...args))
           .then((value) => worker.postMessage({ id: msg.id, ok: true, result: value }))
-          .catch((e: any) => worker.postMessage({ id: msg.id, ok: false, error: e?.message || String(e) }));
+          .catch((e: unknown) =>
+            worker.postMessage({
+              id: msg.id,
+              ok: false,
+              error: e instanceof Error ? e.message : String(e),
+            }),
+          );
         return;
       }
       if (msg?.type === 'log') {
-        ctx.log(String(msg.line));
+        ctx.log(String(msg.line ?? ''));
         return;
       }
       if (msg?.type === 'result') settle({ ok: true, output: msg.output });
-      if (msg?.type === 'error') settle({ ok: false, error: `工作流脚本执行失败: ${msg.error}` });
+      if (msg?.type === 'error') {
+        settle({ ok: false, error: `工作流脚本执行失败: ${String(msg.error ?? '未知错误')}` });
+      }
     });
 
     worker.on('error', (err) => settle({ ok: false, error: `工作流 worker 错误: ${err.message}` }));

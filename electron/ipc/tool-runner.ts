@@ -298,7 +298,7 @@ export async function runToolBatch(
             toolName: tc.name,
             input: tc.input,
             output: null,
-            error: `并发执行崩溃: ${String((s as any).reason)}`,
+            error: `并发执行崩溃: ${String(s.reason)}`,
             durationMs: 0,
           };
           resultMap.set(tc.index, emergency);

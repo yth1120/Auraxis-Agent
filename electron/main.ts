@@ -281,7 +281,7 @@ app.whenReady().then(async () => {
   // would otherwise lose it — undo backups exist on disk but entries are
   // only replayed after init).
   try {
-    const bootSettings: any = await (await import('./ipc/settings-store')).readSettings();
+    const bootSettings = await (await import('./ipc/settings-store')).readSettings();
     if (typeof bootSettings?.projectPath === 'string' && bootSettings.projectPath) {
       const { undoManager } = await import('./ipc/undo-manager');
       await undoManager.init(bootSettings.projectPath);
@@ -345,7 +345,7 @@ app.whenReady().then(async () => {
           let root = projectRoot || '';
           if (!root) {
             try {
-              const s: any = await (await import('./ipc/settings-store')).readSettings();
+              const s = await (await import('./ipc/settings-store')).readSettings();
               root = typeof s?.projectPath === 'string' ? s.projectPath : '';
             } catch {
               /* settings unavailable */
@@ -382,7 +382,7 @@ app.whenReady().then(async () => {
         let root = projectRoot || '';
         if (!root) {
           try {
-            const s: any = await (await import('./ipc/settings-store')).readSettings();
+            const s = await (await import('./ipc/settings-store')).readSettings();
             root = typeof s?.projectPath === 'string' ? s.projectPath : '';
           } catch {
             /* settings unavailable */

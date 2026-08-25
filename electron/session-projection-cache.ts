@@ -83,20 +83,26 @@ export interface SqliteLike {
   close?: () => void;
 }
 
-function nodeRequire(): (id: string) => any {
+type SqliteModule = { DatabaseSync?: new (path: string) => SqliteLike } | ((path: string) => SqliteLike);
+
+function nodeRequire(): (id: string) => unknown {
   // `require` exists in CJS; `(0, eval)('require')` recovers it in ESM.
-  return typeof require === 'function' ? require : (0, eval)('require');
+  return typeof require === 'function'
+    ? (require as (id: string) => unknown)
+    : ((0, eval)('require') as (id: string) => unknown);
 }
 
-let sqliteModule: any = undefined;
+let sqliteModule: SqliteModule | null | undefined = undefined;
 
-export function loadSqliteModule(): any {
+export function loadSqliteModule(): SqliteModule | null {
   if (sqliteModule !== undefined) return sqliteModule;
   try {
-    sqliteModule = nodeRequire()('node:sqlite');
+    const mod = nodeRequire()('node:sqlite');
+    sqliteModule = mod && (typeof mod === 'object' || typeof mod === 'function') ? (mod as SqliteModule) : null;
   } catch {
     try {
-      sqliteModule = nodeRequire()('better-sqlite3');
+      const mod = nodeRequire()('better-sqlite3');
+      sqliteModule = mod && (typeof mod === 'object' || typeof mod === 'function') ? (mod as SqliteModule) : null;
     } catch {
       sqliteModule = null;
     }
@@ -112,11 +118,13 @@ export function openSqlite(dbPath: string): SqliteLike | null {
   const mod = loadSqliteModule();
   if (!mod) return null;
   try {
-    if (typeof mod.DatabaseSync === 'function') {
-      return new mod.DatabaseSync(dbPath) as SqliteLike;
+    const databaseSync = typeof mod === 'object' && 'DatabaseSync' in mod ? mod.DatabaseSync : undefined;
+    if (typeof databaseSync === 'function') {
+      return new (databaseSync as new (path: string) => SqliteLike)(dbPath);
     }
     if (typeof mod === 'function') {
-      return new mod(dbPath) as SqliteLike; // better-sqlite3
+      const constructor = mod as unknown as new (path: string) => SqliteLike;
+      return new constructor(dbPath); // better-sqlite3
     }
   } catch {
     /* corrupt/locked database — caller falls back to JSON */

@@ -22,7 +22,7 @@ export interface CommandContext {
 export interface PluginHooks {
   afterAgentStart?: (agentId: string) => void;
   beforeToolExecute?: (toolName: string, input: Record<string, unknown>) => void;
-  afterSessionEnd?: (messages: any[]) => void;
+  afterSessionEnd?: (messages: unknown[]) => void;
   onAppReady?: () => void;
 }
 
@@ -48,6 +48,8 @@ export interface Plugin {
   ui?: PluginUI;
   /** Permissions this plugin requires */
   permissions?: string[];
+  /** Transient install-time risk scan metadata (never persisted). */
+  __scannedRisks?: string[];
 }
 
 // ─── Installed Plugin State ────────────────────────────

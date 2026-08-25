@@ -19,6 +19,10 @@ interface StatsData {
   heatmapDays?: HeatmapDay[];
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
 function cssVar(name: string, fallback: string): string {
   if (typeof document === 'undefined') return fallback;
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
@@ -139,9 +143,13 @@ export default function StatsHeatmap() {
     chartRef.current = chart;
     chart.setOption({
       tooltip: {
-        formatter: (params: any) => {
-          const [date, level] = params.value;
-          const levelKey = `heatmap.level${Math.max(0, Math.min(4, Number(level) || 0))}` as I18nKey;
+        formatter: (params: unknown) => {
+          const first = Array.isArray(params) ? params[0] : params;
+          const record = isRecord(first) ? first : {};
+          const value = Array.isArray(record.value) ? record.value : [];
+          const date = String(value[0] ?? '');
+          const level = Number(value[1] ?? 0);
+          const levelKey = `heatmap.level${Math.max(0, Math.min(4, level || 0))}` as I18nKey;
           return `<b>${date}</b><br/>${t('heatmap.activity', { level: t(levelKey) })}`;
         },
         backgroundColor: bgElevated,

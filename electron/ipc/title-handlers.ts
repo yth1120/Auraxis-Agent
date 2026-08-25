@@ -50,14 +50,18 @@ export async function generateSessionTitle(
   opts: { model?: string; apiKey?: string; apiBase?: string; adapter?: string } = {},
 ): Promise<string | null> {
   if (!messages || messages.length === 0) return null;
-  const settings = (await readSettings().catch(() => ({}))) as Record<string, any>;
-  const model = opts.model || process.env.AURAXIS_TITLE_MODEL || settings.titleModel || 'deepseek-v4-flash';
+  const settings = (await readSettings().catch(() => ({}))) as Record<string, unknown>;
+  const model =
+    opts.model ||
+    process.env.AURAXIS_TITLE_MODEL ||
+    (typeof settings.titleModel === 'string' ? settings.titleModel : undefined) ||
+    'deepseek-v4-flash';
   const apiKey =
     opts.apiKey ||
     (await resolveModelApiKey(model)) ||
     process.env.DEEPSEEK_API_KEY ||
     (await resolveCredential('DEEPSEEK_API_KEY').catch(() => undefined))?.value ||
-    settings.deepseekApiKey ||
+    (typeof settings.deepseekApiKey === 'string' ? settings.deepseekApiKey : undefined) ||
     '';
   if (!apiKey) return null;
   const apiBase = opts.apiBase || (await resolveModelApiBase(model));

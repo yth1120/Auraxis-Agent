@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Button, Input, message } from 'antd';
 import { ChatTeardropDots, Folder, FileText } from '@/components/common/icons';
-import { useT } from '../../i18n';
+import { useT, type I18nKey } from '../../i18n';
 
 type Kind = 'slack' | 'drive' | 'notion';
 
 const KINDS: Kind[] = ['slack', 'drive', 'notion'];
 
-const KIND_META: Record<Kind, { icon: React.ReactNode; nameKey: string; descKey: string; placeholder: string }> = {
+const KIND_META: Record<Kind, { icon: React.ReactNode; nameKey: I18nKey; descKey: I18nKey; placeholder: string }> = {
   slack: {
     icon: <ChatTeardropDots size={18} />,
     nameKey: 'settings.connectors.slack',
@@ -101,8 +101,8 @@ export default function ConnectorsPane() {
                   {meta.icon}
                 </span>
                 <div className="min-w-0">
-                  <div className="text-sm font-semibold text-text-primary">{t(meta.nameKey as any)}</div>
-                  <div className="text-xs text-text-muted leading-[1.5]">{t(meta.descKey as any)}</div>
+                  <div className="text-sm font-semibold text-text-primary">{t(meta.nameKey)}</div>
+                  <div className="text-xs text-text-muted leading-[1.5]">{t(meta.descKey)}</div>
                 </div>
                 <span
                   className={`ml-auto inline-flex items-center h-5 px-2 rounded-full text-2xs font-medium ${

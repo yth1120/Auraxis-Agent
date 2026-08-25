@@ -76,8 +76,10 @@ export function runLintFix(projectRoot: string, files?: string[], opts: LintFixO
     child.stderr?.on('data', (d: Buffer) => {
       stderr += d.toString();
     });
-    child.on('error', (e: any) => {
-      const msg = e?.code === 'ENOENT' ? '未找到 npx / eslint，请确认依赖已安装' : e?.message || '启动 lint 失败';
+    child.on('error', (e: unknown) => {
+      const code = e instanceof Error ? (e as NodeJS.ErrnoException).code : undefined;
+      const msg =
+        code === 'ENOENT' ? '未找到 npx / eslint，请确认依赖已安装' : e instanceof Error ? e.message : '启动 lint 失败';
       finish({ exitCode: null, output: (stdout + stderr).trim(), error: msg });
     });
     child.on('close', (code) => {

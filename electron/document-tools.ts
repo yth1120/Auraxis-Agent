@@ -128,7 +128,7 @@ export async function readDocument(filePath: string): Promise<DocumentReadResult
     }
     case 'xlsx': {
       const workbook = new ExcelJS.Workbook();
-      await workbook.xlsx.load(buffer as any);
+      await workbook.xlsx.load(buffer as unknown as Parameters<typeof workbook.xlsx.load>[0]);
       const sheets: DocumentSheet[] = workbook.worksheets.map((ws) => {
         const rows: unknown[][] = [];
         ws.eachRow({ includeEmpty: false }, (_row, rowNumber) => {
@@ -274,7 +274,7 @@ async function buildXlsx(spec: DocumentWriteSpec): Promise<Buffer> {
       ws.addRow(row.map((v) => (v === null || v === undefined ? '' : v)));
     }
   }
-  return (await workbook.xlsx.writeBuffer()) as any as Buffer;
+  return (await workbook.xlsx.writeBuffer()) as unknown as Buffer;
 }
 
 function buildPptx(spec: DocumentWriteSpec): Promise<Buffer> {

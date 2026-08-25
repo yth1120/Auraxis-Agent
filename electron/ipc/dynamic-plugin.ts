@@ -133,7 +133,7 @@ export function mountDynamicPlugin(spec: DynamicPluginSpec): {
       additionalProperties: false,
     }) as ToolDef['input_schema'];
     compiled.push({
-      name: toolName as any,
+      name: toolName,
       description,
       input_schema: inputSchema,
       isConcurrencySafe: false,
