@@ -20,6 +20,8 @@ vi.mock('../llm-adapter', () => ({
   })),
   llmClientInvoke: vi.fn(),
   buildToolResultContent: vi.fn(() => 'result'),
+  buildToolResultText: vi.fn(() => 'result'),
+  isDeepSeekVisionModel: vi.fn(() => false),
 }));
 vi.mock('../tool-runner', () => ({
   runToolBatch: vi.fn(async () => [{

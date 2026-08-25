@@ -16,7 +16,7 @@ import { clearLlmContext } from './query-context';
 import { resolveCredential } from '../credentials';
 import { getDeepSeekUserId } from '../auth-store';
 import { isPermissionPreset, PERMISSION_PRESETS } from '../contracts/permission';
-import { normalizeApprovalPolicy } from '../contracts/core';
+import { normalizeApprovalPolicy, normalizeDeepSeekMessages, apiMessageText, type ApiMessage } from '../contracts/core';
 
 const activeStreams = new Map<string, AbortController>();
 const activeQueries = new Map<string, AbortController>();
@@ -87,7 +87,7 @@ export function registerAiHandlers() {
   secureHandle('ai:chatStream', async (event, payload: {
     requestId: string;
     model: string;
-    messages: { role: string; content: string }[];
+    messages: ApiMessage[];
     isDeepThink: boolean;
     reasoningEffort?: 'low' | 'high' | 'max';
     isWebSearch: boolean;
@@ -115,7 +115,7 @@ export function registerAiHandlers() {
     let searchPromise: Promise<string | null> = Promise.resolve(null);
     if (isWebSearch) {
       const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
-      const searchQuery = lastUserMsg?.content?.slice(0, 200) || '';
+      const searchQuery = lastUserMsg ? apiMessageText(lastUserMsg.content).slice(0, 200) : '';
       if (searchQuery) {
         searchPromise = performWebSearch(searchQuery);
       }
@@ -214,7 +214,7 @@ export function registerAiHandlers() {
     requestId: string;
     sessionId?: string;
     model: string;
-    messages: { role: string; content: string }[];
+    messages: ApiMessage[];
     memoryContext?: string;
     isDeepThink: boolean;
     reasoningEffort?: 'low' | 'high' | 'max';
@@ -394,7 +394,7 @@ export function registerAiHandlers() {
 async function streamDeepSeek(
   request: {
     model: string;
-    messages: { role: string; content: string }[];
+    messages: ApiMessage[];
     isDeepThink: boolean;
     reasoningEffort?: 'low' | 'high' | 'max';
     isWebSearch?: boolean;
@@ -411,7 +411,7 @@ async function streamDeepSeek(
   const body: Record<string, unknown> = {
     model: request.model,
     max_tokens: request.maxTokens ?? 8192,
-    messages: [...request.messages],
+    messages: normalizeDeepSeekMessages(request.messages, request.model),
     stream: true,
     // 官方用法：流式末尾额外返回 usage 块（含缓存命中与推理 tokens）。
     stream_options: { include_usage: true },

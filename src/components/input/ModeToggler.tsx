@@ -25,7 +25,9 @@ function modelName(modelId: string): string {
 }
 
 function modelDescriptionKey(modelId: string): I18nKey {
-  return modelId === 'deepseek-v4-flash' ? 'model.desc.flash' : 'model.desc.pro';
+  if (modelId === 'deepseek-v4-flash') return 'model.desc.flash';
+  if (modelId === 'deepseek-v4-pro') return 'model.desc.pro';
+  return 'model.desc.vision';
 }
 
 const ChevronDown = ({ open }: { open?: boolean }) => (
@@ -133,6 +135,7 @@ export const ModePanelContent = memo(function ModePanelContent({ onSelect }: { o
           >
             <span className="flex-1 min-w-0 flex flex-col">
               <span className="overflow-hidden text-ellipsis whitespace-nowrap text-sm leading-5 font-medium text-text-primary">{m.name}</span>
+              {m.experimental && <span className="shrink-0 text-[10px] leading-4 px-1.5 rounded-full bg-[var(--color-warning-soft)] text-warning">{t('model.experimental')}</span>}
               <span className="overflow-hidden text-ellipsis whitespace-nowrap text-xs leading-[17px] text-text-muted">{t(modelDescriptionKey(m.id))}</span>
             </span>
             <span className="flex flex-none w-5 items-center justify-center">{selected ? <Check /> : null}</span>

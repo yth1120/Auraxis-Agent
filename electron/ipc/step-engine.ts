@@ -21,7 +21,7 @@ import {
   appendAssistantToHistory,
   readErrorBody,
 } from './agent-loop';
-import { invokeLlm, buildToolResultContent } from './llm-adapter';
+import { invokeLlm, buildToolResultContent, buildToolResultText, isDeepSeekVisionModel } from './llm-adapter';
 import { getShellExecutor } from './shell-executor';
 import { runToolBatch, isDeniedError } from './tool-runner';
 import type { RunnerToolCall, RunnerToolResult } from './tool-runner';
@@ -224,7 +224,9 @@ async function appendToolResults(
   messages: any[],
   results: { toolUseId: string; toolName: string; input: Record<string, unknown>; output: unknown; error?: string }[],
   sessionId?: string,
+  model = '',
 ): Promise<void> {
+  const imageUserParts: Array<Record<string, unknown>> = [];
   for (const tr of results) {
     const raw = tr.error ? `Error: ${tr.error}` : JSON.stringify(tr.output);
     let content = raw;
@@ -241,11 +243,20 @@ async function appendToolResults(
         // Spill is best-effort — keep the raw output if the store fails.
       }
     }
+    const imageResult = !tr.error && isImageResult(tr.output);
+    const toolContent = imageResult ? buildToolResultText(tr.output) : content;
     messages.push({
       role: 'tool' as const,
       tool_call_id: tr.toolUseId,
-      content: isImageResult(tr.output) ? buildToolResultContent(tr.output) : content,
+      content: toolContent,
     });
+    if (imageResult && isDeepSeekVisionModel(model)) {
+      const imageParts = buildToolResultContent(tr.output);
+      if (Array.isArray(imageParts)) imageUserParts.push(...imageParts);
+    }
+  }
+  if (imageUserParts.length > 0) {
+    messages.push({ role: 'user' as const, content: imageUserParts });
   }
 }
 
@@ -568,7 +579,7 @@ export async function runStep(
     input: r.input,
     output: r.output,
     error: r.error,
-  })), cfg.requestId);
+  })), cfg.requestId, cfg.model);
 
   cfg.onToolBatchEnd?.();
 

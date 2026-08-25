@@ -75,7 +75,6 @@ import { registerGoalHandlers } from '../goal-handlers';
 import { registerFtsHandlers } from '../fts-handlers';
 import { registerChatLogHandlers } from '../chat-log-handlers';
 import { registerSystemHandlers } from '../system-handlers';
-import path from 'path';
 import { loadProjectActions } from '../../actions';
 import { loadRules } from '../../rules';
 import { describeCredential, setCredential, unsetCredential } from '../../credentials';

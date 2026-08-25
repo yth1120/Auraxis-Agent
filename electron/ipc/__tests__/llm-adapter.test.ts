@@ -11,7 +11,9 @@ import {
   llmClientInvoke,
   sanitizeToolCallPairing,
   buildToolResultContent,
+  buildToolResultText,
   modelSupportsImageInput,
+  isDeepSeekVisionModel,
   buildOpenAIFormatTools,
   buildAnthropicFormatTools,
   isAnthropicFormatEndpoint,
@@ -142,6 +144,13 @@ describe('llm-adapter format helpers', () => {
     expect(String(parts[1].text)).toContain('image/png');
   });
 
+    expect(buildToolResultText({
+      file_path: 'C:/proj/shot.png',
+      mime: 'image/png',
+      bytes: 4,
+      image: 'data:image/png;base64,AAAA',
+    })).toContain('image/png');
+
   it('keeps non-image tool results as plain JSON strings', () => {
     const content = buildToolResultContent({ stdout: 'ok', exitCode: 0 });
     expect(content).toBe(JSON.stringify({ stdout: 'ok', exitCode: 0 }));
@@ -153,6 +162,9 @@ describe('llm-adapter format helpers', () => {
     expect(modelSupportsImageInput('example-vision-model')).toBe(true);
     expect(modelSupportsImageInput('deepseek-vl')).toBe(true);
     expect(modelSupportsImageInput('deepseek-v4-flash')).toBe(false);
+    expect(modelSupportsImageInput('deepseek-v4-flash-vision-exp')).toBe(true);
+    expect(isDeepSeekVisionModel('deepseek-v4-flash-vision-exp')).toBe(true);
+    expect(isDeepSeekVisionModel('deepseek-v4-pro')).toBe(false);
   });
 });
 

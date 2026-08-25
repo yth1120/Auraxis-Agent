@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { ApplyCodePayload } from './contracts/core';
+import type { ApplyCodePayload, ApiMessage } from './contracts/core';
 
 function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
@@ -78,7 +78,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     chatStream: (
       request: {
         model: string;
-        messages: { role: string; content: string }[];
+        messages: ApiMessage[];
         isDeepThink: boolean;
         reasoningEffort?: 'low' | 'high' | 'max';
         isWebSearch: boolean;
@@ -149,7 +149,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('ai:fim', params),
 
     sendQuery: (
-      request: { sessionId?: string; model: string; messages: { role: string; content: string }[]; memoryContext?: string; isDeepThink: boolean; reasoningEffort?: 'low' | 'high' | 'max'; projectRoot: string; autoApprove?: boolean; mode?: string; apiKey?: string; maxIterations?: number },
+      request: { sessionId?: string; model: string; messages: ApiMessage[]; memoryContext?: string; isDeepThink: boolean; reasoningEffort?: 'low' | 'high' | 'max'; projectRoot: string; autoApprove?: boolean; mode?: string; apiKey?: string; maxIterations?: number },
       callbacks: { onEvent: (event: any) => void; onDone: () => void; onError: (error: string) => void }
     ) => {
       const requestId = generateId();

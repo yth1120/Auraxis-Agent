@@ -1,8 +1,10 @@
 import { getApiKeyFromStore } from '../stores/useSettingsStore';
+import type { ApiMessage } from '../../electron/types';
+import { normalizeDeepSeekMessages } from '../../electron/types';
 
 interface ChatRequest {
   model: string;
-  messages: { role: string; content: string }[];
+  messages: ApiMessage[];
   isDeepThink: boolean;
   reasoningEffort?: 'low' | 'high' | 'max';
   isWebSearch: boolean;
@@ -36,7 +38,7 @@ export async function streamChat(
   const body: Record<string, unknown> = {
     model: request.model,
     max_tokens: request.maxOutputTokens ?? 8192,
-    messages: [...request.messages],
+    messages: normalizeDeepSeekMessages(request.messages, request.model),
     stream: true,
   };
 

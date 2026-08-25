@@ -1,4 +1,5 @@
 import type {
+  ApiMessage,
   ApplyCodePayload,
   ApplyCodeResult,
   FileSearchResult,
@@ -25,7 +26,7 @@ import type { AuthChangePasswordParams, AuthLoginParams, AuthPhase, AuthSetupPar
 import type { ProjectGlobalState } from '../../electron/contracts/project';
 
 // Re-export for convenience
-export type { ApplyCodePayload, ApplyCodeResult, FileSearchResult, FileResult, DirectoryEntry, ModelDefinition, WorkspaceFileDiff };
+export type { ApiMessage, ApplyCodePayload, ApplyCodeResult, FileSearchResult, FileResult, DirectoryEntry, ModelDefinition, WorkspaceFileDiff };
 export type { AuthPhase, AuthStatus, AuthSetupParams, AuthLoginParams, AuthChangePasswordParams };
 
 export interface AIStreamCallbacks {
@@ -153,7 +154,7 @@ export interface ElectronAPI {
   ai: {
     chatStream: (request: {
       model: string;
-      messages: { role: string; content: string }[];
+      messages: ApiMessage[];
       isDeepThink: boolean;
       reasoningEffort?: 'low' | 'high' | 'max';
       isWebSearch: boolean;
@@ -174,7 +175,7 @@ export interface ElectronAPI {
     sendQuery: (request: {
       sessionId?: string;
       model: string;
-      messages: { role: string; content: string }[];
+      messages: ApiMessage[];
       memoryContext?: string;
       isDeepThink: boolean;
       reasoningEffort?: 'low' | 'high' | 'max';

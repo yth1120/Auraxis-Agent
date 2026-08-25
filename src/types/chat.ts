@@ -1,5 +1,6 @@
 import type { ToolCall } from './tools';
-import { BUILT_IN_MODELS as SHARED_MODELS } from '../../electron/types';
+import { BUILT_IN_MODELS as SHARED_MODELS, modelSupportsImageInput as sharedModelSupportsImageInput } from '../../electron/types';
+import type { ApiMessageContent } from '../../electron/types';
 import type { PermissionRequest, DeepSeekToolChoice, WorkAutonomyTier } from './advanced';
 
 // Re-export for convenience
@@ -18,6 +19,9 @@ export interface AIModel {
   name: string;
   provider: ModelProvider;
   maxTokens?: number;
+  contextWindow?: number;
+  supportsImages?: boolean;
+  experimental?: boolean;
   apiBase?: string;
 }
 
@@ -26,6 +30,9 @@ export const BUILT_IN_MODELS: AIModel[] = SHARED_MODELS.map((m) => ({
   name: m.name,
   provider: m.provider,
   maxTokens: m.maxTokens,
+  contextWindow: m.contextWindow,
+  supportsImages: m.supportsImages,
+  experimental: m.experimental,
   apiBase: m.apiBase,
 }));
 
@@ -45,6 +52,40 @@ export function getContentText(content: string | ContentBlock[]): string {
     .map((b) => b.text)
     .join('\n\n');
 }
+
+/** 渲染层复用主进程的视觉能力判断。 */
+export function modelSupportsImageInput(model: string): boolean {
+  return sharedModelSupportsImageInput(model);
+}
+
+const RAW_IMAGE_BLOCK_RE = /【图片: ([^\n】]*)】\s*\n?(data:image\/[^\s]+)/g;
+
+/**
+ * 将聊天消息转换为 API 内容。视觉模型会把输入区中的图片占位块解析成
+ * OpenAI 兼容的 image_url 内容块；非视觉模型仍使用纯文本，避免 API 400。
+ */
+export function toApiMessageContent(content: string | ContentBlock[], supportsImages: boolean): ApiMessageContent {
+  if (!supportsImages) return typeof content === 'string' ? content : getContentText(content);
+  if (typeof content !== 'string') {
+    return content.map((part) => part.type === 'image'
+      ? { type: 'image_url', image_url: { url: `data:${part.source.media_type};base64,${part.source.data}` } }
+      : part);
+  }
+  const parts: Record<string, unknown>[] = [];
+  let cursor = 0;
+  let matched = false;
+  for (const match of content.matchAll(RAW_IMAGE_BLOCK_RE)) {
+    const index = match.index ?? 0;
+    if (index > cursor) parts.push({ type: 'text', text: content.slice(cursor, index) });
+    parts.push({ type: 'image_url', image_url: { url: match[2] ?? '' } });
+    cursor = index + match[0].length;
+    matched = true;
+  }
+  if (!matched) return content;
+  if (cursor < content.length) parts.push({ type: 'text', text: content.slice(cursor) });
+  return parts;
+}
+
 
 // ─── Plan approval ─────────────────────────────────────
 
@@ -400,6 +441,9 @@ export async function fetchModels(): Promise<AIModel[]> {
         name: m.name,
         provider: m.provider,
         maxTokens: m.maxTokens,
+        contextWindow: m.contextWindow,
+        supportsImages: m.supportsImages,
+        experimental: m.experimental,
         apiBase: m.apiBase,
       }));
     }

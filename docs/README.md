@@ -35,7 +35,7 @@ The project follows **paper-driven development**: 7 arXiv papers' core technique
 - **Headless CLI**: `npm run cli -- --run "<task>"` (model / project / permission / sandbox / JSON output), plus `--sdk` / `--acp` / `--plugin list|scan|enable|disable`
 - **Public SDKs**: TypeScript (`packages/auraxis-sdk`, TCP JSON-RPC) and Python (`python/auraxis_sdk`)
 - **Code Mode**: `RunCode` TypeScript programs orchestrate tools in a worker thread via `await tools.Name(args)`; sub-calls re-enter the full permission pipeline (8-way concurrent overlap, hard timeout)
-- **Image input**: `ReadImage` + content-addressed attachment storage; multimodal results auto-convert to OpenAI `image_url` / Anthropic `image` blocks; non-vision models degrade to text
+- **Image input**: `ReadImage` + content-addressed attachment storage; multimodal results auto-convert to OpenAI `image_url` / Anthropic `image` blocks; `deepseek-v4-flash-vision-exp` receives image blocks while non-vision DeepSeek models degrade to text
 - **Background tasks**: `Task*` / `Job*` unify background bash, terminal tasks, and sub-agents; `Schedule*` supports after / at / every in-session follow-ups
 - **Terminal**: dockable terminal drawer + `Terminal*` six-pack model tools + persistent PTY sessions + SSH
 - **Native sandbox**: Windows restricted token / AppContainer, Linux, macOS backends + worktree isolation + read-before-write observation hard gate
@@ -824,7 +824,7 @@ The SQLite projection cache and FTS index both carry `PRAGMA user_version = 1` f
 `getAllModels()` in `model-config.ts` resolves models in this priority order:
 
 ```
-1. Built-in models (deepseek-v4-flash, deepseek-v4-pro)
+1. Built-in models (deepseek-v4-flash, deepseek-v4-pro, deepseek-v4-flash-vision-exp)
    ↓
 2. AURAXIS_MODELS environment variable (JSON array)
    ↓
@@ -838,7 +838,7 @@ See `.env.example` ([view file](../.env.example)):
 | Variable | Description | Default |
 |------|------|--------|
 | `DEEPSEEK_API_KEY` | DeepSeek API key | none (required) |
-| `DEEPSEEK_BASE_URL` | OpenAI-format endpoint | `https://api.deepseek.com/v1/chat/completions` |
+| `DEEPSEEK_BASE_URL` | OpenAI-format endpoint | `https://api.deepseek.com/beta/chat/completions` |
 | `DEEPSEEK_ANTHROPIC_BASE_URL` | Anthropic-format endpoint | `https://api.deepseek.com/anthropic/v1/messages` |
 | `ANTHROPIC_API_KEY` | Anthropic API key | none |
 | `ANTHROPIC_BASE_URL` | Anthropic endpoint | `https://api.anthropic.com/v1/messages` |
@@ -874,6 +874,7 @@ Models can use either OpenAI-compatible or Anthropic format. OpenAI format is th
 ### 10.5 DeepSeek Official Capabilities & Interfaces
 
 - **Reasoning effort**: `low / high / max` (`reasoning_effort`); Chat follows DeepSeek style (fixed high, controlled by the thinking toggle), Work/Code keep the slider
+- **V4 Flash Vision Exp (experimental)**: built-in image-understanding model (`deepseek-v4-flash-vision-exp`); images are accepted only in `user` messages, supported formats are JPEG/PNG/GIF/WebP, and ReadImage tool results are delivered as image content for this model
 - **strict tools (Beta)**: strict tool mode with automatic handling of empty schemas, avoiding "object cannot be empty" 400 errors
 - **Plan-generation JSON mode**: agent planning uses JSON mode to produce TaskPlan
 - **Conversation prefix continuation**: code-block "continue writing" uses the conversation prefix

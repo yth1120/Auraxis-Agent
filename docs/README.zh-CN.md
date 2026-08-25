@@ -33,7 +33,7 @@ Auraxis v3.0.0 是一款基于 Electron 的桌面端智能体工作台，融合�
 - **headless CLI**：`npm run cli -- --run "<任务>"`（模型/项目/权限/沙箱/JSON 输出），另有 `--sdk` / `--acp` / `--plugin list|scan|enable|disable`
 - **对外 SDK**：TypeScript（`packages/auraxis-sdk`，TCP JSON-RPC）与 Python（`python/auraxis_sdk`）
 - **Code Mode**：`RunCode` 的 TypeScript 程序在工作线程中 `await tools.Name(args)` 编排工具，子调用回穿完整权限管线（8 路并发重叠、硬超时）
-- **图片输入**：`ReadImage` + 内容寻址附件存储，多模态结果自动转 OpenAI `image_url` / Anthropic `image` block，非视觉模型降级为文本
+- **图片输入**：`ReadImage` + 内容寻址附件存储，多模态结果自动转 OpenAI `image_url` / Anthropic `image` block；`deepseek-v4-flash-vision-exp` 接收图片块，非视觉 DeepSeek 模型降级为文本
 - **后台任务**：`Task*` / `Job*` 统一管理后台 bash、终端任务与子 Agent；`Schedule*` 支持 after/at/every 会话内跟进
 - **终端**：底部可拖拽终端抽屉 + `Terminal*` 六件套模型工具 + PTY 持久会话 + SSH
 - **原生沙箱**：Windows restricted token / AppContainer、Linux、macOS 四种后端 + worktree 隔离 + read-before-write 观测硬门
@@ -821,7 +821,7 @@ SQLite 投影缓存与 FTS 索引均带 `PRAGMA user_version = 1`，后续结构
 `model-config.ts` 中的 `getAllModels()` 函数按以下优先顺序解析：
 
 ```
-1. 内置模型 (deepseek-v4-flash, deepseek-v4-pro)
+1. 内置模型 (deepseek-v4-flash, deepseek-v4-pro, deepseek-v4-flash-vision-exp)
    ↓
 2. AURAXIS_MODELS 环境变量（JSON 数组）
    ↓
@@ -835,7 +835,7 @@ SQLite 投影缓存与 FTS 索引均带 `PRAGMA user_version = 1`，后续结构
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
 | `DEEPSEEK_API_KEY` | DeepSeek API 密钥 | 无（必填） |
-| `DEEPSEEK_BASE_URL` | OpenAI 格式端点 | `https://api.deepseek.com/v1/chat/completions` |
+| `DEEPSEEK_BASE_URL` | OpenAI 格式端点 | `https://api.deepseek.com/beta/chat/completions` |
 | `DEEPSEEK_ANTHROPIC_BASE_URL` | Anthropic 格式端点 | `https://api.deepseek.com/anthropic/v1/messages` |
 | `ANTHROPIC_API_KEY` | Anthropic API 密钥 | 无 |
 | `ANTHROPIC_BASE_URL` | Anthropic 端点 | `https://api.anthropic.com/v1/messages` |
@@ -871,6 +871,7 @@ SQLite 投影缓存与 FTS 索引均带 `PRAGMA user_version = 1`，后续结构
 ### 10.5 DeepSeek 官方能力与接口
 
 - **思考强度**：`low / high / max` 三档（`reasoning_effort`）；Chat 模式按 DeepSeek 风格固定 high 并由思考开关控制，Work/Code 保留滑轨选择
+- **V4 Flash Vision Exp（实验版）**：内置图片理解模型（`deepseek-v4-flash-vision-exp`）；图片仅在 `user` 消息中受支持，格式为 JPEG/PNG/GIF/WebP，ReadImage 工具结果会以图片内容块交给该模型
 - **strict tools（Beta）**：严格工具模式，空 schema 工具自动兼容处理，避免「对象不能为空」类 400 错误
 - **计划生成 JSON 模式**：Agent 规划阶段用 JSON 模式生成 TaskPlan
 - **对话前缀续写**：代码块「继续写」走对话前缀（prefix）续写

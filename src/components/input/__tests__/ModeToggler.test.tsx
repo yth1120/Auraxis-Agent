@@ -65,6 +65,8 @@ describe('ModePanelContent', () => {
     render(<ModePanelContent />);
     expect(screen.getByText('DeepSeek V4 Flash')).toBeDefined();
     expect(screen.getByText('DeepSeek V4 Pro')).toBeDefined();
+    expect(screen.getByText('DeepSeek V4 Flash Vision Exp')).toBeDefined();
+    expect(screen.getByText('实验')).toBeDefined();
     expect(screen.getByText('思考深度')).toBeDefined();
     expect(screen.getByRole('slider', { name: '思考深度' })).toBeDefined();
     expect(screen.getByText('中度思考')).toBeDefined();
@@ -74,6 +76,12 @@ describe('ModePanelContent', () => {
     render(<ModePanelContent />);
     fireEvent.click(screen.getByText('DeepSeek V4 Flash'));
     expect(useChatStore.getState().selectedModel).toBe('deepseek-v4-flash');
+  });
+
+  it('clicking DeepSeek V4 Flash Vision Exp switches model', () => {
+    render(<ModePanelContent />);
+    fireEvent.click(screen.getByText('DeepSeek V4 Flash Vision Exp'));
+    expect(useChatStore.getState().selectedModel).toBe('deepseek-v4-flash-vision-exp');
   });
 
   it('clicking DeepSeek V4 Pro switches model', () => {

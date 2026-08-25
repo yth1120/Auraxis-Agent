@@ -2,13 +2,12 @@ import { useMemo } from 'react';
 import { Popover } from 'antd';
 import clsx from 'clsx';
 import { useT } from '../../i18n';
-import { getContentText } from '@/types/chat';
+import { BUILT_IN_MODELS, getContentText } from '@/types/chat';
 import { useChatStore } from '@/stores/useChatStore';
 import { useAgentStore } from '@/stores/useAgentStore';
 
 const SYSTEM_OVERHEAD_TOKENS = 900;
 /** Real context window (DeepSeek V4 = 1M), not the per-model OUTPUT max. */
-const CONTEXT_CAPACITY = 1_000_000;
 
 /** Rough CJK/ASCII mix heuristic — 该仪表为近似估算. */
 function estimateTokens(chars: number): number {
@@ -22,11 +21,17 @@ function estimateTokens(chars: number): number {
 export default function ContextMeter() {
   const t = useT();
   const messages = useChatStore((s) => s.messages);
+  const selectedModel = useChatStore((s) => s.selectedModel);
   const currentAgentId = useAgentStore((s) => s.currentAgentId);
   const currentAgent = useAgentStore((s) => s.agents.find((a) => a.id === currentAgentId));
   const exactInputTokens = useChatStore((s) => s.exactInputTokens);
   const exactOutputTokens = useChatStore((s) => s.exactOutputTokens);
   const reasoningTokens = useChatStore((s) => s.reasoningOutputTokens);
+
+  const capacity = useMemo(
+    () => BUILT_IN_MODELS.find((m) => m.id === selectedModel)?.contextWindow ?? 1_000_000,
+    [selectedModel],
+  );
 
   const estimated = useMemo(() => {
     let messageChars = 0;
@@ -64,7 +69,6 @@ export default function ContextMeter() {
     : { input: exactInputTokens, output: exactOutputTokens, reasoning: reasoningTokens };
   const hasReal = real.input > 0 || real.output > 0;
   const used = hasReal ? real.input : estimated.used;
-  const capacity = CONTEXT_CAPACITY;
 
   const pct = Math.min(100, Math.round((used / capacity) * 100));
   const ringR = 6.5;

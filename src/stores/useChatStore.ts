@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type { Message, ChatStore, CodeBlock } from '../types/chat';
-import { getContentText, mapThinkingLevelToEffort } from '../types/chat';
+import { getContentText, mapThinkingLevelToEffort, modelSupportsImageInput, toApiMessageContent } from '../types/chat';
+import type { ApiMessageContent } from '../../electron/types';
 import { createDebouncedStorage } from './debouncedStorage';
 export { createDebouncedStorage } from './debouncedStorage';
 import { streamChat } from '../services/ai-service';
@@ -822,9 +823,14 @@ export const useChatStore = create<ChatStore>()(
           });
         }, STREAM_TIMEOUT_MS);
 
-        const chatHistory = newMessages
+        const chatHistory: { role: string; content: ApiMessageContent }[] = newMessages
           .filter((m) => !m.isStreaming || m.id === assistantId)
-          .map((m) => ({ role: m.role, content: getContentText(m.content) }));
+          .map((m) => ({
+            role: m.role,
+            content: m.role === 'user' && modelSupportsImageInput(selectedModel)
+              ? toApiMessageContent(m.content, true)
+              : getContentText(m.content),
+          }));
 
         // Inject project context (Code/agent mode only — Chat is a plain,
         // tool-less conversation, so the "explore with tools" preamble misleads there).

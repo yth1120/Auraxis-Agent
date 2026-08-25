@@ -31,6 +31,9 @@ function parseEnvModels(): ModelDefinition[] {
       name: m.name,
       provider: 'deepseek' as const,
       maxTokens: m.maxTokens,
+      contextWindow: m.contextWindow ?? m.context_window,
+      supportsImages: m.supportsImages ?? m.supports_images,
+      experimental: m.experimental ?? false,
       apiBase: m.apiBase || m.api_base,
       apiKey: m.apiKey || m.api_key,
     }));

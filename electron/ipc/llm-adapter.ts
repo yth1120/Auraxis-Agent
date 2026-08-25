@@ -17,6 +17,9 @@ import { getDeepSeekUserId } from '../auth-store';
 import { readSettings, resolveMaxOutputTokens } from './settings-store';
 import type { DeepSeekToolChoice } from '../contracts/advanced';
 import type { AssistantMessage, ContentBlock, ToolCall } from './agent-loop';
+import { modelSupportsImageInput, isDeepSeekVisionModel } from '../types';
+
+export { modelSupportsImageInput, isDeepSeekVisionModel };
 
 // ─── LLM types ───────────────────────────────────────────
 
@@ -229,35 +232,41 @@ export function sanitizeToolCallPairing(messages: any[]): any[] {
  * content array with an `image_url` part plus a compact text summary, so
  * image-capable models actually see the pixels instead of a base64 blob.
  */
-export function buildToolResultContent(output: unknown, error?: string): string | Array<Record<string, unknown>> {
-  if (error) return `Error: ${error}`;
+function toolResultMeta(output: unknown): { image: string | null; obj: Record<string, unknown> } | null {
   const obj = (output && typeof output === 'object' ? output : {}) as Record<string, unknown>;
   const image = typeof obj.image === 'string' && obj.image.startsWith('data:image/')
     ? obj.image
     : null;
-  if (!image) return JSON.stringify(output);
+  return { image, obj };
+}
+
+export function buildToolResultText(output: unknown, error?: string): string {
+  if (error) return `Error: ${error}`;
+  const metaWithImage = toolResultMeta(output);
+  if (!metaWithImage) return 'null';
+  if (!metaWithImage.image) return JSON.stringify(output) ?? 'null';
+  const { obj } = metaWithImage;
   const meta: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(obj)) {
     if (k === 'image') continue;
     meta[k] = v;
   }
-  const text = [
+  return [
     `[图片] ${String(obj.mime ?? 'image')}`,
     `文件: ${String(obj.file_path ?? obj.attachment_id ?? '')}`,
     `大小: ${Number(obj.bytes) || 0} 字节`,
     ...(Object.keys(meta).length > 0 ? [JSON.stringify(meta)] : []),
   ].filter(Boolean).join(' · ');
-  return [
-    { type: 'image_url', image_url: { url: image } },
-    { type: 'text', text },
-  ];
 }
 
-/** Heuristic for whether the routed model can consume image parts. */
-export function modelSupportsImageInput(model: string): boolean {
-  const m = model.toLowerCase();
-  if (!m.startsWith('deepseek-')) return true;
-  return /(vl|vision|omni|multimodal)/.test(m);
+export function buildToolResultContent(output: unknown, error?: string): string | Array<Record<string, unknown>> {
+  if (error) return `Error: ${error}`;
+  const metaWithImage = toolResultMeta(output);
+  if (!metaWithImage?.image) return JSON.stringify(output) ?? 'null';
+  return [
+    { type: 'image_url', image_url: { url: metaWithImage.image } },
+    { type: 'text', text: buildToolResultText(output) },
+  ];
 }
 
 /**
@@ -267,12 +276,28 @@ export function modelSupportsImageInput(model: string): boolean {
  */
 function normalizeProviderContent(m: any, provider: 'openai' | 'anthropic', model: string): any {
   if (!Array.isArray(m.content)) return m;
-  let parts: any[] = m.content;
-  const hasImage = parts.some((p) => p?.type === 'image_url');
-  if (hasImage && !modelSupportsImageInput(model)) {
-    parts = parts.filter((p) => p?.type !== 'image_url');
+  let parts: any[] | string = m.content;
+  const isDeepSeek = model.toLowerCase().startsWith('deepseek-');
+  const supportsImage = modelSupportsImageInput(model);
+  const hasImage = Array.isArray(parts) && parts.some((p) => p?.type === 'image_url' || p?.type === 'image' || p?.type === 'file');
+  if (hasImage && Array.isArray(parts) && (!supportsImage || (isDeepSeek && m.role !== 'user'))) {
+    parts = parts.filter((p) => !['image_url', 'image', 'file'].includes(p?.type));
   }
-  if (provider === 'anthropic') {
+  if (Array.isArray(parts) && isDeepSeek && supportsImage) {
+    parts = parts.filter((p) => {
+      if (p?.type !== 'image_url') return true;
+      const url = String(p.image_url?.url ?? '');
+      const mime = /^data:image\/([^;]+);/i.exec(url);
+      return !mime || ['jpeg', 'png', 'gif', 'webp'].includes(mime[1].toLowerCase());
+    });
+  }
+  if (m.role === 'tool' && Array.isArray(parts)) {
+    parts = parts
+      .map((p) => (p?.type === 'text' ? String(p.text) : ''))
+      .filter(Boolean)
+      .join('\n');
+  }
+  if (provider === 'anthropic' && Array.isArray(parts)) {
     parts = parts.map((p) => {
       if (p?.type === 'image_url' && p.image_url?.url) {
         const url = String(p.image_url.url);
