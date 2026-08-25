@@ -57,6 +57,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 function SetupScreen() {
   const t = useT();
   const setup = useAuthStore((s) => s.setup);
+  const switchToLogin = useAuthStore((s) => s.switchToLogin);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -209,6 +210,16 @@ function SetupScreen() {
         <Button type="primary" htmlType="submit" block loading={submitting}>
           {t('auth.createAccount')}
         </Button>
+        <button
+          type="button"
+          className="self-center border-none bg-transparent text-2xs text-text-faint cursor-pointer hover:text-text-secondary"
+          onClick={() => {
+            setError('');
+            switchToLogin();
+          }}
+        >
+          {t('auth.haveAccount')}
+        </button>
         <div className="text-center text-2xs leading-[18px] text-text-faint">{t('auth.localOnly')}</div>
       </form>
     </AuthShell>
@@ -283,6 +294,16 @@ function LoginScreen() {
         <Button type="primary" htmlType="submit" block loading={submitting}>
           {t('auth.login')}
         </Button>
+        <button
+          type="button"
+          className="self-center border-none bg-transparent text-2xs text-text-faint cursor-pointer hover:text-text-secondary"
+          onClick={() => {
+            setError('');
+            switchToSetup();
+          }}
+        >
+          {t('auth.noAccount')}
+        </button>
       </form>
     </AuthShell>
   );

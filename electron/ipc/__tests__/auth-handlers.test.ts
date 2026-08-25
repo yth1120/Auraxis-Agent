@@ -20,6 +20,7 @@ vi.mock('../../auth-store', () => ({
   changeAccountName: vi.fn(async (params: { name?: string }) =>
     params?.name?.trim() ? { ok: true } : { ok: false, error: '账户名不能为空' },
   ),
+  isUnlocked: vi.fn(() => true),
 }));
 
 import { registerAuthHandlers } from '../auth-handlers';
@@ -31,6 +32,7 @@ import {
   logoutAccount,
   changeAccountPassword,
   setAccountAvatar,
+  isUnlocked,
 } from '../../auth-store';
 
 type Handler = (event: unknown, ...args: unknown[]) => Promise<any>;
@@ -83,5 +85,23 @@ describe('auth-handlers', () => {
     const h = capture();
     vi.mocked(logoutAccount).mockRejectedValueOnce(new Error('account down'));
     expect(await h.get('auth:logout')!({})).toEqual({ ok: false, error: 'account down' });
+  });
+
+  it('未解锁时拒绝修改账户配置', async () => {
+    vi.mocked(isUnlocked).mockReturnValue(false);
+    const h = capture();
+    expect(await h.get('auth:changePassword')!({}, { currentPassword: 'p', newPassword: 'q' })).toEqual({
+      ok: false,
+      error: '请先登录',
+    });
+    expect(await h.get('auth:setAvatar')!({}, 'data:image/png;base64,AA')).toEqual({
+      ok: false,
+      error: '请先登录',
+    });
+    expect(await h.get('auth:changeName')!({}, { name: 'A' })).toEqual({
+      ok: false,
+      error: '请先登录',
+    });
+    vi.mocked(isUnlocked).mockReturnValue(true);
   });
 });

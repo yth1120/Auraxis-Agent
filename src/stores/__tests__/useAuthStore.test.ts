@@ -104,4 +104,11 @@ describe('useAuthStore — 账户名修改', () => {
       error: 'boom',
     });
   });
+
+  it('认证状态不可用时进入注册兜底页面', async () => {
+    vi.mocked(electronApi.auth.status).mockResolvedValueOnce({ ok: false, error: 'auth unavailable' } as any);
+    await useAuthStore.getState().hydrate();
+    expect(useAuthStore.getState().ready).toBe(true);
+    expect(useAuthStore.getState().phase).toBe('setup');
+  });
 });

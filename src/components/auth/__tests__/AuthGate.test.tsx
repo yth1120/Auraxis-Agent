@@ -33,4 +33,19 @@ describe('AuthGate — 注册登录按钮', () => {
       expect((window as any).electronAPI.auth.setup).toHaveBeenCalled();
     });
   });
+
+  it('从登录页可以返回创建账户页面', async () => {
+    (window as any).electronAPI.auth.status = vi.fn(async () => ({
+      ok: true,
+      data: { phase: 'locked', registered: true },
+    }));
+    render(
+      <AuthGate>
+        <div />
+      </AuthGate>,
+    );
+    const link = await screen.findByRole('button', { name: '还没有账户？创建账户' });
+    fireEvent.click(link);
+    expect(await screen.findByPlaceholderText('怎么称呼你')).toBeTruthy();
+  });
 });

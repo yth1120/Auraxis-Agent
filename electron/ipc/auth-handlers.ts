@@ -8,6 +8,7 @@ import {
   changeAccountPassword,
   setAccountAvatar,
   changeAccountName,
+  isUnlocked,
 } from '../auth-store';
 import type {
   AuthChangeNameParams,
@@ -51,6 +52,7 @@ export function registerAuthHandlers(): void {
   });
 
   secureHandle('auth:changePassword', async (_event, params: AuthChangePasswordParams) => {
+    if (!isUnlocked()) return { ok: false, error: '请先登录' };
     try {
       return await changeAccountPassword(params ?? {});
     } catch (error: unknown) {
@@ -59,6 +61,7 @@ export function registerAuthHandlers(): void {
   });
 
   secureHandle('auth:setAvatar', async (_event, avatar: string) => {
+    if (!isUnlocked()) return { ok: false, error: '请先登录' };
     try {
       return await setAccountAvatar(avatar);
     } catch (error: unknown) {
@@ -67,6 +70,7 @@ export function registerAuthHandlers(): void {
   });
 
   secureHandle('auth:changeName', async (_event, params: AuthChangeNameParams) => {
+    if (!isUnlocked()) return { ok: false, error: '请先登录' };
     try {
       return await changeAccountName(params ?? {});
     } catch (error: unknown) {

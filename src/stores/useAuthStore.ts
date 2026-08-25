@@ -18,6 +18,7 @@ interface AuthStore {
   login: (params: AuthLoginParams) => Promise<{ ok: boolean; error?: string }>;
   logout: () => Promise<void>;
   switchToSetup: () => void;
+  switchToLogin: () => void;
   changePassword: (params: AuthChangePasswordParams) => Promise<{ ok: boolean; error?: string }>;
   setAvatar: (avatar: string) => Promise<{ ok: boolean; error?: string }>;
   changeName: (name: string) => Promise<{ ok: boolean; error?: string }>;
@@ -33,9 +34,11 @@ export const useAuthStore = create<AuthStore>((set) => ({
   notice: '',
 
   hydrate: async () => {
+    let statusResolved = false;
     try {
       const res = await window.electronAPI?.auth?.status();
       if (res?.ok && res.data) {
+        statusResolved = true;
         set({
           phase: res.data.phase,
           name: res.data.name ?? '',
@@ -46,9 +49,9 @@ export const useAuthStore = create<AuthStore>((set) => ({
         });
       }
     } catch {
-      // Keep the default locked phase; the app stays behind the login screen.
+      // 认证服务不可用时仍允许进入注册页，避免用户卡死在登录页。
     } finally {
-      set({ ready: true });
+      set({ ready: true, ...(statusResolved ? {} : { phase: 'setup' as const }) });
     }
   },
 
@@ -98,6 +101,8 @@ export const useAuthStore = create<AuthStore>((set) => ({
   },
 
   switchToSetup: () => set({ phase: 'setup', notice: '' }),
+
+  switchToLogin: () => set({ phase: 'locked', notice: '' }),
 
   changePassword: async (params) => {
     try {

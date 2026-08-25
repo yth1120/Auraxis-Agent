@@ -38,6 +38,10 @@ interface StoredAccount {
 /** In-memory session flag for this process boot. */
 let unlocked = false;
 
+export function isUnlocked(): boolean {
+  return unlocked;
+}
+
 function authBypassEnabled(): boolean {
   return !(typeof app !== 'undefined' && app.isPackaged) && process.env.AURAXIS_AUTH_DISABLED === '1';
 }
