@@ -11,16 +11,16 @@ import { useAutoResize } from '../../hooks/useAutoResize';
 import { useSettingsStore } from '../../stores/useSettingsStore';
 import { useProjectStore } from '../../stores/useProjectStore';
 import ChatInputComposer from './ChatInputComposer';
+import { useChatInputMentions } from './useChatInputMentions';
 import { resolveSessionRefs } from '../../utils/sessionRefs';
 import { resolveFollowTarget } from '../../utils/followTarget';
-import { useT, agentSkillNameKey } from '../../i18n';
+import { useT } from '../../i18n';
 import {
   greeting,
   parsePendingImages,
   resolveAgentConfig,
   resolvePlanAgentConfig,
   resolveWorkAgentConfig,
-  parseTreePaths,
   type ChatInputProps,
 } from './ChatInputUtils';
 import type { WorkAutonomyTier } from '../../types/advanced';
@@ -191,69 +191,41 @@ export default function ChatInput({ position, heroSubtitleKey }: ChatInputProps)
     setModePanelOpen(false);
   }, [sidebarMode]);
 
-  const [mentionOpen, setMentionOpen] = useState(false);
-  const [mentionQuery, setMentionQuery] = useState('');
-  const [mentionIndex, setMentionIndex] = useState(-1);
-  const [mentionItems, setMentionItems] = useState<string[]>([]);
-  const [mentionSessions, setMentionSessions] = useState<{ id: string; title: string }[]>([]);
-  const [mentionSelected, setMentionSelected] = useState(0);
-  const [allFilePaths, setAllFilePaths] = useState<string[]>([]);
-  const allSessions = useSessionStore((s) => s.sessions);
-  const mentionFetchRef = useRef(0);
-  const mentionDebounceRef = useRef<ReturnType<typeof setTimeout>>();
   const containerRef = useRef<HTMLDivElement>(null);
-
-  const [commandOpen, setCommandOpen] = useState(false);
-  const [commandQuery, setCommandQuery] = useState('');
-  const [commandIndex, setCommandIndex] = useState(-1);
-  const [commandItems, setCommandItems] = useState<SlashCommand[]>([]);
-  const [commandSelected, setCommandSelected] = useState(0);
-
-  // `$`-mention — 技能调用入口（目前仅前端）。
-  const [dollarOpen, setDollarOpen] = useState(false);
-  const [dollarIndex, setDollarIndex] = useState(-1);
-  const [dollarQuery, setDollarQuery] = useState('');
-  const [dollarSelected, setDollarSelected] = useState(0);
-
-  const [backendSkills, setBackendSkills] = useState<AgentSkill[]>([]);
-  useEffect(() => {
-    let cancelled = false;
-    void window.electronAPI?.skills
-      ?.list()
-      .then((r) => {
-        if (cancelled || !r?.ok || !r.data) return;
-        setBackendSkills(
-          r.data.skills.map((s) => ({
-            key: s.name,
-            name: s.name,
-            description: s.description,
-            type: 'general-purpose' as const,
-            icon: 'feature' as const,
-            instruction: s.whenToUse ? `${s.description}\n\n何时使用：${s.whenToUse}` : s.description,
-          })),
-        );
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const allSkills = useMemo(() => {
-    const seen = new Set(AGENT_SKILLS.map((s) => s.name).concat(AGENT_SKILLS.map((s) => s.key)));
-    return [...AGENT_SKILLS, ...backendSkills.filter((s) => !seen.has(s.name) && !seen.has(s.key))];
-  }, [backendSkills]);
-
-  const dollarSkills = useMemo(() => {
-    const q = dollarQuery.trim().toLowerCase();
-    return allSkills.filter(
-      (s) =>
-        !q ||
-        s.name.toLowerCase().includes(q) ||
-        s.key.includes(q) ||
-        t(agentSkillNameKey(s.key)).toLowerCase().includes(q),
-    );
-  }, [dollarQuery, allSkills, t]);
+  const {
+    mentionOpen,
+    mentionQuery,
+    mentionIndex,
+    mentionItems,
+    mentionSessions,
+    mentionSelected,
+    setMentionOpen,
+    setMentionIndex,
+    setMentionSelected,
+    commandOpen,
+    commandQuery,
+    commandIndex,
+    commandItems,
+    commandSelected,
+    setCommandOpen,
+    setCommandIndex,
+    setCommandSelected,
+    dollarOpen,
+    dollarIndex,
+    dollarQuery,
+    dollarSelected,
+    setDollarOpen,
+    setDollarIndex,
+    setDollarSelected,
+    allSkills,
+    dollarSkills,
+  } = useChatInputMentions({
+    projectPath,
+    inputValue,
+    textareaRef,
+    isAgentSurface,
+    t,
+  });
 
   const hasInput = inputValue.trim().length > 0;
   const micSupported = useMemo(() => typeof window !== 'undefined' && !!speechRecognitionConstructor(), []);
@@ -263,30 +235,6 @@ export default function ChatInput({ position, heroSubtitleKey }: ChatInputProps)
   }, [inputValue, resize, isCenter]);
 
   useEffect(() => {
-    const api = window.electronAPI;
-    if (!projectPath || !api?.context) {
-      setAllFilePaths([]);
-      return;
-    }
-    const fetchId = ++mentionFetchRef.current;
-    void (async () => {
-      const [tree, plans] = await Promise.all([
-        api.context.getFileStructure(projectPath),
-        api.plan?.list(projectPath) ?? Promise.resolve({ ok: false as const }),
-      ]);
-      if (fetchId !== mentionFetchRef.current) return;
-      const paths = tree.ok && tree.data ? parseTreePaths(tree.data) : [];
-      if (plans?.ok && plans.data) {
-        for (const p of plans.data) {
-          const rel = p.relative || p.name;
-          if (rel) paths.push(rel);
-        }
-      }
-      setAllFilePaths(paths);
-    })();
-  }, [projectPath]);
-
-  useEffect(() => {
     let cancelled = false;
     if (!projectPath) {
       setGitBranch('');
@@ -294,9 +242,9 @@ export default function ChatInput({ position, heroSubtitleKey }: ChatInputProps)
     }
     window.electronAPI?.system
       ?.getGitBranches?.(projectPath)
-      .then((r) => {
+      .then((result) => {
         if (cancelled) return;
-        setGitBranch(r?.ok && r.data?.current ? r.data.current : '');
+        setGitBranch(result?.ok && result.data?.current ? result.data.current : '');
       })
       .catch(() => {
         if (!cancelled) setGitBranch('');
@@ -305,73 +253,6 @@ export default function ChatInput({ position, heroSubtitleKey }: ChatInputProps)
       cancelled = true;
     };
   }, [projectPath]);
-
-  useEffect(() => {
-    clearTimeout(mentionDebounceRef.current);
-    mentionDebounceRef.current = setTimeout(() => {
-      const cursorPos = textareaRef.current?.selectionStart ?? inputValue.length;
-      const textBefore = inputValue.slice(0, cursorPos);
-      const lastAtIndex = textBefore.lastIndexOf('@');
-      const lastSlashIdx = textBefore.lastIndexOf('/');
-      const lastDollarIdx = textBefore.lastIndexOf('$');
-
-      // Slash autocomplete works in both modes; Agent-only commands are
-      // rejected at execution time instead of disappearing from discovery.
-      if (lastSlashIdx > lastAtIndex && lastSlashIdx > lastDollarIdx) {
-        const query = textBefore.slice(lastSlashIdx + 1);
-        if (!query.includes(' ') && !query.includes('\n') && !query.includes('/')) {
-          setCommandIndex(lastSlashIdx);
-          setCommandQuery(query);
-          const allCommands = listSlashCommands();
-          const filtered = allCommands.filter((c) => c.name.startsWith(query.toLowerCase())).slice(0, 6);
-          setCommandItems(filtered);
-          setCommandSelected(0);
-          setCommandOpen(filtered.length > 0);
-        } else {
-          setCommandOpen(false);
-        }
-        setMentionOpen(false);
-        setDollarOpen(false);
-      } else if (lastDollarIdx > lastAtIndex && isAgentSurface) {
-        // `$`-mention: skill invocation entry (skills engine lands later).
-        const query = textBefore.slice(lastDollarIdx + 1);
-        if (!query.includes(' ') && !query.includes('\n') && !query.includes('$')) {
-          setDollarIndex(lastDollarIdx);
-          setDollarQuery(query);
-          setDollarSelected(0);
-          setDollarOpen(true);
-        } else {
-          setDollarOpen(false);
-        }
-        setMentionOpen(false);
-        setCommandOpen(false);
-      } else if (lastAtIndex >= 0) {
-        const query = textBefore.slice(lastAtIndex + 1);
-        if (!query.includes(' ') && !query.includes('\n') && !query.includes('@')) {
-          setMentionIndex(lastAtIndex);
-          setMentionQuery(query);
-          const filtered = allFilePaths.filter((p) => p.toLowerCase().includes(query.toLowerCase())).slice(0, 8);
-          const sessionMatches = allSessions
-            .filter((s) => (s.title || '').toLowerCase().includes(query.toLowerCase()))
-            .slice(0, 4)
-            .map((s) => ({ id: s.id, title: s.title }));
-          setMentionItems(filtered);
-          setMentionSessions(sessionMatches);
-          setMentionSelected(0);
-          setMentionOpen(filtered.length > 0 || sessionMatches.length > 0);
-        } else {
-          setMentionOpen(false);
-        }
-        setCommandOpen(false);
-        setDollarOpen(false);
-      } else {
-        setMentionOpen(false);
-        setCommandOpen(false);
-        setDollarOpen(false);
-      }
-    }, 60);
-    return () => clearTimeout(mentionDebounceRef.current);
-  }, [inputValue, allFilePaths, allSessions, isAgentSurface, textareaRef]);
 
   const handleInputChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -674,7 +555,7 @@ export default function ChatInput({ position, heroSubtitleKey }: ChatInputProps)
         textareaRef.current?.focus();
       }, 0);
     },
-    [inputValue, mentionIndex, setInputValue, textareaRef],
+    [inputValue, mentionIndex, setInputValue, textareaRef, setMentionOpen, setMentionIndex],
   );
 
   const handleMentionSessionSelect = useCallback(
@@ -694,7 +575,7 @@ export default function ChatInput({ position, heroSubtitleKey }: ChatInputProps)
         textareaRef.current?.focus();
       }, 0);
     },
-    [inputValue, mentionIndex, setInputValue, textareaRef],
+    [inputValue, mentionIndex, setInputValue, textareaRef, setMentionOpen, setMentionIndex],
   );
 
   const handleDollarSelect = useCallback(
@@ -713,7 +594,7 @@ export default function ChatInput({ position, heroSubtitleKey }: ChatInputProps)
         textareaRef.current?.focus();
       }, 0);
     },
-    [inputValue, dollarIndex, setInputValue, textareaRef],
+    [inputValue, dollarIndex, setInputValue, textareaRef, setDollarOpen, setDollarIndex],
   );
 
   const handleCommandSelect = useCallback(
@@ -757,7 +638,7 @@ export default function ChatInput({ position, heroSubtitleKey }: ChatInputProps)
       setCommandOpen(false);
       setCommandIndex(-1);
     },
-    [inputValue, commandIndex, commandQuery, setInputValue, textareaRef, t],
+    [inputValue, commandIndex, commandQuery, setInputValue, textareaRef, t, setCommandOpen, setCommandIndex],
   );
 
   const handleKeyDownWithMention = useCallback(
@@ -889,6 +770,12 @@ export default function ChatInput({ position, heroSubtitleKey }: ChatInputProps)
       inputValue,
       sendQueueNow,
       t,
+      setCommandOpen,
+      setCommandSelected,
+      setDollarOpen,
+      setDollarSelected,
+      setMentionOpen,
+      setMentionSelected,
     ],
   );
 
@@ -908,7 +795,7 @@ export default function ChatInput({ position, heroSubtitleKey }: ChatInputProps)
     };
     document.addEventListener('mousedown', onMouseDown);
     return () => document.removeEventListener('mousedown', onMouseDown);
-  }, [smartMoreClose, smartMorePanelRef]);
+  }, [smartMoreClose, smartMorePanelRef, setDollarOpen]);
 
   const handleBlur = useCallback(() => {
     requestAnimationFrame(() => {
@@ -923,7 +810,7 @@ export default function ChatInput({ position, heroSubtitleKey }: ChatInputProps)
       setCommandOpen(false);
       setDollarOpen(false);
     });
-  }, [smartMoreClose, smartMorePanelRef]);
+  }, [smartMoreClose, smartMorePanelRef, setCommandOpen, setDollarOpen, setMentionOpen]);
 
   // ── Image draft rail: live thumbnails for picked images in the composer ──
   const pendingImages = useMemo(() => parsePendingImages(inputValue), [inputValue]);
