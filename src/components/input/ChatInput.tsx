@@ -10,8 +10,9 @@ import { useAutoResize } from '../../hooks/useAutoResize';
 import { useSettingsStore } from '../../stores/useSettingsStore';
 import ChatInputComposer from './ChatInputComposer';
 import { useChatInputMentions } from './useChatInputMentions';
-import { executeLeadingCommand, launchAgentTask, recordCommand } from './ChatInputActions';
+import { recordCommand } from './ChatInputActions';
 import { useChatInputFiles } from './useChatInputFiles';
+import { useChatInputSend } from './useChatInputSend';
 import { useT } from '../../i18n';
 import {
   greeting,
@@ -43,9 +44,7 @@ export default function ChatInput({ position, heroSubtitleKey }: ChatInputProps)
   const heroSizing = isCenter || isFlowCenter;
   const inputValue = useChatStore((s) => s.inputValue);
   const setInputValue = useChatStore((s) => s.setInputValue);
-  const sendMessage = useChatStore((s) => s.sendMessage);
   const isStreaming = useChatStore((s) => s.isStreaming);
-  const stopStreaming = useChatStore((s) => s.stopStreaming);
   const isWebSearch = useChatStore((s) => s.isWebSearch);
   const toggleWebSearch = useChatStore((s) => s.toggleWebSearch);
   const selectedModel = useChatStore((s) => s.selectedModel);
@@ -259,122 +258,22 @@ export default function ChatInput({ position, heroSubtitleKey }: ChatInputProps)
     if (composerFocusTick > 0) textareaRef.current?.focus();
   }, [composerFocusTick, textareaRef]);
 
-  // Code mode: each send launches a new parallel Agent task (via the
-  // background agent engine), instead of a plain chat turn.
-  const startCodeTask = useCallback(
-    (instruction: string, opts?: { clearInput?: boolean }) =>
-      launchAgentTask({
-        instruction,
-        clearInput: opts?.clearInput,
-        allSkills,
-        permissionPreset,
-        selectedModel,
-        reasoningEffort,
-        taskPriority,
-        t,
-      }),
-    [allSkills, permissionPreset, selectedModel, reasoningEffort, taskPriority, t],
-  );
-
-  /** Executes a leading slash command when the user presses Enter directly. */
-  const tryExecuteLeadingCommand = useCallback(
-    (raw: string) => executeLeadingCommand(raw, setInputValue, t),
-    [setInputValue, t],
-  );
-
-  const handleSend = useCallback(() => {
-    // In code mode the send button becomes a STOP control while the current
-    // task is busy — this must win over slash commands / typing state.
-    if (isAgentSurface && currentAgentRunning && currentAgentId) {
-      const text = inputValue.trim();
-      if (text) {
-        // 有输入时：排队续写，任务结束后自动跟进
-        useChatStore.getState().enqueueAgentMessage(text);
-        useChatStore.getState().setInputValue('');
-        setToastMsg(t('composer.toast.queued'));
-        setShowToast(true);
-        return;
-      }
-      useAgentStore.getState().stopAgent(currentAgentId);
-      return;
-    }
-    // Leading slash commands run in both modes before anything else.
-    if (tryExecuteLeadingCommand(inputValue)) return;
-    if (isStreaming) {
-      const hasText = inputValue.trim().length > 0;
-      stopStreaming();
-      // Chat 模式：允许生成期间起草，按发送 = 停止当前生成并立即发出新消息。
-      if (hasText && !isAgentSurface) window.setTimeout(() => sendMessage(), 0);
-      return;
-    }
-    if (!inputValue.trim()) return;
-    if (isAgentSurface) {
-      startCodeTask(inputValue);
-      return;
-    }
-    sendMessage();
-  }, [
+  const { handleSend, sendQueueNow } = useChatInputSend({
     inputValue,
-    isStreaming,
-    sendMessage,
-    stopStreaming,
     isAgentSurface,
-    currentAgentId,
     currentAgentRunning,
-    startCodeTask,
-    tryExecuteLeadingCommand,
+    currentAgentId,
+    currentAgentStatus,
+    isStreaming,
+    setToastMsg,
+    setShowToast,
+    allSkills,
+    permissionPreset,
+    selectedModel,
+    reasoningEffort,
+    taskPriority,
     t,
-  ]);
-
-  /** Guards the auto-drain effect against explicit "interrupt & send now" flows. */
-  const explicitInterruptRef = useRef(false);
-
-  /** Queue action: interrupt the current task and send a queued/typed message now. */
-  const sendQueueNow = useCallback(
-    async (text: string) => {
-      const trimmed = text.trim();
-      if (!trimmed) return;
-      if (isAgentSurface && currentAgentRunning && currentAgentId) {
-        // The settle transition from this explicit stop would otherwise trip
-        // the auto-drain effect and fire the NEXT queued message as well.
-        explicitInterruptRef.current = true;
-        await useAgentStore.getState().stopAgent(currentAgentId);
-        setToastMsg(t('composer.toast.interrupted'));
-        setShowToast(true);
-      }
-      void startCodeTask(trimmed, { clearInput: false });
-    },
-    [currentAgentId, currentAgentRunning, isAgentSurface, startCodeTask, t],
-  );
-
-  // Auto-continue: a message queued while the task was busy dispatches as a
-  // follow-up once the current task settles. One at a time — the next queued
-  // message waits for the next terminal transition, so 续写 runs sequentially.
-  const prevAgentStatusRef = useRef<string | null>(null);
-  useEffect(() => {
-    const prev = prevAgentStatusRef.current;
-    prevAgentStatusRef.current = currentAgentStatus;
-    if (!isAgentSurface || !currentAgentId) return;
-    const wasBusy = prev === 'running' || prev === 'queued' || prev === 'paused';
-    const settled =
-      currentAgentStatus === 'completed' || currentAgentStatus === 'error' || currentAgentStatus === 'stopped';
-    if (!wasBusy) {
-      // A stale guard (explicit stop that never produced a busy→settled
-      // transition) must not suppress a later real drain.
-      explicitInterruptRef.current = false;
-      return;
-    }
-    if (explicitInterruptRef.current) {
-      // The explicit "send now" flow already launched the next run.
-      explicitInterruptRef.current = false;
-      return;
-    }
-    if (!settled) return;
-    const next = useChatStore.getState().agentQueue[0];
-    if (!next) return;
-    useChatStore.getState().dequeueAgentMessage(next.id);
-    void startCodeTask(next.text, { clearInput: false });
-  }, [currentAgentStatus, currentAgentId, isAgentSurface, startCodeTask]);
+  });
 
   const handleMentionSelect = useCallback(
     (filePath: string) => {
