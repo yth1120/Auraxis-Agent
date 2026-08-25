@@ -60,6 +60,28 @@ import { AGENT_SKILLS, type AgentSkill } from '../../core/skills';
 import { useAuthStore } from '../../stores/useAuthStore';
 import logoPng from '../../assets/auraxis-logo.png';
 
+interface SpeechRecognitionEventLike {
+  results: ArrayLike<ArrayLike<{ transcript?: string }>>;
+}
+
+interface SpeechRecognitionInstanceLike {
+  lang: string;
+  interimResults: boolean;
+  onerror?: () => void;
+  onresult?: (event: SpeechRecognitionEventLike) => void;
+  start: () => void;
+}
+
+type SpeechRecognitionConstructor = new () => SpeechRecognitionInstanceLike;
+
+function speechRecognitionConstructor(): SpeechRecognitionConstructor | undefined {
+  if (typeof window === 'undefined') return undefined;
+  const w = window as typeof window & {
+    SpeechRecognition?: SpeechRecognitionConstructor;
+    webkitSpeechRecognition?: SpeechRecognitionConstructor;
+  };
+  return w.SpeechRecognition || w.webkitSpeechRecognition;
+}
 export default function ChatInput({ position, heroSubtitleKey }: ChatInputProps) {
   const t = useT();
   const accountName = useAuthStore((s) => s.name);
@@ -282,11 +304,7 @@ export default function ChatInput({ position, heroSubtitleKey }: ChatInputProps)
   }, [dollarQuery, allSkills, t]);
 
   const hasInput = inputValue.trim().length > 0;
-  const micSupported = useMemo(
-    () =>
-      typeof window !== 'undefined' && !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition),
-    [],
-  );
+  const micSupported = useMemo(() => typeof window !== 'undefined' && !!speechRecognitionConstructor(), []);
 
   useEffect(() => {
     resize();
@@ -1039,7 +1057,7 @@ export default function ChatInput({ position, heroSubtitleKey }: ChatInputProps)
   );
 
   const handleMicClick = useCallback(() => {
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const SR = speechRecognitionConstructor();
     if (!SR) {
       message.info(t('composer.micUnavailable'));
       return;
@@ -1051,7 +1069,7 @@ export default function ChatInput({ position, heroSubtitleKey }: ChatInputProps)
       rec.onerror = () => {
         message.error(t('composer.micPermission'));
       };
-      rec.onresult = (e: any) => {
+      rec.onresult = (e) => {
         const t = e.results[0][0].transcript?.trim();
         if (t) {
           const { inputValue: iv, setInputValue: sv } = useChatStore.getState();

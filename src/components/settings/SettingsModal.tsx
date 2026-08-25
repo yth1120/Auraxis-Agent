@@ -287,11 +287,11 @@ export default function SettingsModal({ open, onClose, initialKey }: SettingsMod
         });
         let r: { ok: boolean; message: string; models?: string[] };
         if (resp.ok) {
-          const data = await resp.json();
+          const data = (await resp.json()) as { data?: Array<{ id?: string }> };
           r = {
             ok: true,
             message: t('settings.deepseekConnected'),
-            models: (data.data || []).map((m: any) => m.id).slice(0, 10),
+            models: (data.data || []).map((m) => m.id ?? '').slice(0, 10),
           };
         } else if (resp.status === 401 || resp.status === 403) {
           r = { ok: false, message: t('settings.apiKeyInvalid') };
@@ -872,7 +872,8 @@ export default function SettingsModal({ open, onClose, initialKey }: SettingsMod
             input.onchange = async (e) => {
               const file = (e.target as HTMLInputElement).files?.[0];
               if (!file) return;
-              const ok = await pluginManager.installFromPath((file as any).path || file.name);
+              const pluginFile = file as File & { path?: string };
+              const ok = await pluginManager.installFromPath(pluginFile.path || file.name);
               if (ok) message.success(t('settings.pluginInstalled', { name: file.name }));
               else message.warning(t('settings.pluginInstallFailed'));
             };

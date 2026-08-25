@@ -264,7 +264,7 @@ export const SessionRow = memo(function SessionRow({
             title={t('sidebar.deleteChatConfirm')}
             onConfirm={(e) => {
               e?.stopPropagation();
-              onDelete(e as any, s.id);
+              onDelete(e!, s.id);
             }}
             onCancel={(e) => {
               e?.stopPropagation();
