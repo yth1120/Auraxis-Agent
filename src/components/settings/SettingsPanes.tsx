@@ -1,28 +1,22 @@
 import { errorText } from '../../../electron/errors';
 import { useEffect, useRef, useState } from 'react';
-import { Input, InputNumber, Modal, Select, Button, Space, message, Switch, Popconfirm, Segmented, Slider } from 'antd';
+import { Input, InputNumber, Modal, Select, Button, Space, message, Switch, Segmented, Slider } from 'antd';
 import {
-  MinusCircle as MinusCircleOutlined,
-  Clock as ClockCircleOutlined,
   PlusCircle as PlusCircleOutlined,
 } from '@/components/common/icons';
 import clsx from 'clsx';
 import { useSettingsStore } from '../../stores/useSettingsStore';
 import { getDeepSeekModelsUrl } from '../../../electron/api-config';
-import { useAdvancedStore } from '../../stores/useAdvancedStore';
 import { useAppStore } from '../../stores/useAppStore';
 import { useModels } from '../../hooks/useModels';
-import { useKeybindingsStore } from '../../stores/useKeybindingsStore';
-import { KEY_BINDINGS, formatBinding, isCtrlOrCmd, type KeyBinding } from '../../constants/keybindings';
 import { usePluginStore } from '../../stores/usePluginStore';
 import { pluginManager } from '../../core/plugin-manager';
 import { getCapabilitySummary } from '../../core/plugin-loader';
 import SettingItem from './SettingItem';
 import { readWallpaperFile } from './SettingsModalConfig';
 import InlineEmpty from '../common/InlineEmpty';
-import PermissionProfilePanel from './PermissionProfilePanel';
 import { useI18nStore } from '../../i18n';
-import { useT, keybindingDescKey } from '../../i18n';
+import { useT } from '../../i18n';
 
 export function SettingsPaneHeader({ title, description }: { title: string; description?: string }) {
   return (
@@ -455,224 +449,6 @@ export function SettingsAppearancePane() {
           <Switch checked={alwaysShowMessageActions} onChange={setAlwaysShowMessageActions} />
         </SettingItem>
       </section>
-    </>
-  );
-}
-
-export function SettingsKeybindingsPane() {
-  const t = useT();
-  const overrides = useKeybindingsStore((s) => s.overrides);
-  const setOverride = useKeybindingsStore((s) => s.setOverride);
-  const clearOverrides = useKeybindingsStore((s) => s.clearOverrides);
-  const active = useKeybindingsStore((s) => s.getActive());
-  const [recordingIndex, setRecordingIndex] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (recordingIndex === null) return;
-    const handler = (e: KeyboardEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (e.key === 'Escape') {
-        setRecordingIndex(null);
-        return;
-      }
-      if (['Control', 'Shift', 'Alt', 'Meta'].includes(e.key)) return;
-      const newBinding: KeyBinding = {
-        key: e.key,
-        ctrl: isCtrlOrCmd(e) || undefined,
-        shift: e.shiftKey || undefined,
-        alt: e.altKey || undefined,
-        description: KEY_BINDINGS[recordingIndex].description,
-        category: KEY_BINDINGS[recordingIndex].category,
-      };
-      const conflictIdx = active.findIndex(
-        (b, i) =>
-          i !== recordingIndex &&
-          b.key === newBinding.key &&
-          (b.ctrl ?? false) === (newBinding.ctrl ?? false) &&
-          (b.shift ?? false) === (newBinding.shift ?? false) &&
-          (b.alt ?? false) === (newBinding.alt ?? false),
-      );
-      if (conflictIdx >= 0) {
-        Modal.confirm({
-          title: t('settings.shortcutConflict'),
-          content: t('settings.shortcutConflictBody', {
-            new: formatBinding(newBinding),
-            desc: KEY_BINDINGS[conflictIdx].description,
-          }),
-          okText: t('settings.overwrite'),
-          cancelText: t('common.cancel'),
-          onOk: () => {
-            setOverride(recordingIndex, newBinding);
-            setRecordingIndex(null);
-          },
-          onCancel: () => setRecordingIndex(null),
-        });
-      } else {
-        setOverride(recordingIndex, newBinding);
-        setRecordingIndex(null);
-      }
-    };
-    window.addEventListener('keydown', handler, true);
-    return () => window.removeEventListener('keydown', handler, true);
-  }, [recordingIndex, active, setOverride, t]);
-
-  return (
-    <>
-      <SettingsPaneHeader title={t('settings.item.keybindings')} description={t('settings.pane.keybindings.desc')} />
-      <div className="flex items-center justify-between mb-1">
-        <span className="text-sm font-semibold text-text-primary">{t('settings.bindings')}</span>
-        <Button
-          size="small"
-          onClick={() => {
-            Modal.confirm({
-              title: t('settings.restoreDefaultConfirmTitle'),
-              content: t('settings.restoreDefaultConfirmBody'),
-              okText: t('settings.confirm'),
-              cancelText: t('common.cancel'),
-              onOk: () => clearOverrides(),
-            });
-          }}
-        >
-          {t('settings.restoreDefault')}
-        </Button>
-      </div>
-      <div>
-        {KEY_BINDINGS.map((def, i) => {
-          const current = active[i];
-          const isRecording = recordingIndex === i;
-          const isOverridden = overrides[i] !== undefined;
-          return (
-            <div key={i} className="flex items-center justify-between py-3">
-              <span className="text-sm text-text-primary">{t(keybindingDescKey(def.description))}</span>
-              <Space size={8}>
-                <span
-                  className={clsx(
-                    'font-mono text-xs text-text-secondary bg-border-dim px-2 py-[2px] rounded-md',
-                    isOverridden && 'text-text-primary bg-primary-soft',
-                  )}
-                >
-                  {formatBinding(current)}
-                </span>
-                <Button
-                  size="small"
-                  type={isRecording ? 'primary' : 'default'}
-                  onClick={() => setRecordingIndex(isRecording ? null : i)}
-                >
-                  {isRecording ? t('settings.pressNewKey') : t('settings.rebind')}
-                </Button>
-              </Space>
-            </div>
-          );
-        })}
-      </div>
-    </>
-  );
-}
-
-export function SettingsPermissionsPane() {
-  const t = useT();
-  const permissionRules = useAdvancedStore((s) => s.permissionRules);
-  const setPermissionRules = useAdvancedStore((s) => s.setPermissionRules);
-  const removePermissionRule = useAdvancedStore((s) => s.removePermissionRule);
-  const clearPermissionRules = useAdvancedStore((s) => s.clearPermissionRules);
-
-  useEffect(() => {
-    window.electronAPI?.permission
-      ?.getRules()
-      .then((r) => {
-        if (r?.ok && r.data) setPermissionRules(r.data);
-      })
-      .catch(() => {
-        /* keep local list */
-      });
-  }, [setPermissionRules]);
-
-  return (
-    <>
-      <SettingsPaneHeader title={t('settings.item.permissions')} description={t('settings.pane.permissions.desc')} />
-      <PermissionProfilePanel />
-      <SettingsSectionTitle>{t('settings.section.rules')}</SettingsSectionTitle>
-      <div className="flex items-center justify-between mb-1">
-        {permissionRules.length > 0 && (
-          <Button
-            danger
-            size="small"
-            onClick={() => {
-              Modal.confirm({
-                title: t('settings.clearRulesTitle'),
-                content: t('settings.clearRulesBody', { n: permissionRules.length }),
-                okText: t('settings.confirmClear'),
-                cancelText: t('common.cancel'),
-                okButtonProps: { danger: true },
-                onOk: () => {
-                  clearPermissionRules();
-                  message.success(t('settings.rulesCleared'));
-                },
-              });
-            }}
-          >
-            {t('settings.clearAll', { n: permissionRules.length })}
-          </Button>
-        )}
-      </div>
-      {permissionRules.length === 0 ? (
-        <InlineEmpty description={t('settings.noRules')} compact />
-      ) : (
-        <div>
-          {permissionRules
-            .slice()
-            .reverse()
-            .map((rule) => (
-              <div key={rule.id} className="flex items-start gap-3 py-3">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <span className="inline-flex items-center px-2 py-[1px] rounded-full text-2xs font-medium leading-[1.6] whitespace-nowrap bg-border-dim text-text-secondary">
-                      {rule.toolName}
-                    </span>
-                    <span
-                      className={clsx(
-                        'inline-flex items-center px-2 py-[1px] rounded-full text-2xs font-medium leading-[1.6] whitespace-nowrap',
-                        rule.scope === 'always'
-                          ? 'bg-success-soft text-text-secondary'
-                          : 'bg-border-dim text-text-secondary',
-                      )}
-                    >
-                      {rule.scope === 'always'
-                        ? t('settings.ruleAlways')
-                        : rule.scope === 'session'
-                          ? t('settings.ruleSession')
-                          : t('settings.ruleOnce')}
-                    </span>
-                    {rule.action === 'deny' && (
-                      <span className="inline-flex items-center px-2 py-[1px] rounded-full text-2xs font-medium leading-[1.6] whitespace-nowrap bg-danger-soft text-text-secondary">
-                        {t('settings.ruleDeny')}
-                      </span>
-                    )}
-                  </div>
-                  {rule.matchPattern && (
-                    <div className="text-xs text-text-muted mt-1 font-mono">
-                      {t('settings.ruleMatch', { pattern: rule.matchPattern })}
-                    </div>
-                  )}
-                  <div className="text-2xs text-text-faint mt-1">
-                    <ClockCircleOutlined style={{ marginRight: 4 }} />
-                    {new Date(rule.createdAt).toLocaleString()}
-                  </div>
-                </div>
-                <Popconfirm
-                  title={t('settings.deleteRuleConfirm')}
-                  onConfirm={() => removePermissionRule(rule.id)}
-                  okText={t('sidebar.delete')}
-                  cancelText={t('common.cancel')}
-                  okButtonProps={{ danger: true, type: 'primary' }}
-                >
-                  <Button type="text" size="small" danger icon={<MinusCircleOutlined />} />
-                </Popconfirm>
-              </div>
-            ))}
-        </div>
-      )}
     </>
   );
 }

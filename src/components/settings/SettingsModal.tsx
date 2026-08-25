@@ -14,10 +14,10 @@ import { SettingsAboutPane } from './SettingsAboutPane';
 import {
   SettingsGeneralPane,
   SettingsAppearancePane,
-  SettingsKeybindingsPane,
-  SettingsPermissionsPane,
   SettingsPluginsPane,
 } from './SettingsPanes';
+import { SettingsKeybindingsPane } from './SettingsKeybindingsPane';
+import { SettingsPermissionsPane } from './SettingsPermissionsPane';
 import {
   SettingsActionsPane,
   SettingsWorkflowsPane,
