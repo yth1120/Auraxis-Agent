@@ -6,6 +6,7 @@
  * 渲染层可以列出任务、停止运行中的任务、以及把命令回放到交互终端。
  */
 import { ipcMain } from 'electron';
+import { secureHandle } from './trust';
 import { randomUUID } from 'crypto';
 import { getMainWindowRef } from './window-ref';
 
@@ -109,9 +110,9 @@ export function clearTasks(): void {
 export function registerTerminalTaskHandlers(): void {
   if (handlersRegistered) return;
   handlersRegistered = true;
-  ipcMain.handle('terminal:tasks:list', () => ({ ok: true, data: listTasks() }));
-  ipcMain.handle('terminal:tasks:stop', (_e, id: string) => ({ ok: stopTask(id) }));
-  ipcMain.handle('terminal:tasks:clear', () => {
+  secureHandle('terminal:tasks:list', () => ({ ok: true, data: listTasks() }));
+  secureHandle('terminal:tasks:stop', (_e, id: string) => ({ ok: stopTask(id) }));
+  secureHandle('terminal:tasks:clear', () => {
     clearTasks();
     return { ok: true };
   });

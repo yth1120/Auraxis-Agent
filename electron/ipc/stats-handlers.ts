@@ -5,6 +5,7 @@
  * `stats:get`.
  */
 import { app } from 'electron';
+import { secureHandle } from './trust';
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import path from 'path';
 import { ipcMain } from 'electron';
@@ -164,7 +165,7 @@ function formatLineCount(n: number): string {
 /* ── IPC registration ───────────────────────────────────── */
 
 export function registerStatsHandlers(): void {
-  ipcMain.handle('stats:get', async () => {
+  secureHandle('stats:get', async () => {
     try {
       const s = await loadStats();
       return { ok: true, data: formatStats(s) };
@@ -173,7 +174,7 @@ export function registerStatsHandlers(): void {
     }
   });
 
-  ipcMain.handle('stats:reset', async () => {
+  secureHandle('stats:reset', async () => {
     try {
       await saveStats({ ...DEFAULT_STATS });
       return { ok: true };

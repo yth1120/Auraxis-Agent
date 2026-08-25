@@ -1,9 +1,12 @@
 import { ipcMain, dialog } from 'electron';
+import { secureHandle } from './trust';
 import { readFile, writeFile, readdir, rm, rename, mkdir, stat, open } from 'fs/promises';
 import path from 'path';
 import mime from 'mime-types';
 import { normalizeWinPath, isPathInside, isAllowedExtension, isDocumentExtension, assertString } from './shared';
 import { estimateTokens } from './token-estimate';
+import { assertTrustedIpcSender } from './trust';
+import { resolveTrustedProjectRoot } from './project-access';
 
 const PREVIEW_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.pdf']);
 const PREVIEW_MAX_BYTES = 8 * 1024 * 1024;
@@ -19,20 +22,12 @@ function resolveInsideProject(filePath: string, projectRoot?: string): string | 
 }
 
 async function requireProjectRoot(projectRoot?: string): Promise<string> {
-  if (projectRoot) return path.resolve(projectRoot);
-  // 不传 projectRoot 时回退到主进程记录的项目根，禁止操作任意路径。
-  try {
-    const { readSettings } = await import('./settings-store');
-    const settings = await readSettings();
-    if (typeof settings?.projectPath === 'string' && settings.projectPath) {
-      return path.resolve(settings.projectPath);
-    }
-  } catch { /* fall through */ }
-  throw new Error('缺少项目路径');
+  return resolveTrustedProjectRoot(projectRoot);
 }
 
 export function registerFileHandlers() {
-  ipcMain.handle('file:open', async (_event, projectRoot?: string) => {
+  secureHandle('file:open', async (event,  projectRoot?: string) => {
+    assertTrustedIpcSender(event);
     try {
       const result = await dialog.showOpenDialog({
         properties: ['openFile', 'multiSelections'],
@@ -65,7 +60,8 @@ export function registerFileHandlers() {
     }
   });
 
-  ipcMain.handle('file:read', async (_event, filePath: string, projectRoot?: string) => {
+  secureHandle('file:read', async (event,  filePath: string, projectRoot?: string) => {
+    assertTrustedIpcSender(event);
     try {
       const root = await requireProjectRoot(projectRoot);
       const normalizedPath = resolveInsideProject(filePath, root);
@@ -77,7 +73,8 @@ export function registerFileHandlers() {
     }
   });
 
-  ipcMain.handle('file:estimateTokens', async (_event, files: string[], projectRoot?: string) => {
+  secureHandle('file:estimateTokens', async (event,  files: string[], projectRoot?: string) => {
+    assertTrustedIpcSender(event);
     try {
       if (!Array.isArray(files)) return { ok: false, error: 'files 必须是数组' };
       const root = await requireProjectRoot(projectRoot);
@@ -106,7 +103,8 @@ export function registerFileHandlers() {
     }
   });
 
-  ipcMain.handle('file:readPreview', async (_event, filePath: string, projectRoot?: string) => {
+  secureHandle('file:readPreview', async (event,  filePath: string, projectRoot?: string) => {
+    assertTrustedIpcSender(event);
     try {
       const root = await requireProjectRoot(projectRoot);
       const normalizedPath = resolveInsideProject(filePath, root);
@@ -133,7 +131,8 @@ export function registerFileHandlers() {
     }
   });
 
-  ipcMain.handle('file:write', async (_event, filePath: string, content: string, projectRoot?: string) => {
+  secureHandle('file:write', async (event,  filePath: string, content: string, projectRoot?: string) => {
+    assertTrustedIpcSender(event);
     try {
       assertString(filePath, 'filePath');
       assertString(content, 'content', true);
@@ -158,7 +157,8 @@ export function registerFileHandlers() {
     }
   });
 
-  ipcMain.handle('file:search', async (_event, keyword: string, projectRoot: string) => {
+  secureHandle('file:search', async (event,  keyword: string, projectRoot: string) => {
+    assertTrustedIpcSender(event);
     try {
       if (!keyword || keyword.length < 1) {
         return { ok: true, data: [] };
@@ -239,7 +239,8 @@ export function registerFileHandlers() {
     }
   });
 
-  ipcMain.handle('file:delete', async (_event, filePath: string, projectRoot?: string) => {
+  secureHandle('file:delete', async (event,  filePath: string, projectRoot?: string) => {
+    assertTrustedIpcSender(event);
     try {
       const root = await requireProjectRoot(projectRoot);
       const normalizedPath = path.resolve(normalizeWinPath(filePath));
@@ -254,7 +255,8 @@ export function registerFileHandlers() {
     }
   });
 
-  ipcMain.handle('file:rename', async (_event, oldPath: string, newPath: string, projectRoot?: string) => {
+  secureHandle('file:rename', async (event,  oldPath: string, newPath: string, projectRoot?: string) => {
+    assertTrustedIpcSender(event);
     try {
       const root = await requireProjectRoot(projectRoot);
       const normalizedOld = path.resolve(normalizeWinPath(oldPath));
@@ -272,7 +274,8 @@ export function registerFileHandlers() {
     }
   });
 
-  ipcMain.handle('file:createFolder', async (_event, dirPath: string, projectRoot?: string) => {
+  secureHandle('file:createFolder', async (event,  dirPath: string, projectRoot?: string) => {
+    assertTrustedIpcSender(event);
     try {
       const root = await requireProjectRoot(projectRoot);
       const normalizedPath = path.resolve(normalizeWinPath(dirPath));
@@ -286,7 +289,8 @@ export function registerFileHandlers() {
     }
   });
 
-  ipcMain.handle('file:createFile', async (_event, filePath: string, projectRoot?: string) => {
+  secureHandle('file:createFile', async (event,  filePath: string, projectRoot?: string) => {
+    assertTrustedIpcSender(event);
     try {
       const root = await requireProjectRoot(projectRoot);
       const normalizedPath = path.resolve(normalizeWinPath(filePath));

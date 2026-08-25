@@ -1,4 +1,5 @@
 import { app, BrowserWindow, shell, session, ipcMain, Notification } from 'electron';
+import { secureHandle } from './ipc/trust';
 import path from 'path';
 import os from 'os';
 import { existsSync, mkdtempSync, rmSync } from 'fs';
@@ -369,7 +370,7 @@ app.whenReady().then(async () => {
   }
 
   // Window focus IPC for notification click
-  ipcMain.handle('window:focus', () => {
+  secureHandle('window:focus', () => {
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.focus();

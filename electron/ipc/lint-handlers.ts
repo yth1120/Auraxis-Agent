@@ -6,7 +6,11 @@
  * prompting to download packages inside a non-interactive shell.
  */
 import { ipcMain } from 'electron';
+import { secureHandle } from './trust';
 import { spawn } from 'child_process';
+import { safeProcessEnv } from '../safe-env';
+import { assertTrustedIpcSender } from './trust';
+import { resolveTrustedProjectRoot } from './project-access';
 
 export function lintCommand(): string {
   return process.env.AURAXIS_LINT_CMD || (process.platform === 'win32' ? 'npx.cmd' : 'npx');
@@ -21,6 +25,8 @@ export interface LintFixOptions {
   command?: string;
   args?: string[];
   timeoutMs?: number;
+  /** Explicit child env overrides; secret keys are still filtered. */
+  env?: Record<string, string>;
 }
 
 export interface LintFixResult {
@@ -39,7 +45,7 @@ export function runLintFix(
     const args = opts.args ?? buildLintArgs(files);
     let child;
     try {
-      child = spawn(command, args, { cwd: projectRoot, windowsHide: true, shell: false });
+      child = spawn(command, args, { cwd: projectRoot, windowsHide: true, shell: false, env: safeProcessEnv(opts.env) });
     } catch (e: any) {
       resolve({ exitCode: null, output: '', error: e?.message || '启动 lint 失败' });
       return;
@@ -74,10 +80,12 @@ export function runLintFix(
 }
 
 export function registerLintHandlers() {
-  ipcMain.handle('lint:fix', async (_event, params: { projectRoot: string; files?: string[] }) => {
+  secureHandle('lint:fix', async (event, params: { projectRoot: string; files?: string[] }) => {
+    assertTrustedIpcSender(event);
     try {
       if (!params?.projectRoot) return { ok: false, error: '缺少项目目录' };
-      const result = await runLintFix(params.projectRoot, params.files);
+      const root = await resolveTrustedProjectRoot(params.projectRoot);
+      const result = await runLintFix(root, params.files);
       if (result.error) return { ok: false, error: result.error };
       return { ok: true, data: result };
     } catch (error: any) {

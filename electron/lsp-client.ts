@@ -9,6 +9,7 @@
  * server is unavailable.
  */
 import { spawn, type ChildProcessWithoutNullStreams } from 'child_process';
+import { safeProcessEnv } from './safe-env';
 import path from 'path';
 import { pathToFileURL } from 'url';
 
@@ -121,6 +122,7 @@ export function queryLsp(input: LspQueryInput): Promise<LspQueryResult> {
         cwd: input.cwd,
         stdio: ['pipe', 'pipe', 'pipe'],
         windowsHide: true,
+        env: safeProcessEnv(),
       });
     } catch (e: any) {
       resolve({ ok: false, error: e?.message ?? String(e) });

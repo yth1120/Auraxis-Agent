@@ -7,6 +7,7 @@
  * prompt flow so the built-in "标准" profile preserves current behavior.
  */
 import { ipcMain } from 'electron';
+import { secureHandle } from './ipc/trust';
 import path from 'path';
 import { readSettings, writeSettings } from './ipc/settings-store';
 import { normalizeApprovalPolicy } from './contracts/core';
@@ -284,7 +285,7 @@ export async function evaluateToolProfileGate(
 }
 
 export function registerPermissionProfileIpc() {
-  ipcMain.handle('permission:listProfiles', async () => {
+  secureHandle('permission:listProfiles', async () => {
     try {
       return { ok: true, data: await loadPermissionProfiles() };
     } catch (error: any) {
@@ -292,7 +293,7 @@ export function registerPermissionProfileIpc() {
     }
   });
 
-  ipcMain.handle('permission:listProjectProfiles', async () => {
+  secureHandle('permission:listProjectProfiles', async () => {
     try {
       return { ok: true, data: await loadPermissionProfiles() };
     } catch (error: any) {
@@ -300,7 +301,7 @@ export function registerPermissionProfileIpc() {
     }
   });
 
-  ipcMain.handle('permission:setProjectProfile', async (_event, params: {
+  secureHandle('permission:setProjectProfile', async (_event, params: {
     path?: string;
     profileId?: string | null;
   }) => {
@@ -331,7 +332,7 @@ export function registerPermissionProfileIpc() {
     }
   });
 
-  ipcMain.handle('permission:moveProjectProfile', async (_event, params: {
+  secureHandle('permission:moveProjectProfile', async (_event, params: {
     from?: string;
     to?: string;
   }) => {
@@ -355,7 +356,7 @@ export function registerPermissionProfileIpc() {
     }
   });
 
-  ipcMain.handle('permission:saveProfiles', async (_event, params: {
+  secureHandle('permission:saveProfiles', async (_event, params: {
     custom: PermissionProfile[];
     activeId: string;
   }) => {

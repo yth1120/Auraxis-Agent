@@ -6,6 +6,7 @@
  * the renderer plugin manager — the backend only mirrors the catalog.
  */
 import { ipcMain, app } from 'electron';
+import { secureHandle } from './ipc/trust';
 import path from 'path';
 import { getAllTools } from './tool-registry';
 import { ensureSkillsDirectory, listSkills } from './skill-store';
@@ -57,7 +58,7 @@ export async function inspectRuntime(): Promise<{
 }
 
 export function registerRuntimeInspectIpc() {
-  ipcMain.handle('runtime:syncPlugins', (_event, plugins: RuntimePluginInfo[]) => {
+  secureHandle('runtime:syncPlugins', (_event, plugins: RuntimePluginInfo[]) => {
     syncPluginCatalog(plugins);
     return { ok: true };
   });

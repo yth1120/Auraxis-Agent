@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect , beforeAll, afterAll } from 'vitest';
 import { runCodeProgram } from '../code-mode';
 
 const baseHost = {
@@ -7,6 +7,10 @@ const baseHost = {
   mode: 'ask' as const,
 };
 
+
+let UNSAFE_OLD: string | undefined;
+beforeAll(() => { UNSAFE_OLD = process.env.AURAXIS_ALLOW_UNSAFE_CODE; process.env.AURAXIS_ALLOW_UNSAFE_CODE = '1'; });
+afterAll(() => { if (UNSAFE_OLD === undefined) delete process.env.AURAXIS_ALLOW_UNSAFE_CODE; else process.env.AURAXIS_ALLOW_UNSAFE_CODE = UNSAFE_OLD; });
 describe('runCodeProgram — TypeScript 工具编排程序', () => {
   it('顺序调用工具并返回程序 return 值', async () => {
     const calls: string[] = [];

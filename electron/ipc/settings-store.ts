@@ -2,6 +2,19 @@ import { app, safeStorage } from 'electron';
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import path from 'path';
 
+export function redactSettings(settings: Record<string, unknown>): Record<string, unknown> {
+  const safe: Record<string, unknown> = { ...settings };
+  for (const key of API_KEY_KEYS) delete safe[key];
+  if (Array.isArray(safe.customModels)) {
+    safe.customModels = safe.customModels.map((m) => {
+      if (!m || typeof m !== 'object' || Array.isArray(m)) return m;
+      const { apiKey: _apiKey, ...rest } = m as Record<string, unknown>;
+      return rest;
+    });
+  }
+  return safe;
+}
+
 const API_KEY_KEYS = new Set([
   'deepseekApiKey',
   'exaApiKey',

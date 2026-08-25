@@ -1,4 +1,5 @@
 import { ipcMain, dialog, app } from 'electron';
+import { secureHandle } from './trust';
 import { readFile, writeFile, readdir, stat, mkdir } from 'fs/promises';
 import path from 'path';
 import os from 'os';
@@ -10,6 +11,8 @@ import {
   type ProjectGlobalState,
 } from '../contracts/project';
 import { isPathInside, isAllowedExtension, EXCLUDED_DIRS, assertString, assertObject } from './shared';
+import { assertTrustedIpcSender } from './trust';
+import { resolveTrustedProjectRoot } from './project-access';
 
 function parseGitignore(content: string): string[] {
   return content
@@ -114,7 +117,8 @@ async function buildDirectoryTree(dirPath: string, depth: number, basePath: stri
 }
 
 export function registerProjectHandlers() {
-  ipcMain.handle('project:loadGlobalState', async () => {
+  secureHandle('project:loadGlobalState', async (event) => {
+    assertTrustedIpcSender(event);
     try {
       return { ok: true, data: await readProjectGlobalState() };
     } catch (error: any) {
@@ -122,7 +126,8 @@ export function registerProjectHandlers() {
     }
   });
 
-  ipcMain.handle('project:saveGlobalState', async (_event, state: unknown) => {
+  secureHandle('project:saveGlobalState', async (event, state: unknown) => {
+    assertTrustedIpcSender(event);
     try {
       await writeProjectGlobalState(normalizeProjectGlobalState(state));
       return { ok: true };
@@ -131,9 +136,10 @@ export function registerProjectHandlers() {
     }
   });
 
-  ipcMain.handle('project:getTree', async (_event, projectRoot: string) => {
+  secureHandle('project:getTree', async (event, projectRoot: string) => {
+    assertTrustedIpcSender(event);
     try {
-      const root = path.resolve(projectRoot);
+      const root = await resolveTrustedProjectRoot(projectRoot);
       const ignorePatterns = await loadGitignore(root);
       const tree = await buildDirectoryTree(root, 0, root, ignorePatterns);
       return { ok: true, data: tree };
@@ -142,7 +148,8 @@ export function registerProjectHandlers() {
     }
   });
 
-  ipcMain.handle('project:selectDirectory', async () => {
+  secureHandle('project:selectDirectory', async (event) => {
+    assertTrustedIpcSender(event);
     try {
       const result = await dialog.showOpenDialog({
         properties: ['openDirectory'],
@@ -160,14 +167,15 @@ export function registerProjectHandlers() {
     }
   });
 
-  ipcMain.handle('project:applyCode', async (_event, payload: ApplyCodePayload) => {
+  secureHandle('project:applyCode', async (event, payload: ApplyCodePayload) => {
+    assertTrustedIpcSender(event);
     try {
       assertObject(payload, 'payload');
       const { filePath, code, projectRoot } = payload;
       assertString(filePath, 'filePath');
       assertString(code, 'code', true);
       assertString(projectRoot, 'projectRoot');
-      const root = path.resolve(projectRoot);
+      const root = await resolveTrustedProjectRoot(projectRoot);
       const fullPath = path.resolve(root, filePath);
 
       if (!isPathInside(fullPath, root)) {
@@ -194,7 +202,8 @@ export function registerProjectHandlers() {
     }
   });
 
-  ipcMain.handle('project:previewCode', async (_event, payload: ApplyCodePayload) => {
+  secureHandle('project:previewCode', async (event, payload: ApplyCodePayload) => {
+    assertTrustedIpcSender(event);
     try {
       const { filePath, code } = payload;
       const ext = path.extname(filePath).toLowerCase();

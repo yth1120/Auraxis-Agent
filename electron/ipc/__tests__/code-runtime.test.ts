@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect , beforeAll, afterAll } from 'vitest';
 import { spawnSync } from 'child_process';
 import { runCode } from '../../code-runtime';
 
@@ -10,6 +10,10 @@ const hasPython = (() => {
   }
 })();
 
+
+let UNSAFE_OLD: string | undefined;
+beforeAll(() => { UNSAFE_OLD = process.env.AURAXIS_ALLOW_UNSAFE_CODE; process.env.AURAXIS_ALLOW_UNSAFE_CODE = '1'; });
+afterAll(() => { if (UNSAFE_OLD === undefined) delete process.env.AURAXIS_ALLOW_UNSAFE_CODE; else process.env.AURAXIS_ALLOW_UNSAFE_CODE = UNSAFE_OLD; });
 describe('code-runtime', () => {
   it('runs JavaScript and captures stdout', async () => {
     const r = await runCode({ language: 'javascript', code: 'console.log(6 * 7)' });

@@ -8,6 +8,7 @@ import { promises as fs } from 'fs';
 import os from 'os';
 import path from 'path';
 import { getShellExecutor } from './ipc/shell-executor';
+import { safeProcessEnv, unsafeCodeEnabled, unsafeCodeDisabledMessage } from './safe-env';
 
 export type CodeLanguage = 'javascript' | 'python' | 'shell';
 
@@ -40,6 +41,9 @@ function languageBinary(language: CodeLanguage): { bin: string; file: string; ar
 }
 
 export async function runCode(req: RunCodeRequest): Promise<RunCodeResult> {
+  if (!unsafeCodeEnabled()) {
+    return { stdout: '', stderr: unsafeCodeDisabledMessage('RunCode'), exitCode: 1, timedOut: false, truncated: false };
+  }
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'auraxis-code-'));
   const { bin, file, args = [] } = languageBinary(req.language);
   const timeoutMs = req.timeoutMs && req.timeoutMs > 0 ? req.timeoutMs : DEFAULT_TIMEOUT;
@@ -49,7 +53,7 @@ export async function runCode(req: RunCodeRequest): Promise<RunCodeResult> {
       command: bin,
       args: [...(args ?? []), file],
       cwd: dir,
-      env: { PATH: process.env.PATH || '', ...(req.env || {}) },
+      env: safeProcessEnv(req.env),
       timeoutMs,
       outputCap: OUTPUT_CAP,
     });

@@ -1,8 +1,12 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect , beforeAll, afterAll } from 'vitest';
 import { runInlineWorkflow } from '../inline-workflow';
 
 const BASE_CTX = { projectRoot: 'C:/proj', requestId: 'r1', log: () => {} };
 
+
+let UNSAFE_OLD: string | undefined;
+beforeAll(() => { UNSAFE_OLD = process.env.AURAXIS_ALLOW_UNSAFE_CODE; process.env.AURAXIS_ALLOW_UNSAFE_CODE = '1'; });
+afterAll(() => { if (UNSAFE_OLD === undefined) delete process.env.AURAXIS_ALLOW_UNSAFE_CODE; else process.env.AURAXIS_ALLOW_UNSAFE_CODE = UNSAFE_OLD; });
 describe('inline-workflow', () => {
   it('runs an async script and returns its value', async () => {
     const logs: string[] = [];

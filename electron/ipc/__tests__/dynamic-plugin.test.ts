@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach , beforeAll, afterAll } from 'vitest';
 import {
   mountDynamicPlugin,
   unmountDynamicPlugin,
@@ -7,6 +7,10 @@ import {
   getDynamicPluginCatalog,
 } from '../dynamic-plugin';
 
+
+let UNSAFE_OLD: string | undefined;
+beforeAll(() => { UNSAFE_OLD = process.env.AURAXIS_ALLOW_UNSAFE_CODE; process.env.AURAXIS_ALLOW_UNSAFE_CODE = '1'; });
+afterAll(() => { if (UNSAFE_OLD === undefined) delete process.env.AURAXIS_ALLOW_UNSAFE_CODE; else process.env.AURAXIS_ALLOW_UNSAFE_CODE = UNSAFE_OLD; });
 describe('dynamic-plugin', () => {
   afterEach(() => {
     for (const p of getDynamicPluginCatalog()) unmountDynamicPlugin(p.id);

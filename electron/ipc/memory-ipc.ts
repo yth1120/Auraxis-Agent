@@ -7,6 +7,7 @@
  */
 
 import { ipcMain } from 'electron';
+import { secureHandle } from './trust';
 import { extractMemories, type ExtractedMemory } from './memory-extractor';
 import {
   addBelief,
@@ -190,11 +191,11 @@ async function runExtraction(ctx: ExtractContext): Promise<{ ok: boolean; data?:
 // ─── Registration ──────────────────────────────────────
 
 export function registerMemoryIpc() {
-  ipcMain.handle('memory:extract', async (_event, sessionContext: ExtractContext) => {
+  secureHandle('memory:extract', async (_event, sessionContext: ExtractContext) => {
     return runExtraction(sessionContext);
   });
 
-  ipcMain.handle('memory:getByProject', async (_event, projectPath: string) => {
+  secureHandle('memory:getByProject', async (_event, projectPath: string) => {
     try {
       return { ok: true, data: toLegacyList(getBeliefsByScope(projectPath, { activeOnly: true })) };
     } catch (error: any) {
@@ -202,7 +203,7 @@ export function registerMemoryIpc() {
     }
   });
 
-  ipcMain.handle('memory:getByType', async (_event, projectPath: string, type: string) => {
+  secureHandle('memory:getByType', async (_event, projectPath: string, type: string) => {
     try {
       const beliefs = getBeliefsByScope(projectPath, { activeOnly: true }).filter(
         (b) => beliefKindToLegacyType(b.kind) === type,
@@ -213,7 +214,7 @@ export function registerMemoryIpc() {
     }
   });
 
-  ipcMain.handle('memory:search', async (_event, projectPath: string, query: string) => {
+  secureHandle('memory:search', async (_event, projectPath: string, query: string) => {
     try {
       return { ok: true, data: toLegacyList(searchBeliefs(projectPath, query)) };
     } catch (error: any) {
@@ -221,7 +222,7 @@ export function registerMemoryIpc() {
     }
   });
 
-  ipcMain.handle('memory:archive', async (_event, memoryId: string) => {
+  secureHandle('memory:archive', async (_event, memoryId: string) => {
     try {
       archiveBelief(memoryId);
       return { ok: true };
@@ -230,7 +231,7 @@ export function registerMemoryIpc() {
     }
   });
 
-  ipcMain.handle('memory:delete', async (_event, memoryId: string) => {
+  secureHandle('memory:delete', async (_event, memoryId: string) => {
     try {
       deleteBelief(memoryId);
       return { ok: true };
@@ -239,7 +240,7 @@ export function registerMemoryIpc() {
     }
   });
 
-  ipcMain.handle('memory:evidenceList', async (_event, projectPath: string) => {
+  secureHandle('memory:evidenceList', async (_event, projectPath: string) => {
     try {
       return { ok: true, data: listEvidence(projectPath) };
     } catch (error: any) {
@@ -247,7 +248,7 @@ export function registerMemoryIpc() {
     }
   });
 
-  ipcMain.handle('memory:evidenceDetail', async (_event, id: string) => {
+  secureHandle('memory:evidenceDetail', async (_event, id: string) => {
     try {
       const evidence = getEvidenceById(id);
       return { ok: true, data: evidence ? { evidence, signals: listSignals(id) } : null };
@@ -256,7 +257,7 @@ export function registerMemoryIpc() {
     }
   });
 
-  ipcMain.handle('memory:beliefAudit', async (_event, beliefId: string) => {
+  secureHandle('memory:beliefAudit', async (_event, beliefId: string) => {
     try {
       const belief = getBeliefById(beliefId);
       if (!belief) return { ok: true, data: null };
@@ -284,7 +285,7 @@ export function registerMemoryIpc() {
     }
   });
 
-  ipcMain.handle('memory:readForQuery', async (_event, projectPath: string, query: string, opts?: any) => {
+  secureHandle('memory:readForQuery', async (_event, projectPath: string, query: string, opts?: any) => {
     try {
       return { ok: true, data: readForQuery(query, projectPath, opts) };
     } catch (error: any) {
@@ -292,7 +293,7 @@ export function registerMemoryIpc() {
     }
   });
 
-  ipcMain.handle('memory:readTrace', async (_event, runId: string) => {
+  secureHandle('memory:readTrace', async (_event, runId: string) => {
     try {
       return { ok: true, data: getReadTrace(runId) };
     } catch (error: any) {
@@ -300,7 +301,7 @@ export function registerMemoryIpc() {
     }
   });
 
-  ipcMain.handle('memory:erase', async (_event, scope: string) => {
+  secureHandle('memory:erase', async (_event, scope: string) => {
     try {
       const erased = eraseScope(scope);
       const audit = listEraseAudits(scope, 1)[0] ?? null;
@@ -310,7 +311,7 @@ export function registerMemoryIpc() {
     }
   });
 
-  ipcMain.handle('memory:reindex', async (_event, projectPath: string) => {
+  secureHandle('memory:reindex', async (_event, projectPath: string) => {
     try {
       const config = await getApiConfig();
       const evidence = listEvidence(projectPath, 500);
@@ -340,7 +341,7 @@ export function registerMemoryIpc() {
     }
   });
 
-  ipcMain.handle('memory:graph', async (_event, projectPath: string, role?: AgentRole, agent?: { id?: string; name?: string }) => {
+  secureHandle('memory:graph', async (_event, projectPath: string, role?: AgentRole, agent?: { id?: string; name?: string }) => {
     try {
       const resolvedRole = role ?? (agent?.name ? roleForAgent(agent.name) : undefined);
       const graph = buildScopeGraph(projectPath, {
@@ -355,7 +356,7 @@ export function registerMemoryIpc() {
     }
   });
 
-  ipcMain.handle('memory:rejections', async (_event, projectPath: string) => {
+  secureHandle('memory:rejections', async (_event, projectPath: string) => {
     try {
       return { ok: true, data: listBeliefRejections(projectPath) };
     } catch (error: any) {

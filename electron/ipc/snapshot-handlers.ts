@@ -7,6 +7,8 @@
  * without losing the conversation.
  */
 import { ipcMain } from 'electron';
+import { secureHandle } from './trust';
+import { resolveTrustedProjectRoot } from './project-access';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { undoManager } from './undo-manager';
@@ -184,35 +186,39 @@ export async function deleteNamedSnapshot(id: string, projectRoot: string): Prom
 }
 
 export function registerSnapshotHandlers() {
-  ipcMain.handle('snapshot:create', async (_event, projectRoot: string, name: string) => {
+  secureHandle('snapshot:create', async (_event, projectRoot: string, name: string) => {
     try {
-      const snap = await createNamedSnapshot(projectRoot, name);
+      const root = await resolveTrustedProjectRoot(projectRoot);
+      const snap = await createNamedSnapshot(root, name);
       return { ok: true, data: snap };
     } catch (error: any) {
       return { ok: false, error: error.message };
     }
   });
 
-  ipcMain.handle('snapshot:list', async (_event, projectRoot: string) => {
+  secureHandle('snapshot:list', async (_event, projectRoot: string) => {
     try {
-      return { ok: true, data: await listNamedSnapshots(projectRoot) };
+      const root = await resolveTrustedProjectRoot(projectRoot);
+      return { ok: true, data: await listNamedSnapshots(root) };
     } catch (error: any) {
       return { ok: false, error: error.message };
     }
   });
 
-  ipcMain.handle('snapshot:restore', async (_event, id: string, projectRoot: string) => {
+  secureHandle('snapshot:restore', async (_event, id: string, projectRoot: string) => {
     try {
-      const result = await restoreNamedSnapshot(id, projectRoot);
+      const root = await resolveTrustedProjectRoot(projectRoot);
+      const result = await restoreNamedSnapshot(id, root);
       return { ok: true, data: result };
     } catch (error: any) {
       return { ok: false, error: error.message };
     }
   });
 
-  ipcMain.handle('snapshot:delete', async (_event, id: string, projectRoot: string) => {
+  secureHandle('snapshot:delete', async (_event, id: string, projectRoot: string) => {
     try {
-      await deleteNamedSnapshot(id, projectRoot);
+      const root = await resolveTrustedProjectRoot(projectRoot);
+      await deleteNamedSnapshot(id, root);
       return { ok: true };
     } catch (error: any) {
       return { ok: false, error: error.message };

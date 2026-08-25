@@ -1,4 +1,5 @@
 import { ipcMain, app } from 'electron';
+import { secureHandle } from './trust';
 import path from 'path';
 import { ensureSkillsDirectory, listSkills, readSkill, seedBuiltinSkills } from '../skill-store';
 
@@ -8,7 +9,7 @@ function skillsRoot(): string {
 
 /** Skill discovery IPC — 技能列表接口 for the renderer. */
 export function registerSkillHandlers() {
-  ipcMain.handle('skills:list', async () => {
+  secureHandle('skills:list', async () => {
     try {
       const root = skillsRoot();
       await ensureSkillsDirectory(root);
@@ -19,7 +20,7 @@ export function registerSkillHandlers() {
     }
   });
 
-  ipcMain.handle('skills:read', async (_event, name: string) => {
+  secureHandle('skills:read', async (_event, name: string) => {
     try {
       if (!name || typeof name !== 'string') return { ok: false, error: '技能名称无效' };
       const skill = await readSkill(skillsRoot(), name);

@@ -2,7 +2,9 @@
  * terminal-handlers.ts — real integrated terminal (node-pty, pipe fallback).
  */
 import { ipcMain, BrowserWindow } from 'electron';
+import { secureHandle } from './trust';
 import { spawn, type ChildProcessWithoutNullStreams } from 'child_process';
+import { safeProcessEnv } from '../safe-env';
 import { ptyRegistry } from './pty-tool';
 
 let PTY: any = null;
@@ -49,7 +51,7 @@ function send(win: BrowserWindow, id: string, type: string, data?: unknown) {
 }
 
 export function registerTerminalHandlers() {
-  ipcMain.handle('terminal:create', (event, payload: { id?: string; cwd?: string; cols?: number; rows?: number }) => {
+  secureHandle('terminal:create', (event, payload: { id?: string; cwd?: string; cols?: number; rows?: number }) => {
     try {
       const win = BrowserWindow.fromWebContents(event.sender);
       if (!win) return { ok: false, error: '窗口无效' };
@@ -66,7 +68,7 @@ export function registerTerminalHandlers() {
           cols,
           rows,
           cwd,
-          env: { ...process.env, TERM: 'xterm-256color' },
+          env: { ...safeProcessEnv({ TERM: 'xterm-256color' }) },
         });
         const session: TerminalSession = { kind: 'pty', proc: pty, win };
         sessions.set(id, session);
@@ -83,7 +85,7 @@ export function registerTerminalHandlers() {
       } else {
         const child = spawn(defaultShell(), [], {
           cwd,
-          env: { ...process.env, TERM: 'xterm-256color' },
+          env: { ...safeProcessEnv({ TERM: 'xterm-256color' }) },
           stdio: ['pipe', 'pipe', 'pipe'],
         });
         const session: TerminalSession = { kind: 'pipe', child, win };
@@ -109,7 +111,7 @@ export function registerTerminalHandlers() {
     }
   });
 
-  ipcMain.handle('terminal:input', (_e, id: string, data: string) => {
+  secureHandle('terminal:input', (_e, id: string, data: string) => {
     const s = sessions.get(id);
     if (!s) return { ok: false };
     if (s.kind === 'pty') s.proc.write(data);
@@ -117,13 +119,13 @@ export function registerTerminalHandlers() {
     return { ok: true };
   });
 
-  ipcMain.handle('terminal:resize', (_e, id: string, cols: number, rows: number) => {
+  secureHandle('terminal:resize', (_e, id: string, cols: number, rows: number) => {
     const s = sessions.get(id);
     if (s?.kind === 'pty') s.proc.resize(cols, rows);
     return { ok: true };
   });
 
-  ipcMain.handle('terminal:kill', (_e, id: string) => {
+  secureHandle('terminal:kill', (_e, id: string) => {
     const s = sessions.get(id);
     if (!s) return { ok: false };
     try {
@@ -137,7 +139,7 @@ export function registerTerminalHandlers() {
 
 /** Read-only mirror of an agent's persistent shell for the terminal drawer. */
 export function registerAgentShellHandlers() {
-  ipcMain.handle('agentShell:attach', (event, agentId: string) => {
+  secureHandle('agentShell:attach', (event, agentId: string) => {
     if (typeof agentId !== 'string' || !agentId) return { ok: false, error: 'agentId 无效' };
     const win = BrowserWindow.fromWebContents(event.sender);
     if (!win) return { ok: false, error: '窗口无效' };
@@ -168,7 +170,7 @@ export function registerAgentShellHandlers() {
     return { ok: true, buffer: peek.buffer, exited: peek.exited };
   });
 
-  ipcMain.handle('agentShell:detach', (_e, agentId: string) => {
+  secureHandle('agentShell:detach', (_e, agentId: string) => {
     const watcher = agentShellWatchers.get(agentId);
     if (watcher) {
       watcher.unsub();
@@ -179,7 +181,7 @@ export function registerAgentShellHandlers() {
 
   // Read-only mirror still allows control characters (Ctrl-C / Ctrl-Z / Ctrl-D),
   // so the user can interrupt a runaway command without typing into the shell.
-  ipcMain.handle('agentShell:write', (_e, agentId: string, data: string) => {
+  secureHandle('agentShell:write', (_e, agentId: string, data: string) => {
     if (typeof agentId !== 'string' || typeof data !== 'string') {
       return { ok: false, error: '参数无效' };
     }

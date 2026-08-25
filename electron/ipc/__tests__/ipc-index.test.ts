@@ -79,6 +79,10 @@ const registerFns = vi.hoisted(() => ({
   registerPluginStateHandlers: vi.fn(),
   readSettings: vi.fn(),
   writeSettings: vi.fn(),
+  redactSettings: vi.fn((settings: any) => {
+    const { deepseekApiKey, exaApiKey, perplexityApiKey, slackToken, driveToken, notionToken, ...rest } = settings || {};
+    return rest;
+  }),
   getAllModels: vi.fn(),
   getActiveWorktree: vi.fn(),
 }));
@@ -136,6 +140,7 @@ vi.mock('../plugin-state-handlers', () => ({ registerPluginStateHandlers: regist
 vi.mock('../settings-store', () => ({
   readSettings: registerFns.readSettings,
   writeSettings: registerFns.writeSettings,
+  redactSettings: registerFns.redactSettings,
 }));
 vi.mock('../model-config', () => ({ getAllModels: registerFns.getAllModels }));
 vi.mock('../tool-handlers', () => ({ getActiveWorktree: registerFns.getActiveWorktree }));
@@ -315,7 +320,7 @@ describe('index — registerIpcHandlers 总注册与窗口/shell/设置处理器
 
     await expect(h.get('settings:get')!({})).resolves.toEqual({ ok: true, data: { selectedModel: 'm' } });
     await expect(h.get('settings:get')!({}, 'selectedModel')).resolves.toEqual({ ok: true, data: 'm' });
-    await expect(h.get('settings:getApiKey')!({}, 'deepseek')).resolves.toEqual({ ok: true, data: 'sk' });
+    await expect(h.get('settings:getApiKey')!({}, 'deepseek')).resolves.toEqual({ ok: true, data: '' });
 
     await expect(h.get('settings:set')!({}, 'selectedModel', 'm2')).resolves.toEqual({ ok: true });
     expect(registerFns.writeSettings).toHaveBeenCalledWith(expect.objectContaining({ selectedModel: 'm2' }));

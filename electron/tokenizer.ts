@@ -11,6 +11,7 @@
  * 在文本中出现时先剥离再对剩余内容做 BPE，避免重复计费。
  */
 import { ipcMain, app } from 'electron';
+import { secureHandle } from './ipc/trust';
 import { readFileSync, existsSync } from 'fs';
 import path from 'path';
 
@@ -205,7 +206,7 @@ export function getTokenizerStats(): { vocabSize: number; mergeCount: number; sp
 }
 
 export function registerTokenizerIpc(): void {
-  ipcMain.handle('tokenizer:count', (_event, text: unknown) => {
+  secureHandle('tokenizer:count', (_event, text: unknown) => {
     if (typeof text !== 'string') return { ok: false, error: 'text 必须为字符串' };
     try {
       return { ok: true, data: countTokens(text) };

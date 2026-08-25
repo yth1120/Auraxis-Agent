@@ -1,4 +1,5 @@
 import { ipcMain, BrowserWindow } from 'electron';
+import { secureHandle } from './trust';
 import { readFile } from 'fs/promises';
 import { resolve } from 'path';
 import type { PermissionRule, PermissionRequest } from '../advanced-defs';
@@ -210,7 +211,7 @@ export async function requestPermission(
 }
 
 export function registerPermissionHandlers() {
-  ipcMain.handle('permission:respond', async (_event, requestId: string, allowed: boolean) => {
+  secureHandle('permission:respond', async (_event, requestId: string, allowed: boolean) => {
     const pending = pendingRequests.get(requestId);
     if (pending) {
       clearTimeout(pending.timer);
@@ -227,7 +228,7 @@ export function registerPermissionHandlers() {
     return { ok: true };
   });
 
-  ipcMain.handle('permission:addRule', async (_event, rule: PermissionRule, requestId: string) => {
+  secureHandle('permission:addRule', async (_event, rule: PermissionRule, requestId: string) => {
     // Only allow adding rules that match a currently pending permission request.
     // The requestId must exactly match an active pending request.  This prevents
     // renderer-side XSS from injecting arbitrary rules outside of a real prompt.
@@ -243,11 +244,11 @@ export function registerPermissionHandlers() {
     return { ok: true };
   });
 
-  ipcMain.handle('permission:getRules', async () => {
+  secureHandle('permission:getRules', async () => {
     return { ok: true, data: [...permissionRules] };
   });
 
-  ipcMain.handle('permission:removeRule', async (_event, ruleId: string) => {
+  secureHandle('permission:removeRule', async (_event, ruleId: string) => {
     const idx = permissionRules.findIndex((r) => r.id === ruleId);
     if (idx < 0) return { ok: false, error: '规则不存在' };
     permissionRules.splice(idx, 1);
@@ -255,7 +256,7 @@ export function registerPermissionHandlers() {
     return { ok: true, data: [...permissionRules] };
   });
 
-  ipcMain.handle('permission:clearRules', async () => {
+  secureHandle('permission:clearRules', async () => {
     permissionRules.splice(0, permissionRules.length);
     await persistPermissionRules();
     return { ok: true };

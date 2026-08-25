@@ -1,4 +1,5 @@
 import { ipcMain, BrowserWindow } from 'electron';
+import { secureHandle } from './trust';
 import type { AgentInfo, AgentLogEntry } from '../advanced-defs';
 import { waitForPlanApproval } from './plan-handlers';
 import type { ToolDef } from '../tool-defs';
@@ -584,7 +585,7 @@ export function getSubAgentReports(agentId: string): Array<{ id: string; text: s
 // invoked from the chat ReAct loop), so the remove/clear handlers stay.
 
 export function registerAgentHandlers() {
-  ipcMain.handle('agent:remove', async (_e, agentId: string) => {
+  secureHandle('agent:remove', async (_e, agentId: string) => {
     try {
       const c = agentAborts.get(agentId);
       if (c) { c.abort(); agentAborts.delete(agentId); }
@@ -595,7 +596,7 @@ export function registerAgentHandlers() {
     }
   });
 
-  ipcMain.handle('agent:clear', async () => {
+  secureHandle('agent:clear', async () => {
     try {
       for (const [, c] of agentAborts) c.abort();
       agentAborts.clear();

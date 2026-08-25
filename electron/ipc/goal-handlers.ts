@@ -1,4 +1,5 @@
 import { ipcMain } from 'electron';
+import { secureHandle } from './trust';
 import {
   getGoal, createGoal, editGoal, pauseGoal, resumeGoal,
   completeGoal, blockGoal, clearGoal, recordGoalRound,
@@ -16,40 +17,40 @@ function wrap<T>(fn: () => Promise<T>) {
 
 /** Goal lifecycle IPC — durable same-session goal state （目标状态）. */
 export function registerGoalHandlers() {
-  ipcMain.handle('goal:get', async (_e, sessionId: string) => {
+  secureHandle('goal:get', async (_e, sessionId: string) => {
     if (!sessionId || typeof sessionId !== 'string') return { ok: false, error: '会话 ID 无效' };
     return wrap(() => getGoal(sessionId))();
   });
-  ipcMain.handle('goal:create', async (_e, sessionId: string, text: string, maxRounds?: number) => {
+  secureHandle('goal:create', async (_e, sessionId: string, text: string, maxRounds?: number) => {
     if (!sessionId || typeof sessionId !== 'string') return { ok: false, error: '会话 ID 无效' };
     if (!text || typeof text !== 'string') return { ok: false, error: '目标不能为空' };
     return wrap(() => createGoal(sessionId, text, maxRounds ?? 256))();
   });
-  ipcMain.handle('goal:edit', async (_e, sessionId: string, text: string) => {
+  secureHandle('goal:edit', async (_e, sessionId: string, text: string) => {
     if (!sessionId || typeof sessionId !== 'string') return { ok: false, error: '会话 ID 无效' };
     return wrap(() => editGoal(sessionId, text))();
   });
-  ipcMain.handle('goal:pause', async (_e, sessionId: string) => {
+  secureHandle('goal:pause', async (_e, sessionId: string) => {
     if (!sessionId || typeof sessionId !== 'string') return { ok: false, error: '会话 ID 无效' };
     return wrap(() => pauseGoal(sessionId))();
   });
-  ipcMain.handle('goal:resume', async (_e, sessionId: string) => {
+  secureHandle('goal:resume', async (_e, sessionId: string) => {
     if (!sessionId || typeof sessionId !== 'string') return { ok: false, error: '会话 ID 无效' };
     return wrap(() => resumeGoal(sessionId))();
   });
-  ipcMain.handle('goal:complete', async (_e, sessionId: string) => {
+  secureHandle('goal:complete', async (_e, sessionId: string) => {
     if (!sessionId || typeof sessionId !== 'string') return { ok: false, error: '会话 ID 无效' };
     return wrap(() => completeGoal(sessionId))();
   });
-  ipcMain.handle('goal:block', async (_e, sessionId: string, reason: string) => {
+  secureHandle('goal:block', async (_e, sessionId: string, reason: string) => {
     if (!sessionId || typeof sessionId !== 'string') return { ok: false, error: '会话 ID 无效' };
     return wrap(() => blockGoal(sessionId, reason))();
   });
-  ipcMain.handle('goal:clear', async (_e, sessionId: string) => {
+  secureHandle('goal:clear', async (_e, sessionId: string) => {
     if (!sessionId || typeof sessionId !== 'string') return { ok: false, error: '会话 ID 无效' };
     return wrap(() => clearGoal(sessionId))();
   });
-  ipcMain.handle('goal:round', async (_e, sessionId: string) => {
+  secureHandle('goal:round', async (_e, sessionId: string) => {
     if (!sessionId || typeof sessionId !== 'string') return { ok: false, error: '会话 ID 无效' };
     return wrap(() => recordGoalRound(sessionId))();
   });

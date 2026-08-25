@@ -3,6 +3,7 @@
  * Appends one JSONL record per submission under userData/feedback.
  */
 import { ipcMain, app } from 'electron';
+import { secureHandle } from './trust';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { flushTelemetry } from './session-telemetry';
@@ -98,12 +99,12 @@ export async function listMessageFeedback(sessionId: string): Promise<MessageFee
 }
 
 export function registerFeedbackHandlers() {
-  ipcMain.handle('feedback:submit', async (_e, text: string) => appendFeedback(text));
-  ipcMain.handle('feedback:message', async (_e, record: Omit<MessageFeedbackRecord, 'ts'>) => {
+  secureHandle('feedback:submit', async (_e, text: string) => appendFeedback(text));
+  secureHandle('feedback:message', async (_e, record: Omit<MessageFeedbackRecord, 'ts'>) => {
     const r = await appendMessageFeedback(record);
     return r.ok ? { ok: true } : { ok: false, error: r.error };
   });
-  ipcMain.handle('feedback:messageList', async (_e, sessionId: string) => {
+  secureHandle('feedback:messageList', async (_e, sessionId: string) => {
     return { ok: true, data: await listMessageFeedback(sessionId) };
   });
 }

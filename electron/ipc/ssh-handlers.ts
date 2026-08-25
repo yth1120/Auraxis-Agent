@@ -1,4 +1,5 @@
 import { ipcMain } from 'electron';
+import { secureHandle } from './trust';
 import { readFile } from 'fs/promises';
 import { Client } from 'ssh2';
 import { listSshConnections, saveSshConnection, removeSshConnection, type SshConnection } from '../ssh-store';
@@ -32,9 +33,9 @@ async function connectTo(cfg: SshConnection): Promise<Client> {
 }
 
 export function registerSshHandlers() {
-  ipcMain.handle('ssh:list', async () => wrap(listSshConnections)());
+  secureHandle('ssh:list', async () => wrap(listSshConnections)());
 
-  ipcMain.handle('ssh:save', async (_e, conn: SshConnection) => {
+  secureHandle('ssh:save', async (_e, conn: SshConnection) => {
     if (!conn || typeof conn.host !== 'string' || !conn.host.trim()) return { ok: false, error: '主机地址无效' };
     return wrap(() => saveSshConnection({
       id: conn.id || `ssh-${Date.now()}`,
@@ -48,9 +49,9 @@ export function registerSshHandlers() {
     }))();
   });
 
-  ipcMain.handle('ssh:remove', async (_e, id: string) => wrap(() => removeSshConnection(id))());
+  secureHandle('ssh:remove', async (_e, id: string) => wrap(() => removeSshConnection(id))());
 
-  ipcMain.handle('ssh:test', async (_e, conn: SshConnection) => {
+  secureHandle('ssh:test', async (_e, conn: SshConnection) => {
     let client: Client | null = null;
     try {
       client = await connectTo(conn);
@@ -71,7 +72,7 @@ export function registerSshHandlers() {
     }
   });
 
-  ipcMain.handle('ssh:exec', async (_e, conn: SshConnection, command: string) => {
+  secureHandle('ssh:exec', async (_e, conn: SshConnection, command: string) => {
     let client: Client | null = null;
     try {
       client = await connectTo(conn);

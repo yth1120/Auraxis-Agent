@@ -14,6 +14,7 @@
 import vm from 'vm';
 import type { ToolDef } from '../tool-defs';
 import { createOrchestrationApi, type OrchestrationCaller } from './agent-orchestration';
+import { unsafeCodeEnabled, unsafeCodeDisabledMessage } from '../safe-env';
 import type { ToolResult } from './tool-handlers';
 
 const MAX_PLUGINS = 12;
@@ -83,6 +84,7 @@ export function mountDynamicPlugin(spec: DynamicPluginSpec): {
   toolNames?: string[];
   defs?: ToolDef[];
 } {
+  if (!unsafeCodeEnabled()) return { ok: false, error: unsafeCodeDisabledMessage('动态插件') };
   const id = String(spec?.id ?? '').trim();
   const name = String(spec?.name ?? '').trim();
   if (!safeId(id)) return { ok: false, error: `插件 id 非法: ${id || '(空)'}` };

@@ -1,4 +1,6 @@
 import { ipcMain } from 'electron';
+import { secureHandle } from './trust';
+import { resolveTrustedProjectRoot } from './project-access';
 import {
   appendChatEvents,
   appendChatMeta,
@@ -14,17 +16,18 @@ import { removeFtsDoc } from '../fts';
 
 /** Chat-log IPC — durable session event stream + authoritative session directory. */
 export function registerChatLogHandlers() {
-  ipcMain.handle('chatLog:append', async (_e, sessionId: string, events: Array<Omit<ChatLogEvent, 'seq'>>, projectRoot?: string) => {
+  secureHandle('chatLog:append', async (_e, sessionId: string, events: Array<Omit<ChatLogEvent, 'seq'>>, projectRoot?: string) => {
     try {
       if (!sessionId || typeof sessionId !== 'string') return { ok: false, error: '会话 ID 无效' };
-      await appendChatEvents(sessionId, events || [], projectRoot);
+      const root = projectRoot ? await resolveTrustedProjectRoot(projectRoot) : undefined;
+      await appendChatEvents(sessionId, events || [], root);
       return { ok: true };
     } catch (error: any) {
       return { ok: false, error: error.message };
     }
   });
 
-  ipcMain.handle('chatLog:read', async (_e, sessionId: string) => {
+  secureHandle('chatLog:read', async (_e, sessionId: string) => {
     try {
       if (!sessionId || typeof sessionId !== 'string') return { ok: false, error: '会话 ID 无效' };
       return { ok: true, data: await readChatLog(sessionId) };
@@ -34,7 +37,7 @@ export function registerChatLogHandlers() {
   });
 
   /** List all logged sessions (metadata only, sorted by updated desc). */
-  ipcMain.handle('chatLog:list', async () => {
+  secureHandle('chatLog:list', async () => {
     try {
       return { ok: true, data: await listChatSessions() };
     } catch (error: any) {
@@ -43,7 +46,7 @@ export function registerChatLogHandlers() {
   });
 
   /** Rebuild a full session (messages + tool calls + metadata) from its log. */
-  ipcMain.handle('chatLog:project', async (_e, sessionId: string) => {
+  secureHandle('chatLog:project', async (_e, sessionId: string) => {
     try {
       if (!sessionId || typeof sessionId !== 'string') return { ok: false, error: '会话 ID 无效' };
       return { ok: true, data: await projectChatSession(sessionId) };
@@ -52,7 +55,7 @@ export function registerChatLogHandlers() {
     }
   });
 
-  ipcMain.handle('chatLog:delete', async (_e, sessionId: string) => {
+  secureHandle('chatLog:delete', async (_e, sessionId: string) => {
     try {
       if (!sessionId || typeof sessionId !== 'string') return { ok: false, error: '会话 ID 无效' };
       await deleteChatSession(sessionId);
@@ -65,7 +68,7 @@ export function registerChatLogHandlers() {
     }
   });
 
-  ipcMain.handle('chatLog:fork', async (_e, sessionId: string, uptoMessageId?: string) => {
+  secureHandle('chatLog:fork', async (_e, sessionId: string, uptoMessageId?: string) => {
     try {
       if (!sessionId || typeof sessionId !== 'string') return { ok: false, error: '会话 ID 无效' };
       return { ok: true, data: await forkChatSession(sessionId, uptoMessageId) };
@@ -75,7 +78,7 @@ export function registerChatLogHandlers() {
   });
 
   /** Persist a metadata snapshot (title / pinned / model / touch…). */
-  ipcMain.handle('chatLog:meta', async (_e, sessionId: string, meta: ChatSessionMeta) => {
+  secureHandle('chatLog:meta', async (_e, sessionId: string, meta: ChatSessionMeta) => {
     try {
       if (!sessionId || typeof sessionId !== 'string' || !meta || typeof meta !== 'object') {
         return { ok: false, error: '会话 ID 或元数据无效' };

@@ -37,8 +37,21 @@ const MUTATION_PATTERNS: { re: RegExp; reason: string }[] = [
   { re: /\b(del|erase|rd|move|ren|format|diskpart|shutdown|taskkill|reg\s+add)\b/i, reason: '检测到 Windows 变更命令' },
 ];
 
+
+const READ_ONLY_COMMAND_RE = /^(?:(?:ls|cat|head|tail|find|pwd|echo|dir|type|where|which|tree|wc|sort|uniq|rg|grep|git\s+(?:status|log|diff|show|branch|rev-parse|ls-files))(?:\s|$))/i;
+const DYNAMIC_INTERPRETER_RE = /\b(?:powershell|pwsh|cmd|bash|sh|zsh|node|python|python3|pythonw|perl|ruby|php|java|dotnet|npx|npm|pnpm|yarn|deno|bun|curl|wget|ssh|scp)\b/i;
+
+function isReadOnlyBashCommand(command: string): boolean {
+  const trimmed = command.trim();
+  if (!trimmed) return false;
+  if (/[;&|<>]/.test(trimmed) || trimmed.includes('`') || trimmed.includes('$(')) return false;
+  return READ_ONLY_COMMAND_RE.test(trimmed);
+}
+
 export function commandMutates(command: string): { mutates: boolean; reason?: string } {
   if (!command.trim()) return { mutates: false };
+  if (isReadOnlyBashCommand(command)) return { mutates: false };
+  if (DYNAMIC_INTERPRETER_RE.test(command)) return { mutates: true, reason: '检测到解释器/网络命令，可能执行任意代码或访问网络' };
   for (const { re, reason } of MUTATION_PATTERNS) {
     if (re.test(command)) return { mutates: true, reason };
   }
@@ -63,6 +76,7 @@ export function enforceSandbox(args: {
       const command = typeof args.input.command === 'string' ? args.input.command : '';
       const m = commandMutates(command);
       if (m.mutates) return { allowed: false, reason: `只读沙箱禁止变更命令（${m.reason}）` };
+      if (!isReadOnlyBashCommand(command)) return { allowed: false, reason: '只读沙箱仅允许明确的只读命令白名单' };
     }
     return { allowed: true };
   }

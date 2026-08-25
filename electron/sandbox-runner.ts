@@ -10,6 +10,7 @@ import os from 'os';
 import path from 'path';
 import { app } from 'electron';
 import { createOutputDecoder } from './text-encoding';
+import { safeProcessEnv } from './safe-env';
 
 export type SandboxBackend = 'restricted' | 'appcontainer' | 'linux' | 'macos';
 
@@ -25,6 +26,7 @@ export interface SandboxCommandOptions {
   signal?: AbortSignal | null;
   onStdout?: (chunk: string) => void;
   onStderr?: (chunk: string) => void;
+  env?: Record<string, string>;
 }
 
 export interface SandboxCommandResult {
@@ -132,6 +134,7 @@ export async function runSandboxedCommand(opts: SandboxCommandOptions): Promise<
           windowsHide: true,
           shell: false,
           stdio: ['ignore', 'pipe', 'pipe'],
+          env: opts.env ?? safeProcessEnv(),
         });
       } else {
         const shell = process.platform === 'darwin' ? '/bin/bash' : 'bash';
@@ -151,14 +154,13 @@ export async function runSandboxedCommand(opts: SandboxCommandOptions): Promise<
           shell: false,
           stdio: ['ignore', 'pipe', 'pipe'],
           detached: true,
+          env: opts.env ?? safeProcessEnv(),
         });
       }
 
-      // 原生沙箱启动失败（如 Git Bash 与受限令牌不兼容）时，降级为直接执行。
-      // 策略层（sandbox-policy / 路径边界 / 命令变异检测）仍然在 executeToolCall
-      // 里先于本启动器生效，因此这不是完全放开，而是隔离层的降级兜底。
+      // Fail closed: if the native launcher cannot start, the command must be
+      // rejected instead of silently falling back to an unsandboxed spawn.
       let currentChild = child;
-      let fallbackTried = false;
 
       let stdout = '';
       let stderr = '';
@@ -233,22 +235,11 @@ export async function runSandboxedCommand(opts: SandboxCommandOptions): Promise<
             opts.onStdout?.(stdoutTail);
           }
           // Git Bash（msys2）在受限令牌下无法创建 \BaseNamedObjects\msys-*
-          // 内核对象，启动即崩（0xC0000022）。此时降级为直接执行——策略层
-          // （sandbox-policy / 路径边界 / 命令变异检测）仍然先于启动器生效。
+          // 内核对象，启动即崩（0xC0000022）。此时必须拒绝执行，绝不降级到非沙箱模式。
           const launchError = stderr.includes('SANDBOX_LAUNCH_ERROR')
             || stderr.includes('fatal error - NtCreateDirectoryObject');
-          if (launchError && !fallbackTried && isWinBackend) {
-            fallbackTried = true;
-            const msg = '\n[AURAXIS] 原生沙箱启动失败（Windows 受限令牌与当前 shell 不兼容），本次命令降级为非沙箱执行。\n';
-            stderr += msg;
-            opts.onStderr?.(msg);
-            const fallback = spawn(opts.argv[0], opts.argv.slice(1), {
-              cwd: opts.cwd,
-              windowsHide: true,
-              shell: false,
-              stdio: ['ignore', 'pipe', 'pipe'],
-            });
-            attachChild(fallback);
+          if (launchError && isWinBackend) {
+            finish({ supported: true, exitCode: null, error: '原生沙箱启动失败，已拒绝执行（fail-closed）' });
             return;
           }
           finish({

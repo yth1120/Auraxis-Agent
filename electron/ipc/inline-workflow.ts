@@ -20,6 +20,7 @@
 
 import { Worker } from 'worker_threads';
 import { createOrchestrationApi, type OrchestrationCaller } from './agent-orchestration';
+import { unsafeCodeEnabled, unsafeCodeDisabledMessage } from '../safe-env';
 
 export interface InlineWorkflowContext extends OrchestrationCaller {
   log: (line: string) => void;
@@ -105,6 +106,7 @@ export async function runInlineWorkflow(
   ctx: InlineWorkflowContext,
   timeoutMs = DEFAULT_TIMEOUT_MS,
 ): Promise<{ ok: boolean; output?: unknown; error?: string }> {
+  if (!unsafeCodeEnabled()) return { ok: false, error: unsafeCodeDisabledMessage('内联工作流') };
   const body = String(script ?? '').trim();
   if (!body) return { ok: false, error: 'script 不能为空' };
   if (body.length > MAX_SCRIPT_LENGTH) {

@@ -1,7 +1,10 @@
 import { ipcMain } from 'electron';
+import { secureHandle } from './trust';
 import { readFile, readdir, stat } from 'fs/promises';
 import path from 'path';
 import { isPathInside, normalizeWinPath, SAFE_EXTENSIONS, EXCLUDED_DIRS } from './shared';
+import { assertTrustedIpcSender } from './trust';
+import { resolveTrustedProjectRoot } from './project-access';
 import { compactHistory, estimateTokens } from './context-manager';
 import { readSettings } from './settings-store';
 import { resolveModelApiBase, resolveModelApiKey } from './model-config';
@@ -46,10 +49,11 @@ async function getFileTreeText(dirPath: string, prefix = '', depth = 0): Promise
 }
 
 export function registerContextHandlers() {
-  ipcMain.handle('context:compact', async (_event, params: {
+  secureHandle('context:compact', async (event, params: {
     projectRoot?: string;
     messages: { role: string; content: string }[];
   }) => {
+    assertTrustedIpcSender(event);
     try {
       const settings: Record<string, any> = await readSettings();
       const model = settings.selectedModel || 'deepseek-v4-pro';
@@ -82,9 +86,10 @@ export function registerContextHandlers() {
     }
   });
 
-  ipcMain.handle('context:getProjectContext', async (_event, projectRoot: string) => {
+  secureHandle('context:getProjectContext', async (event, projectRoot: string) => {
+    assertTrustedIpcSender(event);
     try {
-      const root = path.resolve(projectRoot);
+      const root = await resolveTrustedProjectRoot(projectRoot);
 
       // Read project instruction file if present — precedence mirrors
       // agent-instructions.ts (AGENTS.override.md > AGENTS.md),
@@ -135,9 +140,10 @@ export function registerContextHandlers() {
     }
   });
 
-  ipcMain.handle('context:getFileStructure', async (_event, projectRoot: string) => {
+  secureHandle('context:getFileStructure', async (event, projectRoot: string) => {
+    assertTrustedIpcSender(event);
     try {
-      const root = path.resolve(projectRoot);
+      const root = await resolveTrustedProjectRoot(projectRoot);
       const treeText = await getFileTreeText(root);
       return { ok: true, data: treeText };
     } catch (error: any) {
@@ -146,13 +152,12 @@ export function registerContextHandlers() {
   });
 
 
-  ipcMain.handle('context:readFile', async (_event, filePath: string, projectRoot?: string) => {
+  secureHandle('context:readFile', async (event, filePath: string, projectRoot?: string) => {
+    assertTrustedIpcSender(event);
     try {
       const resolved = path.resolve(normalizeWinPath(filePath));
-      if (!projectRoot) {
-        return { ok: false, error: '缺少项目路径，无法读取文件' };
-      }
-      if (!isPathInside(resolved, projectRoot)) {
+      const root = await resolveTrustedProjectRoot(projectRoot);
+      if (!isPathInside(resolved, root)) {
         return { ok: false, error: '路径越权：无法访问项目外的文件' };
       }
       const content = await readFile(resolved, 'utf-8');

@@ -1,12 +1,15 @@
 import { ipcMain } from 'electron';
+import { secureHandle } from './trust';
+import { resolveTrustedProjectRoot } from './project-access';
 import { loadProjectActions } from '../actions';
 
 /** Project Actions IPC — reads <project>/.auraxis/actions.json. */
 export function registerActionHandlers() {
-  ipcMain.handle('actions:list', async (_e, projectRoot: string) => {
+  secureHandle('actions:list', async (_e, projectRoot: string) => {
     try {
       if (!projectRoot || typeof projectRoot !== 'string') return { ok: false, error: '项目目录无效' };
-      return { ok: true, data: await loadProjectActions(projectRoot) };
+      const root = await resolveTrustedProjectRoot(projectRoot);
+      return { ok: true, data: await loadProjectActions(root) };
     } catch (error: any) {
       return { ok: false, error: error.message };
     }

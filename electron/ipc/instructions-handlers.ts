@@ -7,10 +7,13 @@
  * (global scope).
  */
 import { ipcMain } from 'electron';
+import { secureHandle } from './trust';
 import { readFile, writeFile, mkdir, readdir, stat } from 'fs/promises';
 import path from 'path';
 import { globalInstructionsDir } from '../agent-instructions';
 import { isPathInside } from './shared';
+import { assertTrustedIpcSender } from './trust';
+import { resolveTrustedProjectRoot } from './project-access';
 
 const MAX_FOLDER_DEPTH = 4;
 
@@ -66,7 +69,8 @@ function resolveFolder(projectRoot: string, relPath: string | undefined): string
 }
 
 export function registerInstructionsHandlers() {
-  ipcMain.handle('instructions:getGlobal', async () => {
+  secureHandle('instructions:getGlobal', async (event) => {
+    assertTrustedIpcSender(event);
     try {
       const dir = globalInstructionsDir();
       const hit = await readFirstExisting(dir);
@@ -79,7 +83,8 @@ export function registerInstructionsHandlers() {
     }
   });
 
-  ipcMain.handle('instructions:setGlobal', async (_event, content: unknown) => {
+  secureHandle('instructions:setGlobal', async (event, content: unknown) => {
+    assertTrustedIpcSender(event);
     try {
       const dir = globalInstructionsDir();
       await mkdir(dir, { recursive: true });
@@ -90,9 +95,10 @@ export function registerInstructionsHandlers() {
     }
   });
 
-  ipcMain.handle('instructions:listProject', async (_event, projectRoot: string) => {
+  secureHandle('instructions:listProject', async (event, projectRoot: string) => {
+    assertTrustedIpcSender(event);
     try {
-      const root = path.resolve(projectRoot);
+      const root = await resolveTrustedProjectRoot(projectRoot);
       const folders: { relPath: string; hasOverride: boolean; hasAgents: boolean }[] = [];
       await walkFolders(root, root, 0, folders);
       folders.sort((a, b) => {
@@ -106,9 +112,10 @@ export function registerInstructionsHandlers() {
     }
   });
 
-  ipcMain.handle('instructions:get', async (_event, projectRoot: string, relPath?: string) => {
+  secureHandle('instructions:get', async (event, projectRoot: string, relPath?: string) => {
+    assertTrustedIpcSender(event);
     try {
-      const root = path.resolve(projectRoot);
+      const root = await resolveTrustedProjectRoot(projectRoot);
       const dir = resolveFolder(root, relPath);
       const hit = await readFirstExisting(dir);
       return {
@@ -124,9 +131,10 @@ export function registerInstructionsHandlers() {
     }
   });
 
-  ipcMain.handle('instructions:set', async (_event, projectRoot: string, relPath: string | undefined, content: unknown) => {
+  secureHandle('instructions:set', async (event, projectRoot: string, relPath: string | undefined, content: unknown) => {
+    assertTrustedIpcSender(event);
     try {
-      const root = path.resolve(projectRoot);
+      const root = await resolveTrustedProjectRoot(projectRoot);
       const dir = resolveFolder(root, relPath);
       await mkdir(dir, { recursive: true });
       await writeFile(path.join(dir, 'AGENTS.md'), String(content ?? ''), 'utf8');

@@ -11,6 +11,7 @@
  */
 
 import { app } from 'electron';
+import { secureHandle } from './trust';
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import { join, dirname } from 'path';
 import { devLog } from './shared';
@@ -380,17 +381,17 @@ export function registerCronIpc(): void {
     }
   });
 
-  ipcMain.handle('cron:create', async (_e: any, params: { name: string; prompt: string; cron: string; recurring: boolean }) => {
+  secureHandle('cron:create', async (_e: any, params: { name: string; prompt: string; cron: string; recurring: boolean }) => {
     const result = createCronJob(params);
     return result;
   });
 
-  ipcMain.handle('cron:delete', async (_e: any, jobId: string) => {
+  secureHandle('cron:delete', async (_e: any, jobId: string) => {
     const result = deleteCronJob(jobId);
     return result;
   });
 
-  ipcMain.handle('cron:list', async () => {
+  secureHandle('cron:list', async () => {
     return { ok: true, data: listCronJobs() };
   });
 }

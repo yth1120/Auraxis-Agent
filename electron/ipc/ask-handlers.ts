@@ -5,6 +5,7 @@
  * through the renderer as a modal; the answer resolves the pending tool call.
  */
 import { ipcMain, BrowserWindow } from 'electron';
+import { secureHandle } from './trust';
 
 interface PendingAsk {
   resolve: (answer: string) => void;
@@ -14,7 +15,7 @@ interface PendingAsk {
 const pending = new Map<string, PendingAsk>();
 
 export function registerAskHandlers() {
-  ipcMain.handle('ask:respond', (_event, askId: string, answer: string) => {
+  secureHandle('ask:respond', (_event, askId: string, answer: string) => {
     return resolveAsk(askId, answer) ? { ok: true } : { ok: false, error: '提问不存在或已超时' };
   });
 }

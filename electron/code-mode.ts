@@ -15,6 +15,7 @@ import type { ApprovalPolicy } from './types';
 import type { SandboxMode } from './sandbox-policy';
 import { isToolConcurrencySafe } from './tool-registry';
 import { executeToolCall } from './ipc/tool-handlers';
+import { unsafeCodeEnabled, unsafeCodeDisabledMessage } from './safe-env';
 
 export interface CodeModeHost {
   projectRoot: string;
@@ -112,8 +113,13 @@ parentPort.on('message', (m) => {
 });
 (async () => {
   try {
-    const fn = new Function('tools', 'console', 'require', '"use strict"; return (async () => {\\n' + ${body} + '\\n})();');
-    const result = await fn(tools, console, require);
+    try {
+      (globalThis as any).require = undefined;
+      (globalThis as any).process = undefined;
+      (globalThis as any).Buffer = undefined;
+    } catch { /* best-effort */ }
+    const fn = new Function('tools', 'console', '"use strict"; return (async () => {\\n' + ${body} + '\\n})();');
+    const result = await fn(tools, console);
     const text = result === undefined ? '' : (typeof result === 'string' ? result : format(result));
     send({ k: 'done', value: text });
   } catch (e) {
@@ -133,6 +139,17 @@ export async function runCodeProgram(
     executeTool?: (name: string, input: Record<string, unknown>, ctx: Record<string, unknown>) => Promise<{ output: unknown; error?: string }>;
   } = {},
 ): Promise<CodeModeResult> {
+  if (!unsafeCodeEnabled()) {
+    return {
+      stdout: '',
+      stderr: unsafeCodeDisabledMessage('Code Mode'),
+      exitCode: 1,
+      timedOut: false,
+      aborted: false,
+      truncated: false,
+      subCalls: [],
+    };
+  }
   const timeoutMs = opts.timeoutMs && opts.timeoutMs > 0 ? opts.timeoutMs : DEFAULT_TIMEOUT;
   const outputCap = opts.outputCap && opts.outputCap > 0 ? opts.outputCap : DEFAULT_OUTPUT_CAP;
   const exec = opts.executeTool ?? (executeToolCall as unknown as NonNullable<typeof opts.executeTool>);

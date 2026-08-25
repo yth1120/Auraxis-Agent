@@ -1,4 +1,6 @@
 import { ipcMain, app } from 'electron';
+import { secureHandle } from './trust';
+import { resolveTrustedProjectRoot } from './project-access';
 import os from 'os';
 import { execFile } from 'child_process';
 
@@ -67,7 +69,7 @@ async function getGitBranches(projectRoot: string): Promise<{ current: string; b
 }
 
 export function registerSystemHandlers() {
-  ipcMain.handle('system:getStats', async () => {
+  secureHandle('system:getStats', async () => {
     try {
       const cpu = getCpuUsage();
       const mem = getMemUsage();
@@ -87,21 +89,22 @@ export function registerSystemHandlers() {
     }
   });
 
-  ipcMain.handle('system:getGitBranches', async (_event, projectRoot: string) => {
+  secureHandle('system:getGitBranches', async (_event, projectRoot: string) => {
     try {
-      const gitInfo = await getGitBranches(projectRoot);
+      const root = await resolveTrustedProjectRoot(projectRoot);
+      const gitInfo = await getGitBranches(root);
       return { ok: true, data: gitInfo };
     } catch (error: any) {
       return { ok: false, error: error.message };
     }
   });
 
-  ipcMain.handle('system:getVersion', async () => {
+  secureHandle('system:getVersion', async () => {
     return { ok: true, data: app.getVersion() };
   });
 
   // ── DeepSeek account balance ─────────────────────────
-  ipcMain.handle('system:getAccountInfo', async (_event, apiKey: string) => {
+  secureHandle('system:getAccountInfo', async (_event, apiKey: string) => {
     try {
       const resp = await fetch('https://api.deepseek.com/user/balance', {
         headers: { Authorization: `Bearer ${apiKey}` },

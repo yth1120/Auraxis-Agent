@@ -27,7 +27,8 @@ jobs:
 
       - run: npm run electron:compile
       - run: npx tsc --noEmit -p tsconfig.json
-      - run: npx vitest run
+      - run: npx vite build
+      - run: npx vitest run --coverage
 
       - name: Build (Linux)
         if: runner.os == 'Linux'

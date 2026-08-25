@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import path from 'path';
 
 const h = vi.hoisted(() => ({
   handlers: new Map<string, Function>(),
@@ -114,7 +115,7 @@ describe('registerPlanHandlers', () => {
 
   it('plan:list 返回列表并包装错误', async () => {
     expect(await list()({}, { projectRoot: 'C:/proj' })).toEqual({ ok: true, data: [{ id: 'p1', title: 'T' }] });
-    expect(listPlanFiles).toHaveBeenCalledWith('C:/proj', 'C:/tmp/user-data');
+    expect(listPlanFiles).toHaveBeenCalledWith(path.resolve('C:/proj'), 'C:/tmp/user-data');
 
     vi.mocked(listPlanFiles).mockRejectedValueOnce(new Error('boom'));
     expect(await list()({}, {})).toEqual({ ok: false, error: 'boom' });

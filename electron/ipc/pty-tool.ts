@@ -7,6 +7,7 @@
  */
 import { spawn, type ChildProcessWithoutNullStreams } from 'child_process';
 import { EventEmitter } from 'events';
+import { safeProcessEnv } from '../safe-env';
 
 export interface PtySessionLike {
   write(data: string): void;
@@ -39,7 +40,7 @@ export const defaultPtyFactory: PtyFactory = (opts) => {
       cols: opts.cols ?? 80,
       rows: opts.rows ?? 24,
       cwd: opts.cwd || process.cwd(),
-      env: { ...process.env, TERM: 'xterm-256color' },
+      env: { ...safeProcessEnv({ TERM: 'xterm-256color' }) },
     });
     const dataListeners = new Set<(d: string) => void>();
     const exitListeners = new Set<() => void>();
@@ -57,7 +58,7 @@ export const defaultPtyFactory: PtyFactory = (opts) => {
 
   const child: ChildProcessWithoutNullStreams = spawn(opts.command, [], {
     cwd: opts.cwd || process.cwd(),
-    env: { ...process.env, TERM: 'xterm-256color' },
+    env: { ...safeProcessEnv({ TERM: 'xterm-256color' }) },
     stdio: ['pipe', 'pipe', 'pipe'],
     windowsHide: true,
   });

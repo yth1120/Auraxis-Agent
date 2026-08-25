@@ -47,10 +47,10 @@ describe('lint-handlers', () => {
   });
 
   it('reports a non-zero exit when lint still has problems', async () => {
-    process.env.FAKE_LINT_EXIT = '1';
     const result = await runLintFix(testDir, undefined, {
       command: process.execPath,
       args: [fixture],
+      env: { FAKE_LINT_EXIT: '1' },
     });
     expect(result.exitCode).toBe(1);
     expect(result.error).toBeUndefined();

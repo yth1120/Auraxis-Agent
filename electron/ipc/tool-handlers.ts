@@ -28,6 +28,7 @@ import { writeSkill } from '../skill-store';
 import { inspectRuntime } from '../runtime-inspect';
 import type { SandboxMode } from '../sandbox-policy';
 import { runHooksFor } from '../hooks';
+import { safeProcessEnv } from '../safe-env';
 import { startBashTask, finishBashTask, setTaskStopper } from './task-monitor';
 import type { SessionEvent } from '../contracts/session-types';
 import {
@@ -559,6 +560,9 @@ async function runBash(
   const isWin = process.platform === 'win32';
 
   if (params.run_in_background === true) {
+    if (ctx.sandboxMode === 'read' || ctx.sandboxMode === 'workspace-write') {
+      return { output: null, error: '受限沙箱模式暂不支持后台 Bash；请使用前台执行或切换到允许的配置。' };
+    }
     return runBashBackground(params.command, workdir, ctx);
   }
 
@@ -883,6 +887,9 @@ async function runEdit(params: { file_path: string; old_string: string; new_stri
   if (boundary) {
     return { output: null, error: `${boundary}: ${params.file_path}` };
   }
+  if (!ctx.autoApprove && !isSafeExtension(resolved)) {
+    return { output: null, error: `不允许编辑的文件类型: ${path.extname(resolved)}` };
+  }
   if (isDocumentExtension(resolved)) {
     return { output: null, error: '文档文件（.docx/.xlsx/.pptx/.pdf）请使用 ReadDocument / WriteDocument 工具处理' };
   }
@@ -950,6 +957,9 @@ async function runStrReplaceEditor(
   const boundary = outsideWorkspace(resolved, ctx, isWriteCmd);
   if (boundary) {
     return { output: null, error: `${boundary}: ${params.path}` };
+  }
+  if (!ctx.autoApprove && !isSafeExtension(resolved)) {
+    return { output: null, error: `不允许编辑的文件类型: ${path.extname(resolved)}` };
   }
 
   switch (params.command) {
@@ -2381,12 +2391,7 @@ async function runReviewArtifact(
     cwd,
     timeout: 180000,
     maxBuffer: 5 * 1024 * 1024,
-    env: {
-      ...process.env,
-      CI: 'true',
-      FORCE_COLOR: '0',
-      NO_COLOR: '1',
-    },
+    env: safeProcessEnv({ CI: 'true', FORCE_COLOR: '0', NO_COLOR: '1' }),
   });
 
   const stdout = (result.stdout || '').toString();
@@ -3571,6 +3576,10 @@ export async function executeToolCall(
     ? input.sandbox_permissions as SandboxMode
     : undefined;
   const effectiveSandbox = perCallSandbox ?? ctx.sandboxMode ?? 'full';
+  const escalatedSandbox = !!perCallSandbox && perCallSandbox !== ctx.sandboxMode;
+  if (escalatedSandbox && ctx.mode === 'auto' && !ctx.autoApprove) {
+    return { output: null, error: '模型不允许在自动模式下自行提升沙箱权限；请由用户在权限对话框中确认后重试。' };
+  }
   const sandbox = enforceSandbox({ sandboxMode: effectiveSandbox, toolName, input });
   if (!sandbox.allowed) {
     return { output: null, error: `沙箱拒绝: ${sandbox.reason}` };

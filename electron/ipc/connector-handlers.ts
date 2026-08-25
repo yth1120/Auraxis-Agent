@@ -2,6 +2,7 @@
  * connector-handlers.ts — Slack / Drive / Notion connector IPC for Settings.
  */
 import { ipcMain } from 'electron';
+import { secureHandle } from './trust';
 import {
   getConnectorStatuses,
   setConnectorToken,
@@ -14,7 +15,7 @@ function isKind(v: unknown): v is ConnectorKind {
 }
 
 export function registerConnectorHandlers() {
-  ipcMain.handle('connector:status', async () => {
+  secureHandle('connector:status', async () => {
     try {
       return { ok: true, data: await getConnectorStatuses() };
     } catch (error: any) {
@@ -22,7 +23,7 @@ export function registerConnectorHandlers() {
     }
   });
 
-  ipcMain.handle('connector:setToken', async (_event, kind: unknown, token: unknown) => {
+  secureHandle('connector:setToken', async (_event, kind: unknown, token: unknown) => {
     try {
       if (!isKind(kind)) return { ok: false, error: '连接器类型无效' };
       if (typeof token !== 'string') return { ok: false, error: 'Token 必须是字符串' };
@@ -33,7 +34,7 @@ export function registerConnectorHandlers() {
     }
   });
 
-  ipcMain.handle('connector:test', async (_event, kind: unknown) => {
+  secureHandle('connector:test', async (_event, kind: unknown) => {
     try {
       if (!isKind(kind)) return { ok: false, error: '连接器类型无效' };
       return { ok: true, data: await testConnector(kind) };

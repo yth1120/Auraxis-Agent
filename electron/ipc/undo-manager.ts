@@ -6,6 +6,7 @@
 import path from 'path';
 import { promises as fs } from 'fs';
 import { ipcMain } from 'electron';
+import { secureHandle } from './trust';
 import type { WorkspaceFileDiff } from '../types';
 
 // ─── Types ─────────────────────────────────────────────
@@ -343,33 +344,33 @@ export const undoManager = new UndoManager();
 // ─── IPC ─────────────────────────────────────────────────
 
 export function registerUndoIpc() {
-  ipcMain.handle('undo:getHistory', async (_event, sessionId?: string) => {
+  secureHandle('undo:getHistory', async (_event, sessionId?: string) => {
     try {
       return { ok: true, data: undoManager.getUndoHistory(sessionId) };
     } catch (error: any) { return { ok: false, error: error.message }; }
   });
 
-  ipcMain.handle('undo:getList', async () => {
+  secureHandle('undo:getList', async () => {
     try {
       return { ok: true, data: undoManager.getUndoHistory() };
     } catch (error: any) { return { ok: false, error: error.message }; }
   });
 
-  ipcMain.handle('undo:getSessionDiffs', async (_event, sessionId: string, projectRoot: string) => {
+  secureHandle('undo:getSessionDiffs', async (_event, sessionId: string, projectRoot: string) => {
     try {
       const diffs = await undoManager.getSessionDiffs(sessionId, projectRoot);
       return { ok: true, data: diffs };
     } catch (error: any) { return { ok: false, error: error.message }; }
   });
 
-  ipcMain.handle('undo:revertSessionFile', async (_event, params: { sessionId: string; relPath: string; projectRoot: string }) => {
+  secureHandle('undo:revertSessionFile', async (_event, params: { sessionId: string; relPath: string; projectRoot: string }) => {
     try {
       const result = await undoManager.revertSessionFile(params.sessionId, params.relPath, params.projectRoot);
       return { ok: true, data: result };
     } catch (error: any) { return { ok: false, error: error.message }; }
   });
 
-  ipcMain.handle('undo:execute', async (_event, fileId: string, projectRoot: string) => {
+  secureHandle('undo:execute', async (_event, fileId: string, projectRoot: string) => {
     try {
       const ok = await undoManager.undoFile(fileId, projectRoot);
       if (!ok) return { ok: false, error: '备份不存在或恢复失败' };
@@ -377,7 +378,7 @@ export function registerUndoIpc() {
     } catch (error: any) { return { ok: false, error: error.message }; }
   });
 
-  ipcMain.handle('undo:revertLast', async (_event, projectRoot: string) => {
+  secureHandle('undo:revertLast', async (_event, projectRoot: string) => {
     try {
       const history = undoManager.getUndoHistory();
       if (history.length === 0) return { ok: false, error: '无撤销历史' };
@@ -387,14 +388,14 @@ export function registerUndoIpc() {
     } catch (error: any) { return { ok: false, error: error.message }; }
   });
 
-  ipcMain.handle('undo:revertSessions', async (_event, params: { sessionIds: string[]; projectRoot: string }) => {
+  secureHandle('undo:revertSessions', async (_event, params: { sessionIds: string[]; projectRoot: string }) => {
     try {
       const result = await undoManager.revertSessions(params.sessionIds, params.projectRoot);
       return { ok: true, data: result };
     } catch (error: any) { return { ok: false, error: error.message }; }
   });
 
-  ipcMain.handle('undo:revert', async (_event, fileId: string, projectRoot: string) => {
+  secureHandle('undo:revert', async (_event, fileId: string, projectRoot: string) => {
     try {
       const ok = await undoManager.undoFile(fileId, projectRoot);
       if (!ok) return { ok: false, error: '备份不存在或恢复失败' };
@@ -402,7 +403,7 @@ export function registerUndoIpc() {
     } catch (error: any) { return { ok: false, error: error.message }; }
   });
 
-  ipcMain.handle('undo:markBest', async (_event, params: {
+  secureHandle('undo:markBest', async (_event, params: {
     projectRoot: string; sessionId: string; filePath: string; label?: string;
   }) => {
     try {
@@ -417,7 +418,7 @@ export function registerUndoIpc() {
     } catch (error: any) { return { ok: false, error: error.message }; }
   });
 
-  ipcMain.handle('undo:restoreBest', async (_event, params: {
+  secureHandle('undo:restoreBest', async (_event, params: {
     projectRoot: string; sessionId: string; filePath: string;
   }) => {
     try {
@@ -431,7 +432,7 @@ export function registerUndoIpc() {
     } catch (error: any) { return { ok: false, error: error.message }; }
   });
 
-  ipcMain.handle('undo:listBest', async (_event, params: { projectRoot: string; sessionId?: string }) => {
+  secureHandle('undo:listBest', async (_event, params: { projectRoot: string; sessionId?: string }) => {
     try {
       return { ok: true, data: undoManager.listBest(params.projectRoot, params.sessionId) };
     } catch (error: any) { return { ok: false, error: error.message }; }

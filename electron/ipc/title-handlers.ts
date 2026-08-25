@@ -7,6 +7,7 @@
  */
 
 import { ipcMain } from 'electron';
+import { secureHandle } from './trust';
 import { invokeLlm } from './llm-adapter';
 import { resolveModelApiBase, resolveModelApiKey } from './model-config';
 import { readSettings } from './settings-store';
@@ -83,7 +84,7 @@ export async function generateSessionTitle(
 }
 
 export function registerTitleHandlers(): void {
-  ipcMain.handle('sessionTitle:generate', async (_event, payload: { messages?: { content: string }[] }) => {
+  secureHandle('sessionTitle:generate', async (_event, payload: { messages?: { content: string }[] }) => {
     const title = await generateSessionTitle(payload?.messages || []);
     return title ? { ok: true, data: { title } } : { ok: false, error: '无法生成标题' };
   });

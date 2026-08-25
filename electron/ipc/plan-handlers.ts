@@ -1,4 +1,6 @@
 import { ipcMain, BrowserWindow, app } from 'electron';
+import { secureHandle } from './trust';
+import { resolveTrustedProjectRoot } from './project-access';
 import type { TaskPlan } from './agent-loop';
 import { savePlanMarkdown, listPlanFiles } from './plan-store';
 
@@ -58,16 +60,17 @@ export async function waitForPlanApproval(
 }
 
 export function registerPlanHandlers(): void {
-  ipcMain.handle('plan:list', async (_event, params: { projectRoot?: string }) => {
+  secureHandle('plan:list', async (_event, params: { projectRoot?: string }) => {
     try {
-      const data = await listPlanFiles(params?.projectRoot, app.getPath('userData'));
+      const root = params?.projectRoot ? await resolveTrustedProjectRoot(params.projectRoot) : undefined;
+      const data = await listPlanFiles(root, app.getPath('userData'));
       return { ok: true, data };
     } catch (error: any) {
       return { ok: false, error: error?.message ?? String(error) };
     }
   });
 
-  ipcMain.handle('plan:approve', async (_event, params: {
+  secureHandle('plan:approve', async (_event, params: {
     planId: string;
     approvedStepIds: string[];
   }) => {
@@ -83,7 +86,7 @@ export function registerPlanHandlers(): void {
     return { ok: true };
   });
 
-  ipcMain.handle('plan:reject', async (_event, params: { planId: string }) => {
+  secureHandle('plan:reject', async (_event, params: { planId: string }) => {
     const pending = pendingApprovals.get(params.planId);
     if (!pending) {
       return { ok: false, error: '未找到对应的计划审批请求（可能已超时）' };

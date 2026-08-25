@@ -1,4 +1,5 @@
 import { ipcMain } from 'electron';
+import { secureHandle } from './trust';
 import { spawn, ChildProcess } from 'child_process';
 import path from 'path';
 import type { MCPServerConfig, MCPToolDef, MCPStatus } from '../advanced-defs';
@@ -267,12 +268,12 @@ export async function callMcpTool(
 }
 
 export function registerMcpHandlers() {
-  ipcMain.handle('mcp:getServers', async () => {
+  secureHandle('mcp:getServers', async () => {
     const configs = Array.from(connections.values()).map((c) => c.config);
     return { ok: true, data: configs };
   });
 
-  ipcMain.handle('mcp:setServers', async (_event, servers: MCPServerConfig[]) => {
+  secureHandle('mcp:setServers', async (_event, servers: MCPServerConfig[]) => {
     // Disconnect removed servers
     for (const [id, conn] of connections) {
       if (!servers.find((s) => s.id === id)) {
@@ -293,17 +294,17 @@ export function registerMcpHandlers() {
     return { ok: true };
   });
 
-  ipcMain.handle('mcp:connect', async (_event, serverId: string) => {
+  secureHandle('mcp:connect', async (_event, serverId: string) => {
     const status = await connectServer(serverId);
     return { ok: status.connected, data: status, error: status.error };
   });
 
-  ipcMain.handle('mcp:disconnect', async (_event, serverId: string) => {
+  secureHandle('mcp:disconnect', async (_event, serverId: string) => {
     const status = disconnectServer(serverId);
     return { ok: true, data: status };
   });
 
-  ipcMain.handle('mcp:getStatuses', async () => {
+  secureHandle('mcp:getStatuses', async () => {
     const statuses: MCPStatus[] = [];
     for (const [id, conn] of connections) {
       statuses.push({
@@ -315,7 +316,7 @@ export function registerMcpHandlers() {
     return { ok: true, data: statuses };
   });
 
-  ipcMain.handle('mcp:listTools', async (_event, serverId: string) => {
+  secureHandle('mcp:listTools', async (_event, serverId: string) => {
     const conn = connections.get(serverId);
     if (!conn) {
       return { ok: false, error: '服务器未找到' };
@@ -323,7 +324,7 @@ export function registerMcpHandlers() {
     return { ok: true, data: conn.tools };
   });
 
-  ipcMain.handle('mcp:callTool', async (_event, serverName: string, toolName: string, args: Record<string, unknown>) => {
+  secureHandle('mcp:callTool', async (_event, serverName: string, toolName: string, args: Record<string, unknown>) => {
     try {
       assertString(serverName, 'serverName');
       assertString(toolName, 'toolName');

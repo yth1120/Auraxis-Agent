@@ -1,4 +1,5 @@
 import { app, ipcMain } from 'electron';
+import { secureHandle } from './trust';
 import { readFile } from 'fs/promises';
 import path from 'path';
 
@@ -15,7 +16,7 @@ function coverageSummaryCandidates(): string[] {
 }
 
 export function registerCoverageIpc(): void {
-  ipcMain.handle('coverage:get', async () => {
+  secureHandle('coverage:get', async () => {
     for (const file of coverageSummaryCandidates()) {
       try {
         const raw = await readFile(file, 'utf-8');

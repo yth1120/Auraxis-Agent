@@ -4,6 +4,8 @@
  */
 
 import { BrowserWindow, app, ipcMain } from 'electron';
+import { secureHandle } from './trust';
+import { resolveTrustedProjectRoot } from './project-access';
 import { existsSync } from 'fs';
 import { agentLoopRun, AgentObserver, type AgentStateSnapshot, type TaskPlan } from './agent-loop';
 import { TOOL_DEFINITIONS } from '../tool-defs';
@@ -1142,14 +1144,15 @@ export const scheduler = new AgentScheduler();
 // ─── IPC Registration ──────────────────────────────────
 
 export function registerSchedulerIpc() {
-  ipcMain.handle('agent:start', async (event, params: { config: AgentConfig; projectPath: string }) => {
+  secureHandle('agent:start', async (event, params: { config: AgentConfig; projectPath: string }) => {
     try {
       assertObject(params, 'params');
       assertObject(params.config, 'config');
       assertString(params.projectPath, 'projectPath');
       // Reject before any fs work — a stale persisted projectPath (deleted
       // folder) would otherwise blow up as an unhandled ENOENT in copyDir.
-      if (!params.projectPath || !existsSync(params.projectPath)) {
+      const projectPath = await resolveTrustedProjectRoot(params.projectPath);
+      if (!projectPath || !existsSync(projectPath)) {
         return { ok: false, error: `项目目录不存在或未设置: ${params.projectPath || '(空)'}。请先在输入框选择有效的项目目录。` };
       }
       // Backend-enforced mode isolation: chat mode must never create Agent tasks.
@@ -1173,21 +1176,21 @@ export function registerSchedulerIpc() {
             return requestPermission(toolName, input, win!, toolCallId, {
               mode: isReviewGate || params.config.workTier === 'full' ? 'ask' : normalizeApprovalPolicy(params.config.mode),
               approvedPlanSteps: params.config.approvedPlanSteps,
-              projectRoot: params.projectPath,
+              projectRoot: projectPath,
               agentId,
             });
           };
-      const agentId = scheduler.startAgent(params.config, params.projectPath, checkPermission);
+      const agentId = scheduler.startAgent(params.config, projectPath, checkPermission);
       return { ok: true, data: { agentId } };
     } catch (error: any) { return { ok: false, error: error.message }; }
   });
 
-  ipcMain.handle('agent:schedulerStop', async (_e, agentId: string) => {
+  secureHandle('agent:schedulerStop', async (_e, agentId: string) => {
     try { return { ok: true, data: { stopped: scheduler.stopAgent(agentId) } }; }
     catch (error: any) { return { ok: false, error: error.message }; }
   });
 
-  ipcMain.handle('agent:sendMessage', async (_e, agentId: string, message: string) => {
+  secureHandle('agent:sendMessage', async (_e, agentId: string, message: string) => {
     try {
       assertString(agentId, 'agentId');
       assertString(message, 'message');
@@ -1200,7 +1203,7 @@ export function registerSchedulerIpc() {
     } catch (error: any) { return { ok: false, error: error.message }; }
   });
 
-  ipcMain.handle('agent:pause', async (_e, agentId: string) => {
+  secureHandle('agent:pause', async (_e, agentId: string) => {
     // await pauseAgent — its Promise only resolves after the loop's .then has
     // written savedState, so the renderer can immediately call agent:resume
     // without racing the capture.
@@ -1208,14 +1211,14 @@ export function registerSchedulerIpc() {
     catch (error: any) { return { ok: false, error: error.message }; }
   });
 
-  ipcMain.handle('agent:resume', async (_e, agentId: string) => {
+  secureHandle('agent:resume', async (_e, agentId: string) => {
     // resumeAgent now async — awaits any in-flight pauseSettled so savedState
     // is guaranteed captured before dequeueAndStart reads it.
     try { return { ok: true, data: { resumed: await scheduler.resumeAgent(agentId) } }; }
     catch (error: any) { return { ok: false, error: error.message }; }
   });
 
-  ipcMain.handle('agent:continue', async (_e, agentId: string, instruction: string, displayInstruction?: string) => {
+  secureHandle('agent:continue', async (_e, agentId: string, instruction: string, displayInstruction?: string) => {
     try {
       assertString(agentId, 'agentId');
       assertString(instruction, 'instruction');
@@ -1227,7 +1230,7 @@ export function registerSchedulerIpc() {
     } catch (error: any) { return { ok: false, error: error.message }; }
   });
 
-  ipcMain.handle('agent:approveDelivery', async (_e, agentId: string) => {
+  secureHandle('agent:approveDelivery', async (_e, agentId: string) => {
     try {
       assertString(agentId, 'agentId');
       const ok = scheduler.approveDelivery(agentId);
@@ -1235,41 +1238,41 @@ export function registerSchedulerIpc() {
     } catch (error: any) { return { ok: false, error: error.message }; }
   });
 
-  ipcMain.handle('agent:setPriority', async (_e, agentId: string, priority: string) => {
+  secureHandle('agent:setPriority', async (_e, agentId: string, priority: string) => {
     try { return { ok: true, data: { set: scheduler.setPriority(agentId, priority as any) } }; }
     catch (error: any) { return { ok: false, error: error.message }; }
   });
 
-  ipcMain.handle('agent:getQueue', async () => {
+  secureHandle('agent:getQueue', async () => {
     try { return { ok: true, data: scheduler.getQueue() }; }
     catch (error: any) { return { ok: false, error: error.message }; }
   });
 
-  ipcMain.handle('agent:setMaxConcurrent', async (_e, n: number) => {
+  secureHandle('agent:setMaxConcurrent', async (_e, n: number) => {
     try { scheduler.setMaxConcurrent(n); return { ok: true }; }
     catch (error: any) { return { ok: false, error: error.message }; }
   });
 
-  ipcMain.handle('agent:getAll', async () => {
+  secureHandle('agent:getAll', async () => {
     try { return { ok: true, data: scheduler.getAllAgentStates() }; }
     catch (error: any) { return { ok: false, error: error.message }; }
   });
 
-  ipcMain.handle('agent:schedulerRemove', async (_e, agentId: string) => {
+  secureHandle('agent:schedulerRemove', async (_e, agentId: string) => {
     try {
       const removed = scheduler.removeAgent(agentId);
       return { ok: true, data: { removed } };
     } catch (error: any) { return { ok: false, error: error.message }; }
   });
 
-  ipcMain.handle('agent:clearAll', async () => {
+  secureHandle('agent:clearAll', async () => {
     try {
       const cleared = scheduler.clearAll();
       return { ok: true, data: { cleared } };
     } catch (error: any) { return { ok: false, error: error.message }; }
   });
 
-  ipcMain.handle('agent:getState', async (_e, agentId: string) => {
+  secureHandle('agent:getState', async (_e, agentId: string) => {
     try {
       const state = scheduler.getAgentState(agentId);
       if (!state) return { ok: false, error: 'Agent not found' };

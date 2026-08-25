@@ -7,6 +7,7 @@
  * sandboxed/remote backends can swap it via setShellExecutor.
  */
 import { spawn } from 'child_process';
+import { safeProcessEnv } from '../safe-env';
 
 export interface ShellExecRequest {
   command: string;
@@ -46,7 +47,7 @@ export const nodeShellExecutor: ShellExecutor = {
       try {
         child = spawn(req.command, req.args ?? [], {
           cwd: req.cwd ?? process.cwd(),
-          env: req.env ?? process.env,
+          env: req.env ?? safeProcessEnv(),
           shell: req.shell ?? false,
           signal: req.signal,
           windowsHide: true,

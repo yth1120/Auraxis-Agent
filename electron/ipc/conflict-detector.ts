@@ -5,6 +5,7 @@
  */
 
 import { ipcMain } from 'electron';
+import { secureHandle } from './trust';
 
 // ─── Types ─────────────────────────────────────────────
 
@@ -134,7 +135,7 @@ export const conflictDetector = new ConflictDetector();
 // ─── IPC ─────────────────────────────────────────────────
 
 export function registerConflictIpc() {
-  ipcMain.handle('conflict:getConflicts', async () => {
+  secureHandle('conflict:getConflicts', async () => {
     try {
       return { ok: true, data: conflictDetector.getConflicts() };
     } catch (error: any) {
@@ -142,7 +143,7 @@ export function registerConflictIpc() {
     }
   });
 
-  ipcMain.handle('conflict:getFileHistory', async (_event, filePath: string) => {
+  secureHandle('conflict:getFileHistory', async (_event, filePath: string) => {
     try {
       return { ok: true, data: conflictDetector.getFileHistory(filePath) };
     } catch (error: any) {

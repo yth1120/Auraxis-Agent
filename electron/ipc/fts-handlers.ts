@@ -1,9 +1,10 @@
 import { ipcMain } from 'electron';
+import { secureHandle } from './trust';
 import { searchFts, rebuildFts } from '../fts';
 
 /** FTS IPC — global full-text search over session logs. */
 export function registerFtsHandlers() {
-  ipcMain.handle('fts:search', async (_e, query: string, limit?: number) => {
+  secureHandle('fts:search', async (_e, query: string, limit?: number) => {
     try {
       if (!query || typeof query !== 'string') return { ok: true, data: [] };
       return { ok: true, data: await searchFts(query, limit || 20) };
@@ -11,7 +12,7 @@ export function registerFtsHandlers() {
       return { ok: false, error: error.message };
     }
   });
-  ipcMain.handle('fts:rebuild', async () => {
+  secureHandle('fts:rebuild', async () => {
     try {
       return { ok: true, data: { indexed: await rebuildFts() } };
     } catch (error: any) {

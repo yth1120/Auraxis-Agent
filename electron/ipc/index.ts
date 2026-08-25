@@ -3,6 +3,8 @@ import { mkdirSync } from 'fs';
 import path from 'path';
 import os from 'os';
 import { app, ipcMain, BrowserWindow, shell } from 'electron';
+import type { IpcMainInvokeEvent } from 'electron';
+import { assertTrustedIpcSender } from './trust';
 import { registerFileHandlers } from './file-handlers';
 import { registerProjectHandlers } from './project-handlers';
 import { registerAiHandlers } from './ai-handlers';
@@ -45,7 +47,7 @@ import { registerTitleHandlers } from './title-handlers';
 import { registerPluginStateHandlers } from './plugin-state-handlers';
 import { registerCoverageIpc } from './coverage-handlers';
 import { registerTokenizerIpc } from '../tokenizer';
-import { readSettings, writeSettings } from './settings-store';
+import { readSettings, writeSettings, redactSettings } from './settings-store';
 import { getAllModels } from './model-config';
 import { getActiveWorktree } from './tool-handlers';
 
@@ -79,16 +81,26 @@ export function broadcastWorktreeStatus(win: BrowserWindow, active: boolean, san
   } catch { /* window may be closed */ }
 }
 
+
+function secureHandle<T extends unknown>(
+  channel: string,
+  handler: (event: Electron.IpcMainInvokeEvent, ...args: any[]) => Promise<T> | T,
+): void {
+  ipcMain.handle(channel, (event, ...args: any[]) => {
+    assertTrustedIpcSender(event);
+    return handler(event, ...args);
+  });
+}
 export function registerIpcHandlers() {
   // Window handlers — resolve the window from the IPC sender, NOT from focus.
   // getFocusedWindow() returns null whenever the window loses focus (e.g. the
   // detached DevTools window grabs it), silently disabling every control button.
-  ipcMain.handle('window:minimize', (event) => {
+  secureHandle('window:minimize', (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);
     win?.minimize();
   });
 
-  ipcMain.handle('window:maximize', (event) => {
+  secureHandle('window:maximize', (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);
     if (win?.isMaximized()) {
       win.unmaximize();
@@ -97,19 +109,19 @@ export function registerIpcHandlers() {
     }
   });
 
-  ipcMain.handle('window:close', (event) => {
+  secureHandle('window:close', (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);
     win?.close();
   });
 
-  ipcMain.handle('window:isMaximized', (event) => {
+  secureHandle('window:isMaximized', (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);
     return win?.isMaximized() ?? false;
   });
 
   // UI zoom — frameless window has no menu, so Ctrl+=/− accelerators don't
   // exist; the renderer forwards zoom intents here. delta=null resets.
-  ipcMain.handle('window:zoom', (event, delta: number | null) => {
+  secureHandle('window:zoom', (event, delta: number | null) => {
     const wc = event.sender;
     const next = delta === null ? 0 : Math.max(-3, Math.min(3, wc.getZoomLevel() + delta));
     wc.setZoomLevel(next);
@@ -119,7 +131,7 @@ export function registerIpcHandlers() {
   // Native frosted-glass window material. The renderer keeps a persisted
   // sidebar-glass value and calls this on change / rehydrate; unsupported
   // OSes (Windows 10 / non-Windows) keep the solid sidebar untouched.
-  ipcMain.handle('window:setBackgroundMaterial', (event, enabled: boolean) => {
+  secureHandle('window:setBackgroundMaterial', (event, enabled: boolean) => {
     const win = BrowserWindow.fromWebContents(event.sender);
     if (!win) return { ok: false, error: 'window unavailable' };
     if (!isWindows11()) return { ok: false, error: 'unsupported' };
@@ -140,15 +152,15 @@ export function registerIpcHandlers() {
     }
   });
 
-  ipcMain.handle('window:backgroundMaterialSupported', (_event) => {
+  secureHandle('window:backgroundMaterialSupported', (_event) => {
     return { ok: true, data: isWindows11() };
   });
 
-  ipcMain.handle('window:glassState', (_event) => {
+  secureHandle('window:glassState', (_event) => {
     return { ok: true, data: { supported: isWindows11(), ready: acrylicWindowReady } };
   });
 
-  ipcMain.handle('shell:openExternal', async (_event, url: string) => {
+  secureHandle('shell:openExternal', async (_event, url: string) => {
     // Only allow https and http URLs to prevent protocol handler abuse
     try {
       const u = new URL(url);
@@ -162,7 +174,7 @@ export function registerIpcHandlers() {
     return { ok: true };
   });
 
-  ipcMain.handle('shell:openPath', async (_event, filePath: string) => {
+  secureHandle('shell:openPath', async (_event, filePath: string) => {
     if (typeof filePath !== 'string' || !filePath.trim()) {
       return { ok: false, error: '缺少文件路径' };
     }
@@ -190,10 +202,10 @@ export function registerIpcHandlers() {
     return { ok: false, error: '未找到 VS Code，请确认 code 命令已添加到 PATH' };
   };
 
-  ipcMain.handle('shell:openInVSCode', async (_event, projectPath: string) => openWithVSCode(projectPath, false));
-  ipcMain.handle('shell:openFileInVSCode', async (_event, filePath: string) => openWithVSCode(filePath, true));
+  secureHandle('shell:openInVSCode', async (_event, projectPath: string) => openWithVSCode(projectPath, false));
+  secureHandle('shell:openFileInVSCode', async (_event, filePath: string) => openWithVSCode(filePath, true));
 
-  ipcMain.handle('shell:openSkillsDirectory', async () => {
+  secureHandle('shell:openSkillsDirectory', async () => {
     const dir = path.join(app.getPath('userData'), 'skills');
     try {
       mkdirSync(dir, { recursive: true });
@@ -219,22 +231,20 @@ export function registerIpcHandlers() {
     perplexity: 'perplexityApiKey',
   };
 
-  ipcMain.handle('settings:get', async (_event, key: string) => {
+  secureHandle('settings:get', async (_event, key: string) => {
     try {
       const settings = await readSettings();
+      const safe = redactSettings(settings);
       if (key) {
-        return { ok: true, data: settings[key] };
+        return { ok: true, data: safe[key] };
       }
-      // Strip API keys from full settings response
-      const safe = { ...settings };
-      for (const k of API_KEY_KEYS) delete safe[k];
       return { ok: true, data: safe };
     } catch (error: any) {
       return { ok: false, error: error.message };
     }
   });
 
-  ipcMain.handle('settings:set', async (_event, key: string, value: unknown) => {
+  secureHandle('settings:set', async (_event, key: string, value: unknown) => {
     try {
       if (API_KEY_KEYS.has(key)) {
         return { ok: false, error: '请使用 api:setKey 设置 API Key' };
@@ -248,19 +258,18 @@ export function registerIpcHandlers() {
     }
   });
 
-  ipcMain.handle('settings:getApiKey', async (_event, provider: string) => {
+  secureHandle('settings:getApiKey', async (_event, provider: string) => {
     try {
       const settings = await readSettings();
       const keyField = PROVIDER_KEY_FIELDS[provider];
       if (!keyField) return { ok: false, error: `不支持的 provider: ${provider}` };
-      const key = (settings as Record<string, unknown>)[keyField];
-      return { ok: true, data: (typeof key === 'string' ? key : '') || '' };
+      return { ok: true, data: '' };
     } catch (error: any) {
       return { ok: false, error: error.message };
     }
   });
 
-  ipcMain.handle('api:setKey', async (_event, provider: string, apiKey: string) => {
+  secureHandle('api:setKey', async (_event, provider: string, apiKey: string) => {
     try {
       if (typeof apiKey !== 'string') return { ok: false, error: 'API Key 不能为空' };
       const field = PROVIDER_KEY_FIELDS[provider];
@@ -276,7 +285,7 @@ export function registerIpcHandlers() {
     }
   });
 
-  ipcMain.handle('model:getAll', async () => {
+  secureHandle('model:getAll', async () => {
     try {
       const models = await getAllModels();
       return { ok: true, data: models };
@@ -336,7 +345,7 @@ export function registerIpcHandlers() {
   });
 
   // Worktree sandbox status
-  ipcMain.handle('worktree:getStatus', (_event, sessionKey: string) => {
+  secureHandle('worktree:getStatus', (_event, sessionKey: string) => {
     const sandboxPath = getActiveWorktree(sessionKey);
     return { ok: true, data: { active: !!sandboxPath, sandboxPath: sandboxPath || null, sessionKey } };
   });

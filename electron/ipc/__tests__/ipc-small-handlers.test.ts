@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import path from 'path';
 
 const electronMock = vi.hoisted(() => ({
   handle: vi.fn(),
@@ -213,7 +214,7 @@ describe('IPC 小型处理器（actions/rules/credentials/skills/session-log/wor
       ok: true,
       data: { runId: 'run-1' },
     });
-    expect(startWorkflow).toHaveBeenCalledWith(expect.objectContaining({ id: 'wf1' }), '/proj');
+    expect(startWorkflow).toHaveBeenCalledWith(expect.objectContaining({ id: 'wf1' }), path.resolve('/proj'));
     await expect(h.get('workflow:run')!({}, { workflowId: 'nope', projectRoot: '/proj' })).resolves.toMatchObject({
       ok: false,
     });

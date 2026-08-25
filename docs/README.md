@@ -6,7 +6,7 @@ Related docs: [TS SDK](../packages/auraxis-sdk/README.md) · [Python SDK](../pyt
 
 ## 1. Project Overview
 
-Auraxis v3.0.0 is an Electron-based desktop agentic workbench that combines a unified ReAct step engine, multi-agent scheduling, Code Mode tool orchestration, plugin extensibility, and persistent project memory. Execution semantics follow the common convention (`end_turn` ends the turn — no scripts or forced gates), and ReviewArtifact is an optional verification tool. The backend LLM defaults to the DeepSeek API (OpenAI / Anthropic compatible formats). Web search defaults to DeepSeek's native search (falling back to DuckDuckGo, with Exa and Perplexity also supported). Official DeepSeek capabilities are integrated: reasoning effort low/high/max, strict tools (Beta), plan-generation JSON mode, conversation prefix continuation ("continue writing" from a code block), FIM completion (Beta) API, streaming usage with context-cache hit display, user_id isolation, configurable max output tokens (up to 384K), and local offline tokenizer counting.
+Auraxis v3.0.1 is an Electron-based desktop agentic workbench that combines a unified ReAct step engine, multi-agent scheduling, Code Mode tool orchestration, plugin extensibility, and persistent project memory. Execution semantics follow the common convention (`end_turn` ends the turn — no scripts or forced gates), and ReviewArtifact is an optional verification tool. The backend LLM defaults to the DeepSeek API (OpenAI / Anthropic compatible formats). Web search defaults to DeepSeek's native search (falling back to DuckDuckGo, with Exa and Perplexity also supported). Official DeepSeek capabilities are integrated: reasoning effort low/high/max, strict tools (Beta), plan-generation JSON mode, conversation prefix continuation ("continue writing" from a code block), FIM completion (Beta) API, streaming usage with context-cache hit display, user_id isolation, configurable max output tokens (up to 384K), and local offline tokenizer counting.
 
 The project follows **paper-driven development**: 7 arXiv papers' core techniques — Eywa (provenance-grounded long-term memory), MAP-Graph (multi-agent shared-memory authorization), AGORA (step-level context compression), SWE-Touch (workspace drift detection), Oversight Has a Capacity (approval fatigue guard), AutoTool (tool usage inertia), Verifier-as-Gatekeeper (skill pollution gating); plus 4 caching-oriented techniques — RadixAttention (canonical history replay / shared-prefix maximization), Prompt Cache (stable block organization), Cache-Aware Prompt Compression (dynamic content tailing), and Byte-Exact Deduplication (byte-exact dedup of memory blocks). Paper links, technical mappings, and landing modules are detailed in [Section 5](#5-research-papers--technical-implementation). Product-side additions include local account login, Chat / Work / Code modes, thinking and web-search toggles, Agent execution flow views, session event timelines, and context-cache alignment.
 
@@ -845,6 +845,7 @@ See `.env.example` ([view file](../.env.example)):
 | `OPENAI_API_KEY` | OpenAI API key | none |
 | `OPENAI_BASE_URL` | OpenAI endpoint | `https://api.openai.com/v1/chat/completions` |
 | `AURAXIS_MODELS` | Custom models (JSON array) | none |
+| `AURAXIS_ALLOW_UNSAFE_CODE` | Enable model-written arbitrary code execution (trusted dev only) | off |
 | `AURAXIS_MEMORY_RISK_GATE` | Enable MAP-Graph memory risk gating (M5) | off unless `1` |
 | `AURAXIS_MEMORY_EMBEDDINGS` | Enable R4 local deterministic vector route | off by default |
 | `AURAXIS_MEMORY_LLM_SIGNALS` | Add LLM signal detection on top of rule signals | off by default |
@@ -940,9 +941,9 @@ The app uses `dotenv` to load environment variables from `.env` at the project r
 - **Framework**: Vitest (`describe`, `it`, `expect`, `vi` injected via globals)
 - **Main-process tests**: `electron/**/__tests__/`, node environment; modules depending on `electron` are isolated with `vi.mock('electron', ...)`
 - **Renderer tests**: `src/**/__tests__/`, jsdom environment (@testing-library/react)
-- **Total**: 237 test files / 1,740 cases passing (+3 environment-skips)
+- **Total**: 238 test files / 1,749 cases passing (+3 environment-skips)
 - **Coverage scope**: the gate only counts `electron/ipc/`, `src/stores/`, `src/core/`; UI components (`src/components/`) and main-process entry points (`main.ts` / `preload.ts` etc.) are excluded from the gate and covered by component tests + Playwright E2E (`npm run test:e2e`)
-- **Coverage thresholds**: lines/statements 80%, branches 70%, functions 80% (current: 85.42% lines / 79.08% branches / 86.63% functions)
+- **Coverage thresholds**: lines/statements 80%, branches 70%, functions 80% (current: 85.04% lines / 78.88% branches / 86.17% functions)
 - **Coverage report**: `npm run test:coverage` outputs `coverage/coverage-summary.json` (gitignored dev artifact); the Settings "Test coverage" page reads it live via the `coverage:get` IPC; pure browser dev is served by a Vite middleware, and production builds copy it into `dist/coverage/`. When the report is missing, the panel shows the command to run instead of fake numbers
 - **E2E**: 15 Playwright UI flows passing (real Electron)
 - **Real-API acceptance (DeepSeek)**: chat streaming, Code auto-approve Bash, Code "confirm each time" permission card (write after one approval), Work smart-execution flow, and Work plan-approval panel all verified; sandbox scripts add cwd fallback when launching `dist-electron/main.js` directly (`electron/sandbox-runner.ts`)

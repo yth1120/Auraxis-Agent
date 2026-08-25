@@ -25,7 +25,9 @@ export async function streamChat(
   signal?: AbortSignal,
   onThinking?: (text: string) => void,
 ): Promise<void> {
-  const apiKey = getApiKeyFromStore() || '';
+  const apiKey = getApiKeyFromStore()
+    || ((import.meta as any).env?.VITE_DEEPSEEK_API_KEY as string | undefined)
+    || '';
 
   if (!apiKey) {
     throw new Error('Missing DeepSeek API key. Please set it in settings.');

@@ -1,4 +1,6 @@
 import { ipcMain, BrowserWindow } from 'electron';
+import { secureHandle } from './trust';
+import { resolveTrustedProjectRoot } from './project-access';
 import axios from 'axios';
 import type { Readable } from 'stream';
 import { readErrorBody } from './agent-loop';
@@ -82,7 +84,7 @@ function sendQueryEvent(win: BrowserWindow, requestId: string, type: 'done' | 'e
 }
 
 export function registerAiHandlers() {
-  ipcMain.handle('ai:chatStream', async (event, payload: {
+  secureHandle('ai:chatStream', async (event, payload: {
     requestId: string;
     model: string;
     messages: { role: string; content: string }[];
@@ -167,7 +169,7 @@ export function registerAiHandlers() {
     }
   });
 
-  ipcMain.handle('ai:abortStream', async (_event, requestId: string) => {
+  secureHandle('ai:abortStream', async (_event, requestId: string) => {
     const controller = activeStreams.get(requestId);
     if (controller) {
       controller.abort();
@@ -175,7 +177,7 @@ export function registerAiHandlers() {
     }
   });
 
-  ipcMain.handle('ai:fim', async (_event, params: {
+  secureHandle('ai:fim', async (_event, params: {
     model: string;
     apiKey?: string;
     prompt: string;
@@ -208,7 +210,7 @@ export function registerAiHandlers() {
     }
   });
 
-  ipcMain.handle('ai:sendQuery', async (event, payload: {
+  secureHandle('ai:sendQuery', async (event, payload: {
     requestId: string;
     sessionId?: string;
     model: string;
@@ -226,6 +228,7 @@ export function registerAiHandlers() {
   }) => {
     const { requestId, sessionId, model, messages, memoryContext, isDeepThink, reasoningEffort, projectRoot, autoApprove, mode, apiKey, maxIterations, approvedPlanSteps, surface } = payload;
     const win = BrowserWindow.fromWebContents(event.sender);
+    const trustedProjectRoot = await resolveTrustedProjectRoot(projectRoot);
 
     if (!win) {
       event.sender.send(`ai:queryEvent:${requestId}`, { requestId, type: 'error' as const, error: '无法获取窗口实例' });
@@ -268,12 +271,12 @@ export function registerAiHandlers() {
       const checkPermission = effectiveAutoApprove
         ? () => Promise.resolve(true)
         : (toolName: string, input: Record<string, unknown>, toolCallId?: string) =>
-            requestPermission(toolName, input, win, toolCallId, { mode: approval, approvedPlanSteps, projectRoot });
+            requestPermission(toolName, input, win, toolCallId, { mode: approval, approvedPlanSteps, projectRoot: trustedProjectRoot });
 
       nudgeQueues.set(requestId, []);
       await runQuery(
         {
-          requestId, sessionId, model, messages, memoryContext, isDeepThink, reasoningEffort, projectRoot, apiKey: resolvedKey, apiBase, checkPermission,
+          requestId, sessionId, model, messages, memoryContext, isDeepThink, reasoningEffort, projectRoot: trustedProjectRoot, apiKey: resolvedKey, apiBase, checkPermission,
           autoApprove: effectiveAutoApprove,
           mode: approval,
           maxIterations,
@@ -307,7 +310,7 @@ export function registerAiHandlers() {
     }
   });
 
-  ipcMain.handle('ai:clearQueryContext', async (_event, sessionId: string) => {
+  secureHandle('ai:clearQueryContext', async (_event, sessionId: string) => {
     try {
       await clearLlmContext(sessionId);
       return { ok: true };
@@ -316,7 +319,7 @@ export function registerAiHandlers() {
     }
   });
 
-  ipcMain.handle('ai:abortQuery', async (_event, requestId: string) => {
+  secureHandle('ai:abortQuery', async (_event, requestId: string) => {
     const controller = activeQueries.get(requestId);
     if (controller) {
       controller.abort();
@@ -324,7 +327,7 @@ export function registerAiHandlers() {
     }
   });
 
-  ipcMain.handle('ai:abortTool', async (_event, requestId: string, toolCallId: string) => {
+  secureHandle('ai:abortTool', async (_event, requestId: string, toolCallId: string) => {
     const ok = abortTool(toolCallId);
     if (!ok) {
       console.warn('[ai:abortTool] no running tool found for', toolCallId);
@@ -332,7 +335,7 @@ export function registerAiHandlers() {
     return { ok };
   });
 
-  ipcMain.handle('ai:retryTool', async (_event, requestId: string, toolName: string) => {
+  secureHandle('ai:retryTool', async (_event, requestId: string, toolName: string) => {
     const queue = nudgeQueues.get(requestId);
     if (!queue) {
       console.warn('[ai:retryTool] no active query found for', requestId);
@@ -343,8 +346,10 @@ export function registerAiHandlers() {
     return { ok: true };
   });
 
-  ipcMain.handle('ai:testConnection', async (_event, payload: { apiKey: string }) => {
+  secureHandle('ai:testConnection', async (_event, payload: { apiKey: string }) => {
     const { apiKey } = payload;
+    const resolvedKey = (typeof apiKey === 'string' && apiKey.trim()) ? apiKey : await getApiKey(undefined);
+    if (!resolvedKey) return { ok: false, error: '未配置 API Key，无法测试连接' };
     try {
       // DEEPSEEK_BASE_URL in .env.example points at the chat completions
       // endpoint (`.../v1/chat/completions`). Strip the chat path so we can
@@ -353,7 +358,7 @@ export function registerAiHandlers() {
       const raw = process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com/v1/chat/completions';
       const apiRoot = raw.replace(/\/chat\/completions\/?$/i, '').replace(/\/+$/, '');
       const response = await axios.get(`${apiRoot}/models`, {
-        headers: { Authorization: `Bearer ${apiKey}` },
+        headers: { Authorization: `Bearer ${resolvedKey}` },
         timeout: 15000,
       });
       if (response.status === 200) {
