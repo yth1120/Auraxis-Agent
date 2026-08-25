@@ -14,8 +14,10 @@ async function openSettings() {
   // 新版 UI：设置入口在账户下拉菜单中，不再直接出现在侧栏。
   await page.locator('nav button').filter({ hasText: '账户' }).first().click();
   await page.locator('.ant-dropdown:visible button').filter({ hasText: '设置' }).first().click();
-  await expect(page.locator('.ant-modal-content:visible')).toBeVisible();
+  await expect(page.getByRole('dialog', { name: '设置' })).toBeVisible();
 }
+
+const settingsDialog = () => page.getByRole('dialog', { name: '设置' });
 
 test.beforeAll(async () => {
   app = await electron.launch({
@@ -99,7 +101,7 @@ test('Chat 模式发送消息并渲染用户气泡', async () => {
 test('设置面板打开并切换主题', async () => {
   // 回归：浮动输入 Dock 曾遮挡侧边栏底部，导致真实鼠标点击打不到账户菜单
   await openSettings();
-  const settingsModal = page.locator('.ant-modal-content:visible');
+  const settingsModal = settingsDialog();
 
   await page.getByText('外观', { exact: true }).click();
   await expect(page.getByText('主题模式', { exact: true })).toBeVisible();
@@ -111,8 +113,8 @@ test('设置面板打开并切换主题', async () => {
   expect(await page.evaluate(() => document.documentElement.classList.contains('dark'))).toBe(false);
 
   // 关闭设置弹窗，避免残留遮挡后续测试
-  await settingsModal.locator('.ant-modal-close').click();
-  await expect(page.locator('.ant-modal-content:visible')).toBeHidden();
+  await settingsModal.getByRole('button', { name: 'Close' }).click();
+  await expect(settingsDialog()).toBeHidden();
 });
 
 test('Code 模式顶部工具面板可开合且不被遮挡', async () => {
@@ -240,7 +242,7 @@ test('命令面板快捷键打开并可关闭', async () => {
 
 test('设置面板各分区导航无异常', async () => {
   await openSettings();
-  const settingsModal = page.locator('.ant-modal-content:visible');
+  const settingsModal = settingsDialog();
 
   const sections: [string, string][] = [
     ['外观', '主题模式'],
@@ -253,13 +255,13 @@ test('设置面板各分区导航无异常', async () => {
     await expect(settingsModal.getByText(content).first()).toBeVisible();
   }
 
-  await settingsModal.locator('.ant-modal-close').click();
-  await expect(page.locator('.ant-modal-content:visible')).toBeHidden();
+  await settingsModal.getByRole('button', { name: 'Close' }).click();
+  await expect(settingsDialog()).toBeHidden();
 });
 
 test('记忆面板展示证据链与读取诊断视图', async () => {
   await openSettings();
-  const settingsModal = page.locator('.ant-modal-content:visible');
+  const settingsModal = settingsDialog();
 
   await settingsModal.getByRole('button', { name: '记忆' }).click();
   await expect(page.getByText('项目记忆', { exact: true })).toBeVisible();
@@ -270,8 +272,8 @@ test('记忆面板展示证据链与读取诊断视图', async () => {
   await page.getByRole('button', { name: '读取诊断', exact: true }).click();
   await expect(page.getByText('暂无读取轨迹', { exact: true })).toBeVisible({ timeout: 15_000 });
 
-  await settingsModal.locator('.ant-modal-close').click();
-  await expect(page.locator('.ant-modal-content:visible')).toBeHidden();
+  await settingsModal.getByRole('button', { name: 'Close' }).click();
+  await expect(settingsDialog()).toBeHidden();
 });
 
 test('整个会话无未捕获页面异常', () => {
