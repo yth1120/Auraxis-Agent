@@ -1,7 +1,7 @@
-import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { Dropdown, Layout } from 'antd';
 import { ArrowLeft, ArrowRight, Cube, PanelBottom, Bell, Minus, Square, Copy, X } from '@/components/common/icons';
-import { Allotment, type AllotmentHandle } from 'allotment';
+import { Allotment } from 'allotment';
 import clsx from 'clsx';
 import { useAppStore } from '../../stores/useAppStore';
 import { useWorktreeStore } from '../../stores/useWorktreeStore';
@@ -19,6 +19,7 @@ import HeaderStatusInfo from './HeaderStatusInfo';
 import { COCKPIT_TABS, PANEL_LABELS } from './WorkbenchLayoutData';
 import GlobalSearchModal from './GlobalSearchModal';
 import { buildEditMenuItems, buildFileMenuItems, buildHelpMenuItems, buildViewMenuItems } from './WorkbenchMenus';
+import { useWorkbenchPaneResize, WORKBENCH_MAIN_MIN } from './useWorkbenchPaneResize';
 
 const DiffPanel = lazy(() => import('./DiffPanel'));
 const PreviewBrowser = lazy(() => import('./PreviewBrowser'));
@@ -94,7 +95,6 @@ export default function WorkbenchLayout() {
 
   // Track maximize state so the maximize button reflects 还原 vs 最大化.
   const [isMaximized, setIsMaximized] = useState(false);
-  const [isResizingRight, setIsResizingRight] = useState(false);
   useEffect(() => useTerminalTasksStore.getState().subscribe(), []);
   // Project switch invalidates any open file tabs.
   useEffect(() => {
@@ -141,130 +141,29 @@ export default function WorkbenchLayout() {
   const viewMenuItems = useMemo(() => buildViewMenuItems(t), [t]);
   const helpMenuItems = useMemo(() => buildHelpMenuItems(t), [t]);
 
-  const allotmentRef = useRef<AllotmentHandle>(null);
-  const bodyRef = useRef<HTMLDivElement>(null);
-  const siderDragRef = useRef<{ startX: number; startWidth: number } | null>(null);
-  const rightDragRef = useRef<{ startX: number; startWidth: number } | null>(null);
-  const [isResizingSider, setIsResizingSider] = useState(false);
-
-  // ── Dynamic drag limits ──
-  // The right panel may cover most of the screen, but the main content must
-  // never be squeezed below a comfortable width. Its max is therefore derived
-  // from the live container width instead of a fixed pixel cap.
-  const MAIN_MIN = 480;
-  const [containerW, setContainerW] = useState(() => (typeof window !== 'undefined' ? window.innerWidth : 1280));
-  useEffect(() => {
-    // Calibrate to the actual body width once mounted (excludes window chrome).
-    const w = bodyRef.current?.clientWidth;
-    if (w) setContainerW(w);
-  }, []);
-  const siderW = sidebarCollapsed ? 0 : Math.max(260, sidebarWidth);
-  const rightMaxSize = Math.max(360, containerW - siderW - MAIN_MIN);
-  // Layout cap for the animated right drawer: the main content must never be
-  // squeezed below MAIN_MIN even when a persisted width is larger than the
-  // current viewport can hold.
-  const rightMaxForLayout = Math.max(0, containerW - siderW - MAIN_MIN);
-  // ── Initial pane sizes ──
-  // We deliberately compute from sidebarWidth + rightPanelWidth (both already
-  // persisted on drag-end) + the current viewport width, instead of replaying a
-  // persisted paneSizes array. That makes the layout adapt when the user starts
-  // a session at a new viewport size — the content slot soaks up the remainder
-  // rather than leaving a gap from a previous, smaller viewport.
-  // Passing undefined or a too-short array would send Allotment's internal
-  // splitView into a bad state ("Cannot read properties of undefined (reading
-  // 'minimumSize')") — so this always returns a complete sizes array.
-  const initialSizes = useMemo<number[]>(() => {
-    const sider = sidebarCollapsed ? 0 : Math.max(260, sidebarWidth);
-    const w = containerW || (typeof window !== 'undefined' ? window.innerWidth : 1280);
-    return [Math.max(MAIN_MIN, w - sider)];
-  }, [containerW, sidebarCollapsed, sidebarWidth]);
-
-  // ── Resize helper — sync correction for Allotment's proportional defaultSizes ──
-  const resizePanes = useCallback(() => {
-    const handle = allotmentRef.current;
-    const w = bodyRef.current?.clientWidth;
-    if (!handle || !w) return;
-    setContainerW(w);
-    const sider = sidebarCollapsed ? 0 : Math.max(260, sidebarWidth);
-    handle.resize([Math.max(MAIN_MIN, w - sider)]);
-  }, [sidebarCollapsed, sidebarWidth]);
-
-  // ── Pin sidebar pixel width across window & panel toggles ──
-  // useLayoutEffect fires synchronously after DOM commit, before paint —
-  // corrects Allotment's proportional defaultSizes before the user sees anything.
-  useLayoutEffect(() => {
-    resizePanes();
-  }, [resizePanes]);
-  useEffect(() => {
-    const handler = () => resizePanes();
-    window.addEventListener('resize', handler);
-    return () => window.removeEventListener('resize', handler);
-  }, [resizePanes]);
-
-  const handleDragEnd = (sizes: number[]) => {
-    setPaneSizes(sizes);
-    if (hasRightPanel && typeof sizes[1] === 'number') {
-      setRightPanelWidth(sizes[1]);
-    }
-  };
-
-  const startSiderResize = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (sidebarCollapsed) return;
-    e.preventDefault();
-    siderDragRef.current = { startX: e.clientX, startWidth: sidebarWidth };
-    setIsResizingSider(true);
-    e.currentTarget.setPointerCapture(e.pointerId);
-  };
-
-  const moveSiderResize = (e: React.PointerEvent<HTMLDivElement>) => {
-    const drag = siderDragRef.current;
-    if (!drag) return;
-    const bodyW = bodyRef.current?.clientWidth ?? containerW;
-    const rightMin = hasRightPanel ? 320 : 0;
-    const maxW = Math.max(260, Math.min(420, bodyW - MAIN_MIN - rightMin));
-    setSidebarWidth(Math.max(260, Math.min(maxW, drag.startWidth + (e.clientX - drag.startX))));
-  };
-
-  const endSiderResize = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!siderDragRef.current) return;
-    siderDragRef.current = null;
-    setIsResizingSider(false);
-    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    }
-  };
-
-  const startRightResize = (e: React.PointerEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    rightDragRef.current = { startX: e.clientX, startWidth: rightPanelWidth };
-    setIsResizingRight(true);
-    e.currentTarget.setPointerCapture(e.pointerId);
-  };
-
-  const moveRightResize = (e: React.PointerEvent<HTMLDivElement>) => {
-    const drag = rightDragRef.current;
-    if (!drag) return;
-    const next = Math.min(rightMaxSize, Math.max(320, drag.startWidth + (drag.startX - e.clientX)));
-    setRightPanelWidth(next);
-  };
-
-  const endRightResize = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!rightDragRef.current) return;
-    rightDragRef.current = null;
-    setIsResizingRight(false);
-    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    }
-  };
-
-  useEffect(() => {
-    if (!isResizingSider && !isResizingRight) return;
-    const prevCursor = document.body.style.cursor;
-    document.body.style.cursor = 'col-resize';
-    return () => {
-      document.body.style.cursor = prevCursor;
-    };
-  }, [isResizingSider, isResizingRight]);
+  const {
+    allotmentRef,
+    bodyRef,
+    isResizingSider,
+    isResizingRight,
+    rightMaxForLayout,
+    initialSizes,
+    handleDragEnd,
+    startSiderResize,
+    moveSiderResize,
+    endSiderResize,
+    startRightResize,
+    moveRightResize,
+    endRightResize,
+  } = useWorkbenchPaneResize({
+    sidebarCollapsed,
+    sidebarWidth,
+    setSidebarWidth,
+    hasRightPanel,
+    rightPanelWidth,
+    setRightPanelWidth,
+    setPaneSizes,
+  });
 
   const renderTabContent = () => {
     if (!activeTab) return <ChatArea />;
@@ -524,7 +423,7 @@ export default function WorkbenchLayout() {
 
         <div className="main-pane-wrap flex-1 min-w-0 h-full">
           <Allotment ref={allotmentRef} defaultSizes={initialSizes} onDragEnd={handleDragEnd}>
-            <Allotment.Pane minSize={MAIN_MIN} className="!overflow-hidden">
+            <Allotment.Pane minSize={WORKBENCH_MAIN_MIN} className="!overflow-hidden">
               <div
                 data-pane="main"
                 tabIndex={-1}
