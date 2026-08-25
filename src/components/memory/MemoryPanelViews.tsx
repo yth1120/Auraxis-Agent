@@ -239,10 +239,7 @@ export function MemoryList({
   return (
     <div className="flex-1 overflow-y-auto px-3 pb-3">
       {items.length === 0 ? (
-        <EmptyState
-          title={t('mem.emptyNoData')}
-          description={t('mem.emptyHintDefault')}
-        />
+        <EmptyState title={t('mem.emptyNoData')} description={t('mem.emptyHintDefault')} />
       ) : (
         items.map((item) => {
           const config = TYPE_CONFIG[item.type] || TYPE_CONFIG.context;
@@ -259,7 +256,12 @@ export function MemoryList({
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 flex-1 min-w-0">
-                  <span className={clsx('inline-flex items-center gap-1 rounded-full h-5 px-1.5 text-2xs font-medium border', config.chip)}>
+                  <span
+                    className={clsx(
+                      'inline-flex items-center gap-1 rounded-full h-5 px-1.5 text-2xs font-medium border',
+                      config.chip,
+                    )}
+                  >
                     {config.icon} {t(config.labelKey)}
                   </span>
                   <span className="text-sm font-medium text-text-primary truncate">{item.title}</span>

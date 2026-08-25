@@ -74,11 +74,7 @@ function persistToolRowOpenState() {
 function readCardProps(entry: AgentLogEntry) {
   const output = (entry.output ?? {}) as Record<string, unknown>;
   const content =
-    typeof output.content === 'string'
-      ? output.content
-      : typeof entry.output === 'string'
-        ? entry.output
-        : '';
+    typeof output.content === 'string' ? output.content : typeof entry.output === 'string' ? entry.output : '';
   return {
     label: typeof output.file_path === 'string' ? output.file_path : undefined,
     content,
@@ -162,7 +158,12 @@ function renderToolBody(entry: AgentLogEntry): ReactNode {
   if (entry.toolName === 'Grep' || entry.toolName === 'Glob') return <AgentSearchCard {...searchCardProps(entry)} />;
   if (entry.toolName === 'WebFetch' || entry.toolName === 'WebSearch') return <AgentWebCard {...webCardProps(entry)} />;
   if (entry.toolName === 'RunCode') {
-    const output = (entry.output ?? {}) as { stdout?: string; stderr?: string; exitCode?: number | null; timedOut?: boolean };
+    const output = (entry.output ?? {}) as {
+      stdout?: string;
+      stderr?: string;
+      exitCode?: number | null;
+      timedOut?: boolean;
+    };
     return (
       <AgentRunCodeCard
         code={typeof entry.input?.code === 'string' ? entry.input.code : ''}

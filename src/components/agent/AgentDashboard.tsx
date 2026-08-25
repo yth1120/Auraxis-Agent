@@ -1,12 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Badge, Button, Popover, Select, Space } from 'antd';
-import {
-  Lightning,
-  PauseCircle,
-  PlayCircle,
-  PlusCircle,
-  Stop,
-} from '@/components/common/icons';
+import { Lightning, PauseCircle, PlayCircle, PlusCircle, Stop } from '@/components/common/icons';
 import { useAgentStore } from '../../stores/useAgentStore';
 import { createAgent } from '../../constants/commands';
 import EmptyState from '../common/EmptyState';
@@ -68,8 +62,10 @@ export default function AgentDashboard() {
   const totalTools = agents.reduce((sum, agent) => sum + (agent?.toolCallCount || 0), 0);
   const goalCount = agents.filter((agent) => agent?.goal).length;
 
-  const handlePauseAll = () => agents.filter((agent) => agent?.status === 'running').forEach((agent) => pauseAgent(agent.id));
-  const handleResumeAll = () => agents.filter((agent) => agent?.status === 'paused').forEach((agent) => resumeAgent(agent.id));
+  const handlePauseAll = () =>
+    agents.filter((agent) => agent?.status === 'running').forEach((agent) => pauseAgent(agent.id));
+  const handleResumeAll = () =>
+    agents.filter((agent) => agent?.status === 'paused').forEach((agent) => resumeAgent(agent.id));
 
   return (
     <div className="flex flex-col h-full overflow-hidden">

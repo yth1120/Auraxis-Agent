@@ -150,7 +150,9 @@ function ToolDetail({ row }: { row: WorkToolRow }) {
       <div className="flex flex-col gap-1.5">
         <CodeBlock text={truncate(typeof input.command === 'string' ? input.command : '')} label="bash" />
         {parsed?.stdout != null && <CodeBlock text={truncate(parsed.stdout)} label={t('work.stdout')} />}
-        {parsed?.stderr != null && parsed.stderr.trim() && <CodeBlock text={truncate(parsed.stderr)} label={t('work.stderr')} />}
+        {parsed?.stderr != null && parsed.stderr.trim() && (
+          <CodeBlock text={truncate(parsed.stderr)} label={t('work.stderr')} />
+        )}
         {typeof parsed?.exitCode === 'number' && (
           <div className={clsx('text-2xs font-mono', parsed.exitCode === 0 ? 'text-success' : 'text-danger')}>
             {t('work.exitCode', { code: String(parsed.exitCode) })}
@@ -181,7 +183,11 @@ function ToolDetail({ row }: { row: WorkToolRow }) {
             <span className="min-w-0 truncate">{input.file_path}</span>
           </div>
         )}
-        {content ? <CodeBlock text={truncate(content)} label={row.toolName} /> : <span className="text-2xs text-text-muted">{t('work.noOutput')}</span>}
+        {content ? (
+          <CodeBlock text={truncate(content)} label={row.toolName} />
+        ) : (
+          <span className="text-2xs text-text-muted">{t('work.noOutput')}</span>
+        )}
       </div>
     );
   } else if (row.toolName === 'WebSearch' || row.toolName === 'WebFetch') {
@@ -292,7 +298,10 @@ export function TurnCard({
             {formatWorkDuration(turn.endTs - turn.startTs)}
           </span>
         )}
-        <CaretDown size={14} className={clsx('shrink-0 text-text-muted transition-transform duration-200', collapsed && '-rotate-90')} />
+        <CaretDown
+          size={14}
+          className={clsx('shrink-0 text-text-muted transition-transform duration-200', collapsed && '-rotate-90')}
+        />
       </button>
 
       {!collapsed && (
@@ -306,7 +315,12 @@ export function TurnCard({
                   ) : (
                     <span className="mt-[7px] w-1.5 h-1.5 rounded-full bg-[var(--color-text-faint)] shrink-0" />
                   )}
-                  <span className={clsx('min-w-0 text-xs leading-[1.6] whitespace-pre-wrap break-words', item.thinking ? 'text-text-muted' : 'text-text-primary')}>
+                  <span
+                    className={clsx(
+                      'min-w-0 text-xs leading-[1.6] whitespace-pre-wrap break-words',
+                      item.thinking ? 'text-text-muted' : 'text-text-primary',
+                    )}
+                  >
                     {item.text}
                   </span>
                 </div>
@@ -322,9 +336,14 @@ export function TurnCard({
             }
             if (item.kind === 'warning') {
               return (
-                <div key={index} className="flex items-start gap-2 px-2.5 py-2 rounded-xl bg-[var(--color-danger-soft)] border border-danger/25">
+                <div
+                  key={index}
+                  className="flex items-start gap-2 px-2.5 py-2 rounded-xl bg-[var(--color-danger-soft)] border border-danger/25"
+                >
                   <WarningCircle size={13} className="mt-[2px] shrink-0 text-danger" />
-                  <span className="min-w-0 text-2xs leading-[1.55] text-danger whitespace-pre-wrap break-words">{item.text}</span>
+                  <span className="min-w-0 text-2xs leading-[1.55] text-danger whitespace-pre-wrap break-words">
+                    {item.text}
+                  </span>
                 </div>
               );
             }
@@ -344,7 +363,9 @@ export function TurnCard({
                 key={row.key}
                 className={clsx(
                   'rounded-xl border overflow-hidden',
-                  failed ? 'border-danger/30 bg-[var(--color-danger-soft)]' : 'border-border-dim bg-[var(--color-bg-inset)]',
+                  failed
+                    ? 'border-danger/30 bg-[var(--color-danger-soft)]'
+                    : 'border-border-dim bg-[var(--color-bg-inset)]',
                 )}
               >
                 <button
@@ -353,10 +374,17 @@ export function TurnCard({
                   onClick={() => onToggleTool(row.key)}
                   aria-expanded={expanded}
                 >
-                  <span className={clsx('flex flex-none items-center justify-center w-5 shrink-0', failed ? 'text-danger' : row.running ? 'text-primary' : 'text-text-muted')}>
+                  <span
+                    className={clsx(
+                      'flex flex-none items-center justify-center w-5 shrink-0',
+                      failed ? 'text-danger' : row.running ? 'text-primary' : 'text-text-muted',
+                    )}
+                  >
                     {TOOL_ICON[row.toolName] ?? <Lightning size={14} />}
                   </span>
-                  <span className="shrink-0 min-w-[72px] font-mono text-2xs font-medium text-text-primary">{row.toolName}</span>
+                  <span className="shrink-0 min-w-[72px] font-mono text-2xs font-medium text-text-primary">
+                    {row.toolName}
+                  </span>
                   <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-2xs text-text-muted">
                     {row.error ? row.error : toolSummary(row)}
                   </span>
@@ -369,10 +397,18 @@ export function TurnCard({
                     <span className="shrink-0 text-2xs font-medium text-danger">{t('work.toolFailed')}</span>
                   ) : (
                     row.durationMs != null && (
-                      <span className="shrink-0 font-mono text-2xs text-text-faint tabular-nums">{formatWorkDuration(row.durationMs)}</span>
+                      <span className="shrink-0 font-mono text-2xs text-text-faint tabular-nums">
+                        {formatWorkDuration(row.durationMs)}
+                      </span>
                     )
                   )}
-                  <CaretDown size={13} className={clsx('shrink-0 text-text-muted transition-transform duration-200', expanded && 'rotate-180')} />
+                  <CaretDown
+                    size={13}
+                    className={clsx(
+                      'shrink-0 text-text-muted transition-transform duration-200',
+                      expanded && 'rotate-180',
+                    )}
+                  />
                 </button>
                 {expanded && (
                   <div className="border-t border-[var(--color-border-dim)] px-2.5 py-2">

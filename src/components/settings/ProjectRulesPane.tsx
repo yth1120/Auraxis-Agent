@@ -49,11 +49,28 @@ export default function ProjectRulesPane() {
     }
   }, [projectPath]);
 
-  const loadContent = useCallback(async (nextScope: Scope, folderRel = selectedFolder) => {
-    setLoading(true);
-    try {
-      if (nextScope === 'global') {
-        const result = await window.electronAPI?.instructions?.getGlobal();
+  const loadContent = useCallback(
+    async (nextScope: Scope, folderRel = selectedFolder) => {
+      setLoading(true);
+      try {
+        if (nextScope === 'global') {
+          const result = await window.electronAPI?.instructions?.getGlobal();
+          if (result?.ok && result.data) {
+            setContent(result.data.content);
+            setTargetPath(result.data.path);
+          } else {
+            setContent('');
+            setTargetPath('');
+          }
+          return;
+        }
+        if (!projectPath) {
+          setContent('');
+          setTargetPath('');
+          return;
+        }
+        const rel = nextScope === 'project' ? '.' : folderRel || '.';
+        const result = await window.electronAPI?.instructions?.get(projectPath, rel);
         if (result?.ok && result.data) {
           setContent(result.data.content);
           setTargetPath(result.data.path);
@@ -61,29 +78,15 @@ export default function ProjectRulesPane() {
           setContent('');
           setTargetPath('');
         }
-        return;
-      }
-      if (!projectPath) {
+      } catch {
         setContent('');
         setTargetPath('');
-        return;
+      } finally {
+        setLoading(false);
       }
-      const rel = nextScope === 'project' ? '.' : folderRel || '.';
-      const result = await window.electronAPI?.instructions?.get(projectPath, rel);
-      if (result?.ok && result.data) {
-        setContent(result.data.content);
-        setTargetPath(result.data.path);
-      } else {
-        setContent('');
-        setTargetPath('');
-      }
-    } catch {
-      setContent('');
-      setTargetPath('');
-    } finally {
-      setLoading(false);
-    }
-  }, [projectPath, selectedFolder]);
+    },
+    [projectPath, selectedFolder],
+  );
 
   const loadContentRef = useRef(loadContent);
   loadContentRef.current = loadContent;

@@ -97,7 +97,8 @@ export function useWorkbenchPaneResize({
     if (!siderDragRef.current) return;
     siderDragRef.current = null;
     setIsResizingSider(false);
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    if (event.currentTarget.hasPointerCapture(event.pointerId))
+      event.currentTarget.releasePointerCapture(event.pointerId);
   }, []);
 
   const startRightResize = useCallback(
@@ -124,7 +125,8 @@ export function useWorkbenchPaneResize({
     if (!rightDragRef.current) return;
     rightDragRef.current = null;
     setIsResizingRight(false);
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    if (event.currentTarget.hasPointerCapture(event.pointerId))
+      event.currentTarget.releasePointerCapture(event.pointerId);
   }, []);
 
   useEffect(() => {

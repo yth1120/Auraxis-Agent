@@ -51,14 +51,7 @@ export default function AgentConversation({
   );
   const isSubagent = !!agent?.parentAgentId;
 
-  const {
-    lastEntry,
-    turnGroups,
-    logViewerRef,
-    logEndRef,
-    onLogScroll,
-    highlightedToolId,
-  } = useAgentConversationLog({
+  const { lastEntry, turnGroups, logViewerRef, logEndRef, onLogScroll, highlightedToolId } = useAgentConversationLog({
     agent,
     agentErrorsOnly,
     agentTextOnly,

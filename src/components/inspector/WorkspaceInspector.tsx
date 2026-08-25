@@ -3,9 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Modal, message } from 'antd';
 import { shallow } from 'zustand/shallow';
 import { useStoreWithEqualityFn } from 'zustand/traditional';
-import {
-  TreeStructure as ApartmentOutlined,
-} from '@/components/common/icons';
+import { TreeStructure as ApartmentOutlined } from '@/components/common/icons';
 import { useInspectorStore, mapTodosToTasks } from '../../stores/useInspectorStore';
 import { useChatStore } from '../../stores/useChatStore';
 import { useAppStore } from '../../stores/useAppStore';
@@ -29,11 +27,7 @@ import {
   RollbackCard,
   SystemMessagesList,
 } from './WorkspaceInspectorSections';
-import {
-  AGENT_STATUS_META,
-  basename,
-  latestAgentTodos,
-} from './WorkspaceInspectorUtils';
+import { AGENT_STATUS_META, basename, latestAgentTodos } from './WorkspaceInspectorUtils';
 
 export default function WorkspaceInspector() {
   const tPanel = useT();
@@ -58,7 +52,10 @@ export default function WorkspaceInspector() {
   const agents = useAgentStore((s) => s.agents);
 
   const statusMeta = agent
-    ? (AGENT_STATUS_META[agent.status] ?? { labelKey: 'status.stopped' as I18nKey, cls: 'bg-[var(--color-text-faint)]' })
+    ? (AGENT_STATUS_META[agent.status] ?? {
+        labelKey: 'status.stopped' as I18nKey,
+        cls: 'bg-[var(--color-text-faint)]',
+      })
     : null;
   const statusLabel = statusMeta ? tPanel(statusMeta.labelKey) : null;
 
@@ -364,7 +361,6 @@ export default function WorkspaceInspector() {
           />
         ) : null}
       </Modal>
-
     </div>
   );
 }

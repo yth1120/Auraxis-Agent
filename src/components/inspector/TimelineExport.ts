@@ -24,7 +24,10 @@ export function exportTrajectory(agent: AgentInfo) {
     exportedAt: new Date().toISOString(),
     log: agent.log,
   };
-  downloadBlob(`${safeName(agent)}.trajectory.json`, new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }));
+  downloadBlob(
+    `${safeName(agent)}.trajectory.json`,
+    new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }),
+  );
 }
 
 export function exportTrajectoryMarkdown(agent: AgentInfo, turns: Turn[], t: Translate) {
@@ -53,5 +56,8 @@ export function exportTrajectoryMarkdown(agent: AgentInfo, turns: Turn[], t: Tra
     }
     lines.push('');
   }
-  downloadBlob(`${safeName(agent)}.trajectory.md`, new Blob([lines.filter((line) => line !== null).join('\n')], { type: 'text/markdown' }));
+  downloadBlob(
+    `${safeName(agent)}.trajectory.md`,
+    new Blob([lines.filter((line) => line !== null).join('\n')], { type: 'text/markdown' }),
+  );
 }

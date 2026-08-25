@@ -182,7 +182,12 @@ export function TerminalSurface({
     };
   }, [onReady, registerClear, registerFocus]);
 
-  return <div ref={containerRef} className="w-full h-full rounded-xl overflow-hidden border border-[var(--color-border-dim)]" />;
+  return (
+    <div
+      ref={containerRef}
+      className="w-full h-full rounded-xl overflow-hidden border border-[var(--color-border-dim)]"
+    />
+  );
 }
 
 /** Read-only mirror of the selected agent's persistent shell session. */
@@ -283,5 +288,10 @@ export function AgentShellSurface({ agentId, paused }: { agentId: string; paused
     };
   }, [agentId]);
 
-  return <div ref={containerRef} className="w-full h-full rounded-xl overflow-hidden border border-[var(--color-border-dim)]" />;
+  return (
+    <div
+      ref={containerRef}
+      className="w-full h-full rounded-xl overflow-hidden border border-[var(--color-border-dim)]"
+    />
+  );
 }

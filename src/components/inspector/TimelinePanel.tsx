@@ -7,10 +7,7 @@ import { useAgentStore } from '@/stores/useAgentStore';
 import { useAppStore } from '@/stores/useAppStore';
 import type { AgentLogEntry } from '@/types/agent';
 import AgentViewFilter from '../agent/AgentViewFilter';
-import {
-  rowKey,
-  type Turn,
-} from './TimelineUtils';
+import { rowKey, type Turn } from './TimelineUtils';
 import { type TimelineDetailTab } from './TimelineRows';
 import {
   buildTimelineRows,
@@ -353,7 +350,11 @@ export default function TimelinePanel() {
               menu={{
                 items: [
                   { key: 'json', label: tPanel('tl.exportJson'), onClick: () => exportTrajectory(agent) },
-                  { key: 'md', label: tPanel('tl.exportMd'), onClick: () => exportTrajectoryMarkdown(agent, turns, tPanel) },
+                  {
+                    key: 'md',
+                    label: tPanel('tl.exportMd'),
+                    onClick: () => exportTrajectoryMarkdown(agent, turns, tPanel),
+                  },
                   { type: 'divider' as const },
                   {
                     key: 'raw',

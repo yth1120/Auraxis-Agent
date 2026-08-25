@@ -117,11 +117,15 @@ export default function SnapshotCard({ projectRoot, now }: { projectRoot: string
         ) : (
           <ul className="list-none m-0 p-0 flex flex-col gap-1">
             {snapshots.slice(0, 8).map((snapshot) => (
-              <li key={snapshot.id} className="flex items-center gap-2 rounded-md bg-[var(--color-bg-inset)] px-2 py-[5px]">
+              <li
+                key={snapshot.id}
+                className="flex items-center gap-2 rounded-md bg-[var(--color-bg-inset)] px-2 py-[5px]"
+              >
                 <span className="flex-1 min-w-0">
                   <span className="block truncate text-xs font-medium text-text-primary">{snapshot.name}</span>
                   <span className="block text-2xs text-text-muted tabular-nums">
-                    {fmtRelative(snapshot.createdAt, now)} · {tPanel('snapshot.fileCount', { n: snapshot.files.length })}
+                    {fmtRelative(snapshot.createdAt, now)} ·{' '}
+                    {tPanel('snapshot.fileCount', { n: snapshot.files.length })}
                   </span>
                 </span>
                 <Dropdown

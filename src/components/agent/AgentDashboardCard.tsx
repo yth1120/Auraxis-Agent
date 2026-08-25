@@ -111,7 +111,9 @@ export default function AgentCard({ agent }: { agent: AgentInfo }) {
 
   const recentEvents = useMemo(() => {
     const log = agent?.log || [];
-    return log.filter((entry) => entry.type === 'tool_start' || entry.type === 'tool_end' || entry.type === 'tool_error').slice(-6);
+    return log
+      .filter((entry) => entry.type === 'tool_start' || entry.type === 'tool_end' || entry.type === 'tool_error')
+      .slice(-6);
   }, [agent?.log]);
 
   const elapsed = useElapsed(startTime, endTime);
@@ -155,7 +157,11 @@ export default function AgentCard({ agent }: { agent: AgentInfo }) {
                   : 'bg-[var(--color-bg-secondary)] text-text-secondary border-[var(--color-border-dim)] hover:bg-[var(--color-hover)]',
             )}
           >
-            {priority === 'high' ? t('dashboard.priorityHigh') : priority === 'normal' ? t('dashboard.priorityMedium') : t('dashboard.priorityLow')}
+            {priority === 'high'
+              ? t('dashboard.priorityHigh')
+              : priority === 'normal'
+                ? t('dashboard.priorityMedium')
+                : t('dashboard.priorityLow')}
           </button>
           <Tooltip title={t('dashboard.viewDetails')}>
             <Button type="text" size="small" icon={<ArrowsOut />} onClick={() => setExpanded(!expanded)} />
@@ -163,16 +169,35 @@ export default function AgentCard({ agent }: { agent: AgentInfo }) {
           {status === 'running' && (
             <>
               <Tooltip title={t('dashboard.pause')}>
-                <Button type="text" size="small" icon={<PauseCircle />} onClick={() => pauseAgent(id)} aria-label={t('dashboard.pauseAgent')} />
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<PauseCircle />}
+                  onClick={() => pauseAgent(id)}
+                  aria-label={t('dashboard.pauseAgent')}
+                />
               </Tooltip>
               <Tooltip title={t('dashboard.stop')}>
-                <Button type="text" size="small" danger icon={<Stop />} onClick={() => stopAgent(id)} aria-label={t('dashboard.stopAgent')} />
+                <Button
+                  type="text"
+                  size="small"
+                  danger
+                  icon={<Stop />}
+                  onClick={() => stopAgent(id)}
+                  aria-label={t('dashboard.stopAgent')}
+                />
               </Tooltip>
             </>
           )}
           {status === 'paused' && (
             <Tooltip title={t('dashboard.resume')}>
-              <Button type="text" size="small" icon={<PlayCircle />} onClick={() => resumeAgent(id)} aria-label={t('dashboard.resumeAgent')} />
+              <Button
+                type="text"
+                size="small"
+                icon={<PlayCircle />}
+                onClick={() => resumeAgent(id)}
+                aria-label={t('dashboard.resumeAgent')}
+              />
             </Tooltip>
           )}
         </Space>
@@ -181,7 +206,12 @@ export default function AgentCard({ agent }: { agent: AgentInfo }) {
       <div className="flex flex-col gap-2">
         {todos.length > 0 && (
           <div className="flex items-center gap-2">
-            <Progress percent={planPct} size="small" showInfo={false} status={status === 'running' ? 'active' : 'normal'} />
+            <Progress
+              percent={planPct}
+              size="small"
+              showInfo={false}
+              status={status === 'running' ? 'active' : 'normal'}
+            />
             <span className="text-xs text-[var(--color-text-muted)] font-mono whitespace-nowrap">
               {doneCount}/{todos.length}
             </span>
@@ -204,7 +234,9 @@ export default function AgentCard({ agent }: { agent: AgentInfo }) {
               <Lightning /> {toolCallCount}
             </span>
           </Tooltip>
-          <span className="inline-flex items-center gap-1">{t('dashboard.rounds', { current: iteration, max: maxIterations })}</span>
+          <span className="inline-flex items-center gap-1">
+            {t('dashboard.rounds', { current: iteration, max: maxIterations })}
+          </span>
           {(totalIn > 0 || totalOut > 0) && (
             <Tooltip title={t('dashboard.tokens', { in: totalIn.toLocaleString(), out: totalOut.toLocaleString() })}>
               <span className="font-mono text-2xs text-[var(--color-text-muted)] bg-[var(--color-bg-elevated)] px-1 py-px rounded-[5px]">
@@ -231,7 +263,11 @@ export default function AgentCard({ agent }: { agent: AgentInfo }) {
             ))}
           </div>
         )}
-        {error && <div className="text-xs text-text-secondary bg-[var(--color-danger-soft)] px-2 py-1 rounded-md">{error.slice(0, 80)}</div>}
+        {error && (
+          <div className="text-xs text-text-secondary bg-[var(--color-danger-soft)] px-2 py-1 rounded-md">
+            {error.slice(0, 80)}
+          </div>
+        )}
         {expanded && todos.length > 0 && (
           <div className="mt-1 pt-2 border-t border-[var(--color-border-dim)] flex flex-col gap-1">
             {todos.map((todo, index) => (
@@ -252,7 +288,13 @@ export default function AgentCard({ agent }: { agent: AgentInfo }) {
                     todo?.status === 'in_progress' && 'text-text-primary',
                   )}
                 >
-                  {todo?.status === 'completed' ? <CheckCircle /> : todo?.status === 'in_progress' ? <ExecutingIndicator size={14} /> : <Clock />}
+                  {todo?.status === 'completed' ? (
+                    <CheckCircle />
+                  ) : todo?.status === 'in_progress' ? (
+                    <ExecutingIndicator size={14} />
+                  ) : (
+                    <Clock />
+                  )}
                 </span>
                 <span>{todo?.content ?? '-'}</span>
               </div>

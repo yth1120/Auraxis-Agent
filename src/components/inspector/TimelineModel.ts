@@ -1,12 +1,5 @@
 import type { AgentLogEntry } from '@/types/agent';
-import {
-  OVERSCAN,
-  ROW_H,
-  TURN_H,
-  entrySearchText,
-  rowKey,
-  type Turn,
-} from './TimelineUtils';
+import { OVERSCAN, ROW_H, TURN_H, entrySearchText, rowKey, type Turn } from './TimelineUtils';
 
 export interface FilteredTurn {
   turn: Turn;
@@ -170,12 +163,7 @@ export function maxTimelineDuration(rows: TimelineRow[]): number {
 }
 
 /** Visible slice with overscan, based on scrollTop and viewport height. */
-export function visibleRange(
-  rows: FlatRow[],
-  total: number,
-  scrollTop: number,
-  viewportHeight: number,
-): VisibleRange {
+export function visibleRange(rows: FlatRow[], total: number, scrollTop: number, viewportHeight: number): VisibleRange {
   if (rows.length === 0) return { start: 0, end: 0, topPad: 0, bottomPad: 0 };
   const viewEnd = scrollTop + viewportHeight;
   let lo = 0;

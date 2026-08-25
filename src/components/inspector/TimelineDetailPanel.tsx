@@ -67,7 +67,11 @@ export function TimelineDetailPanel({
               <span
                 className={clsx(
                   'font-medium',
-                  entry.type === 'tool_error' ? 'text-danger' : entry.type === 'tool_start' ? 'text-primary' : 'text-success',
+                  entry.type === 'tool_error'
+                    ? 'text-danger'
+                    : entry.type === 'tool_start'
+                      ? 'text-primary'
+                      : 'text-success',
                 )}
               >
                 {entry.type === 'tool_error'
@@ -106,7 +110,9 @@ export function TimelineDetailPanel({
             </div>
             <div className="flex items-center justify-between">
               <span className="text-text-muted">{tPanel('tl.endEstimated')}</span>
-              <span className="text-text-secondary tabular-nums">{fmtTime(entry.timestamp + (entry.durationMs ?? 0))}</span>
+              <span className="text-text-secondary tabular-nums">
+                {fmtTime(entry.timestamp + (entry.durationMs ?? 0))}
+              </span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-text-muted">{tPanel('tl.detailTiming')}</span>

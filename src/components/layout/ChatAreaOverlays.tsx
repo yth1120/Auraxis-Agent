@@ -61,8 +61,7 @@ export function ChatReplayModal({
             } else if (event.type === 'tool') {
               label = (
                 <span className="text-text-secondary">
-                  {String(event.data.action ?? '')} {String(event.data.toolName ?? '')}{' '}
-                  {String(event.data.error ?? '')}
+                  {String(event.data.action ?? '')} {String(event.data.toolName ?? '')} {String(event.data.error ?? '')}
                 </span>
               );
             } else if (event.type === 'command') {
@@ -89,13 +88,7 @@ export function ChatReplayModal({
   );
 }
 
-export function ChatToolOverlay({
-  activeToolView,
-  onClose,
-}: {
-  activeToolView: string;
-  onClose: () => void;
-}) {
+export function ChatToolOverlay({ activeToolView, onClose }: { activeToolView: string; onClose: () => void }) {
   if (activeToolView === 'none' || activeToolView === 'terminal') return null;
   return (
     <>

@@ -79,8 +79,7 @@ export async function launchAgentTask({
     message.error(cont.error || t('composer.continueFailed'));
     return null;
   }
-  const activeProjectPath =
-    useChatStore.getState().currentProjectPath || useSettingsStore.getState().projectPath || '';
+  const activeProjectPath = useChatStore.getState().currentProjectPath || useSettingsStore.getState().projectPath || '';
   if (!activeProjectPath) {
     message.error(t('composer.needProject'));
     return null;
@@ -140,11 +139,7 @@ export function recordCommand(name: string, args: string) {
   ]);
 }
 
-export function executeLeadingCommand(
-  raw: string,
-  setInputValue: (value: string) => void,
-  t: Translate,
-): boolean {
+export function executeLeadingCommand(raw: string, setInputValue: (value: string) => void, t: Translate): boolean {
   const trimmed = raw.trim();
   if (!trimmed.startsWith('/')) return false;
   const spaceIndex = trimmed.indexOf(' ');

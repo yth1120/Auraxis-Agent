@@ -156,7 +156,9 @@ export function useAgentConversationLog({
     }
     if (autoScrolledErrorsRef.current) return;
     for (const turn of turnGroups) {
-      const failed = turn.entries.find((entry) => entry.type === 'tool_error' || entry.type === 'warning' || entry.type === 'error');
+      const failed = turn.entries.find(
+        (entry) => entry.type === 'tool_error' || entry.type === 'warning' || entry.type === 'error',
+      );
       if (failed) {
         autoScrolledErrorsRef.current = true;
         requestAnimationFrame(() => {
@@ -173,7 +175,9 @@ export function useAgentConversationLog({
       return;
     }
     if (autoScrolledTextRef.current) return;
-    const first = turnGroups.flatMap((turn) => turn.entries).find((entry) => entry.type === 'text' || entry.type === 'thinking');
+    const first = turnGroups
+      .flatMap((turn) => turn.entries)
+      .find((entry) => entry.type === 'text' || entry.type === 'thinking');
     if (first) {
       autoScrolledTextRef.current = true;
       requestAnimationFrame(() => scrollLogTo(`[data-agent-entry-type="${first.type}"]`));
@@ -211,8 +215,7 @@ export function useAgentConversationLog({
     pinnedRef.current = viewer.scrollHeight - viewer.scrollTop - viewer.clientHeight < 80;
   }, []);
 
-  const isTerminalStatus =
-    agent?.status === 'completed' || agent?.status === 'error' || agent?.status === 'stopped';
+  const isTerminalStatus = agent?.status === 'completed' || agent?.status === 'error' || agent?.status === 'stopped';
   useEffect(() => {
     if (isTerminalStatus && agentRunningOnly) useAppStore.getState().setAgentRunningOnly(false);
   }, [isTerminalStatus, agentRunningOnly]);

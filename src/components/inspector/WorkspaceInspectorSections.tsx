@@ -84,10 +84,14 @@ export function AgentSummaryCard({ agent }: { agent: AgentInfo }) {
   const tPanel = useT();
   return (
     <section className="px-3.5 py-2.5 mb-2.5 rounded-xl bg-[var(--color-bg-secondary)]">
-      <header className="text-2xs font-semibold text-text-muted tracking-wide mb-1.5">{tPanel('inspector.taskSummary')}</header>
+      <header className="text-2xs font-semibold text-text-muted tracking-wide mb-1.5">
+        {tPanel('inspector.taskSummary')}
+      </header>
       <div className="text-xs text-text-secondary leading-[1.5] line-clamp-3">{agent.description || agent.name}</div>
       {(agent.result || agent.error) && (
-        <div className="mt-1.5 text-xs text-text-secondary leading-[1.5] line-clamp-3">{agent.result || agent.error}</div>
+        <div className="mt-1.5 text-xs text-text-secondary leading-[1.5] line-clamp-3">
+          {agent.result || agent.error}
+        </div>
       )}
     </section>
   );
@@ -109,7 +113,9 @@ export function QualityGateCard({
   const tPanel = useT();
   return (
     <section className="px-3.5 py-2.5 mb-2.5 rounded-xl bg-[var(--color-bg-secondary)]">
-      <header className="text-2xs font-semibold text-text-muted tracking-wide mb-1.5">{tPanel('inspector.qualityGate')}</header>
+      <header className="text-2xs font-semibold text-text-muted tracking-wide mb-1.5">
+        {tPanel('inspector.qualityGate')}
+      </header>
       {runs.every((run) => run.passed) ? (
         <div className="flex items-center gap-2 text-xs text-text-secondary">
           <Check size={14} className="text-[var(--color-success)] shrink-0" />
@@ -125,8 +131,12 @@ export function QualityGateCard({
                 ) : (
                   <X size={14} className="text-danger shrink-0" />
                 )}
-                <span className="text-xs font-medium text-text-primary shrink-0">{tPanel('inspector.checkLabel', { type: run.checkType })}</span>
-                {run.command && <code className="flex-1 min-w-0 truncate text-2xs text-text-muted font-mono">{run.command}</code>}
+                <span className="text-xs font-medium text-text-primary shrink-0">
+                  {tPanel('inspector.checkLabel', { type: run.checkType })}
+                </span>
+                {run.command && (
+                  <code className="flex-1 min-w-0 truncate text-2xs text-text-muted font-mono">{run.command}</code>
+                )}
                 <span className={`shrink-0 text-2xs ${run.passed ? 'text-[var(--color-success)]' : 'text-danger'}`}>
                   {run.passed ? tPanel('inspector.checkPassed') : tPanel('inspector.checkFailed')}
                 </span>
@@ -174,7 +184,9 @@ export function NextStepsCard({ agent, steps }: { agent: AgentInfo; steps: NextS
   const tPanel = useT();
   return (
     <section className="px-3.5 py-2.5 mb-2.5 rounded-xl bg-[var(--color-bg-secondary)]">
-      <header className="text-2xs font-semibold text-text-muted tracking-wide mb-1.5">{tPanel('inspector.nextSteps')}</header>
+      <header className="text-2xs font-semibold text-text-muted tracking-wide mb-1.5">
+        {tPanel('inspector.nextSteps')}
+      </header>
       <div className="flex flex-col gap-1.5">
         {steps.map((step) => (
           <button
@@ -193,7 +205,9 @@ export function NextStepsCard({ agent, steps }: { agent: AgentInfo; steps: NextS
           >
             <span className="shrink-0 w-[5px] h-[5px] rounded-full bg-[var(--color-primary)] opacity-70" />
             <span className="flex-1 min-w-0">{step.label}</span>
-            <span className="shrink-0 text-2xs text-text-faint">{step.kind === 'view' ? tPanel('inspector.view') : tPanel('inspector.continue')}</span>
+            <span className="shrink-0 text-2xs text-text-faint">
+              {step.kind === 'view' ? tPanel('inspector.view') : tPanel('inspector.continue')}
+            </span>
           </button>
         ))}
       </div>
@@ -205,7 +219,9 @@ export function DeliverablesCard({ files, onPreview }: { files: string[]; onPrev
   const tPanel = useT();
   return (
     <section className="px-3.5 py-2.5 mb-2.5 rounded-xl bg-[var(--color-bg-secondary)]">
-      <header className="text-2xs font-semibold text-text-muted tracking-wide mb-1.5">{tPanel('inspector.deliverables')}</header>
+      <header className="text-2xs font-semibold text-text-muted tracking-wide mb-1.5">
+        {tPanel('inspector.deliverables')}
+      </header>
       <DeliverablesRow files={files} onPreview={onPreview} />
     </section>
   );
@@ -215,7 +231,9 @@ export function RollbackCard({ onRollback }: { onRollback: () => void }) {
   const tPanel = useT();
   return (
     <section className="px-3.5 py-2.5 mb-2.5 rounded-xl bg-[var(--color-bg-secondary)]">
-      <header className="text-2xs font-semibold text-text-muted tracking-wide mb-1.5">{tPanel('inspector.rollback')}</header>
+      <header className="text-2xs font-semibold text-text-muted tracking-wide mb-1.5">
+        {tPanel('inspector.rollback')}
+      </header>
       <p className="text-2xs text-text-muted leading-[1.5] mb-2">{tPanel('inspector.rollbackBody')}</p>
       <button
         type="button"
@@ -232,7 +250,9 @@ export function SystemMessagesList({ messages }: { messages: SystemMessageEntry[
   const tPanel = useT();
   return (
     <section className="px-0.5 pt-[10px] border-t border-[var(--color-border-dim)] mt-1">
-      <header className="text-2xs font-semibold text-muted tracking-wide mb-[6px]">{tPanel('inspector.systemPrompt')}</header>
+      <header className="text-2xs font-semibold text-muted tracking-wide mb-[6px]">
+        {tPanel('inspector.systemPrompt')}
+      </header>
       <ul className="list-none m-0 p-0 flex flex-col gap-1">
         {messages.slice(-8).map((message) => (
           <li

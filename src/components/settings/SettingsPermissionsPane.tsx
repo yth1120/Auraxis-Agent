@@ -71,7 +71,9 @@ export function SettingsPermissionsPane() {
                     <span
                       className={clsx(
                         'inline-flex items-center px-2 py-[1px] rounded-full text-2xs font-medium leading-[1.6] whitespace-nowrap',
-                        rule.scope === 'always' ? 'bg-success-soft text-text-secondary' : 'bg-border-dim text-text-secondary',
+                        rule.scope === 'always'
+                          ? 'bg-success-soft text-text-secondary'
+                          : 'bg-border-dim text-text-secondary',
                       )}
                     >
                       {rule.scope === 'always'

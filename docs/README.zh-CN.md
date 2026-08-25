@@ -21,7 +21,7 @@ Auraxis v3.2.0 是一款基于 Electron 的桌面端智能体工作台，融合�
 | 层            | 技术                                                                                                     |
 | ------------- | -------------------------------------------------------------------------------------------------------- |
 | 桌面框架      | Electron 44（Node 24，内置 `node:sqlite`），无边框窗口，`contextIsolation: true`                         |
-| 前端          | React 19 + TypeScript 6 + Vite 8                                                                        |
+| 前端          | React 19 + TypeScript 6 + Vite 8                                                                         |
 | UI 组件库     | Ant Design 6，自定义深色/浅色主题                                                                        |
 | 状态管理      | Zustand 5；会话/设置/插件状态以主进程为权威，localStorage 仅作渲染层缓存                                 |
 | 存储与检索    | 会话/Agent 统一 JSONL 事件日志 + SQLite 投影缓存 + FTS5 全文搜索 + 长期记忆（better-sqlite3，JSON 回退） |
