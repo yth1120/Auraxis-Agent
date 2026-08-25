@@ -3,7 +3,6 @@ import {
   PaintBrush,
   Keyboard,
   ChartBar,
-  Robot,
   Brain,
   Plugs,
   Blocks,
@@ -18,6 +17,7 @@ import {
   Key,
   Coins,
   Globe,
+  Waypoints,
 } from '@/components/common/icons';
 import type { I18nKey } from '../../i18n';
 export function readWallpaperFile(file: File): Promise<string> {
@@ -66,7 +66,7 @@ export const NAV_GROUPS: { labelKey: I18nKey; items: { key: string; labelKey: I1
   {
     labelKey: 'settings.nav.modelRuntime',
     items: [
-      { key: 'agents', labelKey: 'settings.item.agents', icon: <Robot size={16} /> },
+      { key: 'agents', labelKey: 'settings.item.agents', icon: <Waypoints size={16} /> },
       { key: 'agent-runtime', labelKey: 'settings.item.agentRuntime', icon: <Gauge size={16} /> },
       { key: 'memory', labelKey: 'settings.item.memory', icon: <Brain size={16} /> },
       { key: 'project-rules', labelKey: 'settings.item.projectRules', icon: <FileText size={16} /> },

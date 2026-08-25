@@ -278,12 +278,23 @@ export interface ElectronAPI {
   connectors: {
     status: () => Promise<{
       ok: boolean;
-      data?: { kind: 'slack' | 'drive' | 'notion'; configured: boolean; tokenHint?: string }[];
+      data?: { kind: 'slack' | 'drive' | 'notion' | 'lark'; configured: boolean; tokenHint?: string }[];
       error?: string;
     }>;
     setToken: (kind: 'slack' | 'drive' | 'notion', token: string) => Promise<{ ok: boolean; error?: string }>;
+    getLark: () => Promise<{
+      ok: boolean;
+      data?: { appId: string; domain: string; tools: string };
+      error?: string;
+    }>;
+    setLark: (input: {
+      appId: string;
+      appSecret: string;
+      domain?: string;
+      tools?: string;
+    }) => Promise<{ ok: boolean; error?: string }>;
     test: (
-      kind: 'slack' | 'drive' | 'notion',
+      kind: 'slack' | 'drive' | 'notion' | 'lark',
     ) => Promise<{ ok: boolean; data?: { ok: boolean; message: string }; error?: string }>;
   };
 
@@ -327,7 +338,7 @@ export interface ElectronAPI {
     getStatuses: () => Promise<{ ok: boolean; data?: import('./advanced').MCPStatus[] }>;
     listTools: (serverId: string) => Promise<{ ok: boolean; data?: import('./advanced').MCPToolDef[]; error?: string }>;
     callTool: (
-      serverName: string,
+      serverId: string,
       toolName: string,
       args: Record<string, unknown>,
     ) => Promise<{ ok: boolean; data?: unknown; error?: string }>;

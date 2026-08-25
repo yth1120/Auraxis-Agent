@@ -41,6 +41,11 @@ export interface MCPServerConfig {
   command: string;
   args: string[];
   env?: Record<string, string>;
+  /** 仅为 DeepSeek Harness 预设启用：把 Auraxis 中已保存的 DeepSeek Key
+   *  注入该 MCP 子进程，避免把密钥复制到 localStorage。 */
+  useAuraxisDeepSeekKey?: boolean;
+  /** 仅为飞书/Lark MCP 预设启用：从加密设置中注入 App ID / App Secret。 */
+  useAuraxisLarkCredentials?: boolean;
   enabled: boolean;
 }
 
@@ -49,6 +54,7 @@ export interface MCPToolDef {
   description: string;
   inputSchema: Record<string, unknown>;
   serverName: string;
+  serverId: string;
 }
 
 export interface MCPStatus {

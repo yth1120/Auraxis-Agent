@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Modal } from 'antd';
 import clsx from 'clsx';
-import { ChatTeardropDots, ChatCircle, MagnifyingGlass, Robot, X } from '@/components/common/icons';
+import { ChatTeardropDots, ChatCircle, MagnifyingGlass, Waypoints, X } from '@/components/common/icons';
 import { useAppStore } from '../../stores/useAppStore';
 import { useChatStore } from '../../stores/useChatStore';
 import { useSessionStore } from '../../stores/useSessionStore';
@@ -216,7 +216,7 @@ export default function GlobalSearchModal({ open, onClose }: { open: boolean; on
                         ) : group === 'chat' ? (
                           <ChatCircle size={14} weight="regular" />
                         ) : (
-                          <Robot size={14} weight="regular" />
+                          <Waypoints size={14} weight="regular" />
                         );
                       const iconCls =
                         group === 'session'

@@ -6,7 +6,7 @@
 
 ## 一、项目概述
 
-Auraxis v3.1.0 是一款基于 Electron 的桌面端智能体工作台，融合了统一 ReAct 步进引擎、多智能体调度、Code Mode 工具编排、插件扩展和持久化项目记忆。执行语义遵循通用约定（`end_turn` 即回合结束，无剧本/强制门），ReviewArtifact 作为可选验证工具。后端 LLM 默认为 DeepSeek API（兼容 OpenAI / Anthropic 格式），联网搜索默认使用 DeepSeek 官方原生搜索（失败自动降级 DuckDuckGo，另支持 Exa / Perplexity provider）。DeepSeek 官方能力已接入：思考强度 low/high/max 三档、strict tools（Beta）、计划生成 JSON 模式、对话前缀续写（代码块“继续写”）、FIM 补全（Beta）API、流式 usage 与上下文缓存命中展示、user_id 隔离、可配置单次最大输出 tokens（上限 384K）、官方离线 tokenizer 本地计数。
+Auraxis v3.2.0 是一款基于 Electron 的桌面端智能体工作台，融合了统一 ReAct 步进引擎、多智能体调度、Code Mode 工具编排、插件扩展和持久化项目记忆。执行语义遵循通用约定（`end_turn` 即回合结束，无剧本/强制门），ReviewArtifact 作为可选验证工具。后端 LLM 默认为 DeepSeek API（兼容 OpenAI / Anthropic 格式），联网搜索默认使用 DeepSeek 官方原生搜索（失败自动降级 DuckDuckGo，另支持 Exa / Perplexity provider）。DeepSeek 官方能力已接入：思考强度 low/high/max 三档、strict tools（Beta）、计划生成 JSON 模式、对话前缀续写（代码块“继续写”）、FIM 补全（Beta）API、流式 usage 与上下文缓存命中展示、user_id 隔离、可配置单次最大输出 tokens（上限 384K）、官方离线 tokenizer 本地计数。
 
 项目采用**论文驱动开发**：已落地 7 篇 arXiv 论文的核心技术——Eywa（溯源长期记忆）、MAP-Graph（多 Agent 共享记忆授权）、AGORA（步骤级上下文压缩）、SWE-Touch（工作区漂移感知）、Oversight Has a Capacity（审批疲劳守卫）、AutoTool（工具使用惯性）、Verifier-as-Gatekeeper（技能库污染门禁）；另落地 4 项缓存方向论文/系统技术——RadixAttention（规范历史重放 / 公共前缀最大化）、Prompt Cache（稳定块组织）、Cache-Aware Prompt Compression（动态内容尾部化）、Byte-Exact Deduplication（记忆块字节级去重）。论文地址、技术映射与落地模块详见「[第五章 研究论文与技术落地](#五研究论文与技术落地)」。产品侧新增本地账户登录、Chat / Work / Code 三模式、思考与联网搜索开关、Agent 执行流程视图、会话事件时间轴、上下文缓存对齐等能力。
 
@@ -480,6 +480,7 @@ Agent 驱动（agentLoopRun，步进委托 step-engine）：
 - **能力加载**：ListSkills / ReadSkill / WriteSkill、LSP、ReviewArtifact、GitCommit、EnterWorktree
 - **专业文档**：ReadDocument（.docx/.xlsx/.pptx/.pdf 文本与结构化读取）、WriteDocument（Word/Excel/PPT/PDF 生成，PDF 自动嵌入中文字体）
 - **云连接器**：SlackListChannels / SlackPostMessage、DriveList / DriveRead、NotionSearch / NotionCreatePage
+- **飞书/Lark**：官方 OpenAPI MCP（`mcp__lark-mcp__*`），覆盖消息、群组、文档、多维表格、日历等能力
 
 **工具分类**：
 
@@ -710,8 +711,9 @@ Agent 循环 (agent-loop.ts) — agentLoopRun()
 - **通信协议**：JSON-RPC over stdio
 - **安全命令验证**：连接前验证服务器命令
 - **工具发现**：`mcp:listTools` 列出远程 MCP 服务器的工具
-- **工具调用**：`mcp:callTool` 调用远程工具（`mcp__serverName__toolName`）
+- **工具调用**：`mcp:callTool` 调用远程工具（`mcp__serverId__toolName`）
 - **状态管理**：`mcp:connect` / `mcp:disconnect` / `mcp:getStatuses`
+- **DeepSeek Harness 预设**：设置 → MCP 可一键添加 `deepseek-harness`，首次连接会用 `npx` 启动本地 Harness Web；Windows 下自动使用 `cross-spawn` 兼容 `npx.cmd`。
 
 ---
 

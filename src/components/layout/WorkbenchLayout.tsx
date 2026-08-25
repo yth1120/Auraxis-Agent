@@ -80,6 +80,12 @@ export default function WorkbenchLayout() {
   const sidebarBg = sidebarGlassOn
     ? `color-mix(in srgb, var(--color-glass-panel) ${Math.round(100 - Math.pow(sidebarGlass / 100, 0.75) * 88)}%, transparent)`
     : undefined;
+  // 边框同样跟随玻璃化淡出：100% 时完全透明，避免深色主题下出现生硬的分隔线。
+  const sidebarBorderColor = sidebarGlassOn
+    ? sidebarGlass >= 100
+      ? 'transparent'
+      : `color-mix(in srgb, var(--color-border-dim) ${Math.round(50 * (1 - sidebarGlass / 100))}%, transparent)`
+    : undefined;
 
   // Track maximize state so the maximize button reflects 还原 vs 最大化.
   const [isMaximized, setIsMaximized] = useState(false);
@@ -207,7 +213,11 @@ export default function WorkbenchLayout() {
             isResizingSider && '!transition-none',
             sidebarCollapsed && '!border-r-0',
           )}
-          style={{ width: sidebarCollapsed ? 0 : Math.max(260, sidebarWidth), background: sidebarBg }}
+          style={{
+            width: sidebarCollapsed ? 0 : Math.max(260, sidebarWidth),
+            background: sidebarBg,
+            borderColor: sidebarBorderColor,
+          }}
         >
           <div className="h-full overflow-hidden" style={{ width: Math.max(260, sidebarWidth) }}>
             <SiderNav collapsed={sidebarCollapsed} />

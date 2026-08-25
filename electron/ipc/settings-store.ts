@@ -22,6 +22,7 @@ const API_KEY_KEYS = new Set([
   'slackToken',
   'driveToken',
   'notionToken',
+  'larkAppSecret',
 ]);
 
 export const MAX_OUTPUT_TOKENS_MIN = 1024;

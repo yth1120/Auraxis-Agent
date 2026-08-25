@@ -9,21 +9,24 @@ import axios from 'axios';
 import { errorRecord, errorText } from './errors';
 import { readSettings, writeSettings } from './ipc/settings-store';
 
-export type ConnectorKind = 'slack' | 'drive' | 'notion';
+export type ConnectorKind = 'slack' | 'drive' | 'notion' | 'lark';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
-export const CONNECTOR_KINDS: ConnectorKind[] = ['slack', 'drive', 'notion'];
+export const CONNECTOR_KINDS: ConnectorKind[] = ['slack', 'drive', 'notion', 'lark'];
 
 const CONNECTOR_FIELD: Record<ConnectorKind, string> = {
   slack: 'slackToken',
   drive: 'driveToken',
   notion: 'notionToken',
+  lark: 'larkAppSecret',
 };
 
 const NOTION_VERSION = '2022-06-28';
+const LARK_DEFAULT_DOMAIN = 'https://open.feishu.cn';
+const LARK_DEFAULT_TOOLS = 'preset.light';
 
 function tokenOf(kind: ConnectorKind, settings: Record<string, unknown>): string {
   const v = settings[CONNECTOR_FIELD[kind]];
@@ -49,6 +52,15 @@ export interface ConnectorStatus {
 export async function getConnectorStatuses(): Promise<ConnectorStatus[]> {
   const settings = await readSettings();
   return CONNECTOR_KINDS.map((kind) => {
+    if (kind === 'lark') {
+      const appId = typeof settings.larkAppId === 'string' ? settings.larkAppId : '';
+      const secret = tokenOf(kind, settings);
+      return {
+        kind,
+        configured: appId.length > 0 && secret.length > 0,
+        tokenHint: appId ? `${appId.slice(0, 4)}…${appId.slice(-4)}` : undefined,
+      };
+    }
     const token = tokenOf(kind, settings);
     return {
       kind,
@@ -65,6 +77,7 @@ async function requireToken(kind: ConnectorKind): Promise<string> {
       slack: 'Slack',
       drive: 'Google Drive',
       notion: 'Notion',
+      lark: '飞书/Lark',
     };
     throw new Error(`${names[kind]} 未配置 Token，请到「设置 → 连接器」添加后再试`);
   }
@@ -73,6 +86,9 @@ async function requireToken(kind: ConnectorKind): Promise<string> {
 
 export async function testConnector(kind: ConnectorKind): Promise<{ ok: boolean; message: string }> {
   try {
+    if (kind === 'lark') {
+      return await testLarkConnector();
+    }
     const token = await requireToken(kind);
     if (kind === 'slack') {
       const r = await axios.get('https://slack.com/api/conversations.list', {
@@ -108,6 +124,67 @@ export async function testConnector(kind: ConnectorKind): Promise<{ ok: boolean;
     const response = record.response as { data?: { error?: string } } | undefined;
     return { ok: false, message: response?.data?.error || errorText(error) };
   }
+}
+
+export interface LarkCredentials {
+  appId: string;
+  appSecret: string;
+  domain: string;
+  tools: string;
+}
+
+export async function getLarkCredentials(): Promise<LarkCredentials> {
+  const settings = await readSettings();
+  return {
+    appId: typeof settings.larkAppId === 'string' ? settings.larkAppId.trim() : '',
+    appSecret: typeof settings.larkAppSecret === 'string' ? settings.larkAppSecret.trim() : '',
+    domain: (typeof settings.larkDomain === 'string' && settings.larkDomain.trim()) || LARK_DEFAULT_DOMAIN,
+    tools: (typeof settings.larkTools === 'string' && settings.larkTools.trim()) || LARK_DEFAULT_TOOLS,
+  };
+}
+
+export async function setLarkCredentials(input: {
+  appId?: string;
+  appSecret?: string;
+  domain?: string;
+  tools?: string;
+}): Promise<void> {
+  const settings = await readSettings();
+  if (typeof input.appId === 'string') settings.larkAppId = input.appId.trim();
+  if (typeof input.appSecret === 'string') settings.larkAppSecret = input.appSecret.trim();
+  if (typeof input.domain === 'string') settings.larkDomain = input.domain.trim() || LARK_DEFAULT_DOMAIN;
+  if (typeof input.tools === 'string') settings.larkTools = input.tools.trim() || LARK_DEFAULT_TOOLS;
+  await writeSettings(settings);
+}
+
+export async function getLarkPublicConfig(): Promise<{
+  appId: string;
+  domain: string;
+  tools: string;
+}> {
+  const credentials = await getLarkCredentials();
+  return {
+    appId: credentials.appId,
+    domain: credentials.domain,
+    tools: credentials.tools,
+  };
+}
+
+async function testLarkConnector(): Promise<{ ok: boolean; message: string }> {
+  const credentials = await getLarkCredentials();
+  if (!credentials.appId || !credentials.appSecret) {
+    throw new Error('飞书/Lark 未配置 App ID 或 App Secret，请到「设置 → 连接器」添加后再试');
+  }
+  const domain = credentials.domain.replace(/\/+$/, '');
+  const r = await axios.post(
+    `${domain}/open-apis/auth/v3/tenant_access_token/internal`,
+    { app_id: credentials.appId, app_secret: credentials.appSecret },
+    { timeout: 15_000 },
+  );
+  if (r.data?.code !== 0 || !r.data?.tenant_access_token) {
+    throw new Error(r.data?.msg || '飞书/Lark 凭据校验失败');
+  }
+  return { ok: true, message: '飞书/Lark 凭据有效（tenant_access_token 已获取）' };
 }
 
 // ─── Slack ───────────────────────────────────────────────

@@ -16,12 +16,24 @@ vi.mock('../../connectors', () => ({
     { kind: 'drive', configured: false },
     { kind: 'notion', configured: false },
   ]),
+  getLarkPublicConfig: vi.fn(async () => ({
+    appId: 'cli-test',
+    domain: 'https://open.feishu.cn',
+    tools: 'preset.light',
+  })),
+  setLarkCredentials: vi.fn(async () => {}),
   setConnectorToken: vi.fn(async () => {}),
   testConnector: vi.fn(async () => ({ ok: true, message: 'Slack 连接成功' })),
 }));
 
 import { registerConnectorHandlers } from '../connector-handlers';
-import { getConnectorStatuses, setConnectorToken, testConnector } from '../../connectors';
+import {
+  getLarkPublicConfig,
+  getConnectorStatuses,
+  setConnectorToken,
+  setLarkCredentials,
+  testConnector,
+} from '../../connectors';
 
 type Handler = (event: unknown, ...args: unknown[]) => Promise<any>;
 
@@ -64,5 +76,36 @@ describe('connector-handlers', () => {
     const h = capture();
     await h.get('connector:status')!({});
     expect(getConnectorStatuses).toHaveBeenCalled();
+  });
+
+  it('setLark validates and delegates the credential payload', async () => {
+    const h = capture();
+    expect(await h.get('connector:setLark')!({}, { appId: 1, appSecret: 's' })).toMatchObject({ ok: false });
+    const r = await h.get('connector:setLark')!(
+      {},
+      {
+        appId: 'cli-new',
+        appSecret: 'secret-new',
+        domain: 'https://open.larksuite.com',
+        tools: 'preset.im.default',
+      },
+    );
+    expect(r.ok).toBe(true);
+    expect(setLarkCredentials).toHaveBeenCalledWith({
+      appId: 'cli-new',
+      appSecret: 'secret-new',
+      domain: 'https://open.larksuite.com',
+      tools: 'preset.im.default',
+    });
+  });
+
+  it('getLark returns public config without a secret', async () => {
+    const h = capture();
+    const r = await h.get('connector:getLark')!({});
+    expect(r).toEqual({
+      ok: true,
+      data: { appId: 'cli-test', domain: 'https://open.feishu.cn', tools: 'preset.light' },
+    });
+    expect(getLarkPublicConfig).toHaveBeenCalled();
   });
 });

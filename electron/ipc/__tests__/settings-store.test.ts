@@ -76,6 +76,8 @@ describe('settings-store API key encryption', () => {
       deepseekApiKey: 'sk-deepseek',
       exaApiKey: 'sk-exa',
       perplexityApiKey: 'sk-perp',
+      larkAppId: 'cli-test',
+      larkAppSecret: 'lark-secret',
       model: 'deepseek-v4-pro',
     });
 
@@ -84,6 +86,8 @@ describe('settings-store API key encryption', () => {
     expect(String(raw.deepseekApiKey)).toMatch(/^enc:/);
     expect(String(raw.exaApiKey)).toMatch(/^enc:/);
     expect(String(raw.perplexityApiKey)).toMatch(/^enc:/);
+    expect(String(raw.larkAppSecret)).toMatch(/^enc:/);
+    expect(raw.larkAppId).toBe('cli-test');
   });
 
   it('readSettings decrypts encrypted keys', async () => {

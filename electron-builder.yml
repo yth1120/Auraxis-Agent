@@ -24,6 +24,8 @@ extraResources:
     to: sandbox/sandbox-linux.sh
   - from: electron/sandbox-macos.sh
     to: sandbox/sandbox-macos.sh
+  - from: scripts/auraxis-mcp-preload.cjs
+    to: mcp/auraxis-mcp-preload.cjs
   - from: electron/tokenizer/tokenizer.json
     to: tokenizer/tokenizer.json
 win:

@@ -28,7 +28,7 @@ function getMcpToolDefs(): ToolDef[] {
 
   const mcpTools = getAllMcpTools();
   cachedMcpTools = mcpTools.map((t) => ({
-    name: `${MCP_PREFIX}${t.name}`,
+    name: `${MCP_PREFIX}${t.serverId}__${t.name}`,
     description: `[MCP:${t.serverName}] ${t.description || `MCP tool: ${t.name}`}`,
     input_schema: (t.inputSchema || { type: 'object', properties: {}, required: [] }) as ToolDef['input_schema'],
     isConcurrencySafe: false,
@@ -67,17 +67,30 @@ export async function executeMcpTool(
     return { output: null, error: `非 MCP 工具: ${fullName}` };
   }
 
-  const toolName = fullName.slice(MCP_PREFIX.length);
+  const qualifiedName = fullName.slice(MCP_PREFIX.length);
+  const separator = qualifiedName.indexOf('__');
+  let serverId = '';
+  let toolName = qualifiedName;
+  if (separator >= 0) {
+    const candidateServer = qualifiedName.slice(0, separator);
+    const candidateTool = qualifiedName.slice(separator + 2);
+    if (getAllMcpTools().some((t) => t.serverId === candidateServer)) {
+      serverId = candidateServer;
+      toolName = candidateTool;
+    }
+  }
 
   // Find which server owns this tool
   const allTools = getAllMcpTools();
-  const tool = allTools.find((t) => t.name === toolName);
+  const tool =
+    allTools.find((t) => t.name === toolName && (!serverId || t.serverId === serverId)) ||
+    allTools.find((t) => t.name === qualifiedName);
   if (!tool) {
     return { output: null, error: `MCP 工具未找到: ${toolName}` };
   }
 
   try {
-    const result = await callMcpTool(tool.serverName, toolName, input);
+    const result = await callMcpTool(tool.serverId, tool.name, input);
     return { output: result };
   } catch (err: unknown) {
     return { output: null, error: `MCP 工具执行失败: ${errorText(err)}` };

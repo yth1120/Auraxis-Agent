@@ -185,15 +185,16 @@ when_to_use: 用户要求生成 PDF、将内容导出为 PDF，或读取 .pdf �
 3. 中文内容会自动使用系统中文字体（Windows 雅黑/黑体等）。`,
   'cloud-connectors': `---
 name: 云连接器
-description: 通过 Slack、Google Drive、Notion 连接器收发消息、检索文件与页面
-when_to_use: 用户要求访问 Slack 频道、Google Drive 文件或 Notion 页面时；Token 在设置 → 连接器配置
+description: 通过 Slack、Google Drive、Notion、飞书/Lark 连接器收发消息、检索文件与页面
+when_to_use: 用户要求访问 Slack 频道、Google Drive 文件、Notion 页面或飞书/Lark 时；凭据在设置 → 连接器配置
 ---
 # 云连接器技能
 
 - Slack：SlackListChannels 列频道 → SlackPostMessage 发消息。
 - Drive：DriveList 检索文件 → DriveRead 读取文件内容。
 - Notion：NotionSearch 搜索页面 → NotionCreatePage 在父页面下创建新页。
-- 所有 Token 在「设置 → 连接器」配置，不要向用户索要 Token。`,
+- 飞书/Lark：使用 mcp__lark-mcp__* 官方 OpenAPI MCP 工具；App ID / App Secret 在「设置 → 连接器」配置。
+- 所有凭据在「设置 → 连接器」配置，不要向用户索要 Token。`,
 };
 
 /** Seed built-in skills into the skills root (idempotent, never overwrites). */

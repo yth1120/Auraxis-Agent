@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
-import { Button, Input, Space, List, Tag, message, Popconfirm } from 'antd';
+import { Button, Checkbox, Input, Space, List, Tag, message, Popconfirm } from 'antd';
 import {
   PlusCircle as PlusCircleOutlined,
   MinusCircle as MinusCircleOutlined,
   Link as LinkOutlined,
   LinkBreak as DisconnectOutlined,
+  Globe,
 } from '@/components/common/icons';
+import DeepSeekHarnessIcon from '@/components/common/DeepSeekHarnessIcon';
 import type { MCPServerConfig, MCPStatus } from '../../types/advanced';
 import { useAdvancedStore } from '../../stores/useAdvancedStore';
 import { useT } from '../../i18n';
@@ -13,6 +15,34 @@ import { useT } from '../../i18n';
 function generateId(): string {
   return `mcp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 }
+
+const DEEPSEEK_HARNESS_PRESET: Omit<MCPServerConfig, 'enabled'> = {
+  id: 'deepseek-harness',
+  name: 'deepseek-harness',
+  command: 'npx',
+  args: ['--yes', '--package=deepseek-harness-mcp@0.2.3', '--', 'deepseek-harness-mcp'],
+  useAuraxisDeepSeekKey: true,
+};
+
+const LARK_MCP_PRESET: Omit<MCPServerConfig, 'enabled'> = {
+  id: 'lark-mcp',
+  name: 'lark-mcp',
+  command: 'npx',
+  args: [
+    '-y',
+    '@larksuiteoapi/lark-mcp@0.5.1',
+    'mcp',
+    '-m',
+    'stdio',
+    '-l',
+    'zh',
+    '-c',
+    'snake',
+    '--token-mode',
+    'tenant_access_token',
+  ],
+  useAuraxisLarkCredentials: true,
+};
 
 interface MCPSettingsProps {
   servers: MCPServerConfig[];
@@ -25,6 +55,7 @@ export default function MCPSettings({ servers, statuses, onUpdateServers }: MCPS
   const [newName, setNewName] = useState('');
   const [newCommand, setNewCommand] = useState('');
   const [newArgs, setNewArgs] = useState('');
+  const [useAuraxisKey, setUseAuraxisKey] = useState(false);
   const updateMcpStatus = useAdvancedStore((s) => s.updateMcpStatus);
 
   // Load MCP statuses on mount
@@ -50,6 +81,7 @@ export default function MCPSettings({ servers, statuses, onUpdateServers }: MCPS
       name: newName.trim(),
       command: newCommand.trim(),
       args: newArgs.trim().split(/\s+/).filter(Boolean),
+      ...(useAuraxisKey ? { useAuraxisDeepSeekKey: true } : {}),
       enabled: true,
     };
 
@@ -57,7 +89,32 @@ export default function MCPSettings({ servers, statuses, onUpdateServers }: MCPS
     setNewName('');
     setNewCommand('');
     setNewArgs('');
+    setUseAuraxisKey(false);
     message.success(t('mcp.added', { name: server.name }));
+  };
+
+  const handleAddDeepSeekHarness = () => {
+    if (servers.some((server) => server.name === DEEPSEEK_HARNESS_PRESET.name)) {
+      message.info(t('mcp.presetExists'));
+      return;
+    }
+
+    const server: MCPServerConfig = {
+      ...DEEPSEEK_HARNESS_PRESET,
+      enabled: true,
+    };
+    onUpdateServers([...servers, server]);
+    message.success(t('mcp.presetAdded'));
+  };
+
+  const handleAddLarkMcp = () => {
+    if (servers.some((server) => server.name === LARK_MCP_PRESET.name)) {
+      message.info(t('mcp.larkExists'));
+      return;
+    }
+
+    onUpdateServers([...servers, { ...LARK_MCP_PRESET, enabled: true }]);
+    message.success(t('mcp.larkAdded'));
   };
 
   const handleRemove = async (id: string) => {
@@ -138,6 +195,13 @@ export default function MCPSettings({ servers, statuses, onUpdateServers }: MCPS
             size="small"
           />
         </Space.Compact>
+        <Checkbox
+          checked={useAuraxisKey}
+          onChange={(e) => setUseAuraxisKey(e.target.checked)}
+          className="!mb-2 !text-xs"
+        >
+          {t('mcp.useAuraxisKey')}
+        </Checkbox>
         <Button
           type="dashed"
           icon={<PlusCircleOutlined />}
@@ -148,6 +212,28 @@ export default function MCPSettings({ servers, statuses, onUpdateServers }: MCPS
         >
           {t('mcp.add')}
         </Button>
+        <Button
+          type="primary"
+          icon={<DeepSeekHarnessIcon size={16} />}
+          onClick={handleAddDeepSeekHarness}
+          size="small"
+          block
+          className="mt-2"
+        >
+          {t('mcp.preset')}
+        </Button>
+        <div className="mt-2 font-body text-xs text-faint leading-relaxed">{t('mcp.dshHint')}</div>
+        <Button
+          type="default"
+          icon={<Globe size={16} />}
+          onClick={handleAddLarkMcp}
+          size="small"
+          block
+          className="mt-2"
+        >
+          {t('mcp.larkPreset')}
+        </Button>
+        <div className="mt-2 font-body text-xs text-faint leading-relaxed">{t('mcp.larkHint')}</div>
       </div>
 
       <div className="p-0">
@@ -206,6 +292,11 @@ export default function MCPSettings({ servers, statuses, onUpdateServers }: MCPS
                           {connected ? t('mcp.connectedState', { n: status?.toolCount || 0 }) : t('mcp.notConnected')}
                         </Tag>
                         {server.name}
+                        {server.useAuraxisDeepSeekKey && (
+                          <Tag color="blue" className="!text-xs !leading-none">
+                            {t('mcp.useAuraxisKey')}
+                          </Tag>
+                        )}
                       </span>
                     }
                     description={

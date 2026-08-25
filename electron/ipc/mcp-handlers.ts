@@ -1,6 +1,11 @@
 import { errorText } from '../errors';
 import { secureHandle } from './trust';
-import { spawn, ChildProcess } from 'child_process';
+import { app } from 'electron';
+import path from 'node:path';
+import type { ChildProcess } from 'node:child_process';
+import spawn from 'cross-spawn';
+import { resolveCredential } from '../credentials';
+import { readSettings } from './settings-store';
 import type { MCPServerConfig, MCPToolDef, MCPStatus } from '../advanced-defs';
 import { invalidateMcpToolCache } from '../tool-registry';
 import { assertString } from './shared';
@@ -16,6 +21,12 @@ interface MCPConnection {
 }
 
 const connections = new Map<string, MCPConnection>();
+const MCP_INITIALIZE_TIMEOUT_MS = 180_000;
+
+function getMcpPreloadPath(): string {
+  const file = 'auraxis-mcp-preload.cjs';
+  return app.isPackaged ? path.join(process.resourcesPath, 'mcp', file) : path.join(app.getAppPath(), 'scripts', file);
+}
 
 function createConnection(config: MCPServerConfig): MCPConnection {
   return {
@@ -29,7 +40,7 @@ function createConnection(config: MCPServerConfig): MCPConnection {
   };
 }
 
-function sendJsonRpc(conn: MCPConnection, method: string, params?: unknown): Promise<unknown> {
+function sendJsonRpc(conn: MCPConnection, method: string, params?: unknown, timeoutMs = 30_000): Promise<unknown> {
   return new Promise((resolve, reject) => {
     if (!conn.process || !conn.process.stdin) {
       reject(new Error('MCP 服务器未连接'));
@@ -55,7 +66,7 @@ function sendJsonRpc(conn: MCPConnection, method: string, params?: unknown): Pro
     const timeout = setTimeout(() => {
       conn.pending.delete(id);
       reject(new Error(`MCP 请求超时 (${method})`));
-    }, 30000);
+    }, timeoutMs);
 
     const origResolve = resolve;
     conn.pending.set(id, {
@@ -123,12 +134,34 @@ function validateMcpConfig(config: MCPServerConfig): string | null {
 
 function getSafeEnv(): Record<string, string | undefined> {
   // Only pass through safe environment variables to child processes
-  const safeVars = ['PATH', 'HOME', 'USER', 'USERNAME', 'TEMP', 'TMP', 'NODE_PATH', 'APPDATA'];
+  const safeVars = [
+    'PATH',
+    'HOME',
+    'USER',
+    'USERNAME',
+    'TEMP',
+    'TMP',
+    'NODE_PATH',
+    'APPDATA',
+    'PATHEXT',
+    'COMSPEC',
+    'SYSTEMROOT',
+    'DSH_MCP_WORKSPACE_ROOTS',
+    'DSH_MCP_DATA_DIR',
+    'DSH_MCP_HARNESS_PACKAGE',
+    'DSH_PERMISSION_MODE',
+  ];
   const env: Record<string, string | undefined> = {};
   for (const key of safeVars) {
     if (process.env[key]) env[key] = process.env[key];
   }
   return env;
+}
+
+function isDeepSeekHarnessMcp(config: MCPServerConfig): boolean {
+  if (config.useAuraxisDeepSeekKey) return true;
+  const label = `${config.name} ${config.args.join(' ')}`.toLowerCase();
+  return label.includes('deepseek-harness') || label.includes('deepseek harness');
 }
 
 async function connectServer(serverId: string): Promise<MCPStatus> {
@@ -153,9 +186,60 @@ async function connectServer(serverId: string): Promise<MCPStatus> {
     conn.process = null;
   }
 
+  // 飞书/Lark 官方 MCP 需要 App ID / App Secret；先校验加密设置，
+  // 避免启动 npx 后才因缺少凭据退出，给出可读的错误提示。
+  let larkSettings: Record<string, unknown> | null = null;
+  if (conn.config.useAuraxisLarkCredentials) {
+    larkSettings = await readSettings().catch(() => ({}));
+    const appId = typeof larkSettings.larkAppId === 'string' ? larkSettings.larkAppId.trim() : '';
+    const appSecret = typeof larkSettings.larkAppSecret === 'string' ? larkSettings.larkAppSecret.trim() : '';
+    if (!appId || !appSecret) {
+      return {
+        serverId,
+        connected: false,
+        toolCount: 0,
+        error: '飞书/Lark 未配置 App ID 或 App Secret，请先到「设置 → 连接器」填写',
+      };
+    }
+  }
+
   try {
+    const childEnv: Record<string, string | undefined> = {
+      ...getSafeEnv(),
+      ...conn.config.env,
+    };
+
+    // DeepSeek Harness 预设使用 Auraxis 已保存的凭据；通用 MCP server 不
+    // 自动注入密钥，避免把凭据泄露给任意第三方子进程。
+    if (conn.config.useAuraxisDeepSeekKey && !childEnv.DEEPSEEK_API_KEY) {
+      const credential = await resolveCredential('DEEPSEEK_API_KEY').catch(() => undefined);
+      if (credential?.value) {
+        childEnv.DEEPSEEK_API_KEY = credential.value;
+      }
+    }
+
+    // 飞书/Lark 官方 MCP 通过 APP_ID / APP_SECRET 环境变量读取凭据。
+    // 密钥始终留在主进程加密设置中，不被写入 MCP 配置或命令行参数。
+    if (larkSettings) {
+      childEnv.APP_ID = larkSettings.larkAppId ? String(larkSettings.larkAppId).trim() : '';
+      childEnv.APP_SECRET = larkSettings.larkAppSecret ? String(larkSettings.larkAppSecret).trim() : '';
+      childEnv.LARK_DOMAIN =
+        (typeof larkSettings.larkDomain === 'string' && larkSettings.larkDomain.trim()) || 'https://open.feishu.cn';
+      childEnv.LARK_TOOLS =
+        (typeof larkSettings.larkTools === 'string' && larkSettings.larkTools.trim()) || 'preset.light';
+      childEnv.LARK_TOKEN_MODE = 'tenant_access_token';
+    }
+
+    // deepseek-harness-mcp runs npx.cmd internally on Windows; Node cannot
+    // spawn that shim directly, so load a small command-shim bridge in the child.
+    if (process.platform === 'win32' && isDeepSeekHarnessMcp(conn.config)) {
+      const options = childEnv.NODE_OPTIONS ? `${childEnv.NODE_OPTIONS} ` : '';
+      const preloadPath = getMcpPreloadPath().replace(/\\/g, '/');
+      childEnv.NODE_OPTIONS = `${options}--require="${preloadPath}"`;
+    }
+
     const child = spawn(conn.config.command, conn.config.args, {
-      env: { ...getSafeEnv(), ...conn.config.env },
+      env: childEnv,
       stdio: ['pipe', 'pipe', 'pipe'],
       shell: false,
       windowsHide: true,
@@ -186,11 +270,16 @@ async function connectServer(serverId: string): Promise<MCPStatus> {
     });
 
     // Initialize handshake
-    await sendJsonRpc(conn, 'initialize', {
-      protocolVersion: '2024-11-05',
-      capabilities: {},
-      clientInfo: { name: 'Auraxis', version: '2.0.0' },
-    });
+    await sendJsonRpc(
+      conn,
+      'initialize',
+      {
+        protocolVersion: '2024-11-05',
+        capabilities: {},
+        clientInfo: { name: 'Auraxis', version: '2.0.0' },
+      },
+      MCP_INITIALIZE_TIMEOUT_MS,
+    );
 
     // Send initialized notification
     if (conn.process?.stdin) {
@@ -209,6 +298,7 @@ async function connectServer(serverId: string): Promise<MCPStatus> {
       description: t.description || '',
       inputSchema: t.inputSchema || {},
       serverName: conn.config.name,
+      serverId: conn.config.id,
     }));
 
     conn.connected = true;
@@ -323,7 +413,7 @@ export function registerMcpHandlers() {
 
   secureHandle('mcp:callTool', async (_event, serverId: string, toolName: string, args: Record<string, unknown>) => {
     try {
-      assertString(serverId, 'serverName');
+      assertString(serverId, 'serverId');
       assertString(toolName, 'toolName');
       const result = await callMcpTool(serverId, toolName, args);
       return { ok: true, data: result };

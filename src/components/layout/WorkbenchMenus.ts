@@ -81,7 +81,7 @@ export function buildHelpMenuItems(t: Translate): MenuProps['items'] {
     {
       key: 'about',
       label: t('menu.about'),
-      onClick: () => message.info('Auraxis v3.1.0'),
+      onClick: () => message.info('Auraxis v3.2.0'),
     },
   ];
 }

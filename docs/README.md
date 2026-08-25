@@ -6,7 +6,7 @@ Related docs: [TS SDK](../packages/auraxis-sdk/README.md) · [Python SDK](../pyt
 
 ## 1. Project Overview
 
-Auraxis v3.1.0 is an Electron-based desktop agentic workbench that combines a unified ReAct step engine, multi-agent scheduling, Code Mode tool orchestration, plugin extensibility, and persistent project memory. Execution semantics follow the common convention (`end_turn` ends the turn — no scripts or forced gates), and ReviewArtifact is an optional verification tool. The backend LLM defaults to the DeepSeek API (OpenAI / Anthropic compatible formats). Web search defaults to DeepSeek's native search (falling back to DuckDuckGo, with Exa and Perplexity also supported). Official DeepSeek capabilities are integrated: reasoning effort low/high/max, strict tools (Beta), plan-generation JSON mode, conversation prefix continuation ("continue writing" from a code block), FIM completion (Beta) API, streaming usage with context-cache hit display, user_id isolation, configurable max output tokens (up to 384K), and local offline tokenizer counting.
+Auraxis v3.2.0 is an Electron-based desktop agentic workbench that combines a unified ReAct step engine, multi-agent scheduling, Code Mode tool orchestration, plugin extensibility, and persistent project memory. Execution semantics follow the common convention (`end_turn` ends the turn — no scripts or forced gates), and ReviewArtifact is an optional verification tool. The backend LLM defaults to the DeepSeek API (OpenAI / Anthropic compatible formats). Web search defaults to DeepSeek's native search (falling back to DuckDuckGo, with Exa and Perplexity also supported). Official DeepSeek capabilities are integrated: reasoning effort low/high/max, strict tools (Beta), plan-generation JSON mode, conversation prefix continuation ("continue writing" from a code block), FIM completion (Beta) API, streaming usage with context-cache hit display, user_id isolation, configurable max output tokens (up to 384K), and local offline tokenizer counting.
 
 The project follows **paper-driven development**: 7 arXiv papers' core techniques — Eywa (provenance-grounded long-term memory), MAP-Graph (multi-agent shared-memory authorization), AGORA (step-level context compression), SWE-Touch (workspace drift detection), Oversight Has a Capacity (approval fatigue guard), AutoTool (tool usage inertia), Verifier-as-Gatekeeper (skill pollution gating); plus 4 caching-oriented techniques — RadixAttention (canonical history replay / shared-prefix maximization), Prompt Cache (stable block organization), Cache-Aware Prompt Compression (dynamic content tailing), and Byte-Exact Deduplication (byte-exact dedup of memory blocks). Paper links, technical mappings, and landing modules are detailed in [Section 5](#5-research-papers--technical-implementation). Product-side additions include local account login, Chat / Work / Code modes, thinking and web-search toggles, Agent execution flow views, session event timelines, and context-cache alignment.
 
@@ -480,6 +480,7 @@ Tool definitions live in `electron/tool-defs.ts` ([view file](../electron/tool-d
 - **Capability loading**: ListSkills / ReadSkill / WriteSkill, LSP, ReviewArtifact, GitCommit, EnterWorktree
 - **Professional documents**: ReadDocument (text & structured read of .docx/.xlsx/.pptx/.pdf), WriteDocument (Word/Excel/PPT/PDF generation; PDF auto-embeds CJK fonts)
 - **Cloud connectors**: SlackListChannels / SlackPostMessage, DriveList / DriveRead, NotionSearch / NotionCreatePage
+- **Feishu / Lark**: official OpenAPI MCP (`mcp__lark-mcp__*`) covering messages, groups, docs, spreadsheets, calendars and more
 
 **Tool classification**:
 
@@ -710,8 +711,9 @@ Workspace isolation is implemented in `tool-handlers.ts` (`worktreeSessions`):
 - **Transport**: JSON-RPC over stdio
 - **Command validation**: server commands are validated before connecting
 - **Tool discovery**: `mcp:listTools` lists remote MCP server tools
-- **Tool calls**: `mcp:callTool` invokes remote tools (`mcp__serverName__toolName`)
+- **Tool calls**: `mcp:callTool` invokes remote tools (`mcp__serverId__toolName`)
 - **Status management**: `mcp:connect` / `mcp:disconnect` / `mcp:getStatuses`
+- **DeepSeek Harness preset**: Settings → MCP can add `deepseek-harness` in one click; the first connection launches the local Harness Web UI through `npx`, with automatic `cross-spawn` compatibility for `npx.cmd` on Windows.
 
 ---
 

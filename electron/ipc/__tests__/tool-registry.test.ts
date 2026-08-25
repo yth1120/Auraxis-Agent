@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 vi.mock('electron', () => ({
   app: { getPath: () => '', getName: () => 'auraxis' },
@@ -18,13 +18,28 @@ vi.mock('electron', () => ({
   },
 }));
 
+const mcpBridge = vi.hoisted(() => ({
+  getAllMcpTools: vi.fn(),
+  callMcpTool: vi.fn(),
+}));
+
+vi.mock('../../ipc/mcp-handlers', () => mcpBridge);
+
 import {
   addPluginTools,
   removePluginTools,
   getPluginTools,
   getAllTools,
+  getMcpTools,
+  invalidateMcpToolCache,
+  executeMcpTool,
   registerPluginTools,
 } from '../../tool-registry';
+
+beforeEach(() => {
+  mcpBridge.getAllMcpTools.mockReturnValue([]);
+  mcpBridge.callMcpTool.mockResolvedValue({ ok: true });
+});
 
 const TOOL_A = {
   name: 'PluginA',
@@ -67,5 +82,56 @@ describe('electron tool-registry — dynamic plugin tools', () => {
   it('mounted tools are visible in getAllTools', () => {
     addPluginTools([TOOL_A]);
     expect(getAllTools().some((t) => t.name === 'PluginA')).toBe(true);
+  });
+});
+
+describe('electron tool-registry — MCP routing', () => {
+  afterEach(() => {
+    mcpBridge.getAllMcpTools.mockReset();
+    mcpBridge.callMcpTool.mockReset();
+    invalidateMcpToolCache();
+  });
+
+  it('qualifies MCP tool names by server id and routes calls by id', async () => {
+    mcpBridge.getAllMcpTools.mockReturnValue([
+      {
+        name: 'ping',
+        description: 'pong',
+        inputSchema: { type: 'object' },
+        serverName: 'server one',
+        serverId: 'srv1',
+      },
+      {
+        name: 'ping',
+        description: 'pong two',
+        inputSchema: { type: 'object' },
+        serverName: 'server two',
+        serverId: 'srv2',
+      },
+    ]);
+    mcpBridge.callMcpTool.mockResolvedValue({ ok: true });
+
+    invalidateMcpToolCache();
+    expect(getMcpTools().map((t) => t.name)).toEqual(['mcp__srv1__ping', 'mcp__srv2__ping']);
+    await expect(executeMcpTool('mcp__srv2__ping', { x: 1 })).resolves.toEqual({
+      output: { ok: true },
+    });
+    expect(mcpBridge.callMcpTool).toHaveBeenCalledWith('srv2', 'ping', { x: 1 });
+  });
+
+  it('keeps legacy unqualified MCP names working', async () => {
+    mcpBridge.getAllMcpTools.mockReturnValue([
+      {
+        name: 'ping',
+        description: 'pong',
+        inputSchema: { type: 'object' },
+        serverName: 'server one',
+        serverId: 'srv1',
+      },
+    ]);
+    mcpBridge.callMcpTool.mockResolvedValue({ ok: true });
+
+    await expect(executeMcpTool('mcp__ping', {})).resolves.toEqual({ output: { ok: true } });
+    expect(mcpBridge.callMcpTool).toHaveBeenCalledWith('srv1', 'ping', {});
   });
 });

@@ -227,6 +227,7 @@ export function registerIpcHandlers() {
     'slackToken',
     'driveToken',
     'notionToken',
+    'larkAppSecret',
   ]);
   const PROVIDER_KEY_FIELDS: Record<string, string> = {
     deepseek: 'deepseekApiKey',

@@ -297,12 +297,15 @@ const electronAPI = {
       ipcRenderer.invoke('instructions:set', projectRoot, relPath, content),
   },
 
-  // --- Cloud connectors (Slack / Drive / Notion) ---
+  // --- Cloud connectors (Slack / Drive / Notion / Feishu-Lark) ---
   connectors: {
     status: () => ipcRenderer.invoke('connector:status'),
     setToken: (kind: 'slack' | 'drive' | 'notion', token: string) =>
       ipcRenderer.invoke('connector:setToken', kind, token),
-    test: (kind: 'slack' | 'drive' | 'notion') => ipcRenderer.invoke('connector:test', kind),
+    getLark: () => ipcRenderer.invoke('connector:getLark'),
+    setLark: (input: { appId: string; appSecret: string; domain?: string; tools?: string }) =>
+      ipcRenderer.invoke('connector:setLark', input),
+    test: (kind: 'slack' | 'drive' | 'notion' | 'lark') => ipcRenderer.invoke('connector:test', kind),
   },
 
   // --- Permission ---
@@ -357,8 +360,8 @@ const electronAPI = {
     disconnect: (serverId: string) => ipcRenderer.invoke('mcp:disconnect', serverId),
     getStatuses: () => ipcRenderer.invoke('mcp:getStatuses'),
     listTools: (serverId: string) => ipcRenderer.invoke('mcp:listTools', serverId),
-    callTool: (serverName: string, toolName: string, args: unknown) =>
-      ipcRenderer.invoke('mcp:callTool', serverName, toolName, args),
+    callTool: (serverId: string, toolName: string, args: unknown) =>
+      ipcRenderer.invoke('mcp:callTool', serverId, toolName, args),
   },
 
   // --- Agent ---

@@ -15,12 +15,12 @@ import {
   PencilSimple,
   Plugs,
   Question,
-  Robot,
   ShieldCheck,
   Stop,
   Target,
   TerminalWindow,
   Trash,
+  Waypoints,
   Wrench,
 } from '@/components/common/icons';
 
@@ -48,7 +48,7 @@ const TOOL_ICON_MAP: Record<string, (size: number) => ReactNode> = {
   LSP: (size) => <MagnifyingGlass size={size} />,
   WebFetch: (size) => <Globe size={size} />,
   WebSearch: (size) => <Globe size={size} />,
-  Agent: (size) => <Robot size={size} />,
+  Agent: (size) => <Waypoints size={size} />,
   TodoWrite: (size) => <ListChecks size={size} />,
   ReviewArtifact: (size) => <ShieldCheck size={size} />,
   RunCode: (size) => <Code size={size} />,

@@ -4,13 +4,28 @@ import { EventEmitter } from 'events';
 const h = vi.hoisted(() => ({
   handlers: new Map<string, Function>(),
   spawn: vi.fn(),
+  resolveCredential: vi.fn(),
+  readSettings: vi.fn(),
 }));
 
 vi.mock('electron', () => ({
   ipcMain: { handle: vi.fn((ch: string, fn: Function) => h.handlers.set(ch, fn)) },
+  app: {
+    isPackaged: false,
+    getAppPath: () => 'C:\\probe',
+  },
 }));
 vi.mock('child_process', () => ({
   spawn: h.spawn,
+}));
+vi.mock('cross-spawn', () => ({
+  default: h.spawn,
+}));
+vi.mock('../../credentials', () => ({
+  resolveCredential: h.resolveCredential,
+}));
+vi.mock('../settings-store', () => ({
+  readSettings: h.readSettings,
 }));
 vi.mock('../../tool-registry', () => ({
   invalidateMcpToolCache: vi.fn(),
@@ -49,6 +64,10 @@ beforeEach(async () => {
   vi.clearAllMocks();
   h.handlers.clear();
   h.spawn.mockReset();
+  h.resolveCredential.mockReset();
+  h.resolveCredential.mockResolvedValue(undefined);
+  h.readSettings.mockReset();
+  h.readSettings.mockResolvedValue({});
   registerMcpHandlers();
   // 清空模块级 connections，避免用例间串扰
   await h.handlers.get('mcp:setServers')!({}, []);
@@ -90,7 +109,11 @@ describe('mcp — setServers / connect / disconnect', () => {
     expect(h.spawn).toHaveBeenCalledWith('npx', expect.any(Array), expect.objectContaining({ shell: false }));
 
     const list = h.handlers.get('mcp:listTools')! as any;
-    expect((await list({}, 'srv1')).data[0]).toMatchObject({ name: 'ping', serverName: '测试服务器' });
+    expect((await list({}, 'srv1')).data[0]).toMatchObject({
+      name: 'ping',
+      serverName: '测试服务器',
+      serverId: 'srv1',
+    });
     expect(getAllMcpTools()).toHaveLength(1);
 
     // 已连接重复 connect 直接返回
@@ -127,6 +150,71 @@ describe('mcp — setServers / connect / disconnect', () => {
       expect(r.ok).toBe(false);
       expect(r.error).toContain(msg);
     }
+    expect(h.spawn).not.toHaveBeenCalled();
+  });
+
+  it('DeepSeek Harness 预设会注入 Auraxis 已保存的 Key', async () => {
+    const set = h.handlers.get('mcp:setServers')! as any;
+    const connect = h.handlers.get('mcp:connect')! as any;
+    const child = fakeChild();
+    h.spawn.mockReturnValue(child);
+    h.resolveCredential.mockResolvedValue({ value: 'sk-auraxis-test' });
+    await set({}, [cfg({ useAuraxisDeepSeekKey: true })]);
+
+    respond(child, { jsonrpc: '2.0', id: 1, result: {} });
+    respond(child, { jsonrpc: '2.0', id: 2, result: { tools: [] } });
+    await connect({}, 'srv1');
+
+    expect(h.spawn).toHaveBeenCalledWith(
+      'npx',
+      expect.any(Array),
+      expect.objectContaining({
+        env: expect.objectContaining({ DEEPSEEK_API_KEY: 'sk-auraxis-test' }),
+      }),
+    );
+  });
+
+  it('飞书/Lark MCP 预设会注入加密设置中的 App 凭据', async () => {
+    const set = h.handlers.get('mcp:setServers')! as any;
+    const connect = h.handlers.get('mcp:connect')! as any;
+    const child = fakeChild();
+    h.spawn.mockReturnValue(child);
+    h.readSettings.mockResolvedValue({
+      larkAppId: 'cli-test',
+      larkAppSecret: 'secret-test',
+      larkDomain: 'https://open.larksuite.com',
+      larkTools: 'preset.im.default',
+    });
+    await set({}, [cfg({ useAuraxisLarkCredentials: true })]);
+
+    respond(child, { jsonrpc: '2.0', id: 1, result: {} });
+    respond(child, { jsonrpc: '2.0', id: 2, result: { tools: [] } });
+    await connect({}, 'srv1');
+
+    expect(h.spawn).toHaveBeenCalledWith(
+      'npx',
+      expect.any(Array),
+      expect.objectContaining({
+        env: expect.objectContaining({
+          APP_ID: 'cli-test',
+          APP_SECRET: 'secret-test',
+          LARK_DOMAIN: 'https://open.larksuite.com',
+          LARK_TOOLS: 'preset.im.default',
+          LARK_TOKEN_MODE: 'tenant_access_token',
+        }),
+      }),
+    );
+  });
+
+  it('飞书/Lark 凭据缺失时直接返回可读错误而不是启动进程', async () => {
+    const set = h.handlers.get('mcp:setServers')! as any;
+    const connect = h.handlers.get('mcp:connect')! as any;
+    h.readSettings.mockResolvedValue({});
+    await set({}, [cfg({ useAuraxisLarkCredentials: true })]);
+
+    const r = await connect({}, 'srv1');
+    expect(r.ok).toBe(false);
+    expect(r.error).toContain('飞书/Lark 未配置');
     expect(h.spawn).not.toHaveBeenCalled();
   });
 
@@ -169,7 +257,7 @@ describe('mcp — callTool / IPC 校验', () => {
 
   it('callTool 参数断言', async () => {
     const call = h.handlers.get('mcp:callTool')! as any;
-    expect(await call({}, 123, 't', {})).toEqual({ ok: false, error: expect.stringContaining('serverName') });
+    expect(await call({}, 123, 't', {})).toEqual({ ok: false, error: expect.stringContaining('serverId') });
     expect(await call({}, 's', 456, {})).toEqual({ ok: false, error: expect.stringContaining('toolName') });
   });
 

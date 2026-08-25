@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import axios from 'axios';
 import {
   getConnectorStatuses,
+  getLarkPublicConfig,
+  setLarkCredentials,
   setConnectorToken,
   testConnector,
   slackListChannels,
@@ -17,6 +19,10 @@ vi.mock('../ipc/settings-store', () => ({
     slackToken: 'xoxb-1234567890abcdef',
     driveToken: 'ya29-1234567890abcdef',
     notionToken: 'secret-1234567890abcdef',
+    larkAppId: 'cli-1234567890abcdef',
+    larkAppSecret: 'lark-secret-1234567890abcdef',
+    larkDomain: 'https://open.feishu.cn',
+    larkTools: 'preset.light',
   })),
   writeSettings: vi.fn(async () => {}),
 }));
@@ -37,7 +43,7 @@ describe('connectors', () => {
 
   it('reports configured status without leaking tokens', async () => {
     const statuses = await getConnectorStatuses();
-    expect(statuses).toHaveLength(3);
+    expect(statuses).toHaveLength(4);
     for (const s of statuses) {
       expect(s.configured).toBe(true);
       expect(s.tokenHint).not.toContain('test');
@@ -49,6 +55,40 @@ describe('connectors', () => {
     const { writeSettings } = await import('../ipc/settings-store');
     await setConnectorToken('slack', '  xoxb-new  ');
     expect(writeSettings).toHaveBeenCalledWith(expect.objectContaining({ slackToken: 'xoxb-new' }));
+  });
+
+  it('setLarkCredentials writes app id/secret and default domain/tools', async () => {
+    const { writeSettings } = await import('../ipc/settings-store');
+    await setLarkCredentials({ appId: 'cli-new', appSecret: 'secret-new' });
+    expect(writeSettings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        larkAppId: 'cli-new',
+        larkAppSecret: 'secret-new',
+        larkDomain: expect.any(String),
+        larkTools: expect.any(String),
+      }),
+    );
+  });
+
+  it('getLarkPublicConfig never returns the secret', async () => {
+    const config = await getLarkPublicConfig();
+    expect(config).toEqual({
+      appId: 'cli-1234567890abcdef',
+      domain: 'https://open.feishu.cn',
+      tools: 'preset.light',
+    });
+    expect(config).not.toHaveProperty('appSecret');
+  });
+
+  it('testConnector(lark) exchanges app credentials and reports success', async () => {
+    axiosPost.mockResolvedValueOnce({ data: { code: 0, tenant_access_token: 't-ok' } });
+    const r = await testConnector('lark');
+    expect(r.ok).toBe(true);
+    expect(axiosPost).toHaveBeenCalledWith(
+      'https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal',
+      { app_id: 'cli-1234567890abcdef', app_secret: 'lark-secret-1234567890abcdef' },
+      expect.objectContaining({ timeout: 15_000 }),
+    );
   });
 
   it('testConnector returns friendly error when token missing', async () => {

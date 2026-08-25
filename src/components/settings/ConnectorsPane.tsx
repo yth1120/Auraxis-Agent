@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Button, Input, message } from 'antd';
-import { ChatTeardropDots, Folder, FileText } from '@/components/common/icons';
+import { Button, Input, Select, message } from 'antd';
+import { ChatTeardropDots, Folder, FileText, Globe } from '@/components/common/icons';
 import { useT, type I18nKey } from '../../i18n';
 
-type Kind = 'slack' | 'drive' | 'notion';
+type Kind = 'slack' | 'drive' | 'notion' | 'lark';
 
-const KINDS: Kind[] = ['slack', 'drive', 'notion'];
+const KINDS: Kind[] = ['slack', 'drive', 'notion', 'lark'];
 
 const KIND_META: Record<Kind, { icon: React.ReactNode; nameKey: I18nKey; descKey: I18nKey; placeholder: string }> = {
   slack: {
@@ -26,24 +26,75 @@ const KIND_META: Record<Kind, { icon: React.ReactNode; nameKey: I18nKey; descKey
     descKey: 'settings.connectors.notion.desc',
     placeholder: 'secret_…',
   },
+  lark: {
+    icon: <Globe size={18} />,
+    nameKey: 'settings.connectors.lark',
+    descKey: 'settings.connectors.lark.desc',
+    placeholder: 'cli_…',
+  },
+};
+
+interface LarkForm {
+  appId: string;
+  appSecret: string;
+  domain: string;
+  tools: string;
+}
+
+const DEFAULT_LARK: LarkForm = {
+  appId: '',
+  appSecret: '',
+  domain: 'https://open.feishu.cn',
+  tools: 'preset.light',
 };
 
 export default function ConnectorsPane() {
   const t = useT();
-  const [tokens, setTokens] = useState<Record<Kind, string>>({ slack: '', drive: '', notion: '' });
-  const [configured, setConfigured] = useState<Record<Kind, boolean>>({ slack: false, drive: false, notion: false });
+  const [tokens, setTokens] = useState<Record<Kind, string>>({
+    slack: '',
+    drive: '',
+    notion: '',
+    lark: '',
+  });
+  const [lark, setLark] = useState<LarkForm>(DEFAULT_LARK);
+  const [configured, setConfigured] = useState<Record<Kind, boolean>>({
+    slack: false,
+    drive: false,
+    notion: false,
+    lark: false,
+  });
   const [testing, setTesting] = useState<Kind | null>(null);
   const [saving, setSaving] = useState<Kind | null>(null);
-  const [messages, setMessages] = useState<Record<Kind, string>>({ slack: '', drive: '', notion: '' });
+  const [messages, setMessages] = useState<Record<Kind, string>>({
+    slack: '',
+    drive: '',
+    notion: '',
+    lark: '',
+  });
 
   useEffect(() => {
     window.electronAPI?.connectors
       ?.status()
       .then((r) => {
         if (!r?.ok || !r.data) return;
-        const next: Record<Kind, boolean> = { slack: false, drive: false, notion: false };
+        const next: Record<Kind, boolean> = { slack: false, drive: false, notion: false, lark: false };
         for (const s of r.data) next[s.kind] = s.configured;
         setConfigured(next);
+      })
+      .catch(() => {
+        /* keep defaults */
+      });
+    window.electronAPI?.connectors
+      ?.getLark?.()
+      .then((r) => {
+        if (!r?.ok || !r.data) return;
+        const config = r.data;
+        setLark((prev) => ({
+          ...prev,
+          appId: config.appId ?? prev.appId,
+          domain: config.domain || prev.domain,
+          tools: config.tools || prev.tools,
+        }));
       })
       .catch(() => {
         /* keep defaults */
@@ -53,6 +104,27 @@ export default function ConnectorsPane() {
   const saveToken = async (kind: Kind) => {
     setSaving(kind);
     try {
+      if (kind === 'lark') {
+        if (!lark.appId.trim() || !lark.appSecret.trim()) {
+          message.warning(t('settings.connectors.lark.required'));
+          return;
+        }
+        const r = await window.electronAPI?.connectors?.setLark({
+          appId: lark.appId,
+          appSecret: lark.appSecret,
+          domain: lark.domain,
+          tools: lark.tools,
+        });
+        if (r?.ok) {
+          message.success(t('settings.saved'));
+          setConfigured((c) => ({ ...c, lark: true }));
+          setMessages((m) => ({ ...m, lark: '' }));
+        } else {
+          message.error(r?.error || t('settings.saveFailed'));
+        }
+        return;
+      }
+
       const r = await window.electronAPI?.connectors?.setToken(kind, tokens[kind]);
       if (r?.ok) {
         message.success(t('settings.saved'));
@@ -114,25 +186,73 @@ export default function ConnectorsPane() {
                   {ok ? t('settings.connectors.configured') : t('settings.connectors.notConfigured')}
                 </span>
               </div>
-              <div className="mt-3 flex items-center gap-2">
-                <Input.Password
-                  value={tokens[kind]}
-                  onChange={(e) => setTokens((s) => ({ ...s, [kind]: e.target.value }))}
-                  placeholder={meta.placeholder}
-                  autoComplete="off"
-                  className="flex-1"
-                />
-                <Button loading={saving === kind} onClick={() => void saveToken(kind)}>
-                  {t('settings.save')}
-                </Button>
-                <Button
-                  loading={testing === kind}
-                  disabled={!configured[kind] && !tokens[kind].trim()}
-                  onClick={() => void test(kind)}
-                >
-                  {t('settings.test')}
-                </Button>
-              </div>
+              {kind === 'lark' ? (
+                <div className="mt-3 flex flex-col gap-2">
+                  <Input
+                    value={lark.appId}
+                    onChange={(e) => setLark((s) => ({ ...s, appId: e.target.value }))}
+                    placeholder={t('settings.connectors.lark.appId')}
+                    autoComplete="off"
+                  />
+                  <Input.Password
+                    value={lark.appSecret}
+                    onChange={(e) => setLark((s) => ({ ...s, appSecret: e.target.value }))}
+                    placeholder={t('settings.connectors.lark.appSecret')}
+                    autoComplete="off"
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <Select
+                      value={lark.domain}
+                      onChange={(value) => setLark((s) => ({ ...s, domain: value }))}
+                      options={[
+                        { label: t('settings.connectors.lark.domainFeishu'), value: 'https://open.feishu.cn' },
+                        { label: t('settings.connectors.lark.domainLark'), value: 'https://open.larksuite.com' },
+                      ]}
+                    />
+                    <Select
+                      value={lark.tools}
+                      onChange={(value) => setLark((s) => ({ ...s, tools: value }))}
+                      options={[
+                        { label: t('settings.connectors.lark.toolsLight'), value: 'preset.light' },
+                        { label: t('settings.connectors.lark.toolsIM'), value: 'preset.im.default' },
+                        { label: t('settings.connectors.lark.toolsFull'), value: 'preset.default' },
+                      ]}
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button loading={saving === kind} onClick={() => void saveToken(kind)}>
+                      {t('settings.save')}
+                    </Button>
+                    <Button
+                      loading={testing === kind}
+                      disabled={!configured[kind] && (!lark.appId.trim() || !lark.appSecret.trim())}
+                      onClick={() => void test(kind)}
+                    >
+                      {t('settings.test')}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-3 flex items-center gap-2">
+                  <Input.Password
+                    value={tokens[kind]}
+                    onChange={(e) => setTokens((s) => ({ ...s, [kind]: e.target.value }))}
+                    placeholder={meta.placeholder}
+                    autoComplete="off"
+                    className="flex-1"
+                  />
+                  <Button loading={saving === kind} onClick={() => void saveToken(kind)}>
+                    {t('settings.save')}
+                  </Button>
+                  <Button
+                    loading={testing === kind}
+                    disabled={!configured[kind] && !tokens[kind].trim()}
+                    onClick={() => void test(kind)}
+                  >
+                    {t('settings.test')}
+                  </Button>
+                </div>
+              )}
               {messages[kind] && <div className="mt-2 text-xs text-text-muted leading-[1.5]">{messages[kind]}</div>}
             </section>
           );
