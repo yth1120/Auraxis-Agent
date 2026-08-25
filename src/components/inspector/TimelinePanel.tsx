@@ -1,24 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Dropdown } from 'antd';
 import clsx from 'clsx';
-import { MagnifyingGlass, X } from '@/components/common/icons';
+import { MagnifyingGlass } from '@/components/common/icons';
 import { useT } from '../../i18n';
 import { useAgentStore } from '@/stores/useAgentStore';
 import { useAppStore } from '@/stores/useAppStore';
 import type { AgentLogEntry } from '@/types/agent';
-import StateDot from '../common/StateDot';
 import AgentViewFilter from '../agent/AgentViewFilter';
 import {
-  ROW_H,
-  TURN_H,
   fmtDuration,
-  fmtTime,
   rowKey,
   toolSummary,
   turnStats,
   type Turn,
 } from './TimelineUtils';
-import { ToolDetail, TrajectoryToolRow, type TimelineDetailTab } from './TimelineRows';
+import { type TimelineDetailTab } from './TimelineRows';
 import {
   buildTimelineRows,
   buildTurns,
@@ -27,6 +23,8 @@ import {
   maxTimelineDuration,
   visibleRange,
 } from './TimelineModel';
+import { TimelineStream } from './TimelineStream';
+import { TimelineDetailPanel } from './TimelineDetailPanel';
 
 /** Right-panel trajectory table: per-turn ledger with expandable tool details. */
 export default function TimelinePanel() {
@@ -431,325 +429,39 @@ export default function TimelinePanel() {
             </Dropdown>
           </div>
         </div>
-        <div ref={scrollRef} onScroll={onScroll} className="flex-1 min-h-0 overflow-y-auto">
-          {viewMode === 'table' ? (
-            <table className="trajectory-table w-full border-collapse text-xs">
-              <thead>
-                <tr className="sticky top-0 z-10 bg-[var(--color-bg-elevated)]">
-                  <th className="w-8 pl-5 h-8 text-left font-medium text-text-muted">#</th>
-                  <th className="w-20 px-1 h-8 text-left font-medium text-text-muted">{tPanel('tl.colType')}</th>
-                  <th className="px-2 h-8 text-left font-medium text-text-muted">{tPanel('tl.colContent')}</th>
-                  <th className="w-[71px] pr-2 h-8 text-right font-medium text-text-muted">
-                    {tPanel('tl.colDuration')}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {range.start > 0 && (
-                  <tr aria-hidden style={{ height: range.topPad }}>
-                    <td colSpan={4} />
-                  </tr>
-                )}
-                {flatRows.rows.length === 0 && (
-                  <tr style={{ height: ROW_H }}>
-                    <td colSpan={4} className="px-2 py-1.5 text-xs text-text-faint text-center">
-                      {tPanel('tl.noMatchingEvents')}
-                    </td>
-                  </tr>
-                )}
-                {flatRows.rows.slice(range.start, range.end).map((row) => {
-                  if (row.kind === 'turn') {
-                    const stats = turnStats(row.turn.end);
-                    const isCurrent = row.turn.iteration === turns[turns.length - 1].iteration;
-                    return (
-                      <tr
-                        key={row.key}
-                        style={{ height: TURN_H }}
-                        className={clsx(
-                          'bg-[var(--color-bg-secondary)] border-b border-border-dim',
-                          isCurrent && 'bg-primary-soft/40',
-                        )}
-                        data-current-round={isCurrent || undefined}
-                      >
-                        <td colSpan={4} className="px-3">
-                          <span className="text-xs font-semibold text-text-secondary">
-                            {tPanel('timeline.round', { n: row.turn.iteration })}
-                          </span>
-                          {stats && <span className="ml-3 text-xs text-text-muted tabular-nums">{stats}</span>}
-                        </td>
-                      </tr>
-                    );
-                  }
-                  if (row.kind === 'tool' && row.entry) {
-                    const key = row.key;
-                    return (
-                      <TrajectoryToolRow
-                        key={key}
-                        rowKey={key}
-                        index={row.index}
-                        entry={row.entry}
-                        selected={selectedKey === key}
-                        onSelect={() => {
-                          setSelectedKey(key);
-                          setDetailTab('output');
-                        }}
-                        onJump={() => {
-                          if (row.entry?.toolCallId) {
-                            useAppStore.getState().requestAgentLogFocus(agent.id, row.entry.toolCallId);
-                          }
-                        }}
-                      />
-                    );
-                  }
-                  if (row.kind === 'plain' && row.entry) {
-                    const entry = row.entry;
-                    const text =
-                      entry.type === 'text' || entry.type === 'thinking'
-                        ? (entry.text ?? '')
-                        : entry.type === 'warning' || entry.type === 'error'
-                          ? (entry.text ?? entry.error ?? '')
-                          : (entry.text ?? '');
-                    return (
-                      <tr
-                        key={row.key}
-                        data-row-key={row.key}
-                        style={{ height: ROW_H }}
-                        className="transition-colors duration-100"
-                      >
-                        <td className="w-8 pl-5 text-text-faint tabular-nums">#{row.index}</td>
-                        <td className="w-20 px-1">
-                          <span
-                            className={clsx(
-                              'inline-flex items-center h-[22px] px-1.5 rounded-md text-xs font-medium',
-                              entry.type === 'error'
-                                ? 'text-danger bg-danger-soft'
-                                : entry.type === 'warning'
-                                  ? 'text-warning bg-warning-soft'
-                                  : entry.type === 'thinking'
-                                    ? 'text-primary bg-primary-soft'
-                                    : 'text-text-muted bg-[var(--color-bg-inset)]',
-                            )}
-                          >
-                            {entry.type === 'thinking'
-                              ? 'Think'
-                              : entry.type === 'warning'
-                                ? 'Warn'
-                                : entry.type === 'error'
-                                  ? 'Error'
-                                  : entry.type === 'progress'
-                                    ? 'Progress'
-                                    : 'Message'}
-                          </span>
-                        </td>
-                        <td className="px-2 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-text-muted">
-                          {text || '…'}
-                        </td>
-                        <td className="w-[71px] pr-2 text-right text-text-muted tabular-nums">
-                          {entry.durationMs != null ? fmtDuration(entry.durationMs) : ''}
-                        </td>
-                      </tr>
-                    );
-                  }
-                  return (
-                    <tr key={row.key} style={{ height: ROW_H }}>
-                      <td colSpan={4} className="px-2 py-1.5 text-xs text-text-faint">
-                        {tPanel('timeline.noTools')}
-                      </td>
-                    </tr>
-                  );
-                })}
-                {range.end < flatRows.rows.length && (
-                  <tr aria-hidden style={{ height: range.bottomPad }}>
-                    <td colSpan={4} />
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          ) : (
-            <div className="px-3 py-2 min-h-full">
-              {timelineRows.length === 0 ? (
-                <p className="text-xs text-text-faint text-center py-8">{tPanel('tl.noMatchingEvents')}</p>
-              ) : (
-                <>
-                  <div className="flex items-center justify-between text-2xs text-text-faint mb-2 px-14">
-                    <span>{tPanel('tl.blockWidthHint')}</span>
-                  </div>
-                  {timelineRows.map(({ turn, items, total }) => (
-                    <div key={turn.iteration} className="flex items-center gap-2 py-[3px]">
-                      <span className="w-14 shrink-0 text-right text-2xs text-text-muted tabular-nums">
-                        {tPanel('timeline.round', { n: turn.iteration })}
-                      </span>
-                      <div className="flex-1 min-w-0 h-5 flex items-center gap-[2px] overflow-hidden">
-                        {items.map(({ entry, dur }, idx) => (
-                          <button
-                            key={`${entry.toolCallId || entry.timestamp}-${idx}`}
-                            type="button"
-                            className={clsx(
-                              'h-3 shrink-0 min-w-[3px] rounded-sm border-none cursor-pointer transition-opacity duration-100 hover:opacity-80',
-                              entry.type === 'tool_error'
-                                ? 'bg-danger'
-                                : entry.type === 'tool_start'
-                                  ? 'bg-accent'
-                                  : 'bg-success',
-                            )}
-                            style={{ width: `${Math.max(3, (dur / timelineMaxDur) * 90)}%` }}
-                            title={`${entry.toolName}${dur != null ? ` · ${fmtDuration(dur)}` : ''}`}
-                            onClick={() => {
-                              const key = rowKey(turn.iteration, entry);
-                              setViewMode('table');
-                              setSelectedKey(key);
-                              setDetailTab('output');
-                              setTimeout(() => scrollToRow(key), 50);
-                            }}
-                          />
-                        ))}
-                      </div>
-                      <span className="w-16 shrink-0 text-right text-2xs text-text-faint tabular-nums">
-                        {fmtDuration(total)}
-                      </span>
-                    </div>
-                  ))}
-                </>
-              )}
-            </div>
-          )}
-        </div>
+        <TimelineStream
+          flatRows={flatRows}
+          range={range}
+          turns={turns}
+          timelineRows={timelineRows}
+          timelineMaxDur={timelineMaxDur}
+          viewMode={viewMode}
+          selectedKey={selectedKey}
+          agentId={agent.id}
+          scrollRef={scrollRef}
+          onScroll={onScroll}
+          onSelectRow={(key) => {
+            setSelectedKey(key);
+            setDetailTab('output');
+          }}
+          onFocusAgent={(_agentId, toolCallId) => {
+            useAppStore.getState().requestAgentLogFocus(agent.id, toolCallId);
+          }}
+          onOpenTimeline={(key) => {
+            setViewMode('table');
+            setSelectedKey(key);
+            setDetailTab('output');
+            setTimeout(() => scrollToRow(key), 50);
+          }}
+        />
       </div>
       {selectedEntry && (
-        <aside className="w-[340px] shrink-0 border-l border-border-dim bg-[var(--color-bg-elevated)] flex flex-col min-h-0">
-          <header className="flex items-center gap-2 h-10 px-3 border-b border-border-dim shrink-0">
-            <StateDot
-              state={
-                selectedEntry.type === 'tool_error' ? 'error' : selectedEntry.type === 'tool_start' ? 'ongoing' : 'done'
-              }
-              className="shrink-0"
-            />
-            <span className="font-medium text-xs text-text-primary">{selectedEntry.toolName}</span>
-            <span className="ml-auto text-xs text-text-muted tabular-nums">
-              {fmtDuration(selectedEntry.durationMs)}
-            </span>
-            <button
-              type="button"
-              className="flex items-center justify-center w-6 h-6 rounded-md text-text-muted border-none bg-transparent cursor-pointer hover:bg-[var(--color-hover)] hover:text-text-primary"
-              onClick={() => setSelectedKey(null)}
-              aria-label={tPanel('tl.closeDetail')}
-            >
-              <X size={14} />
-            </button>
-          </header>
-          <div className="flex items-center gap-1 px-2 pt-2 shrink-0">
-            {(['overview', 'input', 'output', 'timing'] as const).map((tab) => (
-              <button
-                key={tab}
-                type="button"
-                className={clsx(
-                  'h-7 px-2.5 rounded-md text-xs font-medium border-none cursor-pointer transition-colors duration-150',
-                  detailTab === tab
-                    ? 'bg-primary-soft text-primary'
-                    : 'text-text-muted hover:bg-[var(--color-hover)] hover:text-text-secondary',
-                )}
-                onClick={() => setDetailTab(tab)}
-              >
-                {tab === 'overview'
-                  ? tPanel('tl.detailOverview')
-                  : tab === 'input'
-                    ? tPanel('tl.detailInput')
-                    : tab === 'output'
-                      ? tPanel('tl.detailOutput')
-                      : tPanel('tl.detailTiming')}
-              </button>
-            ))}
-          </div>
-          <div className="flex-1 min-h-0 overflow-y-auto p-3">
-            {detailTab === 'overview' && (
-              <div className="flex flex-col gap-2 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-text-muted">{tPanel('tl.status')}</span>
-                  <span
-                    className={clsx(
-                      'font-medium',
-                      selectedEntry.type === 'tool_error'
-                        ? 'text-danger'
-                        : selectedEntry.type === 'tool_start'
-                          ? 'text-primary'
-                          : 'text-success',
-                    )}
-                  >
-                    {selectedEntry.type === 'tool_error'
-                      ? tPanel('tl.statusFailed')
-                      : selectedEntry.type === 'tool_start'
-                        ? tPanel('tl.statusRunning')
-                        : tPanel('tl.statusDone')}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-text-muted">{tPanel('tl.start')}</span>
-                  <span className="text-text-secondary tabular-nums">{fmtTime(selectedEntry.timestamp)}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-text-muted">{tPanel('tl.detailTiming')}</span>
-                  <span className="text-text-secondary tabular-nums">{fmtDuration(selectedEntry.durationMs)}</span>
-                </div>
-                {selectedEntry.error && (
-                  <div className="rounded-lg bg-danger-soft border border-danger-border px-2.5 py-2 text-xs text-danger break-words">
-                    {selectedEntry.error}
-                  </div>
-                )}
-              </div>
-            )}
-            {detailTab === 'input' && (
-              <pre className="m-0 font-mono text-xs leading-relaxed text-text-secondary whitespace-pre-wrap break-all">
-                {JSON.stringify(selectedEntry.input ?? {}, null, 2)}
-              </pre>
-            )}
-            {detailTab === 'output' && <ToolDetail entry={selectedEntry} />}
-            {detailTab === 'timing' && (
-              <div className="flex flex-col gap-2 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-text-muted">{tPanel('tl.start')}</span>
-                  <span className="text-text-secondary tabular-nums">{fmtTime(selectedEntry.timestamp)}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-text-muted">{tPanel('tl.endEstimated')}</span>
-                  <span className="text-text-secondary tabular-nums">
-                    {fmtTime(selectedEntry.timestamp + (selectedEntry.durationMs ?? 0))}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-text-muted">{tPanel('tl.detailTiming')}</span>
-                  <span className="text-text-secondary tabular-nums">{fmtDuration(selectedEntry.durationMs)}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-text-muted">{tPanel('tl.status')}</span>
-                  <span
-                    className={clsx(
-                      'font-medium',
-                      selectedEntry.type === 'tool_error'
-                        ? 'text-danger'
-                        : selectedEntry.type === 'tool_start'
-                          ? 'text-primary'
-                          : 'text-success',
-                    )}
-                  >
-                    {selectedEntry.type === 'tool_error'
-                      ? tPanel('tl.statusFailed')
-                      : selectedEntry.type === 'tool_start'
-                        ? tPanel('tl.statusRunning')
-                        : tPanel('tl.statusDone')}
-                  </span>
-                </div>
-                {selectedEntry.stepGroupId && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-text-muted">{tPanel('tl.group')}</span>
-                    <span className="text-text-secondary font-mono text-xs">
-                      {selectedEntry.stepGroupId.slice(0, 12)}
-                    </span>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </aside>
+        <TimelineDetailPanel
+          entry={selectedEntry}
+          tab={detailTab}
+          onTabChange={setDetailTab}
+          onClose={() => setSelectedKey(null)}
+        />
       )}
     </div>
   );
