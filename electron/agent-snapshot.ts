@@ -8,6 +8,8 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 import { app } from 'electron';
+import type { AgentLogEntry } from './advanced-defs';
+import type { LoopMessage, TaskPlan } from './ipc/agent-loop-core';
 
 export type AgentSnapshotStatus = 'paused' | 'completed' | 'error' | 'stopped' | 'review';
 
@@ -50,17 +52,17 @@ export interface AgentSnapshotRecord {
   messagesCount: number;
   result?: string;
   error?: string;
-  plan?: unknown;
-  log: Array<{ type: string; timestamp: number; [key: string]: any }>;
+  plan?: TaskPlan | null;
+  log: AgentLogEntry[];
   savedState?: {
-    messages: unknown[];
-    plan: unknown;
+    messages: LoopMessage[];
+    plan: TaskPlan | null;
     iteration: number;
     toolCallCount: number;
     allText: string;
   };
   /** Final LLM transcript for same-task continuation after a restart. */
-  lastMessages?: unknown[];
+  lastMessages?: LoopMessage[];
 }
 
 function snapshotDir(): string {

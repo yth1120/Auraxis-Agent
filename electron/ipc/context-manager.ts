@@ -21,7 +21,7 @@
 
 import { errorText } from '../errors';
 import { llmClientInvoke, matchesPlanTask } from './agent-loop';
-import type { LLMSummaryConfig, TaskPlan } from './agent-loop';
+import type { LLMSummaryConfig, LoopMessage, TaskPlan } from './agent-loop';
 import { Planner } from './agent-loop';
 import { estimateTokens } from './agent-loop';
 import { devLog } from './shared';
@@ -37,7 +37,7 @@ export { estimateTokens };
 
 /** An indivisible group of messages — removed or kept as a unit. */
 interface AtomicGroup {
-  messages: any[];
+  messages: LoopMessage[];
   /** Index of the first message within the body slice. */
   startIndex: number;
   /** Exclusive end index within the body slice. */
@@ -47,6 +47,27 @@ interface AtomicGroup {
   /** True when not all tool_calls in this group have matching tool results.
    *  Happens for the most recent assistant turn whose tools haven't executed yet. */
   hasUnresolvedCalls: boolean;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function toolCallFn(toolCall: Record<string, unknown>): Record<string, unknown> {
+  return isRecord(toolCall.function) ? toolCall.function : toolCall;
+}
+
+function parsedToolArgs(fn: Record<string, unknown>): Record<string, unknown> {
+  const raw = fn.arguments;
+  if (typeof raw === 'string') {
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      return isRecord(parsed) ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+  return isRecord(raw) ? raw : {};
 }
 
 /** Number of prefix messages locked at the head (system prompt). */
@@ -136,8 +157,8 @@ export function prepareCacheAlignedMessages(params: {
   platform: string;
   projectRoot: string;
   isDeepThink?: boolean;
-  chatMessages: { role: string; content: any }[];
-}): any[] {
+  chatMessages: { role: string; content: LoopMessage['content'] }[];
+}): LoopMessage[] {
   const preamble = buildSessionPreamble({
     platform: params.platform,
     projectRoot: params.projectRoot,
@@ -174,7 +195,7 @@ export function prepareCacheAlignedMessages(params: {
  * an assistant with tool_calls, we track pending tool_call_ids and collect
  * tool results until the set is exhausted or a non-tool message is encountered.
  */
-export function buildAtomicGroups(body: any[]): AtomicGroup[] {
+export function buildAtomicGroups(body: LoopMessage[]): AtomicGroup[] {
   const groups: AtomicGroup[] = [];
   let i = 0;
 
@@ -185,7 +206,7 @@ export function buildAtomicGroups(body: any[]): AtomicGroup[] {
       // ── Tool-call group: assistant + its tool results ──
       const pendingIds = new Set<string>();
       for (const tc of msg.tool_calls) {
-        pendingIds.add(tc.id);
+        if (typeof tc.id === 'string') pendingIds.add(tc.id);
       }
 
       const groupStart = i;
@@ -243,7 +264,7 @@ export function buildAtomicGroups(body: any[]): AtomicGroup[] {
  *
  * Maintained for backward compatibility with existing tests and callers.
  */
-export function findSafeBoundaries(messages: any[]): number[] {
+export function findSafeBoundaries(messages: LoopMessage[]): number[] {
   if (messages.length === 0) return [];
   const groups = buildAtomicGroups(messages);
   const boundaries: number[] = [];
@@ -261,7 +282,7 @@ export function findSafeBoundaries(messages: any[]): number[] {
  * A round = a complete tool-call group (all tool_calls resolved) or a
  * text-only assistant/user exchange cycle.
  */
-export function countCompleteRounds(messages: any[]): number {
+export function countCompleteRounds(messages: LoopMessage[]): number {
   const groups = buildAtomicGroups(messages);
   let rounds = 0;
   for (const g of groups) {
@@ -286,7 +307,7 @@ export function countCompleteRounds(messages: any[]): number {
  * Returns the body-relative truncation index.
  * body.slice(truncIdx) retains the last `keepRounds` complete rounds.
  */
-export function findTruncationIndex(messages: any[], keepRounds: number): number {
+export function findTruncationIndex(messages: LoopMessage[], keepRounds: number): number {
   if (keepRounds <= 0) return messages.length;
 
   const groups = buildAtomicGroups(messages);
@@ -323,17 +344,10 @@ function groupContainsCriticalRead(group: AtomicGroup, plan: TaskPlan): boolean 
   for (const msg of group.messages) {
     if (msg.role !== 'assistant' || !msg.tool_calls) continue;
     for (const tc of msg.tool_calls) {
-      const fn = tc.function || tc;
+      const fn = toolCallFn(tc);
       if (fn.name !== 'Read') continue;
-      let args: any = fn.arguments;
-      if (typeof args === 'string') {
-        try {
-          args = JSON.parse(args);
-        } catch {
-          args = {};
-        }
-      }
-      if (args?.file_path && matchesPlanTask(args.file_path, plan)) {
+      const args = parsedToolArgs(fn);
+      if (typeof args.file_path === 'string' && args.file_path && matchesPlanTask(args.file_path, plan)) {
         return true;
       }
     }
@@ -346,11 +360,13 @@ function groupContainsCriticalRead(group: AtomicGroup, plan: TaskPlan): boolean 
  * An orphan is an assistant tool_call_id with no matching tool result.
  * Returns the set of orphaned tool_call IDs (empty = clean).
  */
-function findOrphanedToolCalls(messages: any[]): Set<string> {
+function findOrphanedToolCalls(messages: LoopMessage[]): Set<string> {
   const open = new Set<string>();
   for (const m of messages) {
     if (m.role === 'assistant' && m.tool_calls) {
-      for (const tc of m.tool_calls) open.add(tc.id);
+      for (const tc of m.tool_calls) {
+        if (typeof tc.id === 'string') open.add(tc.id);
+      }
     }
     if (m.role === 'tool' && m.tool_call_id) {
       open.delete(m.tool_call_id);
@@ -377,10 +393,10 @@ function findOrphanedToolCalls(messages: any[]): Set<string> {
  *   - `removed` = the groups that were cut from the body
  */
 export function snipCompact(
-  messages: any[],
+  messages: LoopMessage[],
   maxTokens: number = SNIP_COMPACT_TOKEN_BUDGET,
   plan?: TaskPlan | null,
-): { truncated: any[]; removed: any[] } {
+): { truncated: LoopMessage[]; removed: LoopMessage[] } {
   if (messages.length === 0) return { truncated: [], removed: [] };
 
   // ── 1. Extract locked regions ──
@@ -450,7 +466,7 @@ export function snipCompact(
   }
 
   // ── 4. Build removed + kept message arrays ──
-  const removedMessages: any[] = [];
+  const removedMessages: LoopMessage[] = [];
   for (let gi = 0; gi < firstRemovedGroupIndex; gi++) {
     removedMessages.push(...groups[gi].messages);
   }
@@ -528,7 +544,7 @@ Keep it concise — 5-10 sentences maximum. Format as plain text, no markdown he
 /**
  * Extract structured activity log from messages for summary generation.
  */
-function extractActivityLog(messages: any[]): string {
+function extractActivityLog(messages: LoopMessage[]): string {
   const filesRead = new Set<string>();
   const filesEdited = new Set<string>();
   const filesWritten = new Set<string>();
@@ -540,19 +556,12 @@ function extractActivityLog(messages: any[]): string {
     if (msg.role === 'assistant') {
       if (msg.tool_calls) {
         for (const tc of msg.tool_calls) {
-          const fn = tc.function || tc;
-          let args: any = fn.arguments;
-          if (typeof args === 'string') {
-            try {
-              args = JSON.parse(args);
-            } catch {
-              args = {};
-            }
-          }
-          if (fn.name === 'Read' && args?.file_path) filesRead.add(args.file_path);
-          if (fn.name === 'Edit' && args?.file_path) filesEdited.add(args.file_path);
-          if (fn.name === 'Write' && args?.file_path) filesWritten.add(args.file_path);
-          if (fn.name === 'Bash' && args?.command) commands.push(args.command);
+          const fn = toolCallFn(tc);
+          const args = parsedToolArgs(fn);
+          if (fn.name === 'Read' && typeof args.file_path === 'string') filesRead.add(args.file_path);
+          if (fn.name === 'Edit' && typeof args.file_path === 'string') filesEdited.add(args.file_path);
+          if (fn.name === 'Write' && typeof args.file_path === 'string') filesWritten.add(args.file_path);
+          if (fn.name === 'Bash' && typeof args.command === 'string') commands.push(args.command);
         }
       }
       // Extract text findings
@@ -597,7 +606,7 @@ function extractActivityLog(messages: any[]): string {
  * Falls back to rule-based extraction on any failure (network, timeout, etc.).
  */
 export async function generateSummary(
-  removedMessages: any[],
+  removedMessages: LoopMessage[],
   plan: TaskPlan | null,
   llmConfig: LLMSummaryConfig,
 ): Promise<string> {
@@ -631,7 +640,7 @@ export async function generateSummary(
 }
 
 /** Rule-based summary fallback when LLM is unavailable. */
-function buildRuleBasedSummary(messages: any[], plan: TaskPlan | null): string {
+function buildRuleBasedSummary(messages: LoopMessage[], plan: TaskPlan | null): string {
   const parts: string[] = [];
   const filesRead = new Set<string>();
   const filesEdited = new Set<string>();
@@ -641,19 +650,12 @@ function buildRuleBasedSummary(messages: any[], plan: TaskPlan | null): string {
   for (const msg of messages) {
     if (msg.role === 'assistant' && msg.tool_calls) {
       for (const tc of msg.tool_calls) {
-        const fn = tc.function || tc;
-        let args: any = fn.arguments;
-        if (typeof args === 'string') {
-          try {
-            args = JSON.parse(args);
-          } catch {
-            args = {};
-          }
-        }
-        if (fn.name === 'Read' && args?.file_path) filesRead.add(args.file_path);
-        if (fn.name === 'Edit' && args?.file_path) filesEdited.add(args.file_path);
-        if (fn.name === 'Write' && args?.file_path) filesWritten.add(args.file_path);
-        if (fn.name === 'Bash' && args?.command) commandsRun.push(args.command);
+        const fn = toolCallFn(tc);
+        const args = parsedToolArgs(fn);
+        if (fn.name === 'Read' && typeof args.file_path === 'string') filesRead.add(args.file_path);
+        if (fn.name === 'Edit' && typeof args.file_path === 'string') filesEdited.add(args.file_path);
+        if (fn.name === 'Write' && typeof args.file_path === 'string') filesWritten.add(args.file_path);
+        if (fn.name === 'Bash' && typeof args.command === 'string') commandsRun.push(args.command);
       }
     }
   }
@@ -681,7 +683,7 @@ function buildRuleBasedSummary(messages: any[], plan: TaskPlan | null): string {
 /**
  * Build the `[System Notification]` injection message placed after truncation.
  */
-export function buildSummaryInjection(summaryText: string, plan: TaskPlan | null): any {
+export function buildSummaryInjection(summaryText: string, plan: TaskPlan | null): LoopMessage {
   const planLine = plan ? `\n当前计划状态: ${Planner.getSummary(plan)}` : '';
   const content =
     `[System Notification]: 早期详细历史已折叠释放。核心成果摘要如下：\n` +
@@ -696,7 +698,7 @@ export function buildSummaryInjection(summaryText: string, plan: TaskPlan | null
 // ═══════════════════════════════════════════════════════════
 
 export interface CompactResult {
-  messages: any[];
+  messages: LoopMessage[];
   wasTruncated: boolean;
   roundsRemoved: number;
   summaryInjected: boolean;
@@ -718,7 +720,7 @@ export interface CompactResult {
  * before the retained recent rounds, so the LLM sees it as context.
  */
 export async function compactHistory(params: {
-  messages: any[];
+  messages: LoopMessage[];
   maxTokens?: number;
   plan: TaskPlan | null;
   llmConfig?: LLMSummaryConfig;
@@ -799,7 +801,7 @@ export async function compactHistory(params: {
  * 先清除历史摘要注入，避免跨轮压缩出现摘要叠加；摘要统一走
  * [System Notification] 约定，与 snip 管线对齐。
  */
-function compactWithSteps(messages: any[], plan: TaskPlan | null, keepRecentSteps: number): CompactResult {
+function compactWithSteps(messages: LoopMessage[], plan: TaskPlan | null, keepRecentSteps: number): CompactResult {
   const stripped = messages.filter(
     (m) =>
       !(
@@ -850,7 +852,7 @@ function compactWithSteps(messages: any[], plan: TaskPlan | null, keepRecentStep
  * Uses a 90% threshold of the budget to trigger early, preventing
  * last-minute API errors from token overflow.
  */
-export function shouldCompactByTokens(messages: any[], maxTokens: number): boolean {
+export function shouldCompactByTokens(messages: LoopMessage[], maxTokens: number): boolean {
   const estimated = estimateTokens(messages);
   return estimated > maxTokens * 0.9; // trigger at 90% to leave headroom
 }
@@ -858,7 +860,7 @@ export function shouldCompactByTokens(messages: any[], maxTokens: number): boole
 /**
  * Check if compaction should trigger based on round count.
  */
-export function shouldCompactByRounds(messages: any[], maxRounds: number): boolean {
+export function shouldCompactByRounds(messages: LoopMessage[], maxRounds: number): boolean {
   const rounds = countCompleteRounds(messages);
   return rounds > maxRounds;
 }

@@ -1,5 +1,13 @@
 import { BrowserWindow } from 'electron';
-import { agentLoopRun, AgentObserver, type AgentStateSnapshot, type TaskPlan } from './agent-loop';
+import {
+  agentLoopRun,
+  type AgentLoopEvent,
+  type AgentLoopResult,
+  AgentObserver,
+  type AgentStateSnapshot,
+  type LoopMessage,
+  type TaskPlan,
+} from './agent-loop';
 import { TOOL_DEFINITIONS } from '../tool-defs';
 import { resolveModelApiBase, resolveModelApiKey } from './model-config';
 import { requestPermission } from './permission-handlers';
@@ -24,9 +32,41 @@ import { normalizeApprovalPolicy } from '../contracts/core';
 import type { ApprovalPolicy } from '../types';
 import type { SandboxMode } from '../sandbox-policy';
 import { appendWorkDocsSystemRule } from '../work-docs-policy';
-function taskPlanToFrontendPlan(
-  plan: TaskPlan | null | undefined,
-): { todos: { content: string; status: string; activeForm: string }[] } | null {
+import type { AgentLogEntry } from '../advanced-defs';
+import { errorText } from '../errors';
+
+export interface FrontendTaskPlan {
+  todos: { content: string; status: string; activeForm: string }[];
+}
+
+export interface SchedulerAgentState extends Omit<AgentStateSnapshot, 'plan'> {
+  agentId: string;
+  name: string;
+  status: AgentInstance['status'];
+  priority: 'high' | 'normal' | 'low';
+  startTime?: number;
+  endTime?: number;
+  model?: string;
+  maxIterations?: number;
+  error?: string;
+  result?: string;
+  type?: string;
+  description?: string;
+  workTier?: WorkAutonomyTier;
+  delivery?: WorkDelivery;
+  plan: FrontendTaskPlan | null;
+}
+
+export interface SchedulerQueueItem {
+  agentId: string;
+  name: string;
+  status: AgentInstance['status'];
+  priority: 'high' | 'normal' | 'low';
+  startTime?: number;
+  queuePosition?: number;
+}
+
+function taskPlanToFrontendPlan(plan: TaskPlan | null | undefined): FrontendTaskPlan | null {
   if (!plan) return null;
   return {
     todos: plan.tasks.map((t) => ({
@@ -97,7 +137,7 @@ export interface AgentInstance {
   pendingInstruction?: string;
   abortController: AbortController;
   observer: AgentObserver;
-  plan?: any;
+  plan?: TaskPlan | null;
   result?: string;
   error?: string;
   /** Work 模式交付验收数据（结构化，非日志反推）。 */
@@ -114,14 +154,14 @@ export interface AgentInstance {
     toolCallId?: string,
     agentId?: string,
   ) => Promise<boolean>;
-  log: Array<{ type: string; timestamp: number; [key: string]: any }>;
+  log: AgentLogEntry[];
   /** Unflushed engine events for the durable agent run log (session-log). */
-  logBuffer: Array<Record<string, unknown>>;
+  logBuffer: unknown[];
   /** Snapshot captured when the loop exits with status==='paused'.
    *  agentLoopRun reads this via config.resumeFrom on the next dequeueAndStart. */
   savedState?: {
-    messages: any[];
-    plan: any;
+    messages: LoopMessage[];
+    plan: TaskPlan | null;
     iteration: number;
     toolCallCount: number;
     allText: string;
@@ -129,7 +169,7 @@ export interface AgentInstance {
   /** Final LLM transcript captured when the loop settles (completed/error/
    *  stopped). Continuation reuses it so a follow-up keeps the SAME task —
    *  same id, same workspace, same conversation history. */
-  lastMessages?: any[];
+  lastMessages?: LoopMessage[];
   /** Resolver for the in-flight pauseAgent call. Set when pauseAgent triggers
    *  abort; cleared and invoked when the loop's .then/.catch handler has
    *  captured savedState (or determined there is none). Callers awaiting
@@ -178,8 +218,12 @@ function genId(): string {
   return `agent-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
-function broadcast(win: BrowserWindow | null, agentId: string, event: Record<string, unknown>) {
-  if (win && !win.isDestroyed()) {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function broadcast(win: BrowserWindow | null, agentId: string, event: unknown) {
+  if (win && !win.isDestroyed() && isRecord(event)) {
     win.webContents.send(`agent:event:${agentId}`, { ...event, agentId });
   }
 }
@@ -491,7 +535,7 @@ class AgentScheduler {
     }
 
     inst.observer = {
-      emit: (event: any) => {
+      emit: (event: AgentLoopEvent) => {
         // Forward raw event to the renderer. The `agent:event:${id}` channel
         // is consumed by useAgentStore's per-agent subscription, which expects
         // the unprefixed event.type (text_chunk, tool_start, etc.).
@@ -542,16 +586,21 @@ class AgentScheduler {
       },
     };
 
-    const runtimeSettings = (await readSettings().catch(() => null)) as Record<string, any> | null;
-    const model = runtimeSettings?.executeModel || inst.config.model || 'deepseek-v4-pro';
-    const planModel = runtimeSettings?.planModel || model;
+    const runtimeSettings = await readSettings().catch(() => null);
+    const model =
+      typeof runtimeSettings?.executeModel === 'string' && runtimeSettings.executeModel
+        ? runtimeSettings.executeModel
+        : inst.config.model || 'deepseek-v4-pro';
+    const planModel =
+      typeof runtimeSettings?.planModel === 'string' && runtimeSettings.planModel ? runtimeSettings.planModel : model;
     const apiBase = await resolveModelApiBase(model);
     const modelApiKey = await resolveModelApiKey(model);
     // Unified permission preset fallback: tasks created outside the composer
     // (CLI, restore, plugins) still honor the user's selected preset.
-    const presetSpec = isPermissionPreset(runtimeSettings?.permissionPreset)
-      ? PERMISSION_PRESETS[runtimeSettings.permissionPreset]
-      : undefined;
+    const presetSpec =
+      typeof runtimeSettings?.permissionPreset === 'string' && isPermissionPreset(runtimeSettings.permissionPreset)
+        ? PERMISSION_PRESETS[runtimeSettings.permissionPreset]
+        : undefined;
     const requestedSandbox =
       inst.config.sandboxMode === 'read' ||
       inst.config.sandboxMode === 'workspace-write' ||
@@ -656,7 +705,7 @@ class AgentScheduler {
       });
   }
 
-  private onAgentComplete(agentId: string, result: any) {
+  private onAgentComplete(agentId: string, result: AgentLoopResult) {
     const inst = instances.get(agentId);
     if (!inst) return;
     // Don't overwrite status if already stopped or paused by user
@@ -670,7 +719,7 @@ class AgentScheduler {
     inst.plan = result.plan;
     inst.toolCallCount = result.toolCallCount;
     inst.iterations = result.iterations;
-    inst.lastMessages = Array.isArray(result.messages) ? result.messages : undefined;
+    inst.lastMessages = result.messages;
     if (inst.config.surface === 'work') {
       inst.delivery = {
         files: inst.delivery?.files ?? [],
@@ -721,16 +770,16 @@ class AgentScheduler {
     return true;
   }
 
-  private onAgentError(agentId: string, err: any) {
+  private onAgentError(agentId: string, err: unknown) {
     const inst = instances.get(agentId);
     if (!inst) return;
     if (inst.status === 'stopped' || inst.status === 'paused') return;
     inst.status = 'error';
     inst.endTime = Date.now();
-    inst.error = err.message;
+    inst.error = err instanceof Error ? err.message : errorText(err);
     const win = this.getWindow();
     notifyFrontend(win, inst);
-    broadcast(win, agentId, { type: 'agent:done', success: false, error: err.message });
+    broadcast(win, agentId, { type: 'agent:done', success: false, error: inst.error });
     this.processQueue();
     this.pruneStale();
     this.persistAgent(inst);
@@ -927,9 +976,9 @@ class AgentScheduler {
       const resultText = inst.result || '';
       if (systemPrompt && (taskText || resultText)) {
         history = [
-          { role: 'system', content: systemPrompt },
-          ...(taskText ? [{ role: 'user', content: taskText }] : []),
-          ...(resultText ? [{ role: 'assistant', content: resultText }] : []),
+          { role: 'system' as const, content: systemPrompt },
+          ...(taskText ? [{ role: 'user' as const, content: taskText }] : []),
+          ...(resultText ? [{ role: 'assistant' as const, content: resultText }] : []),
         ];
       }
     }
@@ -999,23 +1048,8 @@ class AgentScheduler {
     };
   }
 
-  getAllAgentStates(): Array<
-    AgentStateSnapshot & {
-      agentId: string;
-      name: string;
-      status: string;
-      priority: string;
-      startTime?: number;
-      endTime?: number;
-      model?: string;
-      maxIterations?: number;
-      error?: string;
-      result?: string;
-      type?: string;
-      description?: string;
-    }
-  > {
-    const result: Array<any> = [];
+  getAllAgentStates(): SchedulerAgentState[] {
+    const result: SchedulerAgentState[] = [];
     for (const [id, inst] of instances) {
       result.push({
         agentId: id,
@@ -1030,7 +1064,7 @@ class AgentScheduler {
         maxIterations: inst.maxIterations,
         toolCallCount: inst.toolCallCount,
         messagesCount: inst.log.length,
-        plan: inst.plan ?? null,
+        plan: taskPlanToFrontendPlan(inst.plan),
         model: inst.config.model,
         surface: inst.config.surface,
         workTier: inst.config.workTier,
@@ -1048,38 +1082,29 @@ class AgentScheduler {
         agentId: sa.id,
         name: sa.name,
         description: sa.description || '',
-        type: (sa as any).type || 'general-purpose',
+        type: sa.type || 'general-purpose',
         status: sa.status,
-        priority: (sa as any).priority || 'normal',
+        priority: sa.priority || 'normal',
         startTime: sa.startTime,
         endTime: sa.endTime,
-        iteration: sa.iterations ?? (sa as any).iteration ?? 0,
-        maxIterations: (sa as any).maxIterations ?? 200,
+        iteration: sa.iterations,
+        maxIterations: sa.maxIterations ?? 200,
         toolCallCount: sa.toolCallCount ?? 0,
-        messagesCount: (sa as any).messagesCount ?? sa.log?.length ?? 0,
+        messagesCount: sa.messagesCount ?? sa.log?.length ?? 0,
         plan: null,
-        model: (sa as any).model,
+        model: sa.model,
         surface: 'code',
         error: sa.error,
         result: sa.result,
       });
     }
 
-    // Post-process: convert any TaskPlan-shape plans into the {todos: [...]}
-    // shape the UI renders. Sub-agents already use plan: null, scheduler
-    // instances may carry a TaskPlan.
-    for (const r of result) {
-      if (r.plan && (r.plan as any).tasks) {
-        r.plan = taskPlanToFrontendPlan(r.plan as any) as any;
-      }
-    }
-
     return result;
   }
 
-  getQueue(): { running: any[]; queued: any[] } {
-    const running: any[] = [];
-    const queued: any[] = [];
+  getQueue(): { running: SchedulerQueueItem[]; queued: SchedulerQueueItem[] } {
+    const running: SchedulerQueueItem[] = [];
+    const queued: SchedulerQueueItem[] = [];
     for (const [id, inst] of instances) {
       if (inst.status === 'running' || inst.status === 'paused') {
         running.push({
@@ -1093,6 +1118,7 @@ class AgentScheduler {
         queued.push({
           agentId: id,
           name: inst.config.name,
+          status: 'queued',
           priority: inst.priority,
           queuePosition: inst.queuePosition,
         });

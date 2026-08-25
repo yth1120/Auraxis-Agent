@@ -20,32 +20,42 @@ function safeStringify(v: unknown): string {
   }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
 /** Read error response body when axios responseType='stream' — the body is a Readable, not parsed JSON. */
-export async function readErrorBody(err: any): Promise<string> {
+export async function readErrorBody(err: unknown): Promise<string> {
   try {
-    const data = err?.response?.data;
+    const data = (err as { response?: { data?: unknown } } | undefined)?.response?.data;
     if (!data) return '';
-    if (typeof data.on === 'function') {
-      return await new Promise<string>((resolve) => {
-        let body = '';
-        const t = setTimeout(() => resolve(body), 2000);
-        data.on('data', (chunk: Buffer) => {
-          body += chunk.toString();
-          if (body.length > 2000) {
+    if (typeof data === 'object') {
+      const stream = data as {
+        on?: (event: string, listener: (chunk: Buffer) => void) => unknown;
+        destroy?: () => unknown;
+      };
+      if (typeof stream.on === 'function') {
+        return await new Promise<string>((resolve) => {
+          let body = '';
+          const t = setTimeout(() => resolve(body), 2000);
+          stream.on?.('data', (chunk: Buffer) => {
+            body += chunk.toString();
+            if (body.length > 2000) {
+              clearTimeout(t);
+              stream.destroy?.();
+              resolve(body);
+            }
+          });
+          stream.on?.('end', () => {
             clearTimeout(t);
-            data.destroy();
             resolve(body);
-          }
+          });
+          stream.on?.('error', () => {
+            clearTimeout(t);
+            resolve(body);
+          });
         });
-        data.on('end', () => {
-          clearTimeout(t);
-          resolve(body);
-        });
-        data.on('error', () => {
-          clearTimeout(t);
-          resolve(body);
-        });
-      });
+      }
     }
     return safeStringify(data);
   } catch {
@@ -67,6 +77,7 @@ import {
   type AgentLoopConfig,
   type AgentLoopResult,
   type ContextConfig,
+  type LoopMessage,
 } from './agent-loop-core';
 export * from './agent-loop-core';
 
@@ -167,8 +178,12 @@ async function runPlanningPhase(params: {
   return null;
 }
 
-function setupInitialMessages(systemPrompt: string, activePlan: TaskPlan | null, mode: ApprovalPolicy = 'ask'): any[] {
-  const msgs: any[] = [];
+function setupInitialMessages(
+  systemPrompt: string,
+  activePlan: TaskPlan | null,
+  mode: ApprovalPolicy = 'ask',
+): LoopMessage[] {
+  const msgs: LoopMessage[] = [];
   const workGuide =
     '请根据 system prompt 中的任务描述开始工作。\n' +
     '节奏由你自主决定：可以直接执行，也可以先探索理解再动手；多步骤任务如需跟踪进度可以使用 TodoWrite。\n' +
@@ -188,8 +203,8 @@ function setupInitialMessages(systemPrompt: string, activePlan: TaskPlan | null,
   return msgs;
 }
 
-export function appendAssistantToHistory(messages: any[], msg: AssistantMessage): void {
-  const m: any = {
+export function appendAssistantToHistory(messages: LoopMessage[], msg: AssistantMessage): void {
+  const m: LoopMessage = {
     role: 'assistant',
     content: msg.rawText || null,
     tool_calls:
@@ -245,8 +260,12 @@ function buildToolSummary(
       case 'Glob':
         return { matchCount: Array.isArray(output) ? output.length : 0 };
       case 'Bash': {
-        const o = output as any;
-        return { exitCode: o?.exitCode, stdoutLen: o?.stdout?.length || 0, stderrLen: o?.stderr?.length || 0 };
+        const o = isRecord(output) ? output : {};
+        return {
+          exitCode: typeof o.exitCode === 'number' ? o.exitCode : undefined,
+          stdoutLen: typeof o.stdout === 'string' ? o.stdout.length : 0,
+          stderrLen: typeof o.stderr === 'string' ? o.stderr.length : 0,
+        };
       }
       case 'ReviewArtifact':
         return {
@@ -257,9 +276,12 @@ function buildToolSummary(
       case 'Delete':
         return { filePath: input.file_path, deleted: true };
       case 'GitCommit':
-        return { message: input.message, hash: (output as any)?.hash || '' };
+        return { message: input.message, hash: isRecord(output) && typeof output.hash === 'string' ? output.hash : '' };
       case 'Replan':
-        return { replanned: true, message: (output as any)?.message };
+        return {
+          replanned: true,
+          message: isRecord(output) && typeof output.message === 'string' ? output.message : undefined,
+        };
       default:
         return undefined;
     }
@@ -388,7 +410,7 @@ export async function agentLoopRun(config: AgentLoopConfig): Promise<AgentLoopRe
   // The saved messages array already contains the system prompt, plan info,
   // and the prior conversation; re-planning would corrupt the history.
   let activePlan: TaskPlan | null = null;
-  let messages: any[];
+  let messages: LoopMessage[];
   let startIter = 1;
   let toolCallCount = 0;
   let allText = '';
@@ -616,7 +638,11 @@ export async function agentLoopRun(config: AgentLoopConfig): Promise<AgentLoopRe
       }
       if (tc.name !== 'Replan') return null;
       if (!activePlan) return { output: null, error: '没有活动计划可重规划' };
-      const replanPrompt = `以下是任务执行中途的状态。部分任务已完成，部分受阻。请基于当前情况生成一个新的子计划，仅包含剩余待完成的任务。\n\n当前计划状态: ${(tc.input as any).currentPlanStatus || '未知'}\n受阻任务: ${JSON.stringify((tc.input as any).blockedTasks || [])}\n重新规划原因: ${(tc.input as any).reason || '原始计划无法继续'}\n\n请输出 JSON 格式的新计划（仅包含还需要执行的任务）:\n{"tasks": [{"id": "1", "description": "...", "dependencies": []}]}`;
+      const input = tc.input;
+      const currentPlanStatus = typeof input.currentPlanStatus === 'string' ? input.currentPlanStatus : '未知';
+      const blockedTasks = Array.isArray(input.blockedTasks) ? input.blockedTasks : [];
+      const reason = typeof input.reason === 'string' ? input.reason : '原始计划无法继续';
+      const replanPrompt = `以下是任务执行中途的状态。部分任务已完成，部分受阻。请基于当前情况生成一个新的子计划，仅包含剩余待完成的任务。\n\n当前计划状态: ${currentPlanStatus}\n受阻任务: ${JSON.stringify(blockedTasks)}\n重新规划原因: ${reason}\n\n请输出 JSON 格式的新计划（仅包含还需要执行的任务）:\n{"tasks": [{"id": "1", "description": "...", "dependencies": []}]}`;
       try {
         const replanResult = await invokeLlm({
           model,

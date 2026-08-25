@@ -54,7 +54,7 @@ describe('sanitizeToolCallPairing', () => {
     const msgs = [asst(['a']), tool('a', 'first'), tool('a', 'dup'), asst(['b']), tool('b')];
     const out = sanitizeToolCallPairing(msgs);
     expect(out.filter((m) => m.tool_call_id === 'a')).toHaveLength(1);
-    expect(out.find((m) => m.tool_call_id === 'a').content).toBe('first');
+    expect(out.find((m) => m.tool_call_id === 'a')!.content).toBe('first');
     expect(out.map((m) => m.role)).toEqual(['assistant', 'tool', 'assistant', 'tool']);
   });
 });

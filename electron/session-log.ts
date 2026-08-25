@@ -27,6 +27,10 @@ const agentStore = new JsonlSessionStore({
   },
 });
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
 function tsOf(e: Record<string, unknown>): number {
   const v = typeof e.ts === 'number' ? e.ts : typeof e.timestamp === 'number' ? e.timestamp : Date.now();
   return v;
@@ -194,16 +198,14 @@ export function mapAgentEventToSessionEvent(e: Record<string, unknown>): Omit<Se
 }
 
 /** Append raw engine events to the durable agent log (mapped to SessionEvent). */
-export async function appendAgentLog(
-  agentId: string,
-  events: Array<Record<string, unknown>>,
-  scope?: string,
-): Promise<void> {
+export async function appendAgentLog(agentId: string, events: readonly unknown[], scope?: string): Promise<void> {
   if (!agentId || !events || events.length === 0) return;
-  captureSessionTelemetry(agentId, 'agent', events);
+  const records = events.filter(isRecord);
+  if (records.length === 0) return;
+  captureSessionTelemetry(agentId, 'agent', records);
   scheduleSessionFtsRefresh(agentId, 'agent');
   const mapped: Array<Omit<SessionEvent, 'seq'>> = [];
-  for (const e of events) {
+  for (const e of records) {
     const m = mapAgentEventToSessionEvent(e);
     if (m) mapped.push(m);
   }
@@ -212,7 +214,7 @@ export async function appendAgentLog(
   // Eywa M1 实时钩子：agent 运行期间捕获用户输入与工具终态。
   if (scope) {
     try {
-      captureEvidenceFromEvents(scope, agentId, events);
+      captureEvidenceFromEvents(scope, agentId, records);
     } catch {
       /* evidence capture is best-effort */
     }

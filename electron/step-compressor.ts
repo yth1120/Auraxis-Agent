@@ -10,6 +10,8 @@
  * 计划相关关键步骤）+ 确定性启发式评分，不调用 LLM。
  */
 
+import type { LoopMessage } from './ipc/agent-loop-core';
+
 export interface StepCompressorPlanTask {
   status?: string;
   description: string;
@@ -24,48 +26,54 @@ export interface StepCompressorOptions {
 }
 
 export interface StepGroup {
-  assistant: any;
+  assistant: LoopMessage;
   /** assistant 之后、下一个 assistant 之前的 user/tool 消息。 */
-  tail: any[];
+  tail: LoopMessage[];
 }
 
 interface ToolCallInfo {
   name: string;
-  input: any;
+  input: Record<string, unknown>;
 }
 
 const DEFAULT_KEEP_RECENT_STEPS = 6;
 
-function isPlainString(m: any): boolean {
-  return !!m && typeof m.content === 'string';
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
-function isPreambleMessage(m: any): boolean {
+function isPlainString(m: LoopMessage): m is LoopMessage & { content: string } {
+  return typeof m.content === 'string';
+}
+
+function isPreambleMessage(m: LoopMessage): boolean {
   const c = isPlainString(m) ? m.content : '';
   return c.includes('你的任务计划') || c.includes('请根据 system prompt');
 }
 
-function toolCallsOf(assistant: any): ToolCallInfo[] {
+function toolCallsOf(assistant: LoopMessage): ToolCallInfo[] {
   const out: ToolCallInfo[] = [];
   const content = assistant?.content;
   if (Array.isArray(content)) {
     for (const block of content) {
-      if (block?.type === 'tool_use' && block.name) {
-        out.push({ name: block.name, input: block.input ?? {} });
+      if (isRecord(block) && block.type === 'tool_use' && typeof block.name === 'string' && block.name) {
+        out.push({ name: block.name, input: isRecord(block.input) ? block.input : {} });
       }
     }
   } else if (assistant?.tool_calls && Array.isArray(assistant.tool_calls)) {
     for (const tc of assistant.tool_calls) {
-      const fn = tc.function || tc;
-      if (fn?.name) {
-        let input: any = {};
+      const rawFn = isRecord(tc.function) ? tc.function : tc;
+      const fn = isRecord(rawFn) ? rawFn : {};
+      if (typeof fn.name === 'string' && fn.name) {
+        let input: Record<string, unknown> = {};
         if (typeof fn.arguments === 'string') {
           try {
-            input = JSON.parse(fn.arguments);
+            const parsed: unknown = JSON.parse(fn.arguments);
+            input = isRecord(parsed) ? parsed : {};
           } catch {
             input = {};
           }
-        } else if (fn.arguments) {
+        } else if (isRecord(fn.arguments)) {
           input = fn.arguments;
         }
         out.push({ name: fn.name, input });
@@ -75,33 +83,30 @@ function toolCallsOf(assistant: any): ToolCallInfo[] {
   return out;
 }
 
-function toolResultText(tailMsg: any): string {
+function toolResultText(tailMsg: LoopMessage): string {
   const content = tailMsg?.content;
   if (typeof content === 'string') return content;
   if (Array.isArray(content)) {
     const parts: string[] = [];
     for (const block of content) {
-      if (typeof block?.content === 'string') parts.push(block.content);
-      else if (block?.content) parts.push(JSON.stringify(block.content));
+      if (isRecord(block) && typeof block.content === 'string') parts.push(block.content);
+      else if (isRecord(block) && block.content !== undefined) parts.push(JSON.stringify(block.content));
     }
     return parts.join(' ');
   }
   return '';
 }
 
-function tailHasError(tail: any[]): boolean {
+function tailHasError(tail: LoopMessage[]): boolean {
   return tail.some((m) => {
     const t = toolResultText(m);
     return t.includes('error') || t.includes('失败') || t.includes('FAILED') || t.includes('异常');
   });
 }
 
-function planMatchesFile(
-  plan: { tasks: StepCompressorPlanTask[] } | null | undefined,
-  filePath: string | undefined,
-): boolean {
+function planMatchesFile(plan: { tasks: StepCompressorPlanTask[] } | null | undefined, filePath: unknown): boolean {
   if (!plan || !filePath) return false;
-  const fileName = filePath.toLowerCase();
+  const fileName = String(filePath).toLowerCase();
   return plan.tasks.some((task) => {
     if (task.status === 'completed') return false;
     const desc = task.description.toLowerCase();
@@ -125,16 +130,20 @@ export function isCriticalStep(step: StepGroup, plan: { tasks: StepCompressorPla
   for (const m of step.tail) {
     const t = toolResultText(m);
     if (!t) continue;
-    let parsed: any = null;
+    let parsed: unknown = null;
     try {
       parsed = JSON.parse(t);
     } catch {
       continue;
     }
-    if (!parsed) continue;
-    if (parsed.file_path && planMatchesFile(plan, parsed.file_path)) return true;
+    if (!parsed || !isRecord(parsed)) continue;
+    if (typeof parsed.file_path === 'string' && parsed.file_path && planMatchesFile(plan, parsed.file_path))
+      return true;
     if (parsed.pattern && Array.isArray(parsed.results)) {
-      if (parsed.results.some((r: any) => r.file && planMatchesFile(plan, r.file))) return true;
+      if (
+        parsed.results.some((r) => isRecord(r) && typeof r.file === 'string' && r.file && planMatchesFile(plan, r.file))
+      )
+        return true;
     }
   }
   return false;
@@ -146,7 +155,8 @@ export function scoreStep(step: StepGroup, _plan: { tasks: StepCompressorPlanTas
   const content = step.assistant?.content;
   if (Array.isArray(content)) {
     for (const block of content) {
-      if (block?.type === 'text' && typeof block.text === 'string' && block.text.trim().length > 100) score += 1;
+      if (isRecord(block) && block.type === 'text' && typeof block.text === 'string' && block.text.trim().length > 100)
+        score += 1;
     }
   } else if (typeof content === 'string' && content.trim().length > 100) {
     score += 1;
@@ -166,15 +176,15 @@ export function scoreStep(step: StepGroup, _plan: { tasks: StepCompressorPlanTas
  * 把消息流切成完整步骤。系统消息与前导注入消息单独抽出；
  * 第一个 assistant 之前的普通 user 消息归入 orphans（原样保留）。
  */
-export function groupIntoSteps(messages: any[]): {
-  system: any[];
-  preamble: any[];
-  orphans: any[];
+export function groupIntoSteps(messages: LoopMessage[]): {
+  system: LoopMessage[];
+  preamble: LoopMessage[];
+  orphans: LoopMessage[];
   steps: StepGroup[];
 } {
-  const system: any[] = [];
-  const preamble: any[] = [];
-  const orphans: any[] = [];
+  const system: LoopMessage[] = [];
+  const preamble: LoopMessage[] = [];
+  const orphans: LoopMessage[] = [];
   const steps: StepGroup[] = [];
   let idx = 0;
   while (idx < messages.length && messages[idx]?.role === 'system') {
@@ -217,7 +227,12 @@ export function buildStepSummary(
     const content = step.assistant?.content;
     if (Array.isArray(content)) {
       for (const block of content) {
-        if (block?.type === 'text' && typeof block.text === 'string' && block.text.trim().length > 100) {
+        if (
+          isRecord(block) &&
+          block.type === 'text' &&
+          typeof block.text === 'string' &&
+          block.text.trim().length > 100
+        ) {
           findings.push(block.text.trim().slice(0, 300));
         }
       }
@@ -226,9 +241,9 @@ export function buildStepSummary(
     }
     for (const tc of toolCallsOf(step.assistant)) {
       const fp = tc.input?.file_path ?? tc.input?.path;
-      if (tc.name === 'Read' && fp) filesRead.add(fp);
-      if (tc.name === 'Edit' && fp) filesEdited.add(fp);
-      if (tc.name === 'Write' && fp) filesWritten.add(fp);
+      if (tc.name === 'Read' && typeof fp === 'string' && fp) filesRead.add(fp);
+      if (tc.name === 'Edit' && typeof fp === 'string' && fp) filesEdited.add(fp);
+      if (tc.name === 'Write' && typeof fp === 'string' && fp) filesWritten.add(fp);
       if (tc.name === 'Bash' && tc.input?.command) commands.push(String(tc.input.command));
     }
   }
@@ -251,7 +266,7 @@ export function buildStepSummary(
  * 步骤级压缩主函数：保留系统/前导/最近 K 步/关键步骤，其余整步丢弃并摘要。
  * 返回新消息数组，不改动原数组；被保留的消息保持原对象引用。
  */
-export function compressHistorySteps(messages: any[], opts: StepCompressorOptions = {}): any[] {
+export function compressHistorySteps(messages: LoopMessage[], opts: StepCompressorOptions = {}): LoopMessage[] {
   const keepRecent = Math.max(1, opts.keepRecentSteps ?? DEFAULT_KEEP_RECENT_STEPS);
   const { system, preamble, orphans, steps } = groupIntoSteps(messages);
   if (steps.length <= keepRecent) return messages;
@@ -261,7 +276,7 @@ export function compressHistorySteps(messages: any[], opts: StepCompressorOption
   const rescued = dropped.filter((s) => isCriticalStep(s, opts.plan));
   const summary = buildStepSummary(dropped, opts.plan, opts.summaryHeader);
 
-  const result: any[] = [...system, ...preamble, ...orphans];
+  const result: LoopMessage[] = [...system, ...preamble, ...orphans];
   result.push({ role: 'user', content: summary, STEP_COMPRESSED: true });
   // 关键步骤原样放回摘要之后（保持原始顺序）。
   for (const step of rescued) {

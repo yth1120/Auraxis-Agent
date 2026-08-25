@@ -30,6 +30,17 @@ export interface ToolResult {
   durationMs: number;
 }
 
+export type LoopMessageRole = 'system' | 'user' | 'assistant' | 'tool';
+
+/** Internal LLM history entry used across planning, execution and compression. */
+export interface LoopMessage {
+  role: string;
+  content?: string | null | Array<Record<string, unknown>>;
+  tool_calls?: Array<Record<string, unknown>>;
+  tool_call_id?: string;
+  [key: string]: unknown;
+}
+
 export interface AssistantMessage {
   /** Chronological content blocks (text ↔ tool_use interleaved in order) */
   contentTimeline: Array<
@@ -177,7 +188,7 @@ export interface AgentLoopConfig {
    *  saved state. The caller (typically scheduler) is responsible for capturing
    *  this state when status transitions to 'paused'. */
   resumeFrom?: {
-    messages: any[];
+    messages: LoopMessage[];
     plan: TaskPlan | null;
     iteration: number;
     toolCallCount: number;
@@ -277,7 +288,7 @@ export interface AgentLoopResult {
   plan: TaskPlan | null;
   /** Internal LLM message history at loop exit. Captured by the scheduler on
    *  pause so resumeFrom can replay the conversation without re-planning. */
-  messages: any[];
+  messages: LoopMessage[];
 }
 
 // ─── Planner ──────────────────────────────────────────────
@@ -328,19 +339,29 @@ export function parsePlanFromLLMText(text: string): TaskPlan | null {
   }
 
   try {
-    const parsed = JSON.parse(jsonStr);
-    if (!parsed.tasks || !Array.isArray(parsed.tasks)) return null;
-    const tasks: PlanTask[] = parsed.tasks.map((t: any, i: number) => ({
-      id: t.id || String(i + 1),
-      description: t.description || '',
-      status: 'pending' as TaskStatus,
-      dependencies: Array.isArray(t.dependencies) ? t.dependencies : [],
-      toolMatches: extractKeywords(t.description || ''),
-    }));
+    const parsed: unknown = JSON.parse(jsonStr);
+    if (!isRecord(parsed) || !Array.isArray(parsed.tasks)) return null;
+    const tasks: PlanTask[] = parsed.tasks.map((value: unknown, i: number) => {
+      const task = isRecord(value) ? value : {};
+      const dependencies = Array.isArray(task.dependencies)
+        ? task.dependencies.filter((dependency): dependency is string => typeof dependency === 'string')
+        : [];
+      return {
+        id: typeof task.id === 'string' && task.id.trim() ? task.id : String(i + 1),
+        description: typeof task.description === 'string' ? task.description : '',
+        status: 'pending' as TaskStatus,
+        dependencies,
+        toolMatches: extractKeywords(typeof task.description === 'string' ? task.description : ''),
+      };
+    });
     return { tasks, createdAt: Date.now() };
   } catch {
     return null;
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
 /** Extract meaningful keywords from a task description for fuzzy matching */
@@ -586,11 +607,11 @@ export const DevianceDetector = createDevianceDetector();
 
 const INJECTED_MARKER = '_ddInjected';
 
-export function markInjected(msg: any): void {
+export function markInjected(msg: LoopMessage): void {
   msg[INJECTED_MARKER] = true;
 }
 
-export function isInjected(msg: any): boolean {
+export function isInjected(msg: LoopMessage): boolean {
   return msg[INJECTED_MARKER] === true;
 }
 
@@ -598,7 +619,7 @@ export function isInjected(msg: any): boolean {
  * Merge consecutive injected user messages at the end of the messages array.
  * Returns the messages array (mutated in place) for chaining.
  */
-export function deduplicateNudges(messages: any[]): void {
+export function deduplicateNudges(messages: LoopMessage[]): void {
   if (messages.length < 2) return;
 
   // Collect consecutive injected user messages from the tail
@@ -614,7 +635,7 @@ export function deduplicateNudges(messages: any[]): void {
   if (tail.length <= 1) return;
 
   // Merge them into a single message
-  const merged = tail.map((i) => messages[i].content as string).join('\n\n');
+  const merged = tail.map((i) => (typeof messages[i].content === 'string' ? messages[i].content : '')).join('\n\n');
   // Keep the first message position, remove the rest
   messages[tail[0]].content = merged;
   for (let i = tail.length - 1; i > 0; i--) {
@@ -719,7 +740,7 @@ export const DEFAULT_CONTEXT_CONFIG: ContextConfig = {
 };
 
 /** Count assistant messages (rounds) in the messages array */
-function countRounds(messages: any[]): number {
+function countRounds(messages: LoopMessage[]): number {
   let rounds = 0;
   for (const m of messages) {
     if (m.role === 'assistant') rounds++;
@@ -732,28 +753,36 @@ const estimateTokens = estimateTokensForMessages;
 export { estimateTokens };
 
 /** Determine if a tool_result is critical (must not be compressed away) */
-export function isCriticalResult(toolResultMsg: any, plan: TaskPlan | null): boolean {
+export function isCriticalResult(toolResultMsg: LoopMessage, plan: TaskPlan | null): boolean {
   if (!plan) return false;
 
   const content = toolResultMsg.content;
-  if (!content) return false;
+  if (content == null) return false;
 
   // Try parsing string content as JSON first (OpenAI-format: role: 'tool' + JSON string)
   if (typeof content === 'string') {
-    let parsed: any = null;
+    let parsed: unknown = null;
     try {
       parsed = JSON.parse(content);
     } catch {
       return false;
     }
-    if (!parsed) return false;
-    if (parsed.file_path && parsed.content && parsed.total_lines && parsed.total_lines > 10) {
-      return matchesPlanTask(parsed.file_path, plan);
+    if (!parsed || !isRecord(parsed)) return false;
+    const filePath = parsed.file_path;
+    const totalLines = parsed.total_lines;
+    if (
+      typeof filePath === 'string' &&
+      filePath &&
+      parsed.content &&
+      typeof totalLines === 'number' &&
+      totalLines > 10
+    ) {
+      return matchesPlanTask(filePath, plan);
     }
     // Also check Grep result (has pattern + results array)
     if (parsed.pattern && Array.isArray(parsed.results)) {
       for (const r of parsed.results) {
-        if (r.file && matchesPlanTask(r.file, plan)) return true;
+        if (isRecord(r) && typeof r.file === 'string' && r.file && matchesPlanTask(r.file, plan)) return true;
       }
     }
     return false;
@@ -762,17 +791,26 @@ export function isCriticalResult(toolResultMsg: any, plan: TaskPlan | null): boo
   // For Anthropic format: content is [{type: 'tool_result', tool_use_id, content}]
   const resultBlocks = Array.isArray(content) ? content : [content];
   for (const block of resultBlocks) {
+    if (!isRecord(block)) continue;
     const resultText = typeof block.content === 'string' ? block.content : JSON.stringify(block.content);
-    let parsed: any = null;
+    let parsed: unknown = null;
     try {
       parsed = JSON.parse(resultText);
     } catch {
       continue;
     }
-    if (!parsed) continue;
+    if (!parsed || !isRecord(parsed)) continue;
 
-    if (parsed.file_path && parsed.content && parsed.total_lines && parsed.total_lines > 10) {
-      return matchesPlanTask(parsed.file_path, plan);
+    const filePath = parsed.file_path;
+    const totalLines = parsed.total_lines;
+    if (
+      typeof filePath === 'string' &&
+      filePath &&
+      parsed.content &&
+      typeof totalLines === 'number' &&
+      totalLines > 10
+    ) {
+      return matchesPlanTask(filePath, plan);
     }
   }
   return false;
@@ -797,28 +835,34 @@ const LLM_SUMMARY_MARKER = 'LLM_SUMMARY';
 
 /** Call LLM to generate a concise summary of compressed history */
 async function llmSummarize(
-  messagesToCompress: any[],
+  messagesToCompress: LoopMessage[],
   plan: TaskPlan | null,
   llm: LLMSummaryConfig,
 ): Promise<string | null> {
   // Build context text from compress zone
   const contextParts: string[] = [];
   for (const msg of messagesToCompress) {
+    const content = msg.content;
     if (msg.role === 'assistant') {
-      const content = msg.content;
       if (Array.isArray(content)) {
         for (const block of content) {
-          if (block.type === 'text' && block.text) contextParts.push(`[助手]: ${block.text.slice(0, 500)}`);
-          if (block.type === 'tool_use')
-            contextParts.push(`[工具调用]: ${block.name}(${JSON.stringify(block.input).slice(0, 200)})`);
+          if (!isRecord(block)) continue;
+          if (block.type === 'text' && typeof block.text === 'string' && block.text) {
+            contextParts.push(`[助手]: ${block.text.slice(0, 500)}`);
+          }
+          if (block.type === 'tool_use') {
+            contextParts.push(
+              `[工具调用]: ${String(block.name ?? '')}(${JSON.stringify(block.input ?? {}).slice(0, 200)})`,
+            );
+          }
         }
       } else if (typeof content === 'string') {
         contextParts.push(`[助手]: ${content.slice(0, 500)}`);
       }
     } else if (msg.role === 'user') {
-      const content = msg.content;
       if (Array.isArray(content)) {
         for (const block of content) {
+          if (!isRecord(block)) continue;
           if (block.type === 'tool_result') {
             const rc =
               typeof block.content === 'string'
@@ -857,7 +901,7 @@ async function llmSummarize(
 }
 
 /** Build a compressed summary from old messages (rule-based fallback) */
-function buildSummary(messagesToCompress: any[], plan: TaskPlan | null): string {
+function buildSummary(messagesToCompress: LoopMessage[], plan: TaskPlan | null): string {
   const parts: string[] = [];
   const filesRead: Set<string> = new Set();
   const filesEdited: Set<string> = new Set();
@@ -866,12 +910,13 @@ function buildSummary(messagesToCompress: any[], plan: TaskPlan | null): string 
   const findings: string[] = [];
 
   for (const msg of messagesToCompress) {
+    const content = msg.content;
     if (msg.role === 'assistant') {
       // Extract text content from assistant message
-      const content = msg.content;
       if (Array.isArray(content)) {
         for (const block of content) {
-          if (block.type === 'text' && block.text) {
+          if (!isRecord(block)) continue;
+          if (block.type === 'text' && typeof block.text === 'string' && block.text) {
             // Collect significant findings (text 100+ chars likely has substance)
             const text = block.text.trim();
             if (text.length > 100) {
@@ -880,10 +925,18 @@ function buildSummary(messagesToCompress: any[], plan: TaskPlan | null): string 
           }
           if (block.type === 'tool_use') {
             const tc = block;
-            if (tc.name === 'Read' && tc.input?.file_path) filesRead.add(tc.input.file_path as string);
-            if (tc.name === 'Edit' && tc.input?.file_path) filesEdited.add(tc.input.file_path as string);
-            if (tc.name === 'Write' && tc.input?.file_path) filesWritten.add(tc.input.file_path as string);
-            if (tc.name === 'Bash' && tc.input?.command) commandsRun.push(tc.input.command as string);
+            if (tc.name === 'Read' && isRecord(tc.input) && typeof tc.input.file_path === 'string') {
+              filesRead.add(tc.input.file_path);
+            }
+            if (tc.name === 'Edit' && isRecord(tc.input) && typeof tc.input.file_path === 'string') {
+              filesEdited.add(tc.input.file_path);
+            }
+            if (tc.name === 'Write' && isRecord(tc.input) && typeof tc.input.file_path === 'string') {
+              filesWritten.add(tc.input.file_path);
+            }
+            if (tc.name === 'Bash' && isRecord(tc.input) && typeof tc.input.command === 'string') {
+              commandsRun.push(tc.input.command);
+            }
           }
         }
       } else if (typeof content === 'string' && content.length > 100) {
@@ -892,29 +945,31 @@ function buildSummary(messagesToCompress: any[], plan: TaskPlan | null): string 
       // Check OpenAI tool_calls format
       if (msg.tool_calls) {
         for (const tc of msg.tool_calls) {
-          const fn = tc.function || tc;
-          if (fn.name === 'Read' && fn.arguments) {
+          const rawFn = isRecord(tc.function) ? tc.function : tc;
+          const fn = isRecord(rawFn) ? rawFn : {};
+          const argumentsValue = fn.arguments;
+          if (fn.name === 'Read' && argumentsValue) {
             try {
-              const args = typeof fn.arguments === 'string' ? JSON.parse(fn.arguments) : fn.arguments;
-              if (args.file_path) filesRead.add(args.file_path);
+              const args: unknown = typeof argumentsValue === 'string' ? JSON.parse(argumentsValue) : argumentsValue;
+              if (isRecord(args) && typeof args.file_path === 'string') filesRead.add(args.file_path);
             } catch {}
           }
-          if (fn.name === 'Edit' && fn.arguments) {
+          if (fn.name === 'Edit' && argumentsValue) {
             try {
-              const args = typeof fn.arguments === 'string' ? JSON.parse(fn.arguments) : fn.arguments;
-              if (args.file_path) filesEdited.add(args.file_path);
+              const args: unknown = typeof argumentsValue === 'string' ? JSON.parse(argumentsValue) : argumentsValue;
+              if (isRecord(args) && typeof args.file_path === 'string') filesEdited.add(args.file_path);
             } catch {}
           }
-          if (fn.name === 'Write' && fn.arguments) {
+          if (fn.name === 'Write' && argumentsValue) {
             try {
-              const args = typeof fn.arguments === 'string' ? JSON.parse(fn.arguments) : fn.arguments;
-              if (args.file_path) filesWritten.add(args.file_path);
+              const args: unknown = typeof argumentsValue === 'string' ? JSON.parse(argumentsValue) : argumentsValue;
+              if (isRecord(args) && typeof args.file_path === 'string') filesWritten.add(args.file_path);
             } catch {}
           }
-          if (fn.name === 'Bash' && fn.arguments) {
+          if (fn.name === 'Bash' && argumentsValue) {
             try {
-              const args = typeof fn.arguments === 'string' ? JSON.parse(fn.arguments) : fn.arguments;
-              if (args.command) commandsRun.push(args.command);
+              const args: unknown = typeof argumentsValue === 'string' ? JSON.parse(argumentsValue) : argumentsValue;
+              if (isRecord(args) && typeof args.command === 'string') commandsRun.push(args.command);
             } catch {}
           }
         }
@@ -953,7 +1008,7 @@ function buildSummary(messagesToCompress: any[], plan: TaskPlan | null): string 
 
 export const ContextManager = {
   /** Check if compression is needed — supports both round-based and token-based thresholds */
-  shouldCompress(messages: any[], config: ContextConfig = DEFAULT_CONTEXT_CONFIG): boolean {
+  shouldCompress(messages: LoopMessage[], config: ContextConfig = DEFAULT_CONTEXT_CONFIG): boolean {
     if (config.maxTokensBeforeCompress && estimateTokens(messages) > config.maxTokensBeforeCompress) {
       return true;
     }
@@ -961,7 +1016,7 @@ export const ContextManager = {
   },
 
   /** Token-based compression check. Convenience wrapper for query paths. */
-  shouldCompressByTokens(messages: any[], maxTokens: number): boolean {
+  shouldCompressByTokens(messages: LoopMessage[], maxTokens: number): boolean {
     return estimateTokens(messages) > maxTokens;
   },
 
@@ -972,11 +1027,11 @@ export const ContextManager = {
    * Returns a new messages array (does not mutate input).
    */
   async compressHistory(
-    messages: any[],
+    messages: LoopMessage[],
     plan: TaskPlan | null,
     config: ContextConfig = DEFAULT_CONTEXT_CONFIG,
     llmConfig?: LLMSummaryConfig,
-  ): Promise<any[]> {
+  ): Promise<LoopMessage[]> {
     const useTokenBased = config.maxTokensBeforeCompress != null;
 
     // Early return: check both token and round thresholds
@@ -992,7 +1047,7 @@ export const ContextManager = {
     }
 
     // Identify system messages (always at very beginning)
-    const systemMsgs: any[] = [];
+    const systemMsgs: LoopMessage[] = [];
     let idx = 0;
     while (idx < messages.length && messages[idx].role === 'system') {
       systemMsgs.push(messages[idx]);
@@ -1000,7 +1055,7 @@ export const ContextManager = {
     }
 
     // Injected system-style user messages (plan info, deviance warnings, nudges)
-    const preambleMsgs: any[] = [];
+    const preambleMsgs: LoopMessage[] = [];
     while (idx < messages.length && typeof messages[idx].content === 'string') {
       const c = messages[idx].content as string;
       if (c.includes('你的任务计划') || c.includes('请根据 system prompt')) {
@@ -1012,8 +1067,8 @@ export const ContextManager = {
     }
 
     // Find boundary: token-based accumulation or round-based counting
-    const compressZone: any[] = [];
-    const criticalPool: any[] = [];
+    const compressZone: LoopMessage[] = [];
+    const criticalPool: LoopMessage[] = [];
     let boundaryIdx = idx;
 
     if (useTokenBased) {
@@ -1116,7 +1171,7 @@ export const ContextManager = {
     }
 
     // Build the compressed messages array
-    const result: any[] = [...systemMsgs, ...preambleMsgs];
+    const result: LoopMessage[] = [...systemMsgs, ...preambleMsgs];
 
     // Add summary of compressed zone (LLM-driven with rule-based fallback)
     if (compressZone.length > 0) {
@@ -1129,7 +1184,7 @@ export const ContextManager = {
       if (!summary) {
         summary = buildSummary(compressZone, plan);
       }
-      const summaryMsg: any = { role: 'user', content: summary };
+      const summaryMsg: LoopMessage = { role: 'user', content: summary };
       if (isLLMGenerated) summaryMsg[LLM_SUMMARY_MARKER] = true;
       result.push(summaryMsg);
     }

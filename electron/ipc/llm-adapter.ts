@@ -16,7 +16,7 @@ import { createStreamFilter } from './text-filter';
 import { getDeepSeekUserId } from '../auth-store';
 import { readSettings, resolveMaxOutputTokens } from './settings-store';
 import type { DeepSeekToolChoice } from '../contracts/advanced';
-import type { AssistantMessage, ToolCall } from './agent-loop';
+import type { AssistantMessage, LoopMessage, ToolCall } from './agent-loop';
 import { modelSupportsImageInput, isDeepSeekVisionModel } from '../types';
 
 export { modelSupportsImageInput, isDeepSeekVisionModel };
@@ -28,7 +28,7 @@ export type LlmInvokeParams = {
   apiKey: string;
   apiBase: string;
   systemPrompt: string;
-  messages: any[];
+  messages: LoopMessage[];
   tools: ToolDef[];
   isDeepThink?: boolean;
   reasoningEffort?: 'low' | 'high' | 'max';
@@ -79,22 +79,23 @@ export async function invokeLlm(params: LlmInvokeParams & { adapter?: string }):
 
 // ─── Format builders ─────────────────────────────────────
 
-function isPlainObject(v: unknown): v is Record<string, any> {
+function isPlainObject(v: unknown): v is Record<string, unknown> {
   return !!v && typeof v === 'object' && !Array.isArray(v);
 }
 
 /** 递归归一化 strict schema：每个对象节点都补齐 required + additionalProperties，
  *  避免嵌套空对象被 DeepSeek 拒绝。 */
-function normalizeStrictSchema(schema: Record<string, any>): Record<string, any> {
-  const properties = (schema.properties ?? {}) as Record<string, any>;
-  const out: Record<string, any> = {};
+function normalizeStrictSchema(schema: Record<string, unknown>): Record<string, unknown> {
+  const properties = isPlainObject(schema.properties) ? schema.properties : {};
+  const out: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(schema)) {
     if (key === 'default' || key === 'properties' || key === 'required' || key === 'additionalProperties') continue;
     out[key] = isPlainObject(value) ? normalizeStrictSchema(value) : value;
   }
-  out.properties = {};
+  const normalizedProperties: Record<string, unknown> = {};
+  out.properties = normalizedProperties;
   for (const [k, v] of Object.entries(properties)) {
-    out.properties[k] = isPlainObject(v) ? normalizeStrictSchema(v) : v;
+    normalizedProperties[k] = isPlainObject(v) ? normalizeStrictSchema(v) : v;
   }
   out.required = Object.keys(properties);
   out.additionalProperties = false;
@@ -104,15 +105,15 @@ function normalizeStrictSchema(schema: Record<string, any>): Record<string, any>
 /** 递归清洗 schema：任何「没有可用属性的 object 节点」都返回 null（由父级丢弃），
  *  保证发给 DeepSeek 的请求里不会出现空对象 —— 这是 400
  *  “An object with no properties is not allowed” 的直接来源。 */
-function sanitizeSchemaForApi(node: unknown): Record<string, any> | null {
-  if (!isPlainObject(node)) return node as Record<string, any>;
-  const n = node as Record<string, any>;
-  const out: Record<string, any> = { ...n };
+function sanitizeSchemaForApi(node: unknown): Record<string, unknown> | null {
+  if (!isPlainObject(node)) return node as unknown as Record<string, unknown>;
+  const n = node;
+  const out: Record<string, unknown> = { ...n };
 
   if (n.type === 'object' || n.properties !== undefined) {
     const props = n.properties;
     if (!isPlainObject(props) || Object.keys(props).length === 0) return null;
-    const cleanedProps: Record<string, any> = {};
+    const cleanedProps: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(props)) {
       const cleaned = sanitizeSchemaForApi(value);
       if (cleaned !== null) cleanedProps[key] = cleaned;
@@ -178,8 +179,8 @@ export function isAnthropicFormatEndpoint(apiBase: string): boolean {
  *  - missing tool replies → synthesize an error stub
  *  - orphaned/duplicate tool messages (no pending id) → drop
  */
-export function sanitizeToolCallPairing(messages: any[]): any[] {
-  const out: any[] = [];
+export function sanitizeToolCallPairing(messages: LoopMessage[]): LoopMessage[] {
+  const out: LoopMessage[] = [];
   let i = 0;
 
   while (i < messages.length) {
@@ -196,8 +197,10 @@ export function sanitizeToolCallPairing(messages: any[]): any[] {
 
     if (m.role !== 'assistant' || !Array.isArray(m.tool_calls) || m.tool_calls.length === 0) continue;
 
-    const pending = new Set<string>(m.tool_calls.map((tc: any) => tc?.id).filter(Boolean));
-    const deferred: any[] = [];
+    const pending = new Set<string>(
+      m.tool_calls.map((tc) => (typeof tc?.id === 'string' ? tc.id : '')).filter((id): id is string => id.length > 0),
+    );
+    const deferred: LoopMessage[] = [];
 
     // Scavenge forward for this assistant's tool replies; stop at the next
     // assistant turn (tool replies never cross an assistant boundary).
@@ -273,40 +276,43 @@ export function buildToolResultContent(output: unknown, error?: string): string 
  * non-vision DeepSeek routes, and translate OpenAI `image_url` parts into
  * Anthropic image blocks on the Anthropic wire format.
  */
-function normalizeProviderContent(m: any, provider: 'openai' | 'anthropic', model: string): any {
+function normalizeProviderContent(m: LoopMessage, provider: 'openai' | 'anthropic', model: string): LoopMessage {
   if (!Array.isArray(m.content)) return m;
-  let parts: any[] | string = m.content;
+  let parts: Array<Record<string, unknown>> | string = m.content;
   const isDeepSeek = model.toLowerCase().startsWith('deepseek-');
   const supportsImage = modelSupportsImageInput(model);
   const hasImage =
-    Array.isArray(parts) && parts.some((p) => p?.type === 'image_url' || p?.type === 'image' || p?.type === 'file');
+    Array.isArray(parts) && parts.some((p) => p.type === 'image_url' || p.type === 'image' || p.type === 'file');
   if (hasImage && Array.isArray(parts) && (!supportsImage || (isDeepSeek && m.role !== 'user'))) {
-    parts = parts.filter((p) => !['image_url', 'image', 'file'].includes(p?.type));
+    parts = parts.filter((p) => !['image_url', 'image', 'file'].includes(String(p.type ?? '')));
   }
   if (Array.isArray(parts) && isDeepSeek && supportsImage) {
     parts = parts.filter((p) => {
-      if (p?.type !== 'image_url') return true;
-      const url = String(p.image_url?.url ?? '');
+      if (p.type !== 'image_url') return true;
+      const image = isPlainObject(p.image_url) ? p.image_url : {};
+      const url = String(image.url ?? '');
       const mime = /^data:image\/([^;]+);/i.exec(url);
       return !mime || ['jpeg', 'png', 'gif', 'webp'].includes(mime[1].toLowerCase());
     });
   }
   if (m.role === 'tool' && Array.isArray(parts)) {
     parts = parts
-      .map((p) => (p?.type === 'text' ? String(p.text) : ''))
+      .map((p) => (p.type === 'text' ? String(p.text ?? '') : ''))
       .filter(Boolean)
       .join('\n');
   }
   if (provider === 'anthropic' && Array.isArray(parts)) {
     parts = parts.map((p) => {
-      if (p?.type === 'image_url' && p.image_url?.url) {
-        const url = String(p.image_url.url);
+      if (p.type === 'image_url') {
+        const image = isPlainObject(p.image_url) ? p.image_url : {};
+        const url = String(image.url ?? '');
+        if (!url) return p;
         const match = /^data:([^;]+);base64,(.*)$/.exec(url);
         return match
           ? { type: 'image', source: { type: 'base64', media_type: match[1], data: match[2] } }
           : { type: 'image', source: { type: 'url', url } };
       }
-      if (p?.type === 'text') return { type: 'text', text: String(p.text) };
+      if (p.type === 'text') return { type: 'text', text: String(p.text ?? '') };
       return p;
     });
   }

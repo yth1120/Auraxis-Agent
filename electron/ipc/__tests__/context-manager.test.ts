@@ -280,7 +280,7 @@ describe('Snip-Compact — Truncation', () => {
     for (const m of truncated) {
       if (m.role === 'assistant' && m.tool_calls) {
         for (const tc of m.tool_calls) {
-          openIds.add(tc.id);
+          if (typeof tc.id === 'string') openIds.add(tc.id);
         }
       }
       if (m.role === 'tool' && m.tool_call_id) {

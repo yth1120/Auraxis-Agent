@@ -90,7 +90,7 @@ export async function orchestrateListAgents(): Promise<Array<Record<string, unkn
     name: a.name,
     description: a.description,
     status: a.status,
-    type: (a as any).type || 'general-purpose',
+    type: a.type || 'general-purpose',
     parentAgentId: a.parentAgentId,
     startTime: a.startTime,
     endTime: a.endTime,

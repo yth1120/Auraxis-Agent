@@ -6,7 +6,7 @@ import type { ToolDef } from '../tool-defs';
 import type { SandboxMode } from '../sandbox-policy';
 import { getAllTools } from '../tool-registry';
 import { resolveModelApiBase, resolveModelApiKey } from './model-config';
-import { agentLoopRun, AgentObserver, AgentStateSnapshot } from './agent-loop';
+import { agentLoopRun, type AgentLoopResult, AgentObserver, AgentStateSnapshot } from './agent-loop';
 import { appendAgentLog } from '../session-log';
 import { appendWorkDocsSystemRule, type WorkSurface } from '../work-docs-policy';
 import { errorRecord, errorText } from '../errors';
@@ -236,19 +236,19 @@ function createAgentObserver(
             type: 'iteration_end',
             requestId: agent.id,
             iteration: event.iteration,
-            toolsThisIteration: (event as any).toolsThisIteration,
-            llmLatencyMs: (event as any).llmLatencyMs,
-            firstTokenMs: (event as any).firstTokenMs,
-            outputTokens: (event as any).outputTokens,
+            toolsThisIteration: event.toolsThisIteration,
+            llmLatencyMs: event.llmLatencyMs,
+            firstTokenMs: event.firstTokenMs,
+            outputTokens: event.outputTokens,
           });
           logEntry({
             type: 'iteration_end',
             timestamp: Date.now(),
             iteration: event.iteration,
-            toolsThisIteration: (event as any).toolsThisIteration,
-            llmLatencyMs: (event as any).llmLatencyMs,
-            firstTokenMs: (event as any).firstTokenMs,
-            outputTokens: (event as any).outputTokens,
+            toolsThisIteration: event.toolsThisIteration,
+            llmLatencyMs: event.llmLatencyMs,
+            firstTokenMs: event.firstTokenMs,
+            outputTokens: event.outputTokens,
           });
           break;
         case 'tool_start':
@@ -280,7 +280,7 @@ function createAgentObserver(
             output: event.output,
             durationMs: event.durationMs,
             stepGroupId: event.stepGroupId,
-            summary: (event as any).summary,
+            summary: event.summary,
           });
           logEntry({
             type: 'tool_end',
@@ -370,7 +370,7 @@ function createAgentObserver(
       }
       // Durable agent run log (SDK / ACP / CLI tasks persist and become
       // searchable like scheduler tasks).
-      void appendAgentLog(agent.id, [event as unknown as Record<string, unknown>], agent.projectRoot).catch(() => {});
+      void appendAgentLog(agent.id, [event], agent.projectRoot).catch(() => {});
     },
 
     onStateChange(snapshot: AgentStateSnapshot) {
@@ -411,19 +411,32 @@ export async function runSubAgent(params: {
   const { readSettings } = await import('./settings-store');
   const agentDef = getAgentDef(params.subagentType);
   const tools = getToolsForAgent(params.subagentType);
-  const settings: Record<string, any> = await readSettings();
-  const model: string = settings.executeModel || settings.selectedModel || 'deepseek-v4-pro';
-  const planModel: string = settings.planModel || model;
-  const fallbackModel = (settings.fallbackModel as string) || undefined;
+  const settings = await readSettings();
+  const model =
+    typeof settings.executeModel === 'string' && settings.executeModel
+      ? settings.executeModel
+      : typeof settings.selectedModel === 'string' && settings.selectedModel
+        ? settings.selectedModel
+        : 'deepseek-v4-pro';
+  const planModel = typeof settings.planModel === 'string' && settings.planModel ? settings.planModel : model;
+  const fallbackModel =
+    typeof settings.fallbackModel === 'string' && settings.fallbackModel ? settings.fallbackModel : undefined;
   const apiBase = await resolveModelApiBase(model);
-  const maxIterations = Number(settings.agentMaxIterations) || 200;
+  const maxIterations =
+    typeof settings.agentMaxIterations === 'number' && settings.agentMaxIterations > 0
+      ? settings.agentMaxIterations
+      : 200;
   const sandboxMode: SandboxMode =
     settings.sandboxMode === 'read' || settings.sandboxMode === 'workspace-write' || settings.sandboxMode === 'full'
       ? settings.sandboxMode
       : 'workspace-write';
   const timeContext = settings.timeContext !== false;
 
-  const apiKey = (await resolveModelApiKey(model)) || settings.deepseekApiKey || process.env.DEEPSEEK_API_KEY || '';
+  const apiKey =
+    (await resolveModelApiKey(model)) ||
+    (typeof settings.deepseekApiKey === 'string' ? settings.deepseekApiKey : '') ||
+    process.env.DEEPSEEK_API_KEY ||
+    '';
 
   if (!apiKey) return { output: null, error: '未配置 DeepSeek API Key' };
 
@@ -442,10 +455,15 @@ export async function runSubAgent(params: {
     name: `${params.subagentType}: ${params.description}`,
     description: params.prompt,
     projectRoot: params.projectRoot,
+    type: params.subagentType,
+    priority: 'normal',
     status: 'running',
     startTime: Date.now(),
     toolCallCount: 0,
     iterations: 0,
+    messagesCount: 0,
+    model,
+    maxIterations,
     log: [],
   };
 
@@ -519,7 +537,7 @@ export async function runSubAgent(params: {
     });
   };
 
-  const finishOk = (result: any) => {
+  const finishOk = (result: AgentLoopResult) => {
     agent.toolCallCount = result.toolCallCount;
     agent.iterations = result.iterations;
     const resultText = result.allText;
@@ -541,10 +559,11 @@ export async function runSubAgent(params: {
     broadcast(agent);
   };
 
-  const finishErr = (err: any) => {
-    agent.status = err.name === 'AbortError' ? 'stopped' : 'error';
+  const finishErr = (err: unknown) => {
+    const isAbort = err instanceof Error && err.name === 'AbortError';
+    agent.status = isAbort ? 'stopped' : 'error';
     agent.endTime = Date.now();
-    agent.error = err.name === 'AbortError' ? undefined : err.message;
+    agent.error = isAbort ? undefined : err instanceof Error ? err.message : errorText(err);
     agentAborts.delete(agentId);
     subAgentObservers.delete(agentId);
     agents.set(agentId, agent);
@@ -569,16 +588,17 @@ export async function runSubAgent(params: {
           controller.signal.aborted ? 'stopped' : 'completed',
         );
       })
-      .catch(async (err: any) => {
+      .catch(async (err: unknown) => {
         finishErr(err);
         const { cacheTaskResult } = await import('./tool-handlers');
+        const isAbort = err instanceof Error && err.name === 'AbortError';
         cacheTaskResult(
           agentId,
           {
-            status: err.name === 'AbortError' ? 'stopped' : 'error',
-            error: err.name === 'AbortError' ? 'Agent 被取消' : err.message,
+            status: isAbort ? 'stopped' : 'error',
+            error: isAbort ? 'Agent 被取消' : err instanceof Error ? err.message : errorText(err),
           },
-          err.name === 'AbortError' ? 'stopped' : 'error',
+          isAbort ? 'stopped' : 'error',
         );
       });
     return {

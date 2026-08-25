@@ -117,13 +117,20 @@ export interface AgentInfo {
   name: string;
   description: string;
   projectRoot?: string;
+  /** Built-in agent role (Explore / Plan / general-purpose). */
+  type?: string;
   status: AgentStatus;
+  priority?: 'high' | 'normal' | 'low';
   startTime: number;
   endTime?: number;
   result?: string;
   error?: string;
   toolCallCount: number;
   iterations: number;
+  /** LLM message count snapshot used by scheduler UI. */
+  messagesCount?: number;
+  model?: string;
+  maxIterations?: number;
   parentAgentId?: string;
   goal?: { text: string; maxRounds: number } | null;
   /** 该 Agent 通过 Report 工具发送的进度汇报。 */

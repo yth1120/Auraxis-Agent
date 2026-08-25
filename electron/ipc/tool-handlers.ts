@@ -58,6 +58,7 @@ import { safeProcessEnv } from '../safe-env';
 import { setTaskStopper } from './task-monitor';
 import type { SessionEvent } from '../contracts/session-types';
 import { getGoal, createGoal, editGoal, pauseGoal, resumeGoal, completeGoal, blockGoal } from '../goal-store';
+import type { DocumentWriteSpec } from '../document-tools';
 
 setTaskStopper((toolCallId) => abortTool(toolCallId));
 
@@ -74,6 +75,10 @@ setTaskStopper((toolCallId) => abortTool(toolCallId));
 // ─── WebFetch ──────────────────────────────────────────
 const BLOCKED_HOSTS = new Set(['localhost', '127.0.0.1', '0.0.0.0', '::1', '[::1]', '169.254.169.254']);
 const BLOCKED_SUFFIXES = ['.local', '.internal', '.localhost'];
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
 
 function isPrivateIpv4(ip: string): boolean {
   const parts = ip.split('.').map(Number);
@@ -524,10 +529,15 @@ async function runEnterPlanMode(params: { goal: string; context?: string }, ctx:
     const { readSettings } = await import('./settings-store');
     const { resolveModelApiBase, resolveModelApiKey } = await import('./model-config');
 
-    const settings: Record<string, any> = await readSettings();
-    const model = settings.selectedModel || 'deepseek-v4-pro';
+    const settings = await readSettings();
+    const model =
+      typeof settings.selectedModel === 'string' && settings.selectedModel ? settings.selectedModel : 'deepseek-v4-pro';
     const apiBase = await resolveModelApiBase(model);
-    const apiKey = (await resolveModelApiKey(model)) || settings.deepseekApiKey || process.env.DEEPSEEK_API_KEY || '';
+    const apiKey =
+      (await resolveModelApiKey(model)) ||
+      (typeof settings.deepseekApiKey === 'string' ? settings.deepseekApiKey : '') ||
+      process.env.DEEPSEEK_API_KEY ||
+      '';
 
     if (!apiKey) return { output: null, error: '未配置 API Key' };
 
@@ -1397,13 +1407,13 @@ async function runReviewArtifact(
 }
 
 // ─── Tool Dispatcher ───────────────────────────────────
-export type ToolExecutor = (params: any, ctx: ToolContext) => Promise<ToolResult>;
+export type ToolExecutor = (params: Record<string, unknown>, ctx: ToolContext) => Promise<ToolResult>;
 
 /** Resolve a dynamically mounted plugin tool to a real executor. */
 async function dynamicPluginExecutor(toolName: string): Promise<ToolExecutor | null> {
   const { getDynamicTool, executeDynamicTool } = await import('./dynamic-plugin');
   if (!getDynamicTool(toolName)) return null;
-  return (input: any, c: ToolContext) =>
+  return (input: Record<string, unknown>, c: ToolContext) =>
     executeDynamicTool(toolName, input ?? {}, {
       projectRoot: c.projectRoot,
       requestId: c.requestId,
@@ -1617,7 +1627,7 @@ async function runReadSpill(params: { path?: unknown }, _ctx: ToolContext): Prom
   }
 }
 
-const toolRegistry: Record<string, ToolExecutor> = {
+const toolRegistry = {
   ListSkills: runListSkills,
   ReadSkill: runReadSkill,
   SessionQuery: runSessionQuery,
@@ -1712,7 +1722,7 @@ async function runListAgents(_params: unknown, ctx: ToolContext): Promise<ToolRe
       name: a.name,
       description: a.description,
       status: a.status,
-      type: (a as any).type || 'general-purpose',
+      type: a.type || 'general-purpose',
       parentAgentId: a.parentAgentId,
       startTime: a.startTime,
       endTime: a.endTime,
@@ -1940,12 +1950,15 @@ async function runMountPlugin(
     version: typeof params?.version === 'string' && params.version.trim() ? params.version.trim() : undefined,
     description:
       typeof params?.description === 'string' && params.description.trim() ? params.description.trim() : undefined,
-    tools: tools.map((t: any) => ({
-      name: String(t?.name ?? '').trim(),
-      description: String(t?.description ?? '').trim(),
-      inputSchema: t?.inputSchema,
-      handler: String(t?.handler ?? '').trim(),
-    })),
+    tools: tools.map((value: unknown) => {
+      const tool = isRecord(value) ? value : {};
+      return {
+        name: String(tool.name ?? '').trim(),
+        description: String(tool.description ?? '').trim(),
+        inputSchema: isRecord(tool.inputSchema) ? tool.inputSchema : undefined,
+        handler: String(tool.handler ?? '').trim(),
+      };
+    }),
   });
   if (!result.ok) return { output: null, error: result.error };
   if (result.defs) addPluginTools(result.defs);
@@ -2000,7 +2013,7 @@ async function runRalph(params: { objective?: unknown; maxRounds?: unknown }, ct
       subagentType: 'general-purpose',
     });
     if (!r.ok) return { output: null, error: `第 ${round} 轮失败: ${r.error}` };
-    const text = String((r.output as any)?.result ?? '');
+    const text = String(isRecord(r.output) ? (r.output.result ?? '') : '');
     const doneMatch = text.match(/\[RALPH:DONE\]\s*([\s\S]*)$/);
     if (doneMatch) {
       return {
@@ -2297,7 +2310,7 @@ async function runWriteDocument(
   }
   try {
     const { writeDocument } = await import('../document-tools');
-    const { format, bytes } = await writeDocument(resolved, spec as any);
+    const { format, bytes } = await writeDocument(resolved, spec as DocumentWriteSpec);
     markFileObserved(ctx, resolved);
     return { output: { file_path: resolved, format, bytes } };
   } catch (e: unknown) {
@@ -2545,7 +2558,8 @@ export async function executeToolCall(
     const { executeMcpTool } = await import('../tool-registry');
     executor = async (toolInput: Record<string, unknown>) => executeMcpTool(toolName, toolInput ?? {});
   } else {
-    executor = toolRegistry[toolName] || (await dynamicPluginExecutor(toolName));
+    const registered = toolRegistry[toolName as keyof typeof toolRegistry];
+    executor = registered ? (registered as unknown as ToolExecutor) : await dynamicPluginExecutor(toolName);
   }
   if (!executor) {
     return { output: null, error: `未知工具: ${toolName}` };

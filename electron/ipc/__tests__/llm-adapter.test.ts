@@ -98,7 +98,10 @@ describe('llm-adapter format helpers', () => {
     expect(tools[0].function.parameters.required).toEqual(['url', 'prompt', 'timeout']);
     expect(tools[0].function.parameters.additionalProperties).toBe(false);
     // strict 模式不支持 default 关键字：归一化时剥离，避免服务端校验失败
-    expect(tools[0].function.parameters.properties.timeout.default).toBeUndefined();
+    const parameters = tools[0].function.parameters as {
+      properties?: Record<string, { default?: unknown }>;
+    };
+    expect(parameters.properties?.timeout?.default).toBeUndefined();
   });
 
   it('非 strict 模式不强制 required 也不带 strict 字段', () => {
@@ -149,8 +152,8 @@ describe('llm-adapter format helpers', () => {
     const repaired = sanitizeToolCallPairing(messages);
     // tool reply must be adjacent to its assistant message
     const toolIdx = repaired.findIndex((m: any) => m.role === 'tool');
-    expect(repaired[toolIdx - 1].role).toBe('assistant');
-    expect(repaired[toolIdx - 1].tool_calls[0].id).toBe('call_1');
+    expect(repaired[toolIdx - 1]!.role).toBe('assistant');
+    expect(repaired[toolIdx - 1]!.tool_calls![0].id).toBe('call_1');
     // injected nudge is deferred after the tool block
     expect(repaired[toolIdx + 1].role).toBe('user');
   });

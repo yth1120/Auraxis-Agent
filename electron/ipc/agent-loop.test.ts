@@ -509,7 +509,7 @@ describe('ContextManager — compressHistory', () => {
     // Should have a summary message (now stored as 'system' role for LLM summaries)
     const summaryMsg = result.find(
       (m: any) => m.role === 'user' && typeof m.content === 'string' && m.content.startsWith('[历史上下文摘要]'),
-    );
+    )!;
     expect(summaryMsg).toBeDefined();
     expect(summaryMsg.content).toContain('阅读了文件');
   });
@@ -528,7 +528,7 @@ describe('ContextManager — compressHistory', () => {
     const result = await ContextManager.compressHistory(messages, plan, config);
     const summaryMsg = result.find(
       (m: any) => typeof m.content === 'string' && m.content.startsWith('[历史上下文摘要]'),
-    );
+    )!;
     expect(summaryMsg.content).toContain('Read config file');
     expect(summaryMsg.content).toContain('Edit port number');
   });
@@ -873,7 +873,7 @@ describe('Integration — Full Agent Flow Simulation', () => {
     // Summary should include plan status
     const summary = compressed.find(
       (m: any) => typeof m.content === 'string' && m.content.startsWith('[历史上下文摘要]'),
-    );
+    )!;
     expect(summary).toBeDefined();
     expect(summary.content).toContain('Run npm test'); // pending
     expect(summary.content).toContain('Read config.ts'); // completed
@@ -1175,7 +1175,7 @@ describe('LLM Summary — degradation and fallback', () => {
     const result = await ContextManager.compressHistory(messages, null, config);
 
     // Rule-based summary has predictable structure
-    const summary = result.find((m: any) => typeof m.content === 'string' && m.content.startsWith('[历史上下文摘要]'));
+    const summary = result.find((m: any) => typeof m.content === 'string' && m.content.startsWith('[历史上下文摘要]'))!;
     expect(summary).toBeDefined();
     // Rule-based summaries include file/command tracking (Chinese labels)
     expect(summary.content).toMatch(/阅读了文件|关键发现/);
@@ -1189,7 +1189,7 @@ describe('LLM Summary — degradation and fallback', () => {
     // Omit llmConfig — should fall back gracefully
     const result = await ContextManager.compressHistory(messages, null, config);
     // Compression still produced a valid summary
-    const summary = result.find((m: any) => typeof m.content === 'string' && m.content.startsWith('[历史上下文摘要]'));
+    const summary = result.find((m: any) => typeof m.content === 'string' && m.content.startsWith('[历史上下文摘要]'))!;
     expect(summary).toBeDefined();
     // Should contain reference to files read (from rule-based extraction)
     expect(summary.content).toMatch(/阅读了文件|关键发现|已完成任务|待完成任务/);
@@ -1201,7 +1201,7 @@ describe('LLM Summary — degradation and fallback', () => {
     const config: ContextConfig = { maxRounds: 10, compressRatio: 0.5 };
     const result = await ContextManager.compressHistory(messages, null, config);
 
-    const summary = result.find((m: any) => typeof m.content === 'string' && m.content.startsWith('[历史上下文摘要]'));
+    const summary = result.find((m: any) => typeof m.content === 'string' && m.content.startsWith('[历史上下文摘要]'))!;
     expect(summary).toBeDefined();
     expect(summary.role).toBe('user');
     // LLM_SUMMARY marker only present when LLM was actually used (llmConfig provided)
@@ -1220,7 +1220,7 @@ describe('LLM Summary — degradation and fallback', () => {
     };
     const result = await ContextManager.compressHistory(messages, null, config, llmCfg);
 
-    const summary = result.find((m: any) => typeof m.content === 'string' && m.content.startsWith('[历史上下文摘要]'));
+    const summary = result.find((m: any) => typeof m.content === 'string' && m.content.startsWith('[历史上下文摘要]'))!;
     expect(summary).toBeDefined();
     expect(summary.role).toBe('user');
     // LLM call will fail with fake key → fallback → no LLM_SUMMARY marker
@@ -1282,7 +1282,7 @@ describe('LLM Summary — degradation and fallback', () => {
     expect(criticalResults.length).toBeGreaterThan(0);
 
     // Summary should still exist
-    const summary = result.find((m: any) => typeof m.content === 'string' && m.content.startsWith('[历史上下文摘要]'));
+    const summary = result.find((m: any) => typeof m.content === 'string' && m.content.startsWith('[历史上下文摘要]'))!;
     expect(summary).toBeDefined();
     // Summary should mention the pending task
     expect(summary.content).toContain('config.ts');
