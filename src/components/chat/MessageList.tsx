@@ -138,7 +138,7 @@ export default function MessageList({
               if (e.key === 'Enter') navigateMatch(e.shiftKey ? -1 : 1);
               if (e.key === 'Escape') setSearchOpen(false);
             }}
-            bordered={false}
+            variant="borderless"
             style={{ flex: 1, fontSize: 14 }}
             aria-label={t('msglist.searchAria')}
           />

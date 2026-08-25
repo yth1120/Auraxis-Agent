@@ -156,7 +156,7 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           onKeyDown={handleKeyDown}
-          bordered={false}
+          variant="borderless"
           size="large"
           className="text-lg"
         />

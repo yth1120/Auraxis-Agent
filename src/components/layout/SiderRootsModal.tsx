@@ -31,7 +31,7 @@ export default function SiderRootsModal({
       cancelText={t('common.cancel')}
       title={t('sidebar.projectRoots')}
       width={440}
-      destroyOnClose
+      destroyOnHidden
     >
       <div className="flex flex-col gap-1.5 py-1">
         {roots.map((root, index) => (

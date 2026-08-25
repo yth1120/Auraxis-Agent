@@ -51,28 +51,36 @@ export function SettingsCostPane() {
       <SettingsSectionTitle>{t('settings.section.cost')}</SettingsSectionTitle>
       <section className="mb-2">
         <SettingItem title={t('settings.cost.input')} description={t('settings.cost.input.desc')}>
-          <InputNumber
-            value={inputPricePerM}
-            onChange={(v) => setInputPricePerM(Number(v) || 0)}
-            min={0}
-            step={0.1}
-            precision={2}
-            addonAfter={t('settings.currencyUnit')}
-            style={{ width: '100%' }}
-            placeholder="0"
-          />
+          <Space.Compact block>
+            <InputNumber
+              value={inputPricePerM}
+              onChange={(v) => setInputPricePerM(Number(v) || 0)}
+              min={0}
+              step={0.1}
+              precision={2}
+              style={{ width: '100%' }}
+              placeholder="0"
+            />
+            <span className="inline-flex items-center px-2.5 text-xs text-text-muted bg-[var(--color-bg-inset)] border border-l-0 border-[var(--color-border-dim)]">
+              {t('settings.currencyUnit')}
+            </span>
+          </Space.Compact>
         </SettingItem>
         <SettingItem title={t('settings.cost.output')} description={t('settings.cost.output.desc')} noBorder>
-          <InputNumber
-            value={outputPricePerM}
-            onChange={(v) => setOutputPricePerM(Number(v) || 0)}
-            min={0}
-            step={0.1}
-            precision={2}
-            addonAfter={t('settings.currencyUnit')}
-            style={{ width: '100%' }}
-            placeholder="0"
-          />
+          <Space.Compact block>
+            <InputNumber
+              value={outputPricePerM}
+              onChange={(v) => setOutputPricePerM(Number(v) || 0)}
+              min={0}
+              step={0.1}
+              precision={2}
+              style={{ width: '100%' }}
+              placeholder="0"
+            />
+            <span className="inline-flex items-center px-2.5 text-xs text-text-muted bg-[var(--color-bg-inset)] border border-l-0 border-[var(--color-border-dim)]">
+              {t('settings.currencyUnit')}
+            </span>
+          </Space.Compact>
         </SettingItem>
       </section>
     </>
