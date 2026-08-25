@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Modal, message, notification } from 'antd';
 import { Copy as CopyIcon } from '@/components/common/icons';
 import { shallow } from 'zustand/shallow';
 import { useStoreWithEqualityFn } from 'zustand/traditional';
 import { t, useT } from '../../i18n';
-import type { AgentLogEntry } from '../../types/agent';
 import { PERMISSION_PRESETS } from '../../types/advanced';
 import { useAgentStore } from '../../stores/useAgentStore';
 import { useAppStore } from '../../stores/useAppStore';
@@ -16,9 +15,9 @@ import { ensureAgentViewShortcuts } from '../../utils/agentViewShortcuts';
 import StateDot from '../common/StateDot';
 import { formatTime } from '../../utils/time';
 import DeepDiveStatus from '../common/DeepDiveStatus';
-import { sessionEventsToLogEntries } from '../../utils/agentLogReplay';
-import { NO_PERMS, basename, cleanText, runDurationLabel, turnStats, type TurnGroup } from './AgentConversationUtils';
+import { NO_PERMS, basename, cleanText, runDurationLabel, turnStats } from './AgentConversationUtils';
 import { AgentLogEntryView as LogEntry, AgentTurnTimeline, projectUserText } from './AgentConversationParts';
+import { useAgentConversationLog } from './useAgentConversationLog';
 import clsx from 'clsx';
 
 export default function AgentConversation({
@@ -37,9 +36,6 @@ export default function AgentConversation({
   const agentRunningFollow = useAppStore((s) => s.agentRunningFollow);
   const agentRawLogRequest = useAppStore((s) => s.agentRawLogRequest);
   const agentErrorNavRequest = useAppStore((s) => s.agentErrorNavRequest);
-  const [highlightedToolId, setHighlightedToolId] = useState<string | null>(null);
-  const autoScrolledErrorsRef = useRef(false);
-  const autoScrolledTextRef = useRef(false);
   const [rawLogOpen, setRawLogOpen] = useState(false);
   const setCurrentAgent = useAgentStore((s) => s.setCurrentAgent);
   const agent = useStoreWithEqualityFn(useAgentStore, (s) => s.agents.find((a) => a.id === currentAgentId), shallow);
@@ -55,6 +51,24 @@ export default function AgentConversation({
   );
   const isSubagent = !!agent?.parentAgentId;
 
+  const {
+    lastEntry,
+    turnGroups,
+    logViewerRef,
+    logEndRef,
+    onLogScroll,
+    highlightedToolId,
+  } = useAgentConversationLog({
+    agent,
+    agentErrorsOnly,
+    agentTextOnly,
+    agentRunningOnly,
+    agentRunningFollow,
+    agentErrorNavRequest,
+    agentLogFocusRequest,
+    pendingPermsLength: pendingPerms.length,
+  });
+
   useEffect(() => {
     ensureAgentViewShortcuts();
   }, []);
@@ -62,34 +76,6 @@ export default function AgentConversation({
   useEffect(() => {
     if (agentRawLogRequest) setRawLogOpen(true);
   }, [agentRawLogRequest]);
-
-  // Restart survival: completed tasks are persisted as metadata only, so a
-  // selected task with an empty log re-hydrates its timeline from the durable
-  // agent session log (electron/session-log.ts) on demand.
-  const restoredLogsRef = useRef<Set<string>>(new Set());
-  useEffect(() => {
-    if (!agent) return;
-    const isTerminal = agent.status === 'completed' || agent.status === 'error' || agent.status === 'stopped';
-    if (!isTerminal || agent.log.length > 0) return;
-    if (restoredLogsRef.current.has(agent.id)) return;
-    const api = window.electronAPI?.sessionLog;
-    if (!api?.read) return;
-    restoredLogsRef.current.add(agent.id);
-    void api
-      .read(agent.id)
-      .then((r) => {
-        if (!r?.ok || !Array.isArray(r.data) || r.data.length === 0) return;
-        const entries = sessionEventsToLogEntries(
-          r.data as { type: string; ts: number; data: Record<string, unknown> }[],
-        );
-        if (entries.length > 0) {
-          useAgentStore.getState().appendAgentLog(agent.id, entries);
-        }
-      })
-      .catch(() => {
-        /* log unavailable — header/result still render */
-      });
-  }, [agent]);
 
   const implementPlan = useCallback(async () => {
     if (!agent?.planFile) return;
@@ -114,212 +100,6 @@ export default function AgentConversation({
       () => message.error(tConv('conv.copyFailed')),
     );
   };
-
-  const logEndRef = useRef<HTMLDivElement>(null);
-  const log = useMemo(() => [...(agent?.log ?? [])], [agent?.log]);
-  const logLen = log.length;
-  const lastEntry = log[logLen - 1];
-
-  // Group the stream by turn (执行轨迹). A finished tool call
-  // renders exactly one row (its end entry); running calls keep their start row.
-  const turnGroups = useMemo<TurnGroup[]>(() => {
-    const ended = new Set<string>();
-    for (const e of log) {
-      if ((e.type === 'tool_end' || e.type === 'tool_error') && e.toolCallId) {
-        ended.add(e.toolCallId);
-      }
-    }
-    // Turn-scoped grouping when the stream carries turn_start/turn_end
-    // lifecycle markers; older in-memory logs fall back to per-iteration
-    // grouping so their view stays stable.
-    const hasTurnMarkers = log.some((e) => e.type === 'turn_start');
-    const list: TurnGroup[] = [];
-    let cur: TurnGroup | null = null;
-    let lastIteration = 1;
-    for (const e of log) {
-      if (hasTurnMarkers && e.type === 'turn_start') {
-        cur = { iteration: e.iteration ?? list.length + 1, entries: [], startTs: e.timestamp };
-        list.push(cur);
-        continue;
-      }
-      if (hasTurnMarkers && e.type === 'turn_end') {
-        if (cur) cur.end = e;
-        continue;
-      }
-      if (!hasTurnMarkers && e.type === 'iteration_start') {
-        lastIteration = e.iteration ?? list.length + 1;
-        cur = { iteration: lastIteration, entries: [], startTs: e.timestamp };
-        list.push(cur);
-        continue;
-      }
-      if (!hasTurnMarkers && e.type === 'iteration_end') {
-        if (cur) cur.end = e;
-        continue;
-      }
-      if (!cur) {
-        cur = { iteration: lastIteration, entries: [], startTs: e.timestamp };
-        list.push(cur);
-      }
-      if (e.type === 'iteration_end') cur.metricsEnd = e;
-      if (e.type === 'tool_start' && e.toolCallId && ended.has(e.toolCallId)) continue;
-      cur.entries.push(e);
-    }
-    // Safety net: coalesce same-kind streaming blocks so a reply reads as one
-    // message (store-level merge is per-flush; this covers cross-flush splits).
-    for (const turn of list) {
-      const merged: AgentLogEntry[] = [];
-      for (const e of turn.entries) {
-        const prev = merged[merged.length - 1];
-        if ((e.type === 'text' || e.type === 'thinking') && prev && prev.type === e.type) {
-          prev.text = (prev.text ?? '') + (e.text ?? '');
-          continue;
-        }
-        if (e.type === 'text' && !(e.text ?? '').trim()) continue;
-        merged.push(e);
-      }
-      turn.entries = merged;
-    }
-    return list;
-  }, [log]);
-
-  // Next / previous error navigation.
-  useEffect(() => {
-    if (!agentErrorNavRequest || !agent) return;
-    const errors = turnGroups.flatMap((t) =>
-      t.entries.filter((e) => e.type === 'tool_error' || e.type === 'warning' || e.type === 'error'),
-    );
-    if (errors.length === 0) {
-      useAppStore.getState().clearAgentErrorNav();
-      return;
-    }
-    const ids = errors.map((e) => e.toolCallId || `${e.type}-${e.timestamp}`);
-    let currentIdx = ids.indexOf(highlightedToolId ?? '');
-    if (currentIdx < 0) currentIdx = -1;
-    const nextIdx = (currentIdx + agentErrorNavRequest.dir + errors.length) % errors.length;
-    const target = errors[nextIdx];
-    const toolCallId = target.toolCallId;
-    setHighlightedToolId(toolCallId || null);
-    if (toolCallId) {
-      requestAnimationFrame(() => {
-        scrollLogTo(`[data-agent-log-entry="${toolCallId}"]`);
-        useAppStore.getState().requestTrajectoryFocus(agent.id, toolCallId);
-      });
-    }
-    useAppStore.getState().clearAgentErrorNav();
-  }, [agentErrorNavRequest, turnGroups, agent, highlightedToolId]);
-
-  // Pin-to-bottom follow: auto-scroll only while the user is already at the
-  // bottom. Scrolling up to read pauses following; scrolling back resumes it.
-  const logViewerRef = useRef<HTMLDivElement>(null);
-  const pinnedRef = useRef(true);
-
-  /** Scroll ONLY the log viewer — scrollIntoView on the tail can bubble to the
-   *  outer chat-area and shove the whole surface (header + composer) off-screen. */
-  const scrollLogToBottom = () => {
-    const el = logViewerRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  };
-  const scrollLogTo = (selector: string) => {
-    const viewer = logViewerRef.current;
-    const el = viewer?.querySelector(selector);
-    if (!viewer || !el) return;
-    const top = el.getBoundingClientRect().top - viewer.getBoundingClientRect().top + viewer.scrollTop;
-    viewer.scrollTop = Math.max(0, top - viewer.clientHeight / 2 + el.clientHeight / 2);
-  };
-
-  // Errors-only mode auto-scrolls to the first failure.
-  useEffect(() => {
-    if (!agentErrorsOnly) {
-      autoScrolledErrorsRef.current = false;
-      return;
-    }
-    if (autoScrolledErrorsRef.current) return;
-    for (const turn of turnGroups) {
-      const failed = turn.entries.find((e) => e.type === 'tool_error' || e.type === 'warning' || e.type === 'error');
-      if (failed) {
-        autoScrolledErrorsRef.current = true;
-        requestAnimationFrame(() => {
-          if (failed.toolCallId) scrollLogTo(`[data-agent-log-entry="${failed.toolCallId}"]`);
-        });
-        break;
-      }
-    }
-  }, [agentErrorsOnly, turnGroups]);
-
-  // Text-only mode auto-scrolls to the first text block.
-  useEffect(() => {
-    if (!agentTextOnly) {
-      autoScrolledTextRef.current = false;
-      return;
-    }
-    if (autoScrolledTextRef.current) return;
-    const first = turnGroups.flatMap((t) => t.entries).find((e) => e.type === 'text' || e.type === 'thinking');
-    if (first) {
-      autoScrolledTextRef.current = true;
-      requestAnimationFrame(() => {
-        scrollLogTo(`[data-agent-entry-type="${first.type}"]`);
-      });
-    }
-  }, [agentTextOnly, turnGroups]);
-
-  // Running-only mode follows the newest running tool.
-  useEffect(() => {
-    if (!agentRunningOnly || !agentRunningFollow) return;
-    let last: AgentLogEntry | null = null;
-    for (const turn of turnGroups) {
-      for (const entry of turn.entries) {
-        if (entry.type === 'tool_start') last = entry;
-      }
-    }
-    if (!last) return;
-    if (last.toolCallId) {
-      requestAnimationFrame(() => {
-        scrollLogTo(`[data-agent-log-entry="${last!.toolCallId}"]`);
-      });
-    }
-  }, [agentRunningOnly, agentRunningFollow, turnGroups]);
-
-  // Cross-panel focus: a double-click in the trajectory table scrolls the main
-  // Agent view to that tool row and flashes it.
-  useEffect(() => {
-    if (!agentLogFocusRequest || agentLogFocusRequest.agentId !== agent?.id) return;
-    setHighlightedToolId(agentLogFocusRequest.toolCallId);
-    const clearTimer = setTimeout(() => {
-      setHighlightedToolId(null);
-      useAppStore.getState().clearAgentLogFocus();
-    }, 1600);
-    requestAnimationFrame(() => {
-      scrollLogTo(`[data-agent-log-entry="${agentLogFocusRequest.toolCallId}"]`);
-    });
-    return () => clearTimeout(clearTimer);
-  }, [agentLogFocusRequest, agent?.id]);
-  const onLogScroll = useCallback(() => {
-    const el = logViewerRef.current;
-    if (!el) return;
-    pinnedRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-  }, []);
-
-  // "只看运行中工具" is a live-stream filter — once the task settles every
-  // tool has ended, so keeping it active would hide the whole trajectory
-  // (and the flag survives restarts via persisted app state).
-  const isTerminalStatus = agent?.status === 'completed' || agent?.status === 'error' || agent?.status === 'stopped';
-  useEffect(() => {
-    if (isTerminalStatus && agentRunningOnly) {
-      useAppStore.getState().setAgentRunningOnly(false);
-    }
-  }, [isTerminalStatus, agentRunningOnly]);
-
-  useEffect(() => {
-    if (!pinnedRef.current) return;
-    scrollLogToBottom();
-  }, [logLen, pendingPerms.length]);
-
-  // Switching tasks always lands at the live tail.
-  const agentId = agent?.id;
-  useEffect(() => {
-    pinnedRef.current = true;
-    scrollLogToBottom();
-  }, [agentId]);
 
   if (!agent) {
     return (
