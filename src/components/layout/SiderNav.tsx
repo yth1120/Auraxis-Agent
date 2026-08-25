@@ -1,18 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Popconfirm, Tooltip, Input, message, Dropdown, Modal } from 'antd';
-import type { MenuProps } from 'antd';
-import {
-  Check as CheckOutlined,
-  Folder as FolderOutlined,
-  FolderOpen as FolderOpenOutlined,
-  SlidersHorizontal,
-  ShieldCheck,
-  Trash as DeleteOutlined,
-  PencilSimple as EditOutlined,
-  MagnifyingGlass as SearchOutlined,
-  Plus as PlusOutlined,
-  SidebarSimple as SidebarSimpleIcon,
-} from '@/components/common/icons';
+import { message, Modal } from 'antd';
+import { MagnifyingGlass as SearchOutlined, SidebarSimple as SidebarSimpleIcon } from '@/components/common/icons';
 import { useAgentStore } from '../../stores/useAgentStore';
 import { useAppStore } from '../../stores/useAppStore';
 import { useChatStore } from '../../stores/useChatStore';
@@ -25,11 +13,11 @@ import { useAuthStore } from '../../stores/useAuthStore';
 import clsx from 'clsx';
 import logoPng from '../../assets/auraxis-logo.png';
 import { useT } from '../../i18n';
-import type { PermissionProfile } from '../../types/electron-api';
-import { SessionRow, AgentRow, rowKey, SIDEBAR_TOP_NAV } from './SiderNavRows';
+import { SessionRow, SIDEBAR_TOP_NAV } from './SiderNavRows';
 import SiderAccountMenu from './SiderAccountMenu';
 import SiderRootsModal from './SiderRootsModal';
 import SiderChatPanel from './SiderChatPanel';
+import SiderCodePanel, { type SiderDragState } from './SiderCodePanel';
 
 /* Agent status → status-dot icon (Code-mode task list). */
 /* ── Component ────────────────────────────────────────── */
@@ -88,11 +76,7 @@ export default function SiderNav({ collapsed }: SiderNavProps) {
   const [showAllSessions, setShowAllSessions] = useState<Set<string>>(new Set());
   const [skillsDirOpen, setSkillsDirOpen] = useState(false);
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
-  const dragStateRef = useRef<{ kind: 'workspace'; id: string } | { kind: 'session'; id: string; root: string } | null>(
-    null,
-  );
-  const [projectProfiles, setProjectProfiles] = useState<PermissionProfile[]>([]);
-  const [projectProfileOverrides, setProjectProfileOverrides] = useState<Record<string, string>>({});
+  const dragStateRef = useRef<SiderDragState>(null);
   const [rootsModalProject, setRootsModalProject] = useState<Project | null>(null);
   const [rootsModalRoots, setRootsModalRoots] = useState<string[]>([]);
   const [rootsModalWritable, setRootsModalWritable] = useState<string[]>([]);
@@ -128,65 +112,6 @@ export default function SiderNav({ collapsed }: SiderNavProps) {
     }
     setRootsModalProject(null);
     message.success(t('sidebar.projectRootsSaved'));
-  };
-
-  /* ── 项目级权限 Profile：覆盖项随设置加载/保存 ── */
-  useEffect(() => {
-    let alive = true;
-    const pending = window.electronAPI?.permissionProfile?.listProjectProfiles?.();
-    if (pending) {
-      pending
-        .then((r) => {
-          if (!alive || !r?.ok || !r.data) return;
-          setProjectProfiles(r.data.profiles);
-          setProjectProfileOverrides(r.data.overrides ?? {});
-        })
-        .catch(() => {});
-    }
-    return () => {
-      alive = false;
-    };
-  }, []);
-
-  const applyProjectProfile = useCallback(
-    async (path: string, profileId: string | null) => {
-      const r = await window.electronAPI?.permissionProfile?.setProjectProfile?.(path, profileId);
-      if (!r?.ok) {
-        message.error(r?.error || t('sidebar.projectPermissionSaveFailed'));
-        return;
-      }
-      setProjectProfileOverrides((prev) => {
-        const next = { ...prev };
-        if (profileId) {
-          next[path] = profileId;
-        } else {
-          delete next[path];
-        }
-        return next;
-      });
-      message.success(t('sidebar.projectPermissionSaved'));
-    },
-    [t],
-  );
-
-  const projectProfileMenu = (path: string): MenuProps['items'] => {
-    const current = projectProfileOverrides[path] ?? null;
-    const items: NonNullable<MenuProps['items']> = [
-      {
-        key: '__global__',
-        label: t('sidebar.projectPermissionGlobal'),
-        icon: current === null ? <CheckOutlined size={12} className="text-primary" /> : undefined,
-      },
-      { type: 'divider' },
-    ];
-    for (const p of projectProfiles) {
-      items.push({
-        key: p.id,
-        label: p.name,
-        icon: current === p.id ? <CheckOutlined size={12} className="text-primary" /> : undefined,
-      });
-    }
-    return items;
   };
 
   const labelCls = visualCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[200px] opacity-100 ml-2';
@@ -232,14 +157,6 @@ export default function SiderNav({ collapsed }: SiderNavProps) {
       return next;
     });
   }, []);
-
-  const addProjectWorkspace = useCallback(async () => {
-    const result = await window.electronAPI?.project.selectDirectory();
-    if (result?.ok && result.data) {
-      const p = useProjectStore.getState().addProject(result.data);
-      message.success(t('sidebar.addedWorkspace', { name: p.name }));
-    }
-  }, [t]);
 
   const startSessionInProject = useCallback((path: string) => {
     useSettingsStore.getState().setProjectPath(path);
@@ -400,385 +317,6 @@ export default function SiderNav({ collapsed }: SiderNavProps) {
     useChatStore.getState().setPendingNewTask(true);
   }, []);
 
-  const renderCodePanel = () => {
-    const viewItems: MenuProps['items'] = [
-      {
-        type: 'group',
-        label: t('sidebar.groupBy'),
-        children: [
-          {
-            key: 'groupBy-workspace',
-            label: t('sidebar.groupByWorkspace'),
-            icon: projectGroupBy === 'workspace' ? <CheckOutlined size={12} className="text-primary" /> : undefined,
-            onClick: () => useProjectStore.getState().setGroupBy('workspace'),
-          },
-          {
-            key: 'groupBy-flat',
-            label: t('sidebar.groupByFlat'),
-            icon: projectGroupBy === 'flat' ? <CheckOutlined size={12} className="text-primary" /> : undefined,
-            onClick: () => useProjectStore.getState().setGroupBy('flat'),
-          },
-        ],
-      },
-      { type: 'divider' },
-      {
-        type: 'group',
-        label: t('sidebar.sort'),
-        children: [
-          {
-            key: 'orderBy-manual',
-            label: t('sidebar.orderManual'),
-            icon: projectOrderBy === 'manual' ? <CheckOutlined size={12} className="text-primary" /> : undefined,
-            onClick: () => useProjectStore.getState().setOrderBy('manual'),
-          },
-          {
-            key: 'orderBy-updated',
-            label: t('sidebar.orderUpdated'),
-            icon: projectOrderBy === 'updated' ? <CheckOutlined size={12} className="text-primary" /> : undefined,
-            onClick: () => useProjectStore.getState().setOrderBy('updated'),
-          },
-        ],
-      },
-    ];
-    const sortSessions = (list: Session[]) => {
-      const pinned = list.filter((s) => s.pinned);
-      const rest = list.filter((s) => !s.pinned);
-      const byUpdated = (arr: Session[]) => [...arr].sort((a, b) => b.updated - a.updated);
-      return projectOrderBy === 'updated' ? [...byUpdated(pinned), ...byUpdated(rest)] : [...pinned, ...rest];
-    };
-    const orderSessionsByKey = (key: string, list: Session[]) => {
-      const order = sessionOrder[key] ?? [];
-      const rank = new Map(order.map((id, i) => [id, i]));
-      return [...sortSessions(list)].sort(
-        (a, b) => (rank.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (rank.get(b.id) ?? Number.MAX_SAFE_INTEGER),
-      );
-    };
-    const projectRank = new Map(workspaceOrder.map((id, i) => [id, i]));
-    const orderedProjects = [...projects].sort(
-      (a, b) => (projectRank.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (projectRank.get(b.id) ?? Number.MAX_SAFE_INTEGER),
-    );
-    const taskGroupMap = new Map<string, import('../../types/agent').AgentInfo[]>();
-    for (const a of agents) {
-      const key = a.projectRoot || '';
-      const list = taskGroupMap.get(key) ?? [];
-      list.push(a);
-      taskGroupMap.set(key, list);
-    }
-    const taskGroups = [...taskGroupMap.entries()];
-    const activeSessions = sessions.filter((s) => !s.archived);
-    const archivedSessions = sessions.filter((s) => s.archived);
-    const projectPaths = new Set(projects.map((p) => p.path));
-    // 工作区分组下：没有 projectRoot 的会话同样不能丢，归入“未分配”。
-    const unassignedSessions = activeSessions.filter((s) => !s.projectRoot || !projectPaths.has(s.projectRoot));
-    const renderAgentRow = (a: import('../../types/agent').AgentInfo) => (
-      <AgentRow
-        key={a.id}
-        agent={a}
-        isActive={a.id === currentAgentId}
-        pendingCount={agentPermissions[a.id]?.length ?? 0}
-        onSelect={(id) => {
-          const target = useAgentStore.getState().agents.find((x) => x.id === id);
-          if (target?.projectRoot) {
-            const project = useProjectStore.getState().ensureProject(target.projectRoot);
-            if (project) useProjectStore.getState().selectProject(project.id);
-          }
-          setCurrentAgent(id);
-        }}
-      />
-    );
-    return (
-      <div className="flex flex-col px-0 sider-code-panel">
-        {/* ── 项目工作区 （工作区树 + 会话） ── */}
-        <div className="shrink-0 flex items-center px-[18px] pt-2.5 pb-[6px]">
-          <span className="text-2xs font-semibold text-text-muted tracking-[0.06em]">{t('sidebar.projects')}</span>
-          <Dropdown menu={{ items: viewItems }} trigger={['click']} placement="bottomRight" transitionName="">
-            <button
-              type="button"
-              className="ml-auto flex items-center justify-center w-6 h-6 border-none bg-transparent text-text-muted rounded-lg cursor-pointer hover:bg-[var(--color-hover)] hover:text-text-primary"
-              title={t('sidebar.viewOptions')}
-              aria-label={t('sidebar.viewOptions')}
-            >
-              <SlidersHorizontal style={{ fontSize: 14 }} />
-            </button>
-          </Dropdown>
-          <button
-            type="button"
-            className="flex items-center justify-center w-6 h-6 border-none bg-transparent text-text-muted rounded-lg cursor-pointer hover:bg-[var(--color-hover)] hover:text-text-primary"
-            onClick={addProjectWorkspace}
-            title={t('sidebar.addWorkspace')}
-            aria-label={t('sidebar.addWorkspace')}
-          >
-            <FolderOpenOutlined size={16} />
-          </button>
-        </div>
-
-        {projectGroupBy === 'flat' ? (
-          <div className="flex flex-col gap-1 px-0 pb-1">
-            {orderSessionsByKey('__flat__', activeSessions).length === 0 ? (
-              <div className="px-[18px] py-2 text-2xs text-text-faint">{t('sidebar.noSessions')}</div>
-            ) : (
-              orderSessionsByKey('__flat__', activeSessions).map(renderSessionRow)
-            )}
-            {taskGroups.map(([root, list]) => (
-              <div key={root || '__unassigned__'} className="flex flex-col gap-1">
-                {root && (
-                  <div className="px-[18px] pt-1 pb-0.5 text-2xs text-text-faint truncate" title={root}>
-                    {root.split(/[\\/]/).pop() || root}
-                  </div>
-                )}
-                {list.map(renderAgentRow)}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="flex flex-col gap-1 px-0 pb-1">
-            {projects.length === 0 && (
-              <div className="px-[18px] py-2 text-2xs text-text-faint">{t('sidebar.noProjects')}</div>
-            )}
-            {orderedProjects.map((p) => {
-              const isCurrent =
-                p.id === currentProjectId || (settingsProjectPath !== null && p.path === settingsProjectPath);
-              const projectTasks = taskGroupMap.get(p.path) ?? [];
-              const count = activeSessions.filter((s) => s.projectRoot === p.path).length + projectTasks.length;
-              const expanded = expandedProjects.has(p.id);
-              const projectSessions = orderSessionsByKey(
-                p.path,
-                activeSessions.filter((s) => s.projectRoot === p.path),
-              );
-              const showAll = showAllSessions.has(p.id);
-              const visibleSessions = showAll ? projectSessions : projectSessions.slice(0, 5);
-              const renaming = renamingProjectId === p.id;
-              return (
-                <div key={p.id} className="ax-sidebar-group">
-                  <div
-                    className={clsx(
-                      'ax-sidebar-item ax-project-folder group w-full h-8 py-1.5 text-sm font-normal',
-                      isCurrent && 'ax-sidebar-item-active',
-                    )}
-                    data-active={isCurrent || undefined}
-                    draggable
-                    onDragStart={(e) => {
-                      e.stopPropagation();
-                      dragStateRef.current = { kind: 'workspace', id: p.id };
-                    }}
-                    onDragOver={(e) => {
-                      if (dragStateRef.current?.kind === 'workspace') {
-                        e.preventDefault();
-                        setDragOverKey(`ws-${p.id}`);
-                      }
-                    }}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      const dragged = dragStateRef.current;
-                      if (dragged?.kind === 'workspace' && dragged.id !== p.id) {
-                        useProjectStore.getState().reorderWorkspace(dragged.id, p.id);
-                      }
-                      dragStateRef.current = null;
-                      setDragOverKey(null);
-                    }}
-                    onDragEnd={() => {
-                      dragStateRef.current = null;
-                      setDragOverKey(null);
-                    }}
-                    data-drop-active={dragOverKey === `ws-${p.id}` || undefined}
-                    onClick={() => {
-                      toggleProjectExpanded(p.id);
-                      useProjectStore.getState().selectProject(p.id);
-                      const agentStore = useAgentStore.getState();
-                      const active = agentStore.agents.find((a) => a.id === agentStore.currentAgentId);
-                      if (active?.projectRoot && active.projectRoot !== p.path) {
-                        agentStore.setCurrentAgent(null);
-                      }
-                    }}
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={rowKey(() => {
-                      toggleProjectExpanded(p.id);
-                      useProjectStore.getState().selectProject(p.id);
-                      const agentStore = useAgentStore.getState();
-                      const active = agentStore.agents.find((a) => a.id === agentStore.currentAgentId);
-                      if (active?.projectRoot && active.projectRoot !== p.path) {
-                        agentStore.setCurrentAgent(null);
-                      }
-                    })}
-                    title={p.path}
-                  >
-                    <span className="ax-sidebar-icon">
-                      {expanded ? <FolderOpenOutlined size={16} /> : <FolderOutlined size={16} />}
-                    </span>
-                    {renaming ? (
-                      <Input
-                        size="small"
-                        value={renameProjectValue}
-                        onChange={(e) => setRenameProjectValue(e.target.value)}
-                        onBlur={() => {
-                          if (renameProjectValue.trim())
-                            useProjectStore.getState().renameProject(p.id, renameProjectValue.trim());
-                          setRenamingProjectId(null);
-                          setRenameProjectValue('');
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            if (renameProjectValue.trim())
-                              useProjectStore.getState().renameProject(p.id, renameProjectValue.trim());
-                            setRenamingProjectId(null);
-                            setRenameProjectValue('');
-                          }
-                          if (e.key === 'Escape') {
-                            setRenamingProjectId(null);
-                            setRenameProjectValue('');
-                          }
-                        }}
-                        className="[&_.ant-input]:!h-[22px] [&_.ant-input]:!text-xs [&_.ant-input]:!px-[6px]"
-                        autoFocus
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    ) : (
-                      <>
-                        <span className="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{p.name}</span>
-                        <span className="shrink-0 text-2xs text-text-muted font-normal tabular-nums">{count}</span>
-                        <span className="flex items-center gap-1 shrink-0 ml-1 opacity-0 group-hover:opacity-100">
-                          <Tooltip title={t('sidebar.newSessionInProject')} placement="top">
-                            <button
-                              className="flex items-center justify-center w-5 h-5 border-none bg-transparent text-text-muted rounded-lg cursor-pointer hover:bg-[var(--color-hover)] hover:text-text-primary"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                startSessionInProject(p.path);
-                              }}
-                              aria-label={t('sidebar.newSessionInProject')}
-                            >
-                              <PlusOutlined style={{ fontSize: 14 }} />
-                            </button>
-                          </Tooltip>
-                          <Tooltip title={t('sidebar.renameProject')} placement="top">
-                            <button
-                              className="flex items-center justify-center w-5 h-5 border-none bg-transparent text-text-muted rounded-lg cursor-pointer hover:bg-[var(--color-hover)] hover:text-text-primary"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setRenamingProjectId(p.id);
-                                setRenameProjectValue(p.name);
-                              }}
-                              aria-label={t('sidebar.renameProject')}
-                            >
-                              <EditOutlined style={{ fontSize: 14 }} />
-                            </button>
-                          </Tooltip>
-                          <Tooltip title={t('sidebar.projectRootsTip')} placement="top">
-                            <button
-                              className="flex items-center justify-center w-5 h-5 border-none bg-transparent text-text-muted rounded-lg cursor-pointer hover:bg-[var(--color-hover)] hover:text-text-primary"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openRootsModal(p);
-                              }}
-                              aria-label={t('sidebar.projectRoots')}
-                            >
-                              <FolderOpenOutlined style={{ fontSize: 14 }} />
-                            </button>
-                          </Tooltip>
-                          <Dropdown
-                            trigger={['click']}
-                            placement="bottomRight"
-                            menu={{
-                              items: projectProfileMenu(p.path),
-                              onClick: ({ key, domEvent }) => {
-                                domEvent.stopPropagation();
-                                void applyProjectProfile(p.path, key === '__global__' ? null : key);
-                              },
-                            }}
-                          >
-                            <button
-                              className="flex items-center justify-center w-5 h-5 border-none bg-transparent text-text-muted rounded-lg cursor-pointer hover:bg-[var(--color-hover)] hover:text-text-primary"
-                              onClick={(e) => e.stopPropagation()}
-                              title={t('sidebar.projectPermissionTip')}
-                              aria-label={t('sidebar.projectPermission')}
-                            >
-                              <ShieldCheck size={14} />
-                            </button>
-                          </Dropdown>
-                          <Popconfirm
-                            title={t('sidebar.removeProjectConfirm')}
-                            onConfirm={(e) => {
-                              e?.stopPropagation();
-                              useProjectStore.getState().removeProject(p.id);
-                            }}
-                            onCancel={(e) => {
-                              e?.stopPropagation();
-                            }}
-                            okText={t('sidebar.remove')}
-                            cancelText={t('common.cancel')}
-                            okButtonProps={{ danger: true, type: 'primary', style: { color: '#fff' } }}
-                          >
-                            <button
-                              className="flex items-center justify-center w-5 h-5 border-none bg-transparent text-text-muted rounded-lg cursor-pointer hover:bg-[var(--color-hover)] hover:text-text-primary"
-                              onClick={(e) => e.stopPropagation()}
-                              aria-label={t('sidebar.remove')}
-                            >
-                              <DeleteOutlined style={{ fontSize: 14 }} />
-                            </button>
-                          </Popconfirm>
-                        </span>
-                      </>
-                    )}
-                  </div>
-                  {expanded && (
-                    <div className="px-0 pb-1 mt-1 flex flex-col gap-1 sider-children opacity-0 animate-[projectExpandIn_0.18s_ease-out_forwards]">
-                      {projectSessions.length === 0 ? (
-                        <div className="pl-[10px] pr-[18px] py-2 text-2xs text-text-faint">
-                          {t('sidebar.noProjectSessions')}
-                        </div>
-                      ) : (
-                        visibleSessions.map(renderSessionRow)
-                      )}
-                      {projectSessions.length > 5 && (
-                        <button
-                          type="button"
-                          className="self-start ml-[28px] px-2 py-0.5 rounded-lg border-none bg-transparent text-2xs text-text-muted cursor-pointer hover:bg-[var(--color-hover)] hover:text-text-secondary"
-                          onClick={() => toggleShowAllSessions(p.id)}
-                        >
-                          {showAll ? t('sidebar.collapse') : t('sidebar.showAll', { n: projectSessions.length })}
-                        </button>
-                      )}
-                      {projectTasks.length > 0 && (
-                        <div className="sider-children-tasks mt-1 flex flex-col gap-0.5">
-                          {projectTasks.map(renderAgentRow)}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {projectGroupBy === 'workspace' && (taskGroupMap.get('') ?? []).length > 0 && (
-          <div className="ax-sidebar-group">
-            <div className="px-[18px] pt-2.5 pb-[6px] text-2xs font-semibold text-text-muted tracking-[0.06em]">
-              {t('sidebar.unassignedTasks')}
-            </div>
-            <div className="px-0 pb-1 flex flex-col gap-1">{(taskGroupMap.get('') ?? []).map(renderAgentRow)}</div>
-          </div>
-        )}
-        {unassignedSessions.length > 0 && (
-          <div className="ax-sidebar-group">
-            <div className="px-[18px] pt-2.5 pb-[6px] text-2xs font-semibold text-text-muted tracking-[0.06em]">
-              {t('sidebar.unassignedSessions')}
-            </div>
-            <div className="px-0 pb-1 flex flex-col gap-1">{unassignedSessions.map(renderSessionRow)}</div>
-          </div>
-        )}
-        {archivedSessions.length > 0 && (
-          <div className="ax-sidebar-group">
-            <div className="px-[18px] pt-2.5 pb-[6px] text-2xs font-semibold text-text-muted tracking-[0.06em]">
-              {t('sidebar.archived')}
-            </div>
-            <div className="px-0 pb-1 flex flex-col gap-1">{archivedSessions.map(renderSessionRow)}</div>
-          </div>
-        )}
-      </div>
-    );
-  };
-
   /** Render one top-nav item (新建/技能/插件/定时). */
   const renderTopItem = (f: (typeof SIDEBAR_TOP_NAV)[number]) => {
     const onClick = () => {
@@ -870,7 +408,55 @@ export default function SiderNav({ collapsed }: SiderNavProps) {
         {sidebarMode === 'work' ? (
           !visualCollapsed && <WorkSidebarPanel />
         ) : sidebarMode !== 'chat' ? (
-          !visualCollapsed && renderCodePanel()
+          !visualCollapsed && (
+            <SiderCodePanel
+              sessions={sessions}
+              projects={projects}
+              agents={agents}
+              currentAgentId={currentAgentId}
+              currentProjectId={currentProjectId}
+              settingsProjectPath={settingsProjectPath}
+              projectGroupBy={projectGroupBy}
+              projectOrderBy={projectOrderBy}
+              workspaceOrder={workspaceOrder}
+              sessionOrder={sessionOrder}
+              agentPermissions={agentPermissions}
+              expandedProjects={expandedProjects}
+              showAllSessions={showAllSessions}
+              renamingProjectId={renamingProjectId}
+              renameProjectValue={renameProjectValue}
+              onToggleProjectExpanded={toggleProjectExpanded}
+              onToggleShowAllSessions={toggleShowAllSessions}
+              onRenameStart={(id, value) => {
+                setRenamingProjectId(id);
+                setRenameProjectValue(value);
+              }}
+              onRenameChange={setRenameProjectValue}
+              onRenameCommit={(id, value) => {
+                if (value.trim()) useProjectStore.getState().renameProject(id, value.trim());
+                setRenamingProjectId(null);
+                setRenameProjectValue('');
+              }}
+              onRenameCancel={() => {
+                setRenamingProjectId(null);
+                setRenameProjectValue('');
+              }}
+              onStartSession={startSessionInProject}
+              onOpenRoots={openRootsModal}
+              onSelectAgent={(id) => {
+                const target = useAgentStore.getState().agents.find((x) => x.id === id);
+                if (target?.projectRoot) {
+                  const project = useProjectStore.getState().ensureProject(target.projectRoot);
+                  if (project) useProjectStore.getState().selectProject(project.id);
+                }
+                setCurrentAgent(id);
+              }}
+              renderSessionRow={renderSessionRow}
+              dragStateRef={dragStateRef}
+              dragOverKey={dragOverKey}
+              setDragOverKey={setDragOverKey}
+            />
+          )
         ) : (
           <SiderChatPanel
             collapsed={visualCollapsed}
