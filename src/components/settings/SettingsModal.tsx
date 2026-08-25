@@ -11,13 +11,11 @@ import { buildAgentRuntimeFields } from './agentRuntimeSchema';
 import AccountPane from './AccountPane';
 import { SettingsCostPane } from './SettingsCostPane';
 import { SettingsAboutPane } from './SettingsAboutPane';
-import {
-  SettingsGeneralPane,
-  SettingsAppearancePane,
-  SettingsPluginsPane,
-} from './SettingsPanes';
+import { SettingsGeneralPane } from './SettingsPanes';
 import { SettingsKeybindingsPane } from './SettingsKeybindingsPane';
 import { SettingsPermissionsPane } from './SettingsPermissionsPane';
+import { SettingsAppearancePane } from './SettingsAppearancePane';
+import { SettingsPluginsPane } from './SettingsPluginsPane';
 import {
   SettingsActionsPane,
   SettingsWorkflowsPane,
