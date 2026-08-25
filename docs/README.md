@@ -950,7 +950,7 @@ The app uses `dotenv` to load environment variables from `.env` at the project r
 - **Renderer tests**: `src/**/__tests__/`, jsdom environment (@testing-library/react)
 - **Total**: 244 test files / 1,784 cases passing (+3 environment-skips)
 - **Coverage scope**: the gate only counts `electron/ipc/`, `src/stores/`, `src/core/`; UI components (`src/components/`) and main-process entry points (`main.ts` / `preload.ts` etc.) are excluded from the gate and covered by component tests + Playwright E2E (`npm run test:e2e`)
-- **Coverage thresholds**: lines/statements 80%, branches 70%, functions 80% (current: 85.18% lines / 78.86% branches / 87.78% functions)
+- **Coverage thresholds**: lines/statements 80%, branches 70%, functions 80% (current: 85.18% lines / 78.85% branches / 87.78% functions)
 - **Coverage report**: `npm run test:coverage` outputs `coverage/coverage-summary.json` (gitignored dev artifact); the Settings "Test coverage" page reads it live via the `coverage:get` IPC; pure browser dev is served by a Vite middleware, and production builds copy it into `dist/coverage/`. When the report is missing, the panel shows the command to run instead of fake numbers
 - **E2E**: 16 Playwright UI flows passing (real Electron, including register → login → remember-me persistence)
 - **Real-API acceptance (DeepSeek)**: chat streaming, Code auto-approve Bash, Code "confirm each time" permission card (write after one approval), Work smart-execution flow, and Work plan-approval panel all verified; sandbox scripts add cwd fallback when launching `dist-electron/main.js` directly (`electron/sandbox-runner.ts`)

@@ -37,7 +37,7 @@
 - Added API endpoint and network-policy regression tests, plus MCP server-ID
   scoping coverage.
 - Quality gate: 244 test files / 1,784 passing cases (+3 environment skips);
-  coverage 85.18% lines/statements, 78.86% branches, 87.78% functions.
+  coverage 85.18% lines/statements, 78.85% branches, 87.78% functions.
 
 ## v3.0.1 (2026-08-20)
 
