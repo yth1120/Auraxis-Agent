@@ -1,17 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Popconfirm, Tooltip, Input, message, Dropdown, Modal, Checkbox } from 'antd';
+import { Popconfirm, Tooltip, Input, message, Dropdown, Modal } from 'antd';
 import type { MenuProps } from 'antd';
 import {
-  CaretRight,
   Check as CheckOutlined,
   Folder as FolderOutlined,
   FolderOpen as FolderOpenOutlined,
   SlidersHorizontal,
   ShieldCheck,
-  XCircle as CloseCircleOutlined,
   Trash as DeleteOutlined,
   PencilSimple as EditOutlined,
-  ChatTeardropDots as MessageOutlined,
   MagnifyingGlass as SearchOutlined,
   Plus as PlusOutlined,
   SidebarSimple as SidebarSimpleIcon,
@@ -30,8 +27,9 @@ import logoPng from '../../assets/auraxis-logo.png';
 import { useT } from '../../i18n';
 import type { PermissionProfile } from '../../types/electron-api';
 import { SessionRow, AgentRow, rowKey, SIDEBAR_TOP_NAV } from './SiderNavRows';
-import { groupSessionsByTime, groupSessionsByProject } from '../../utils/groupSessions';
 import SiderAccountMenu from './SiderAccountMenu';
+import SiderRootsModal from './SiderRootsModal';
+import SiderChatPanel from './SiderChatPanel';
 
 /* Agent status → status-dot icon (Code-mode task list). */
 /* ── Component ────────────────────────────────────────── */
@@ -392,95 +390,6 @@ export default function SiderNav({ collapsed }: SiderNavProps) {
       dropActive={dragOverKey === s.id}
     />
   );
-
-  /* ── Chat panel (conversation history) ─────────────── */
-  const renderChatPanel = () => {
-    const activeSessions = sessions.filter((s) => !s.archived);
-    const archivedSessions = sessions.filter((s) => s.archived).sort((a, b) => b.updated - a.updated);
-    const sortedSessions = [...activeSessions].sort(
-      (a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || b.updated - a.updated,
-    );
-    const projectGroups = groupSessionsByProject(
-      sortedSessions,
-      (s) => s.projectRoot,
-      (s) => s.updated,
-    );
-    const timeGroups = groupSessionsByTime(sortedSessions, (s) => s.updated);
-    const singleProject = projectGroups.length <= 1;
-
-    const renderSessionRows = (items: Session[]) => items.map(renderSessionRow);
-
-    return (
-      <>
-        {/* ── 对话 (original session list, unchanged) ── */}
-        {!visualCollapsed && <div className="ax-sidebar-label !px-[18px] !pb-[6px]">{t('nav.chat')}</div>}
-        <div className="flex flex-col gap-1 px-0 pb-1 sider-tree">
-          {activeSessions.length === 0 ? (
-            <div className="ax-sidebar-group flex flex-col items-center justify-center gap-[6px] px-4 py-10 text-center">
-              <MessageOutlined className="text-[26px] text-text-faint opacity-75 mb-0.5" />
-              <span className="text-sm font-medium text-text-muted">{t('sidebar.noChats')}</span>
-              <span className="text-2xs text-text-muted leading-[1.5]">{t('sidebar.clickNewChat')}</span>
-            </div>
-          ) : singleProject ? (
-            timeGroups.map((group) => (
-              <div key={group.label} className="ax-sidebar-group">
-                <div className="px-[18px] pt-2.5 pb-[6px] text-2xs font-semibold text-text-muted tracking-[0.06em]">
-                  {group.label}
-                </div>
-                <div className="px-0 pb-1 flex flex-col gap-1">{renderSessionRows(group.items)}</div>
-              </div>
-            ))
-          ) : (
-            projectGroups.map((pg) => {
-              const key = pg.projectRoot ?? '__unassigned__';
-              const isCollapsed = collapsedProjects.has(key);
-              return (
-                <div key={key} className="ax-sidebar-group">
-                  <button
-                    className="flex items-center gap-1 w-full px-[18px] pt-2.5 pb-[6px] border-none bg-transparent text-text-muted text-2xs font-semibold tracking-[0.06em] font-body cursor-pointer text-left hover:text-text-secondary"
-                    onClick={() => {
-                      toggleProject(key);
-                      if (pg.projectRoot) {
-                        const project = useProjectStore.getState().ensureProject(pg.projectRoot);
-                        if (project) useProjectStore.getState().selectProject(project.id);
-                      }
-                    }}
-                    title={pg.projectRoot ?? t('sidebar.unspecifiedProject')}
-                  >
-                    <span
-                      className={clsx(
-                        'flex items-center justify-center w-[14px] h-[14px] shrink-0 text-text-muted',
-                        !isCollapsed && 'rotate-90',
-                      )}
-                    >
-                      <CaretRight />
-                    </span>
-                    <span className="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
-                      {pg.projectName}
-                    </span>
-                    <span className="shrink-0 min-w-4 text-2xs font-semibold text-center text-text-muted">
-                      {pg.items.length}
-                    </span>
-                  </button>
-                  {!isCollapsed && (
-                    <div className="px-0 pb-1 mt-0.5 flex flex-col gap-1">{renderSessionRows(pg.items)}</div>
-                  )}
-                </div>
-              );
-            })
-          )}
-          {archivedSessions.length > 0 && (
-            <div className="ax-sidebar-group">
-              <div className="px-[18px] pt-2.5 pb-[6px] text-2xs font-semibold text-text-muted tracking-[0.06em]">
-                {t('sidebar.archived')}
-              </div>
-              <div className="px-0 pb-1 flex flex-col gap-1">{renderSessionRows(archivedSessions)}</div>
-            </div>
-          )}
-        </div>
-      </>
-    );
-  };
 
   /* ── Code panel (parallel Agent task list) ─────────── */
   const handleNewTask = useCallback(() => {
@@ -958,11 +867,23 @@ export default function SiderNav({ collapsed }: SiderNavProps) {
           {/* 「工具」按钮已移除：技能 / 插件中心 / 定时任务直接常驻显示。 */}
           {SIDEBAR_TOP_NAV.filter((f) => f.key === 'new' || sidebarMode !== 'chat').map(renderTopItem)}
         </div>
-        {sidebarMode === 'work'
-          ? !visualCollapsed && <WorkSidebarPanel />
-          : sidebarMode !== 'chat'
-            ? !visualCollapsed && renderCodePanel()
-            : renderChatPanel()}
+        {sidebarMode === 'work' ? (
+          !visualCollapsed && <WorkSidebarPanel />
+        ) : sidebarMode !== 'chat' ? (
+          !visualCollapsed && renderCodePanel()
+        ) : (
+          <SiderChatPanel
+            collapsed={visualCollapsed}
+            sessions={sessions}
+            collapsedProjects={collapsedProjects}
+            toggleProject={toggleProject}
+            onSelectProject={(path) => {
+              const project = useProjectStore.getState().ensureProject(path);
+              if (project) useProjectStore.getState().selectProject(project.id);
+            }}
+            renderSessionRow={renderSessionRow}
+          />
+        )}
       </div>
 
       <SiderAccountMenu
@@ -983,59 +904,23 @@ export default function SiderNav({ collapsed }: SiderNavProps) {
 
       <SkillsDirectory open={skillsDirOpen} onClose={() => setSkillsDirOpen(false)} />
 
-      <Modal
+      <SiderRootsModal
         open={!!rootsModalProject}
+        roots={rootsModalRoots}
+        writable={rootsModalWritable}
         onCancel={() => setRootsModalProject(null)}
-        onOk={saveRootsModal}
-        okText={t('common.confirm')}
-        cancelText={t('common.cancel')}
-        title={t('sidebar.projectRoots')}
-        width={440}
-        destroyOnClose
-      >
-        <div className="flex flex-col gap-1.5 py-1">
-          {rootsModalRoots.map((root, index) => (
-            <div key={root} className="flex items-center gap-2 rounded-lg bg-[var(--color-bg-secondary)] px-2 py-1.5">
-              <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-xs text-text-secondary">
-                {root}
-                {index === 0 ? `（${t('sidebar.projectRootsPrimary')}）` : ''}
-              </span>
-              <Checkbox
-                checked={rootsModalWritable.includes(root)}
-                onChange={(e) => {
-                  const writable = e.target.checked;
-                  setRootsModalWritable((prev) =>
-                    writable ? (prev.includes(root) ? prev : [...prev, root]) : prev.filter((r) => r !== root),
-                  );
-                }}
-              >
-                {t('sidebar.projectRootsWritable')}
-              </Checkbox>
-              {index > 0 && (
-                <button
-                  type="button"
-                  className="border-none bg-transparent text-text-muted cursor-pointer w-5 h-5 rounded-md flex items-center justify-center hover:bg-[var(--color-hover)] hover:text-text-primary"
-                  onClick={() => {
-                    setRootsModalRoots((prev) => prev.filter((r) => r !== root));
-                    setRootsModalWritable((prev) => prev.filter((r) => r !== root));
-                  }}
-                  aria-label={t('sidebar.remove')}
-                >
-                  <CloseCircleOutlined style={{ fontSize: 13 }} />
-                </button>
-              )}
-            </div>
-          ))}
-          <button
-            type="button"
-            className="flex items-center justify-center gap-1.5 mt-1 h-8 rounded-lg border border-dashed border-[var(--color-border-default)] bg-transparent text-xs text-text-muted cursor-pointer hover:bg-[var(--color-hover)] hover:text-text-secondary"
-            onClick={() => void addRootFromPicker()}
-          >
-            <PlusOutlined style={{ fontSize: 13 }} />
-            {t('sidebar.projectRootsAdd')}
-          </button>
-        </div>
-      </Modal>
+        onSave={saveRootsModal}
+        onAddRoot={() => void addRootFromPicker()}
+        onRemoveRoot={(root) => {
+          setRootsModalRoots((prev) => prev.filter((r) => r !== root));
+          setRootsModalWritable((prev) => prev.filter((r) => r !== root));
+        }}
+        onToggleWritable={(root, checked) => {
+          setRootsModalWritable((prev) =>
+            checked ? (prev.includes(root) ? prev : [...prev, root]) : prev.filter((r) => r !== root),
+          );
+        }}
+      />
     </nav>
   );
 }
