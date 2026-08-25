@@ -1,21 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Dropdown, Layout, Modal, message } from 'antd';
+import { Dropdown, Layout, message } from 'antd';
 import type { MenuProps } from 'antd';
-import {
-  ArrowLeft,
-  ArrowRight,
-  Cube,
-  PanelBottom,
-  Bell,
-  MagnifyingGlass,
-  ChatTeardropDots,
-  ChatCircle,
-  Robot,
-  Minus,
-  Square,
-  Copy,
-  X,
-} from '@/components/common/icons';
+import { ArrowLeft, ArrowRight, Cube, PanelBottom, Bell, Minus, Square, Copy, X } from '@/components/common/icons';
 import { Allotment, type AllotmentHandle } from 'allotment';
 import clsx from 'clsx';
 import { useAppStore } from '../../stores/useAppStore';
@@ -27,7 +13,6 @@ import { useAgentStore } from '../../stores/useAgentStore';
 import { useNotificationStore } from '../../stores/useNotificationStore';
 import { useTerminalTasksStore } from '../../stores/useTerminalTasksStore';
 import { useSettingsStore } from '../../stores/useSettingsStore';
-import { getContentText } from '../../types/chat';
 import { useT } from '../../i18n';
 
 import SiderNav from './SiderNav';
@@ -36,7 +21,8 @@ import ChatArea from './ChatArea';
 import WorkbenchActionsButton from './WorkbenchActionsButton';
 import TerminalDrawer from './TerminalDrawer';
 import HeaderStatusInfo from './HeaderStatusInfo';
-import { COCKPIT_TABS, PANEL_LABELS, relativeSearchTime } from './WorkbenchLayoutData';
+import { COCKPIT_TABS, PANEL_LABELS } from './WorkbenchLayoutData';
+import GlobalSearchModal from './GlobalSearchModal';
 
 const DiffPanel = lazy(() => import('./DiffPanel'));
 const PreviewBrowser = lazy(() => import('./PreviewBrowser'));
@@ -79,34 +65,12 @@ export default function WorkbenchLayout() {
   const showSettings = useAppStore((s) => s.showSettings);
 
   const isElectron = typeof window !== 'undefined' && !!window.electronAPI;
-  const [searchResults, setSearchResults] = useState<
-    { type: 'chat' | 'agent' | 'session'; id: string; title: string; snippet: string; ts: number; score: number }[]
-  >([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchIndex, setSearchIndex] = useState(-1);
-  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const searchInputRef = useRef<HTMLInputElement | null>(null);
-  // Monotonic sequence so a slow FTS response can never overwrite results
-  // for a newer query (async race: old query resolves after new one).
-  const searchSeq = useRef(0);
-
   // Opening the settings modal closes the global search dialog.
   useEffect(() => {
     if (showSettings) {
       setGlobalSearchOpen(false);
-      setSearchQuery('');
-      setSearchResults([]);
-      setSearchIndex(-1);
     }
   }, [showSettings, setGlobalSearchOpen]);
-
-  // 弹窗打开时聚焦输入框。
-  useEffect(() => {
-    if (globalSearchOpen) {
-      const id = setTimeout(() => searchInputRef.current?.focus(), 50);
-      return () => clearTimeout(id);
-    }
-  }, [globalSearchOpen]);
 
   const worktreeActive = useWorktreeStore((s) => s.active);
   const worktreeTaskId = useWorktreeStore((s) => s.taskId);
@@ -284,23 +248,6 @@ export default function WorkbenchLayout() {
     const w = containerW || (typeof window !== 'undefined' ? window.innerWidth : 1280);
     return [Math.max(MAIN_MIN, w - sider)];
   }, [containerW, sidebarCollapsed, sidebarWidth]);
-
-  const openSearchResult = (r: { type: 'chat' | 'agent' | 'session'; id: string }) => {
-    setGlobalSearchOpen(false);
-    setSearchResults([]);
-    setSearchQuery('');
-    setSearchIndex(-1);
-    const appState = useAppStore.getState();
-    appState.setActiveToolView('none');
-    if (r.type === 'session' || r.type === 'chat') {
-      appState.setSidebarMode('chat');
-      useChatStore.getState().switchSession(r.id);
-    } else {
-      const targetSurface = useAgentStore.getState().agents.find((a) => a.id === r.id)?.surface ?? 'code';
-      appState.setSidebarMode(targetSurface === 'work' ? 'work' : 'code');
-      useAgentStore.getState().setCurrentAgent(r.id);
-    }
-  };
 
   // ── Resize helper — sync correction for Allotment's proportional defaultSizes ──
   const resizePanes = useCallback(() => {
@@ -534,237 +481,7 @@ export default function WorkbenchLayout() {
 
           <HeaderStatusInfo />
 
-          <Modal
-            open={globalSearchOpen}
-            onCancel={() => setGlobalSearchOpen(false)}
-            footer={null}
-            width={640}
-            centered
-            closable={false}
-            className="global-search-modal"
-            transitionName=""
-            maskTransitionName=""
-            destroyOnHidden
-            styles={{ mask: { background: 'var(--glass-mask)' }, body: { padding: 0 }, content: { padding: 0 } }}
-          >
-            <div className="flex flex-col overflow-hidden rounded-2xl border border-[var(--color-border-dim)] bg-[var(--color-bg-elevated)] shadow-[var(--shadow-lg)]">
-              {/* 搜索输入栏 */}
-              <div className="flex items-center gap-3 shrink-0 h-14 px-4 border-b border-[var(--color-border-dim)]">
-                <MagnifyingGlass size={18} className="shrink-0 text-text-muted" />
-                <input
-                  ref={searchInputRef}
-                  id="global-search-input"
-                  type="search"
-                  placeholder={t('search.placeholder')}
-                  value={searchQuery}
-                  onChange={(e) => {
-                    const q = e.target.value;
-                    const seq = ++searchSeq.current;
-                    setSearchQuery(q);
-                    setSearchIndex(-1);
-                    if (searchTimer.current) clearTimeout(searchTimer.current);
-                    if (!q.trim()) {
-                      setSearchResults([]);
-                      searchSeq.current++;
-                      return;
-                    }
-                    searchTimer.current = setTimeout(() => {
-                      const ql = q.trim().toLowerCase();
-                      const local = useSessionStore
-                        .getState()
-                        .sessions.filter(
-                          (s) =>
-                            s.title.toLowerCase().includes(ql) ||
-                            s.messages.some((m) => getContentText(m.content).toLowerCase().includes(ql)),
-                        )
-                        .slice(0, 6)
-                        .map((s) => {
-                          const last = s.messages[s.messages.length - 1];
-                          return {
-                            type: 'session' as const,
-                            id: s.id,
-                            title: s.title,
-                            snippet: last ? getContentText(last.content).replace(/\s+/g, ' ').slice(0, 90) : '',
-                            ts: s.updated,
-                            score: 1,
-                          };
-                        });
-                      const fts = window.electronAPI?.fts?.search;
-                      if (fts) {
-                        void fts(q, 8)
-                          .then((r) => {
-                            if (seq !== searchSeq.current) return;
-                            setSearchResults([...local, ...(r.ok && r.data ? r.data : [])]);
-                            setSearchIndex(0);
-                          })
-                          .catch(() => {
-                            if (seq === searchSeq.current) setSearchResults(local);
-                          });
-                      } else {
-                        setSearchResults(local);
-                        setSearchIndex(0);
-                      }
-                    }, 250);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'ArrowDown') {
-                      e.preventDefault();
-                      setSearchIndex((i) => (searchResults.length ? (i + 1) % searchResults.length : 0));
-                    } else if (e.key === 'ArrowUp') {
-                      e.preventDefault();
-                      setSearchIndex((i) =>
-                        searchResults.length ? (i - 1 + searchResults.length) % searchResults.length : 0,
-                      );
-                    } else if (e.key === 'Enter') {
-                      const target = searchResults[searchIndex >= 0 ? searchIndex : 0];
-                      if (target) openSearchResult(target);
-                    } else if (e.key === 'Escape') {
-                      setGlobalSearchOpen(false);
-                      (e.target as HTMLInputElement).blur();
-                    }
-                  }}
-                  style={{ borderRadius: 0 }}
-                  className="flex-1 min-w-0 h-full rounded-none bg-transparent text-base text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] outline-none [&::-webkit-search-cancel-button]:hidden"
-                />
-                {searchQuery.trim() && (
-                  <span className="shrink-0 text-2xs text-text-faint tabular-nums">
-                    {t('search.results', { n: searchResults.length })}
-                  </span>
-                )}
-                {searchQuery && (
-                  <button
-                    type="button"
-                    aria-label={t('search.clear')}
-                    className="shrink-0 flex items-center justify-center w-5 h-5 rounded-full text-text-muted hover:text-text-primary hover:bg-[var(--color-hover)]"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => {
-                      searchSeq.current++;
-                      setSearchQuery('');
-                      setSearchResults([]);
-                      setSearchIndex(-1);
-                    }}
-                  >
-                    <X size={10} weight="bold" />
-                  </button>
-                )}
-              </div>
-
-              {/* 结果区 */}
-              <div className="min-h-[200px] max-h-[400px] overflow-y-auto p-2">
-                {!searchQuery.trim() ? (
-                  <div className="flex flex-col items-center justify-center gap-2.5 px-4 py-10 text-center">
-                    <span className="flex items-center justify-center w-12 h-12 text-text-faint">
-                      <MagnifyingGlass size={20} />
-                    </span>
-                    <span className="text-sm font-medium text-text-secondary">{t('search.start')}</span>
-                    <span className="text-2xs text-text-faint leading-[1.6]">{t('search.scope')}</span>
-                  </div>
-                ) : searchResults.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center gap-2.5 px-4 py-10 text-center">
-                    <span className="flex items-center justify-center w-12 h-12 text-text-faint">
-                      <MagnifyingGlass size={20} />
-                    </span>
-                    <span className="text-sm font-medium text-text-secondary">{t('search.noResults')}</span>
-                    <span className="text-2xs text-text-faint leading-[1.6]">{t('search.tryAgain')}</span>
-                  </div>
-                ) : (
-                  <div role="listbox" aria-label={t('search.placeholder')} className="flex flex-col gap-2">
-                    {(['session', 'chat', 'agent'] as const).map((group) => {
-                      const groupItems = searchResults.filter((r) => r.type === group);
-                      if (groupItems.length === 0) return null;
-                      const groupLabel =
-                        group === 'session'
-                          ? t('search.groupSession')
-                          : group === 'chat'
-                            ? t('search.groupChat')
-                            : 'Code';
-                      return (
-                        <div key={group} className="flex flex-col gap-0.5">
-                          <div className="flex items-center gap-1.5 px-2.5 pt-1.5 pb-1">
-                            <span className="text-2xs font-semibold text-text-faint tracking-[0.06em]">
-                              {groupLabel}
-                            </span>
-                            <span className="text-2xs text-text-faint tabular-nums">{groupItems.length}</span>
-                          </div>
-                          {groupItems.map((r, gi) => {
-                            const idx = searchResults.indexOf(r);
-                            const icon =
-                              group === 'session' ? (
-                                <ChatTeardropDots size={14} weight="regular" />
-                              ) : group === 'chat' ? (
-                                <ChatCircle size={14} weight="regular" />
-                              ) : (
-                                <Robot size={14} weight="regular" />
-                              );
-                            const iconCls =
-                              group === 'session'
-                                ? 'text-[var(--color-violet)]'
-                                : group === 'chat'
-                                  ? 'text-[var(--color-primary)]'
-                                  : 'text-[var(--color-violet)]';
-                            return (
-                              <button
-                                key={`${group}-${r.id}-${gi}`}
-                                type="button"
-                                role="option"
-                                aria-selected={idx === searchIndex}
-                                className={clsx(
-                                  'flex items-center gap-3 w-full h-11 px-3 rounded-lg text-left cursor-pointer transition-colors duration-100',
-                                  idx === searchIndex ? 'bg-primary-soft' : 'hover:bg-[var(--color-hover)]',
-                                )}
-                                onMouseDown={(e) => {
-                                  e.preventDefault();
-                                  openSearchResult(r);
-                                }}
-                                onMouseEnter={() => setSearchIndex(idx)}
-                              >
-                                <span className={`shrink-0 flex items-center justify-center w-8 h-8 ${iconCls}`}>
-                                  {icon}
-                                </span>
-                                <span className="min-w-0 flex-1 flex flex-col gap-[2px]">
-                                  <span className="flex items-baseline gap-2 min-w-0">
-                                    <span className="flex-1 min-w-0 text-sm font-medium text-text-primary truncate">
-                                      {r.title}
-                                    </span>
-                                    <span className="shrink-0 text-2xs text-text-faint tabular-nums">
-                                      {relativeSearchTime(r.ts)}
-                                    </span>
-                                  </span>
-                                  {r.snippet && <span className="text-xs text-text-muted truncate">{r.snippet}</span>}
-                                </span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* 快捷键提示 */}
-              <div className="flex items-center gap-4 shrink-0 h-10 px-4 border-t border-[var(--color-border-dim)] text-2xs text-text-faint">
-                <span className="flex items-center gap-1.5">
-                  <kbd className="inline-flex items-center justify-center min-w-5 h-5 px-1 rounded-md bg-[var(--color-bg-inset)] border border-[var(--color-border-dim)] text-2xs font-medium text-text-secondary">
-                    ↑↓
-                  </kbd>
-                  {t('search.upDown')}
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <kbd className="inline-flex items-center justify-center min-w-5 h-5 px-1 rounded-md bg-[var(--color-bg-inset)] border border-[var(--color-border-dim)] text-2xs font-medium text-text-secondary">
-                    Enter
-                  </kbd>
-                  {t('search.enter')}
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <kbd className="inline-flex items-center justify-center min-w-5 h-5 px-1 rounded-md bg-[var(--color-bg-inset)] border border-[var(--color-border-dim)] text-2xs font-medium text-text-secondary">
-                    Esc
-                  </kbd>
-                  {t('search.esc')}
-                </span>
-              </div>
-            </div>
-          </Modal>
+          <GlobalSearchModal open={globalSearchOpen} onClose={() => setGlobalSearchOpen(false)} />
 
           {worktreeActive && (
             <span className="ax-badge" title={t('header.sandbox', { id: worktreeTaskId || 'active' })}>
