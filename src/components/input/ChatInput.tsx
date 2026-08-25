@@ -5,30 +5,21 @@ import { useSmartDropdown, type DropdownPosition } from '../../hooks/useSmartDro
 import clsx from 'clsx';
 import { useChatStore } from '../../stores/useChatStore';
 import { useAppStore } from '../../stores/useAppStore';
-import { useSessionStore } from '../../stores/useSessionStore';
 import { useInspectorStore, selectPendingPlan } from '../../stores/useInspectorStore';
 import { useAutoResize } from '../../hooks/useAutoResize';
 import { useSettingsStore } from '../../stores/useSettingsStore';
-import { useProjectStore } from '../../stores/useProjectStore';
 import ChatInputComposer from './ChatInputComposer';
 import { useChatInputMentions } from './useChatInputMentions';
-import { resolveSessionRefs } from '../../utils/sessionRefs';
-import { resolveFollowTarget } from '../../utils/followTarget';
+import { executeLeadingCommand, launchAgentTask, recordCommand } from './ChatInputActions';
 import { useT } from '../../i18n';
 import {
   greeting,
   parsePendingImages,
-  resolveAgentConfig,
-  resolvePlanAgentConfig,
-  resolveWorkAgentConfig,
   type ChatInputProps,
 } from './ChatInputUtils';
-import type { WorkAutonomyTier } from '../../types/advanced';
-import { mapThinkingLevelToEffort } from '../../types/chat';
 import GhostToast from '../layout/GhostToast';
-import { SLASH_COMMANDS, executeCommand, createAgent, type SlashCommand } from '../../constants/commands';
-import { listSlashCommands, findPluginCommand, resolveSkillRefs } from '../../utils/slashCommands';
-import { scrubSandboxPaths } from '../../utils/scrub';
+import { SLASH_COMMANDS, executeCommand, type SlashCommand } from '../../constants/commands';
+import { findPluginCommand } from '../../utils/slashCommands';
 import { useAgentStore } from '../../stores/useAgentStore';
 import { AGENT_SKILLS, type AgentSkill } from '../../core/skills';
 import { useAuthStore } from '../../stores/useAuthStore';
@@ -271,179 +262,25 @@ export default function ChatInput({ position, heroSubtitleKey }: ChatInputProps)
   // Code mode: each send launches a new parallel Agent task (via the
   // background agent engine), instead of a plain chat turn.
   const startCodeTask = useCallback(
-    async (instruction: string, opts?: { clearInput?: boolean }) => {
-      const trimmed = instruction.trim();
-      if (!trimmed) return;
-      const withSkills = resolveSkillRefs(trimmed, allSkills);
-      const resolved = resolveSessionRefs(withSkills, useSessionStore.getState().sessions);
-      const instructionText = resolved.text;
-      // Resolve the follow-up target FRESH at send time — never trust a captured
-      // closure: the task may have settled (or been replaced) between renders.
-      const chatState = useChatStore.getState();
-      const agentState = useAgentStore.getState();
-      const selectedAgent = agentState.currentAgentId
-        ? (agentState.agents.find((a) => a.id === agentState.currentAgentId) ?? null)
-        : null;
-      const follow = resolveFollowTarget({
-        selected: selectedAgent,
-        agents: agentState.agents,
-        pendingNewTask: chatState.pendingNewTask,
-      });
-      // A "start fresh" intent is consumed by this send (or skipped when an
-      // explicit continuation target outranked it).
-      if (chatState.pendingNewTask) chatState.setPendingNewTask(false);
-      const isFollow = !!follow;
-      const name = isFollow
-        ? '↳ ' + (trimmed.length > 20 ? trimmed.slice(0, 20) + '…' : trimmed)
-        : trimmed.length > 24
-          ? trimmed.slice(0, 24) + '…'
-          : trimmed;
-      // Follow-up: seed the new agent with the prior task's goal + result so it
-      // continues the thread. (Completed tasks free their worktree, so a fresh
-      // agent with carried context is the sound way to continue.)
-      // Sandbox paths in the prior result would lure the model into ls-ing the
-      // agent-workspaces graveyard ("看看之前的项目") — scrub them out.
-      const priorResult = scrubSandboxPaths(follow?.result || '（无结果记录）').slice(0, 2000);
-      const finalInstruction = isFollow
-        ? `请继续当前任务，在前序工作的基础上推进。\n\n【任务背景】\n${follow!.description || follow!.name}\n\n【当前进展】\n${priorResult}\n\n【现在请继续】\n${instructionText}\n\n请继续在同一个工作目录内工作，不要访问历史任务的沙箱目录。`
-        : instructionText;
-      // Same-task continuation: reuse the settled agent (id / workspace /
-      // transcript) instead of spawning a NEW task.
-      if (follow) {
-        const cont = await useAgentStore.getState().continueAgent(follow.id, finalInstruction, instructionText);
-        if (cont.ok) {
-          if (opts?.clearInput !== false) useChatStore.getState().setInputValue('');
-          useAgentStore.getState().setCurrentAgent(follow.id);
-          return follow.id;
-        }
-        message.error(cont.error || t('composer.continueFailed'));
-        return null;
-      }
-      const activeProjectPath =
-        useChatStore.getState().currentProjectPath || useSettingsStore.getState().projectPath || '';
-      if (!activeProjectPath) {
-        message.error(t('composer.needProject'));
-        return null;
-      }
-      // /plan arms the next send in plan mode; resolve fresh at send time.
-      const planNext = useChatStore.getState().pendingPlanMode;
-      if (planNext) useChatStore.getState().setPendingPlanMode(false);
-      // /tool arms the next task's tool_choice; consume once.
-      const toolChoice = useChatStore.getState().pendingToolChoice;
-      if (toolChoice) useChatStore.getState().setPendingToolChoice(null);
-      // Work 模式使用自己的执行档位；Code 模式仍走全局权限预设。
-      const isWorkMode = useAppStore.getState().sidebarMode === 'work';
-      const workTier = useAppStore.getState().workAutonomyTier;
-      // /plan 显式武装时，Work 也强制计划审批（不随档位变化）。
-      const effectiveWorkTier: WorkAutonomyTier = isWorkMode && planNext ? 'plan' : workTier;
-      const cfg = isWorkMode
-        ? resolveWorkAgentConfig(effectiveWorkTier)
-        : planNext
-          ? resolvePlanAgentConfig(permissionPreset)
-          : resolveAgentConfig(permissionPreset);
-      const activeGoal = useChatStore.getState().goal;
-      // 项目多根：把当前项目的工作区根与可写根透传给 Agent 工具边界。
-      const activeProject = activeProjectPath
-        ? useProjectStore.getState().projects.find((p) => p.path === activeProjectPath)
-        : undefined;
-      const id = await createAgent({
-        name,
-        type: cfg.type,
-        instruction: finalInstruction,
-        // UI shows the user's literal words — the follow-up wrapper above is
-        // backend prompt material and must never render in the task header.
-        displayText: trimmed,
-        model: selectedModel,
-        // Work/Code 默认思考开启（Chat 由面板思考开关控制）。
-        isDeepThink: true,
-        // Map UI 3-level → API 3-level: low → low, medium → high, high → max
-        reasoningEffort: mapThinkingLevelToEffort(reasoningEffort),
-        toolChoice: toolChoice ?? undefined,
-        priority: taskPriority,
-        autoApprove: cfg.autoApprove,
-        mode: cfg.mode,
-        workTier: isWorkMode ? effectiveWorkTier : undefined,
-        workspaceRoots: activeProject?.roots && activeProject.roots.length > 0 ? activeProject.roots : undefined,
-        writableRoots:
-          activeProject?.writableRoots && activeProject.writableRoots.length > 0
-            ? activeProject.writableRoots
-            : undefined,
-        goal: activeGoal ? { text: activeGoal.text, maxRounds: 256 } : null,
-      });
-      if (id) {
-        if (opts?.clearInput !== false) useChatStore.getState().setInputValue('');
-        useAgentStore.getState().setCurrentAgent(id);
-        // Goal-sourced turn: advance the durable round counter （目标状态）.
-        const sessionId = useSessionStore.getState().currentSessionId;
-        if (activeGoal && sessionId && window.electronAPI?.goal) {
-          void window.electronAPI.goal.round(sessionId);
-        }
-      } else {
-        message.error(t('composer.createFailed'));
-      }
-    },
-    [selectedModel, permissionPreset, taskPriority, reasoningEffort, allSkills, t],
+    (instruction: string, opts?: { clearInput?: boolean }) =>
+      launchAgentTask({
+        instruction,
+        clearInput: opts?.clearInput,
+        allSkills,
+        permissionPreset,
+        selectedModel,
+        reasoningEffort,
+        taskPriority,
+        t,
+      }),
+    [allSkills, permissionPreset, selectedModel, reasoningEffort, taskPriority, t],
   );
 
   /** Executes a leading slash command when the user presses Enter directly. */
   const tryExecuteLeadingCommand = useCallback(
-    (raw: string): boolean => {
-      const trimmed = raw.trim();
-      if (!trimmed.startsWith('/')) return false;
-      const spaceIdx = trimmed.indexOf(' ');
-      const name = (spaceIdx >= 0 ? trimmed.slice(1, spaceIdx) : trimmed.slice(1)).toLowerCase();
-      const args = spaceIdx >= 0 ? trimmed.slice(spaceIdx + 1).trim() : '';
-      const agentOnly = ['agent', 'goal', 'plan', 'memories', 'skill', 'review', 'workflow'];
-      if (useAppStore.getState().sidebarMode === 'chat' && agentOnly.includes(name)) {
-        message.info(t('composer.agentOnly'));
-        return true;
-      }
-      const execCtx = {
-        clearMessages: () => useChatStore.getState().clearMessages(),
-        setSelectedModel: (model: string) => useChatStore.getState().setSelectedModel(model),
-        setInputValue,
-        toggleTheme: () => useAppStore.getState().toggleTheme(),
-        theme: useAppStore.getState().theme,
-      };
-      const known = listSlashCommands().find((c) => c.name === name);
-      if (known) {
-        const executed = executeCommand(known.name, args, execCtx);
-        if (executed) recordCommand(name, args);
-        // Incomplete commands already set a `/name ` prompt in the composer;
-        // consume the Enter either way so the text never reaches the model.
-        return true;
-      }
-      const pluginCmd = findPluginCommand(name);
-      if (pluginCmd) {
-        try {
-          const executed = pluginCmd.execute(args, execCtx);
-          if (executed) recordCommand(name, args);
-          return true;
-        } catch (e: unknown) {
-          message.error(t('composer.commandFailed', { name, error: errorText(e) }));
-          return true;
-        }
-      }
-      // Unknown or invalid command must never fall through to the model.
-      message.error(t('composer.unknownCommand', { name }));
-      setInputValue('');
-      return true;
-    },
+    (raw: string) => executeLeadingCommand(raw, setInputValue, t),
     [setInputValue, t],
   );
-
-  const recordCommand = (name: string, args: string) => {
-    const sessionId = useSessionStore.getState().currentSessionId;
-    const ts = Date.now();
-    if (!sessionId) return;
-    void window.electronAPI?.chatLog?.append(sessionId, [
-      {
-        type: 'command',
-        ts,
-        data: { name, args },
-      },
-    ]);
-  };
 
   const handleSend = useCallback(() => {
     // In code mode the send button becomes a STOP control while the current
