@@ -399,7 +399,7 @@ describe('ai:testConnection / cleanupWindowStreams', () => {
     let resolvePost: (v: any) => void = () => {};
     vi.mocked(axios.post).mockReturnValueOnce(new Promise((r) => (resolvePost = r)));
     const p = handler('ai:chatStream')({ sender: { send: vi.fn() } }, chatPayload());
-    await new Promise((r) => setTimeout(r, 0));
+    await vi.waitFor(() => expect(vi.mocked(axios.post).mock.calls).toHaveLength(1));
     cleanupWindowStreams();
     const call = vi.mocked(axios.post).mock.calls[0] as any;
     const signal = call[2].signal;
