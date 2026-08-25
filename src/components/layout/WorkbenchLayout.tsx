@@ -1,15 +1,10 @@
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Dropdown, Layout, message } from 'antd';
-import type { MenuProps } from 'antd';
+import { Dropdown, Layout } from 'antd';
 import { ArrowLeft, ArrowRight, Cube, PanelBottom, Bell, Minus, Square, Copy, X } from '@/components/common/icons';
 import { Allotment, type AllotmentHandle } from 'allotment';
 import clsx from 'clsx';
 import { useAppStore } from '../../stores/useAppStore';
 import { useWorktreeStore } from '../../stores/useWorktreeStore';
-import { useChatStore } from '../../stores/useChatStore';
-import { useSessionStore } from '../../stores/useSessionStore';
-import { useUndoStore } from '../../stores/useUndoStore';
-import { useAgentStore } from '../../stores/useAgentStore';
 import { useNotificationStore } from '../../stores/useNotificationStore';
 import { useTerminalTasksStore } from '../../stores/useTerminalTasksStore';
 import { useSettingsStore } from '../../stores/useSettingsStore';
@@ -23,6 +18,7 @@ import TerminalDrawer from './TerminalDrawer';
 import HeaderStatusInfo from './HeaderStatusInfo';
 import { COCKPIT_TABS, PANEL_LABELS } from './WorkbenchLayoutData';
 import GlobalSearchModal from './GlobalSearchModal';
+import { buildEditMenuItems, buildFileMenuItems, buildHelpMenuItems, buildViewMenuItems } from './WorkbenchMenus';
 
 const DiffPanel = lazy(() => import('./DiffPanel'));
 const PreviewBrowser = lazy(() => import('./PreviewBrowser'));
@@ -140,76 +136,10 @@ export default function WorkbenchLayout() {
   // Narrow right panel: tab labels collapse to icons so the row never crowds.
   const rightPanelCompact = rightPanelWidth <= 340;
 
-  const fileMenuItems: MenuProps['items'] = [
-    {
-      key: 'new-chat',
-      label: t('menu.newChat'),
-      onClick: () => {
-        const appState = useAppStore.getState();
-        if (appState.sidebarMode !== 'chat') {
-          // Agent/Work 模式下「新建对话」= 新建任务：清空选中并标记新建，
-          // 否则发送会继续旧任务而不是开新任务（与侧边栏/顶栏行为一致）。
-          appState.setActiveToolView('none');
-          useAgentStore.getState().setCurrentAgent(null);
-          useChatStore.getState().setPendingNewTask(true);
-        }
-        useSessionStore.getState().newSession();
-        useChatStore.getState().clearMessages();
-      },
-    },
-    {
-      key: 'clear-chat',
-      label: t('menu.clearChat'),
-      onClick: () => useChatStore.getState().clearMessages(),
-    },
-    { type: 'divider' },
-    {
-      key: 'settings',
-      label: t('menu.settings'),
-      onClick: () => {
-        useAppStore.getState().setSettingsInitialKey('general');
-        useAppStore.getState().setShowSettings(true);
-      },
-    },
-  ];
-
-  const editMenuItems: MenuProps['items'] = [
-    {
-      key: 'undo',
-      label: t('menu.undo'),
-      onClick: () => {
-        const { undoLast, undos } = useUndoStore.getState();
-        if (undos.length > 0) undoLast();
-      },
-    },
-  ];
-
-  const viewMenuItems: MenuProps['items'] = [
-    {
-      key: 'toggle-sidebar',
-      label: t('menu.toggleSidebar'),
-      onClick: () => useAppStore.getState().toggleSidebar(),
-    },
-    {
-      key: 'toggle-right-panel',
-      label: t('menu.toggleRightPanel'),
-      onClick: () => useAppStore.getState().toggleRightPanel(),
-    },
-    { type: 'divider' },
-    {
-      key: 'toggle-theme',
-      label: t('menu.toggleTheme'),
-      onClick: () => useAppStore.getState().toggleTheme(),
-    },
-  ];
-
-  const helpMenuItems: MenuProps['items'] = [
-    {
-      key: 'about',
-      label: t('menu.about'),
-      onClick: () => message.info('Auraxis v3.1.0'),
-    },
-  ];
+  const fileMenuItems = useMemo(() => buildFileMenuItems(t), [t]);
+  const editMenuItems = useMemo(() => buildEditMenuItems(t), [t]);
+  const viewMenuItems = useMemo(() => buildViewMenuItems(t), [t]);
+  const helpMenuItems = useMemo(() => buildHelpMenuItems(t), [t]);
 
   const allotmentRef = useRef<AllotmentHandle>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
