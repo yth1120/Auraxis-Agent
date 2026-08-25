@@ -155,7 +155,7 @@ export interface CompactionData {
 
 /** Injected-context disclosure （上下文注入披露, UI-only metadata). */
 export interface ContextDisclosure {
-  source: 'instructions' | 'memory';
+  source: 'instructions' | 'memory' | 'workspace';
   producer: string;
   detail?: string;
   /** Optional preview of the injected text (never required). */

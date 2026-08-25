@@ -859,6 +859,7 @@ export const zhCN = {
   'compact.note': '摘要已并入对话流；此检查点仅作记录，不删除上方 transcript。',
   'disclosure.instructions': '上下文注入',
   'disclosure.memory': '跨会话召回',
+  'disclosure.workspace': '工作区上下文',
   'disclosure.aria': '{role} · {producer}，点击展开',
   'disclosure.note': '来源已并入模型上下文；此披露行仅作记录。',
   'deliverables.title': '产物',

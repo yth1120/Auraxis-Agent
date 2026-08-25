@@ -16,7 +16,7 @@ describe('pruneToolResults', () => {
     const messages = [{ role: 'tool', tool_call_id: 't1', content }];
     const { pruned, messages: next } = pruneToolResults(messages, null);
     expect(pruned).toBe(1);
-    const parsed = JSON.parse(next[0].content);
+    const parsed = JSON.parse(String(next[0].content));
     expect(parsed.file_path).toBe('src/auth/login.ts');
     expect(parsed.content.length).toBeLessThan(1000);
     expect(next[0]._pruned).toBe(true);
@@ -31,7 +31,7 @@ describe('pruneToolResults', () => {
       pruneAboveChars: 100,
     });
     expect(pruned).toBe(1);
-    const parsed = JSON.parse(next[0].content);
+    const parsed = JSON.parse(String(next[0].content));
     expect(parsed.pattern).toBe('TODO');
     expect(parsed.count).toBe(50);
     expect(parsed.results).toHaveLength(3);
@@ -41,7 +41,7 @@ describe('pruneToolResults', () => {
     const content = JSON.stringify({ file_path: 'src/auth/login.ts', total_lines: 300, content: 'y'.repeat(20_000) });
     const { pruned, messages: next } = pruneToolResults([{ role: 'tool', tool_call_id: 't3', content }], plan);
     expect(pruned).toBe(1);
-    const parsed = JSON.parse(next[0].content);
+    const parsed = JSON.parse(String(next[0].content));
     expect(parsed.content.length).toBeGreaterThan(5000);
     expect(parsed.note).toContain('关键');
   });

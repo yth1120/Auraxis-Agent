@@ -859,6 +859,7 @@ export const enUS: Record<I18nKey, string> = {
     'The summary is merged into the conversation; this checkpoint is a record only and does not delete the transcript above.',
   'disclosure.instructions': 'Context injected',
   'disclosure.memory': 'Cross-session recall',
+  'disclosure.workspace': 'Workspace context',
   'disclosure.aria': '{role} · {producer}, click to expand',
   'disclosure.note': 'Source merged into model context; this row is a record only.',
   'deliverables.title': 'Deliverables',

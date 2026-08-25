@@ -24,6 +24,10 @@ const activeStreams = new Map<string, AbortController>();
 const activeQueries = new Map<string, AbortController>();
 const nudgeQueues = new Map<string, string[]>();
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
 /** Clean up all active streams/queries for a closed window */
 export function cleanupWindowStreams() {
   for (const [id, ctrl] of activeStreams) {
@@ -45,9 +49,12 @@ async function performWebSearch(query: string): Promise<string | null> {
       { projectRoot: '', requestId: 'websearch', mode: 'ask' },
     );
     if (result.error || !result.output) return null;
-    const output = result.output as any;
-    if (!output.results || output.results.length === 0) return null;
-    return output.results.map((r: any, i: number) => `[${i + 1}] ${r.title}\n${r.snippet}\n${r.url}`).join('\n\n');
+    if (!isRecord(result.output) || !Array.isArray(result.output.results)) return null;
+    const results = result.output.results.filter(isRecord);
+    if (results.length === 0) return null;
+    return results
+      .map((r, i) => `[${i + 1}] ${String(r.title ?? '')}\n${String(r.snippet ?? '')}\n${String(r.url ?? '')}`)
+      .join('\n\n');
   } catch {
     console.warn('[chatStream] 联网搜索未返回结果，已跳过（不影响主回答）');
     return null;
@@ -340,10 +347,11 @@ export function registerAiHandlers() {
 
       const resolvedKey = apiKey || (await resolveModelApiKey(model)) || (await getApiKey(undefined));
       const apiBase = await resolveModelApiBase(model);
-      const settings = (await readSettings().catch(() => null)) as Record<string, any> | null;
-      const presetSpec = isPermissionPreset(settings?.permissionPreset)
-        ? PERMISSION_PRESETS[settings.permissionPreset]
-        : undefined;
+      const settings = await readSettings().catch(() => null);
+      const presetSpec =
+        typeof settings?.permissionPreset === 'string' && isPermissionPreset(settings.permissionPreset)
+          ? PERMISSION_PRESETS[settings.permissionPreset]
+          : undefined;
       const sandboxMode =
         presetSpec?.sandboxMode ??
         (settings?.sandboxMode === 'read' ||
@@ -393,7 +401,10 @@ export function registerAiHandlers() {
             autoApprove: effectiveAutoApprove,
             mode: approval,
             maxIterations,
-            fallbackModel: (settings?.fallbackModel as string) || undefined,
+            fallbackModel:
+              typeof settings?.fallbackModel === 'string' && settings.fallbackModel
+                ? settings.fallbackModel
+                : undefined,
             sandboxMode,
             approvedPlanSteps,
             surface,
@@ -478,7 +489,14 @@ export function registerAiHandlers() {
         timeout: 15000,
       });
       if (response.status === 200) {
-        const modelIds = (response.data?.data || []).map((m: any) => m.id).slice(0, 10);
+        const responseData = isRecord(response.data) ? response.data : {};
+        const models = Array.isArray(responseData.data)
+          ? responseData.data
+              .filter(isRecord)
+              .map((m) => String(m.id ?? ''))
+              .filter(Boolean)
+          : [];
+        const modelIds = models.slice(0, 10);
         return { ok: true, data: { message: 'DeepSeek API 连接成功', models: modelIds } };
       }
       return { ok: false, error: `HTTP ${response.status}: ${response.statusText}` };
@@ -534,10 +552,14 @@ async function streamDeepSeek(
   signal: AbortSignal,
   searchResults?: string | null,
 ): Promise<void> {
+  interface StreamMessage extends ApiMessage {
+    prefix?: boolean;
+  }
+  const wireMessages: StreamMessage[] = normalizeDeepSeekMessages(request.messages, request.model);
   const body: Record<string, unknown> = {
     model: request.model,
     max_tokens: request.maxTokens ?? 8192,
-    messages: normalizeDeepSeekMessages(request.messages, request.model),
+    messages: wireMessages,
     stream: true,
     // 官方用法：流式末尾额外返回 usage 块（含缓存命中与推理 tokens）。
     stream_options: { include_usage: true },
@@ -549,7 +571,7 @@ async function streamDeepSeek(
   }
 
   if (searchResults) {
-    (body.messages as any[]).push({
+    wireMessages.push({
       role: 'system',
       content: `以下是与用户问题相关的网络搜索结果，请基于这些信息回答：\n\n${searchResults}\n\n请结合搜索结果提供准确、最新的回答，并引用来源编号。`,
     });
@@ -558,7 +580,7 @@ async function streamDeepSeek(
   if (request.prefix?.content) {
     // 官方对话前缀续写：最后一条消息必须是 assistant 且 prefix=true，
     // 模型从给定内容继续生成；stop 避免多输出代码块闭合标记。
-    (body.messages as any[]).push({
+    wireMessages.push({
       role: 'assistant',
       content: request.prefix.content,
       prefix: true,

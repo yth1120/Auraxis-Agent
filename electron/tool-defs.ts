@@ -3,40 +3,7 @@
 import type { ToolDef as ContractToolDef, ToolName, BuiltInToolName } from './contracts/tools';
 
 export type { ToolName, BuiltInToolName };
-
-export interface ToolStreamEvent {
-  type: string;
-  requestId: string;
-  text?: string;
-  toolCallId?: string;
-  toolName?: ToolName;
-  input?: Record<string, unknown>;
-  output?: unknown;
-  durationMs?: number;
-  error?: string;
-  timestamp?: number;
-  progress?: string;
-  iteration?: number;
-  tokensBefore?: number;
-  tokensAfter?: number;
-  messagesRemoved?: number;
-  tokensSaved?: number;
-  aborted?: boolean;
-  level?: string;
-  content?: string;
-  isNewBlock?: boolean;
-  chunk?: string;
-  inputTokens?: number;
-  outputTokens?: number;
-  reasoningTokens?: number;
-  planId?: string;
-  steps?: Array<{ id: string; toolName: string; description: string; parameters: Record<string, unknown> }>;
-  source?: 'instructions' | 'memory' | 'workspace';
-  producer?: string;
-  detail?: string;
-  /** Groups tool calls from the same LLM turn into a collapsible tree node. */
-  stepGroupId?: string;
-}
+export type { ToolStreamEvent } from './contracts/tools';
 
 export interface ToolDef extends ContractToolDef {
   /** When true, this tool can run concurrently with other safe tools in the same batch.

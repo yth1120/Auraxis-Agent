@@ -334,26 +334,30 @@ export interface ElectronAPI {
   };
 
   agent: {
-    start: (config: unknown, projectPath: string) => Promise<{ ok: boolean; data?: { agentId: string } }>;
-    schedulerStop: (agentId: string) => Promise<{ ok: boolean }>;
-    pause: (agentId: string) => Promise<{ ok: boolean; data?: { paused: boolean } }>;
-    resume: (agentId: string) => Promise<{ ok: boolean; data?: { resumed: boolean } }>;
+    start: (
+      config: unknown,
+      projectPath: string,
+    ) => Promise<{ ok: boolean; data?: { agentId: string }; error?: string }>;
+    schedulerStop: (agentId: string) => Promise<{ ok: boolean; error?: string }>;
+    pause: (agentId: string) => Promise<{ ok: boolean; data?: { paused: boolean }; error?: string }>;
+    resume: (agentId: string) => Promise<{ ok: boolean; data?: { resumed: boolean }; error?: string }>;
     continue: (
       agentId: string,
       instruction: string,
       displayInstruction?: string,
     ) => Promise<{ ok: boolean; data?: { continued: boolean }; error?: string }>;
     approveDelivery: (agentId: string) => Promise<{ ok: boolean; data?: { approved: boolean }; error?: string }>;
-    setPriority: (agentId: string, priority: string) => Promise<{ ok: boolean }>;
+    setPriority: (agentId: string, priority: string) => Promise<{ ok: boolean; error?: string }>;
     getQueue: () => Promise<{ ok: boolean; data?: { running: unknown[]; queued: unknown[] } }>;
-    setMaxConcurrent: (n: number) => Promise<{ ok: boolean }>;
+    setMaxConcurrent: (n: number) => Promise<{ ok: boolean; error?: string }>;
     getAll: () => Promise<{ ok: boolean; data?: unknown[] }>;
     getState: (agentId: string) => Promise<{ ok: boolean; data?: unknown }>;
-    remove: (agentId: string) => Promise<{ ok: boolean }>;
-    clear: () => Promise<{ ok: boolean }>;
+    remove: (agentId: string) => Promise<{ ok: boolean; error?: string }>;
+    schedulerRemove: (agentId: string) => Promise<{ ok: boolean; error?: string }>;
+    clear: () => Promise<{ ok: boolean; error?: string }>;
     clearAll: () => Promise<{ ok: boolean; data?: { cleared: number }; error?: string }>;
     onUpdated: (callback: (agent: import('./advanced').AgentInfo) => void) => () => void;
-    onEvent: (agentId: string, callback: (event: import('./tools').ToolStreamEvent) => void) => () => void;
+    onEvent: (agentId: string, callback: (event: import('./tools').AgentRuntimeEvent) => void) => () => void;
   };
 
   worktree: {

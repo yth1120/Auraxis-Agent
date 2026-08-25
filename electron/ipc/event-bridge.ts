@@ -27,7 +27,7 @@ export function toToolStreamEvent(event: EngineEvent, requestId: string): ToolSt
         requestId,
         toolCallId: event.toolCallId,
         toolName: event.toolName,
-        input: event.input,
+        input: event.input ?? {},
         timestamp: Date.now(),
         stepGroupId: event.stepGroupId,
       };
@@ -37,7 +37,7 @@ export function toToolStreamEvent(event: EngineEvent, requestId: string): ToolSt
         requestId,
         toolCallId: event.toolCallId,
         toolName: event.toolName,
-        input: event.input,
+        input: event.input ?? {},
         timestamp: Date.now(),
         progress: event.progress,
         stepGroupId: event.stepGroupId,
@@ -52,7 +52,7 @@ export function toToolStreamEvent(event: EngineEvent, requestId: string): ToolSt
         durationMs: event.durationMs,
         timestamp: Date.now(),
         stepGroupId: event.stepGroupId,
-        input: event.input,
+        input: event.input ?? {},
       };
     case 'tool_error':
       return {
@@ -78,7 +78,7 @@ export function toToolStreamEvent(event: EngineEvent, requestId: string): ToolSt
       };
     case 'iteration_start':
       // Chat surface shows a single "iteration" counter.
-      return { type: 'iteration', requestId, iteration: event.iteration };
+      return { type: 'iteration', requestId, iteration: event.iteration, maxIterations: 25 };
     case 'context_compressed':
       return {
         type: 'context_compressed',

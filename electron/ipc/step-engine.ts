@@ -12,7 +12,7 @@ import type { WorkAutonomyTier } from '../types';
 import type { ToolDef } from '../tool-defs';
 import type { SandboxMode } from '../sandbox-policy';
 import { writeSpill } from '../spill';
-import type { AssistantMessage, TaskPlan } from './agent-loop';
+import type { AssistantMessage, LoopMessage, TaskPlan } from './agent-loop';
 import type { DeepSeekToolChoice } from '../contracts/advanced';
 import { errorRecord, errorText } from '../errors';
 import {
@@ -35,7 +35,7 @@ import type { StopDecision } from './agent-loop';
 
 /** Mutable per-run state threaded through every step. */
 export interface StepState {
-  messages: any[];
+  messages: LoopMessage[];
   iteration: number;
   toolCallCount: number;
   consecutiveTextOnly: number;
@@ -45,7 +45,7 @@ export interface StepState {
   startedAt: number;
 }
 
-export function createStepState(messages: any[]): StepState {
+export function createStepState(messages: LoopMessage[]): StepState {
   return {
     messages,
     iteration: 0,
@@ -171,7 +171,7 @@ export interface StepEngineConfig {
    */
   interceptTool?: (tc: RunnerToolCall, toolCallId: string) => Promise<{ output: unknown; error?: string } | null>;
   /** Called before each LLM request (driver hooks / deviance prep). May mutate messages. */
-  onBeforeRequest?: (messages: any[]) => Promise<void> | void;
+  onBeforeRequest?: (messages: LoopMessage[]) => Promise<void> | void;
   /** Called after the assistant message is appended (plan conflict etc.). May mutate msg/messages. */
   onAssistantReady?: (msg: AssistantMessage) => void;
   /** Called after text-only counters are updated, right before stop-policy evaluation. */
@@ -226,7 +226,7 @@ const SPILL_ABOVE_CHARS = 30_000;
 const SPILL_PREVIEW_CHARS = 1_200;
 
 async function appendToolResults(
-  messages: any[],
+  messages: LoopMessage[],
   results: { toolUseId: string; toolName: string; input: Record<string, unknown>; output: unknown; error?: string }[],
   sessionId?: string,
   model = '',

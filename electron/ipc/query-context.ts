@@ -14,6 +14,7 @@
 import type { ApprovalPolicy } from '../contracts/core';
 import { LLM_CONTEXT_CLEAR_EVENT, LLM_CONTEXT_SNAPSHOT_EVENT } from '../contracts/session-types';
 import { appendChatEvents, readChatLog } from '../chat-log';
+import type { LoopMessage } from './agent-loop-core';
 
 export const AGENTS_MD_PREFIX = '## 项目指令（AGENTS.md）';
 export const MEMORY_PREAMBLE_PREFIX = '## 项目记忆（带证据溯源，来自之前的会话）';
@@ -36,11 +37,11 @@ export function buildModeHint(mode: ApprovalPolicy): string {
 
 export interface ReplayAssembled {
   ok: boolean;
-  messages: any[];
+  messages: LoopMessage[];
 }
 
-function isUserStringMessage(m: any): m is { role: 'user'; content: string } {
-  return !!m && m.role === 'user' && typeof m.content === 'string';
+function isUserStringMessage(m: LoopMessage): m is LoopMessage & { role: 'user'; content: string } {
+  return m.role === 'user' && typeof m.content === 'string';
 }
 
 /**
@@ -55,8 +56,8 @@ function isUserStringMessage(m: any): m is { role: 'user'; content: string } {
  * renderer payload has no user message to append.
  */
 export function tryReplayStoredContext(
-  stored: any[],
-  chatMessages: any[],
+  stored: LoopMessage[],
+  chatMessages: LoopMessage[],
   instructions: string,
   modeHint: string,
   memoryContext?: string,
@@ -73,7 +74,8 @@ export function tryReplayStoredContext(
     const instrIdx = messages.findIndex((m) => isUserStringMessage(m) && m.content.startsWith(AGENTS_MD_PREFIX));
     if (instrIdx < 0) return { ok: false, messages };
     const nextInstr = buildAgentsMdMessage(instructions);
-    if (messages[instrIdx].content !== nextInstr) messages[instrIdx].content = nextInstr;
+    const instrMsg = messages[instrIdx];
+    if (instrMsg.content !== nextInstr) messages[instrIdx] = { ...instrMsg, content: nextInstr };
   } else {
     // Project rules were removed — replaying the stale AGENTS.md block would
     // keep the model following rules that no longer exist. Rebuild fresh.
@@ -89,7 +91,8 @@ export function tryReplayStoredContext(
         m.content.startsWith('当前为交互模式')),
   );
   if (modeIdx < 0) return { ok: false, messages };
-  if (messages[modeIdx].content !== modeHint) messages[modeIdx].content = modeHint;
+  const modeMsg = messages[modeIdx];
+  if (modeMsg.content !== modeHint) messages[modeIdx] = { ...modeMsg, content: modeHint };
 
   // Cache-Aware Prompt Compression: keep the previous snapshot's memory in
   // place (stable prefix) and append only the newest retrieval at the tail.
@@ -99,7 +102,8 @@ export function tryReplayStoredContext(
   if (memory) {
     let lastMemoryIdx = -1;
     for (let i = messages.length - 1; i >= 0; i--) {
-      if (isUserStringMessage(messages[i]) && messages[i].content.startsWith(MEMORY_PREAMBLE_PREFIX)) {
+      const message = messages[i];
+      if (isUserStringMessage(message) && message.content.startsWith(MEMORY_PREAMBLE_PREFIX)) {
         lastMemoryIdx = i;
         break;
       }
@@ -117,7 +121,7 @@ export function tryReplayStoredContext(
 }
 
 export interface LlmContextSnapshot {
-  messages: unknown[];
+  messages: LoopMessage[];
   seq: number;
 }
 
@@ -132,7 +136,7 @@ export function pickLatestLlmContext(
     const eventName = e.data.event;
     if (eventName === LLM_CONTEXT_CLEAR_EVENT) clearedSeq = e.seq;
     if (eventName === LLM_CONTEXT_SNAPSHOT_EVENT && Array.isArray(e.data.messages)) {
-      latest = { messages: e.data.messages as unknown[], seq: e.seq };
+      latest = { messages: e.data.messages as LoopMessage[], seq: e.seq };
     }
   }
   if (!latest) return null;
@@ -140,14 +144,14 @@ export function pickLatestLlmContext(
   return latest;
 }
 
-export async function loadLlmContext(sessionId: string): Promise<unknown[] | null> {
+export async function loadLlmContext(sessionId: string): Promise<LoopMessage[] | null> {
   if (!sessionId) return null;
   const events = await readChatLog(sessionId);
   return pickLatestLlmContext(events)?.messages ?? null;
 }
 
 /** Persist the canonical messages array into the session's append-only log. */
-export async function saveLlmContext(sessionId: string, messages: unknown[]): Promise<void> {
+export async function saveLlmContext(sessionId: string, messages: LoopMessage[]): Promise<void> {
   if (!sessionId || !Array.isArray(messages) || messages.length === 0) return;
   const clean = messages.map((m) => {
     if (!m || typeof m !== 'object') return m;

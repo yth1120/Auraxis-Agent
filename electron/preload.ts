@@ -12,10 +12,8 @@ interface UsageEvent {
   cacheMissTokens?: number;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type QueryEvent = any;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AgentEventPayload = any;
+type QueryEvent = ToolStreamEvent;
+type AgentEventPayload = { type: string } & Record<string, unknown>;
 
 function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;

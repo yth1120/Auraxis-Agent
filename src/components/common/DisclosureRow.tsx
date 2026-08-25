@@ -7,6 +7,7 @@ import { useT, type I18nKey } from '../../i18n';
 const ROLE_LABEL: Record<ContextDisclosure['source'], I18nKey> = {
   instructions: 'disclosure.instructions',
   memory: 'disclosure.memory',
+  workspace: 'disclosure.workspace',
 };
 
 /**

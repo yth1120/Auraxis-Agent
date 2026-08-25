@@ -24,10 +24,11 @@ export function estimateTokens(text: string): number {
 }
 
 /** Estimate token count for an array of chat messages (role + content). */
-export function estimateTokensForMessages(messages: any[]): number {
+export function estimateTokensForMessages(messages: readonly unknown[]): number {
   let total = 0;
   for (const msg of messages) {
-    const contentStr = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content);
+    const record = msg && typeof msg === 'object' && !Array.isArray(msg) ? (msg as Record<string, unknown>) : {};
+    const contentStr = typeof record.content === 'string' ? record.content : (JSON.stringify(record.content) ?? '');
     total += estimateTokens(contentStr) + MESSAGE_OVERHEAD;
   }
   return total;

@@ -71,8 +71,67 @@ export interface ToolDef {
   description: string;
   input_schema: {
     type: 'object';
-    properties: Record<string, any>;
+    properties: Record<string, unknown>;
     required: string[];
     additionalProperties?: boolean;
   };
 }
+
+/** Shared IPC event payload for chat/query streaming. */
+export type ToolStreamEvent =
+  | { type: 'text_chunk'; requestId: string; text: string }
+  | {
+      type: 'tool_start' | 'tool_progress' | 'tool_end' | 'tool_error' | 'tool_aborted';
+      requestId: string;
+      toolCallId: string;
+      toolName: ToolName;
+      input: Record<string, unknown>;
+      timestamp: number;
+      stepGroupId: string;
+      progress?: string;
+      output?: unknown;
+      durationMs?: number;
+      error?: string;
+    }
+  | { type: 'iteration'; requestId: string; iteration: number; maxIterations: number }
+  | {
+      type: 'context_compressed';
+      requestId: string;
+      tokensBefore: number;
+      tokensAfter: number;
+      messagesRemoved?: number;
+      tokensSaved?: number;
+    }
+  | { type: 'system_message'; requestId: string; level: 'warning' | 'info'; content: string }
+  | {
+      type: 'context_injected';
+      requestId: string;
+      source: 'instructions' | 'memory' | 'workspace';
+      producer: string;
+      detail?: string;
+    }
+  | { type: 'thinking_chunk'; requestId: string; chunk: string; isNewBlock: boolean }
+  | {
+      type: 'usage_update';
+      requestId: string;
+      inputTokens: number;
+      outputTokens: number;
+      reasoningTokens?: number;
+      cacheHitTokens?: number;
+      cacheMissTokens?: number;
+    }
+  | {
+      type: 'plan_generated';
+      requestId: string;
+      planId: string;
+      steps: Array<{
+        id: string;
+        toolName: string;
+        description: string;
+        parameters: Record<string, unknown>;
+      }>;
+      filePath?: string;
+      agentId?: string;
+    }
+  | { type: 'done'; requestId: string }
+  | { type: 'error'; requestId: string; error: string };

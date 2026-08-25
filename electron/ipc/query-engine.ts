@@ -20,7 +20,7 @@ import type { ApprovalPolicy } from '../types';
 import type { SandboxMode } from '../sandbox-policy';
 import { errorRecord, errorText } from '../errors';
 import { makeTurnId, type EngineEvent } from './engine-events';
-import type { ContextConfig } from './agent-loop';
+import type { ContextConfig, LoopMessage } from './agent-loop';
 import { isDeniedError } from './tool-runner';
 import { runStep, createStepState } from './step-engine';
 import type { StepEngineConfig } from './step-engine';
@@ -44,7 +44,7 @@ interface QueryRequest {
   /** Model ID — "deepseek-v4-flash" (fast) or "deepseek-v4-pro" (expert). */
   model: string;
   /** Chat messages — content may be string or multimodal content-block array. */
-  messages: { role: string; content: any }[];
+  messages: { role: string; content: LoopMessage['content'] }[];
   /** Freshly retrieved cross-session memory preamble — appended near the tail
    *  (cache-aligned) instead of being unshifted into the conversation head. */
   memoryContext?: string;
@@ -117,7 +117,7 @@ async function permissionInterceptor(
  *  preamble (platform/project/thinking) and work guide are all part of the
  *  cache prefix. After an app upgrade or project switch, replay would keep
  *  serving stale instructions, so it must fall back to fresh assembly. */
-function storedHeadIsCurrent(stored: any[], req: QueryRequest): boolean {
+function storedHeadIsCurrent(stored: LoopMessage[], req: QueryRequest): boolean {
   if (!Array.isArray(stored) || stored.length < 3) return false;
   const expectedPreamble = buildSessionPreamble({
     platform: process.platform,
@@ -148,9 +148,9 @@ async function runUnifiedLoop(req: QueryRequest, emit: EventCallback, signal: Ab
   // results) and append only the new memory preamble + user message at the
   // tail. This keeps the request prefix byte-stable for DeepSeek's cache and
   // restores tool history that the renderer's text-only payload drops.
-  let messages: any[] | null = null;
+  let messages: LoopMessage[] | null = null;
   if (req.sessionId) {
-    let stored: unknown[] | null = null;
+    let stored: LoopMessage[] | null = null;
     try {
       stored = await loadLlmContext(req.sessionId);
     } catch (error: unknown) {
@@ -290,8 +290,14 @@ async function runUnifiedLoop(req: QueryRequest, emit: EventCallback, signal: Ab
               id: subAgentIds.get(tc.index) || '',
               status: 'completed',
               result: typeof r.output === 'string' ? r.output : JSON.stringify(r.output).slice(0, 500),
-              toolCallCount: (r.output as any)?.toolCallCount || 0,
-              iteration: (r.output as any)?.iterations || 0,
+              toolCallCount:
+                r.output && typeof r.output === 'object' && !Array.isArray(r.output)
+                  ? Number((r.output as Record<string, unknown>).toolCallCount) || 0
+                  : 0,
+              iteration:
+                r.output && typeof r.output === 'object' && !Array.isArray(r.output)
+                  ? Number((r.output as Record<string, unknown>).iterations) || 0
+                  : 0,
               endTime: Date.now(),
             });
           } catch {

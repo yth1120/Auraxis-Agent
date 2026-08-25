@@ -110,6 +110,7 @@ describe('event-bridge → ToolStreamEvent', () => {
       type: 'iteration',
       requestId: RID,
       iteration: 4,
+      maxIterations: 25,
     });
   });
 

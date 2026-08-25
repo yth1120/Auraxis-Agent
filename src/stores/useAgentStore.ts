@@ -1,36 +1,139 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { AgentInfo, AgentStore, AgentLogEntry, AgentStatus } from '../types/agent';
+import type { AgentInfo, AgentStore, AgentLogEntry, AgentPriority, AgentStatus } from '../types/agent';
+import type { AgentInfo as BackendAgentInfo } from '../types/advanced';
+import type { AgentRuntimeEvent } from '../types/tools';
 import { useAppStore } from './useAppStore';
 
 // ─── IPC bridge helpers ────────────────────────────
 
 function agentIpc() {
-  return (window as any).electronAPI?.agent as
-    | {
-        start: (config: any, projectPath: string) => Promise<{ ok: boolean; data?: any; error?: string }>;
-        schedulerStop: (agentId: string) => Promise<{ ok: boolean; error?: string }>;
-        pause: (agentId: string) => Promise<{ ok: boolean; error?: string }>;
-        resume: (agentId: string) => Promise<{ ok: boolean; error?: string }>;
-        continue: (
-          agentId: string,
-          instruction: string,
-          displayInstruction?: string,
-        ) => Promise<{ ok: boolean; error?: string }>;
-        approveDelivery: (agentId: string) => Promise<{ ok: boolean; error?: string }>;
-        setPriority: (agentId: string, priority: string) => Promise<{ ok: boolean; error?: string }>;
-        setMaxConcurrent: (n: number) => Promise<{ ok: boolean; error?: string }>;
-        getAll: () => Promise<{ ok: boolean; data?: any[]; error?: string }>;
-        // Dual delete — sub-agent (agent-handlers Map) and scheduler instances
-        // both need their entries cleared. preload exposes both directly.
-        remove: (agentId: string) => Promise<{ ok: boolean; error?: string }>;
-        schedulerRemove: (agentId: string) => Promise<{ ok: boolean; error?: string }>;
-        clear: () => Promise<{ ok: boolean; error?: string }>;
-        clearAll: () => Promise<{ ok: boolean; data?: { cleared: number }; error?: string }>;
-        onUpdated: (cb: (agent: any) => void) => () => void;
-        onEvent: (agentId: string, cb: (event: any) => void) => () => void;
-      }
-    | undefined;
+  return window.electronAPI?.agent;
+}
+
+interface BackendAgentSnapshot {
+  id?: string;
+  agentId?: string;
+  name?: string;
+  description?: string;
+  type?: string;
+  status?: string;
+  priority?: string;
+  startTime?: number;
+  endTime?: number;
+  iteration?: number;
+  iterations?: number;
+  maxIterations?: number;
+  toolCallCount?: number;
+  messagesCount?: number;
+  surface?: string;
+  plan?: unknown;
+  error?: string;
+  result?: string;
+  workTier?: unknown;
+  delivery?: unknown;
+  model?: string;
+  projectPath?: string;
+  projectRoot?: string;
+  log?: AgentLogEntry[];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isAgentStatus(value: unknown): value is AgentStatus {
+  return (
+    value === 'idle' ||
+    value === 'queued' ||
+    value === 'running' ||
+    value === 'paused' ||
+    value === 'completed' ||
+    value === 'error' ||
+    value === 'stopped' ||
+    value === 'review'
+  );
+}
+
+function isAgentType(value: unknown): value is AgentInfo['type'] {
+  return value === 'Explore' || value === 'Plan' || value === 'general-purpose';
+}
+
+function isAgentPriority(value: unknown): value is AgentPriority {
+  return value === 'high' || value === 'normal' || value === 'low';
+}
+
+function normalizeTodos(value: unknown): AgentLogEntry['todos'] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const todos = value
+    .filter(
+      (item): item is { content: string; status: string; activeForm?: string } =>
+        isRecord(item) && typeof item.content === 'string' && typeof item.status === 'string',
+    )
+    .map((item) => ({
+      content: item.content,
+      status: item.status,
+      ...(typeof item.activeForm === 'string' ? { activeForm: item.activeForm } : {}),
+    }));
+  return todos.length > 0 ? todos : undefined;
+}
+
+function toBackendPatch(snapshot: BackendAgentSnapshot): Partial<AgentInfo> {
+  const patch: Partial<AgentInfo> = {};
+  if (snapshot.name) patch.name = snapshot.name;
+  if (snapshot.description !== undefined) patch.description = snapshot.description;
+  if (isAgentType(snapshot.type)) patch.type = snapshot.type;
+  if (isAgentStatus(snapshot.status)) patch.status = snapshot.status;
+  if (isAgentPriority(snapshot.priority)) patch.priority = snapshot.priority;
+  if (typeof snapshot.startTime === 'number') patch.startTime = snapshot.startTime;
+  if (typeof snapshot.endTime === 'number') patch.endTime = snapshot.endTime;
+  const iteration =
+    typeof snapshot.iteration === 'number'
+      ? snapshot.iteration
+      : typeof snapshot.iterations === 'number'
+        ? snapshot.iterations
+        : undefined;
+  if (iteration !== undefined) patch.iteration = iteration;
+  if (typeof snapshot.maxIterations === 'number') patch.maxIterations = snapshot.maxIterations;
+  if (typeof snapshot.toolCallCount === 'number') patch.toolCallCount = snapshot.toolCallCount;
+  if (typeof snapshot.messagesCount === 'number') patch.messagesCount = snapshot.messagesCount;
+  if (snapshot.surface === 'work' || snapshot.surface === 'code' || snapshot.surface === 'chat') {
+    patch.surface = snapshot.surface;
+  }
+  const plan = normalizeTodos(isRecord(snapshot.plan) ? snapshot.plan.todos : undefined);
+  if (isRecord(snapshot.plan) && Array.isArray(snapshot.plan.tasks)) {
+    const taskTodos = snapshot.plan.tasks
+      .filter(
+        (task): task is { description: string; status: string } =>
+          isRecord(task) && typeof task.description === 'string' && typeof task.status === 'string',
+      )
+      .map((task) => ({ content: task.description, status: task.status, activeForm: `执行: ${task.description}` }));
+    patch.plan = taskTodos.length > 0 ? { todos: taskTodos } : plan ? { todos: plan } : null;
+  } else if (plan) {
+    patch.plan = { todos: plan };
+  } else if (isRecord(snapshot.plan)) {
+    patch.plan = null;
+  }
+  if (snapshot.error !== undefined) patch.error = snapshot.error;
+  if (snapshot.result !== undefined) patch.result = snapshot.result;
+  if (snapshot.model) patch.model = snapshot.model;
+  const workTier = snapshot.workTier;
+  if (workTier === 'plan' || workTier === 'smart' || workTier === 'full') patch.workTier = workTier;
+  if (
+    isRecord(snapshot.delivery) &&
+    Array.isArray(snapshot.delivery.files) &&
+    typeof snapshot.delivery.result === 'string'
+  ) {
+    const files = snapshot.delivery.files.filter((file): file is string => typeof file === 'string');
+    patch.delivery = {
+      files,
+      result: snapshot.delivery.result,
+      ...(typeof snapshot.delivery.summary === 'string' ? { summary: snapshot.delivery.summary } : {}),
+    };
+  }
+  const projectPath = snapshot.projectPath || snapshot.projectRoot;
+  if (typeof projectPath === 'string' && projectPath) patch.projectRoot = projectPath;
+  return patch;
 }
 
 /** Agent ids explicitly removed by the user — late backend broadcasts must
@@ -342,9 +445,11 @@ export const useAgentStore = create<AgentStore>()(
           const result = await api.getAll();
           if (result.ok && result.data) {
             set((s) => {
-              const backendMap = new Map<string, any>();
-              for (const a of result.data!) {
-                backendMap.set(a.agentId || a.id, a);
+              const snapshots = result.data as BackendAgentSnapshot[];
+              const backendMap = new Map<string, BackendAgentSnapshot>();
+              for (const snapshot of snapshots) {
+                const id = snapshot.agentId || snapshot.id;
+                if (id) backendMap.set(id, snapshot);
               }
 
               // Merge backend state into existing frontend agents.
@@ -357,55 +462,35 @@ export const useAgentStore = create<AgentStore>()(
 
                 backendMap.delete(existing.id);
 
-                return {
-                  ...existing,
-                  name: be.name || existing.name,
-                  description: be.description ?? existing.description,
-                  type: be.type || existing.type,
-                  status: be.status || existing.status,
-                  priority: be.priority || existing.priority,
-                  startTime: be.startTime || existing.startTime,
-                  endTime: be.endTime ?? existing.endTime,
-                  iteration: be.iteration ?? existing.iteration,
-                  maxIterations: be.maxIterations ?? existing.maxIterations,
-                  toolCallCount: be.toolCallCount ?? existing.toolCallCount,
-                  messagesCount: be.messagesCount ?? existing.messagesCount,
-                  surface: be.surface ?? existing.surface,
-                  plan: be.plan !== undefined ? be.plan : existing.plan,
-                  error: be.error ?? existing.error,
-                  result: be.result ?? existing.result,
-                  workTier: be.workTier ?? existing.workTier,
-                  delivery: be.delivery ?? existing.delivery,
-                  // log, model, isDeepThink, reasoningEffort are
-                  // frontend-authoritative — backend never sends them.
-                };
+                return { ...existing, ...toBackendPatch(be) };
               });
 
               // Agents backend knows about but frontend doesn't
               // (e.g. scheduler-created agents before agent:updated).
               for (const [id, be] of backendMap) {
+                const patch = toBackendPatch(be);
                 merged.push({
                   id,
-                  name: be.name || 'Agent',
-                  description: be.description || '',
-                  type: be.type || 'general-purpose',
-                  status: be.status || 'idle',
-                  priority: be.priority || 'normal',
-                  startTime: be.startTime || Date.now(),
-                  endTime: be.endTime,
-                  iteration: be.iteration ?? 0,
-                  maxIterations: be.maxIterations ?? 25,
-                  toolCallCount: be.toolCallCount ?? 0,
-                  messagesCount: be.messagesCount ?? 0,
-                  surface: be.surface,
+                  name: patch.name ?? 'Agent',
+                  description: patch.description ?? '',
+                  type: patch.type ?? 'general-purpose',
+                  status: patch.status ?? 'idle',
+                  priority: patch.priority ?? 'normal',
+                  startTime: patch.startTime ?? Date.now(),
+                  endTime: patch.endTime,
+                  iteration: patch.iteration ?? 0,
+                  maxIterations: patch.maxIterations ?? 25,
+                  toolCallCount: patch.toolCallCount ?? 0,
+                  messagesCount: patch.messagesCount ?? 0,
+                  surface: patch.surface,
                   totalInputTokens: 0,
                   totalOutputTokens: 0,
-                  plan: be.plan ?? null,
-                  error: be.error,
-                  result: be.result,
-                  workTier: be.workTier,
-                  delivery: be.delivery,
-                  model: be.model,
+                  plan: patch.plan ?? null,
+                  error: patch.error,
+                  result: patch.result,
+                  workTier: patch.workTier,
+                  delivery: patch.delivery,
+                  model: patch.model,
                   log: [],
                 });
               }
@@ -454,8 +539,9 @@ export const useAgentStore = create<AgentStore>()(
         const api = agentIpc();
         if (!api?.onUpdated) return () => {};
 
-        const unsub = api.onUpdated((updated: any) => {
-          const id = updated.id || updated.agentId;
+        const unsub = api.onUpdated((updated: BackendAgentInfo) => {
+          const snapshot = updated as BackendAgentSnapshot;
+          const id = updated.id || snapshot.agentId;
           if (!id) return;
           if (removedAgentIds.has(id)) return;
 
@@ -465,25 +551,19 @@ export const useAgentStore = create<AgentStore>()(
           // first text_chunk from the planning phase) is already subscribed.
           // Skipping this synchronous attach loses the opening events of the
           // run while React schedules a re-render.
-          const active = updated.status === 'running' || updated.status === 'queued' || updated.status === 'paused';
+          const status = updated.status as string;
+          const active = status === 'running' || status === 'queued' || status === 'paused';
           if (active) ensureEventSub(id);
           else scheduleEventSubCleanup(id);
 
-          const { log: _log, ...snapshot } = updated;
+          const patch = toBackendPatch(snapshot);
           set((s) => {
             const exists = s.agents.some((a) => a.id === id);
             if (exists) {
               return {
                 agents: s.agents.map((a) => {
                   if (a.id !== id) return a;
-                  // Normalize backend `iterations` (plural) to frontend
-                  // `iteration` (singular) so the UI never sees a stale 0.
-                  const norm: any = { ...snapshot };
-                  if (norm.iterations !== undefined && norm.iteration === undefined) {
-                    norm.iteration = norm.iterations;
-                  }
-                  if (norm.projectPath && !norm.projectRoot) norm.projectRoot = norm.projectPath;
-                  return { ...a, ...norm, log: a.log };
+                  return { ...a, ...patch, log: a.log };
                 }),
               };
             }
@@ -493,27 +573,27 @@ export const useAgentStore = create<AgentStore>()(
                 ...s.agents,
                 {
                   id,
-                  name: snapshot.name || 'Sub-Agent',
-                  description: snapshot.description || '',
-                  type: snapshot.type || 'general-purpose',
-                  status: snapshot.status || 'running',
-                  priority: 'normal',
-                  projectRoot: snapshot.projectPath || snapshot.projectRoot || '',
-                  startTime: snapshot.startTime || Date.now(),
-                  endTime: snapshot.endTime,
-                  iteration: snapshot.iteration ?? snapshot.iterations ?? 0,
-                  maxIterations: snapshot.maxIterations || 200,
-                  toolCallCount: snapshot.toolCallCount || 0,
-                  messagesCount: snapshot.messagesCount || 0,
-                  surface: snapshot.surface,
+                  name: patch.name ?? 'Sub-Agent',
+                  description: patch.description ?? '',
+                  type: patch.type ?? 'general-purpose',
+                  status: patch.status ?? 'running',
+                  priority: patch.priority ?? 'normal',
+                  projectRoot: patch.projectRoot ?? '',
+                  startTime: patch.startTime ?? Date.now(),
+                  endTime: patch.endTime,
+                  iteration: patch.iteration ?? 0,
+                  maxIterations: patch.maxIterations ?? 200,
+                  toolCallCount: patch.toolCallCount ?? 0,
+                  messagesCount: patch.messagesCount ?? 0,
+                  surface: patch.surface,
                   totalInputTokens: 0,
                   totalOutputTokens: 0,
-                  plan: snapshot.plan ?? null,
-                  model: snapshot.model,
-                  error: snapshot.error,
-                  result: snapshot.result,
-                  workTier: snapshot.workTier,
-                  delivery: snapshot.delivery,
+                  plan: patch.plan ?? null,
+                  model: patch.model,
+                  error: patch.error,
+                  result: patch.result,
+                  workTier: patch.workTier,
+                  delivery: patch.delivery,
                   log: [],
                 },
               ],
@@ -577,7 +657,7 @@ export const useAgentStore = create<AgentStore>()(
 // Convert a raw backend event into a log entry the UI can render.
 // Returns null for events that aren't shown as log entries (text_chunk goes
 // through the RAF buffer instead).
-function logEntryFromEvent(event: any): AgentLogEntry | null {
+function logEntryFromEvent(event: AgentRuntimeEvent): AgentLogEntry | null {
   switch (event.type) {
     case 'text_chunk':
       // Handled by the RAF buffer; never produces a direct log entry here.
@@ -604,8 +684,10 @@ function logEntryFromEvent(event: any): AgentLogEntry | null {
         summary: event.summary,
         streamOutput: event.streamOutput,
       };
-      if (event.toolName === 'TodoWrite' && event.output?.todos) {
-        entry.todos = event.output.todos;
+      if (event.toolName === 'TodoWrite') {
+        const output = isRecord(event.output) ? event.output : {};
+        const todos = normalizeTodos(output.todos);
+        if (todos) entry.todos = todos;
       }
       return entry;
     }
@@ -674,8 +756,8 @@ function logEntryFromEvent(event: any): AgentLogEntry | null {
         timestamp: Date.now(),
         text: '',
         compaction: {
-          tokensBefore: event.tokensBefore,
-          tokensAfter: event.tokensAfter,
+          tokensBefore: event.tokensBefore ?? 0,
+          tokensAfter: event.tokensAfter ?? 0,
           messagesRemoved: event.messagesRemoved,
           tokensSaved: event.tokensSaved,
         },
@@ -688,8 +770,11 @@ function logEntryFromEvent(event: any): AgentLogEntry | null {
         type: 'context',
         timestamp: Date.now(),
         disclosure: {
-          source: event.source,
-          producer: event.producer,
+          source:
+            event.source === 'instructions' || event.source === 'memory' || event.source === 'workspace'
+              ? event.source
+              : 'instructions',
+          producer: event.producer ?? '',
           detail: event.detail,
         },
       };
@@ -810,7 +895,7 @@ function ensureEventSub(id: string) {
   if (eventSubs.has(id)) return;
   const api = agentIpc();
   if (!api?.onEvent) return;
-  const unsub = api.onEvent(id, (event: any) => {
+  const unsub = api.onEvent(id, (event: AgentRuntimeEvent) => {
     if (event.type === 'text_chunk') {
       queueChunk(id, event.text || '', 'text');
       return;
@@ -837,18 +922,19 @@ function ensureEventSub(id: string) {
       // progress bar and the inspector's TaskChecklist render.
       const raw = event.plan;
       if (raw) {
-        const plan = raw.todos
-          ? raw
-          : {
-              todos: (raw.tasks || []).map((t: any) => ({
-                content: t.description,
-                status: t.status,
-                activeForm: `执行: ${t.description}`,
-              })),
-            };
-        useAgentStore.setState((s) => ({
-          agents: s.agents.map((a) => (a.id === id ? { ...a, plan } : a)),
-        }));
+        const taskTodos = (raw.tasks ?? [])
+          .filter(
+            (t): t is { description: string; status: string } =>
+              isRecord(t) && typeof t.description === 'string' && typeof t.status === 'string',
+          )
+          .map((t) => ({ content: t.description, status: t.status, activeForm: `执行: ${t.description}` }));
+        const todos = normalizeTodos(raw.todos) ?? (taskTodos.length > 0 ? taskTodos : undefined);
+        if (todos) {
+          const plan: AgentInfo['plan'] = { todos };
+          useAgentStore.setState((s) => ({
+            agents: s.agents.map((a) => (a.id === id ? { ...a, plan } : a)),
+          }));
+        }
       }
       return;
     }
@@ -920,10 +1006,10 @@ function scheduleEventSubCleanup(id: string) {
 // ─── Module-level subscription (auto-inits, HMR-safe) ───
 
 if (typeof window !== 'undefined') {
-  const STORE_KEY = '__auraxis_agent_sub';
-  const prev = (window as any)[STORE_KEY];
+  const subscriptionWindow = window as typeof window & { __auraxis_agent_sub?: () => void };
+  const prev = subscriptionWindow.__auraxis_agent_sub;
   if (prev) prev(); // Clean previous subscription (HMR)
-  (window as any)[STORE_KEY] = (() => {
+  subscriptionWindow.__auraxis_agent_sub = (() => {
     const unsubUpdates = useAgentStore.getState().subscribeToUpdates();
     // 模式切换不丢任务：先记住当前模式选中的任务，再恢复目标模式上次的
     // 选中项；没有历史选中才清空。这样 Code↔Work 来回切换不会回到新建界面。

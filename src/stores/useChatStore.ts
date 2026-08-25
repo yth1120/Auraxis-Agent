@@ -23,6 +23,10 @@ let ipcSubscription: AIStreamSubscription | null = null;
 let isQueryStream = false;
 let stopping = false;
 const STREAM_TIMEOUT_MS = 300_000; // 5 min
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
 const usageAcc = { input: 0, output: 0, reasoning: 0, cacheHit: 0, cacheMiss: 0 };
 
 function flushUsageToStore() {
@@ -969,13 +973,14 @@ export const useChatStore = create<ChatStore>()(
           void flushChatLog();
         };
 
-        const makeCatch = (err: any, abortedMsg?: string) => {
+        const makeCatch = (err: unknown, abortedMsg?: string) => {
           if (stopping) return;
           clearStreamTimeout();
           clearHeartbeatInterval();
           ipcSubscription?.unsubscribe();
           ipcSubscription = null;
-          if (err.name === 'AbortError') {
+          const isAbort = err instanceof Error && err.name === 'AbortError';
+          if (isAbort) {
             set((s) => ({
               ...setAssistantError(assistantId, abortedMsg || '[已停止生成]')(s),
               isStreaming: false,
@@ -985,7 +990,7 @@ export const useChatStore = create<ChatStore>()(
             }));
           } else {
             set((s) => ({
-              ...setAssistantError(assistantId, `Error: ${err.message}`)(s),
+              ...setAssistantError(assistantId, `Error: ${err instanceof Error ? err.message : errorText(err)}`)(s),
               isStreaming: false,
               currentIteration: null,
               maxIterations: null,
@@ -1162,7 +1167,7 @@ export const useChatStore = create<ChatStore>()(
                         }
                         // Defer undo registration so it doesn't block the event pipeline
                         if ((event.toolName === 'Write' || event.toolName === 'Edit') && event.input) {
-                          const filePath = (event.input as any).file_path as string;
+                          const filePath = typeof event.input.file_path === 'string' ? event.input.file_path : '';
                           if (filePath) {
                             const projectPath = get().currentProjectPath || useSettingsStore.getState().projectPath;
                             const toolName = event.toolName;
@@ -1442,12 +1447,14 @@ export const useChatStore = create<ChatStore>()(
       version: 2,
       // v2：Chat 改为 DeepSeek 风格 —— 默认思考开启、强度固定 high。
       // 同时重置 Chat 的快照，避免旧存档把开关恢复成关闭。
-      migrate: (persisted: any) => {
-        const stored = persisted?.state ?? {};
-        const prefs = { ...(stored.modeThinkingPrefs ?? {}) };
-        if (prefs.chat) prefs.chat = { isDeepThink: true, reasoningEffort: 'high' };
+      migrate: (persisted: unknown) => {
+        const record = isRecord(persisted) ? persisted : {};
+        const stored = isRecord(record.state) ? record.state : {};
+        const prefs = isRecord(stored.modeThinkingPrefs) ? { ...stored.modeThinkingPrefs } : {};
+        const chatPrefs = isRecord(prefs.chat) ? prefs.chat : {};
+        prefs.chat = { ...chatPrefs, isDeepThink: true, reasoningEffort: 'high' };
         return {
-          ...(persisted ?? {}),
+          ...record,
           state: {
             ...stored,
             isDeepThink: true,
