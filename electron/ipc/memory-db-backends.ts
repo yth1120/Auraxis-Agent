@@ -1,6 +1,6 @@
 import path from 'path';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
-import { openSqlite } from '../session-projection-cache';
+import { openSqlite, type SqliteLike } from '../session-projection-cache';
 import {
   legacyTypeToKind,
   newId,
@@ -9,6 +9,7 @@ import {
   type MemoryInput,
   type BeliefEvidenceLink,
   type BeliefInput,
+  type BeliefKind,
   type BeliefRecord,
   type BeliefRejection,
   type BeliefRejectionInput,
@@ -24,10 +25,24 @@ import {
   type SignalInput,
   type SignalRecord,
 } from './memory-db-types';
+type SqlRow = Record<string, unknown>;
+function rowString(value: unknown, fallback = ''): string {
+  return typeof value === 'string' ? value : fallback;
+}
+function rowNumber(value: unknown, fallback = 0): number {
+  return typeof value === 'number' ? value : fallback;
+}
+function rowNullableString(value: unknown): string | null {
+  return typeof value === 'string' ? value : null;
+}
+function rowNullableNumber(value: unknown): number | null {
+  return typeof value === 'number' ? value : null;
+}
+
 // ─── SQLite backend ────────────────────────────────────
 
 export class SqliteBackend implements MemoryBackend {
-  private db: any;
+  private db: SqliteLike;
 
   constructor(dbPath: string) {
     const db = openSqlite(dbPath);
@@ -251,7 +266,9 @@ export class SqliteBackend implements MemoryBackend {
     const fields = Object.keys(updates).filter((k) => k !== 'id');
     if (fields.length === 0) return;
     const sets = fields.map((f) => `${f} = ?`);
-    const values = fields.map((f) => (f === 'tags' ? JSON.stringify(updates[f] || []) : (updates as any)[f]));
+    const values = fields.map((f) =>
+      f === 'tags' ? JSON.stringify(updates[f] || []) : (updates as Record<string, unknown>)[f],
+    );
     this.db.prepare(`UPDATE memories SET ${sets.join(', ')} WHERE id = ?`).run(...values, id);
   }
 
@@ -554,7 +571,7 @@ export class SqliteBackend implements MemoryBackend {
     const rows = scope
       ? this.db.prepare('SELECT * FROM erase_audits WHERE scope = ? ORDER BY ts DESC LIMIT ?').all(scope, limit)
       : this.db.prepare('SELECT * FROM erase_audits ORDER BY ts DESC LIMIT ?').all(limit);
-    return rows.map((row: any) => this.rowToEraseAudit(row));
+    return rows.map((row) => this.rowToEraseAudit(row));
   }
 
   eraseScope(scope: string, opts?: { actor?: string; reason?: string }): number {
@@ -604,65 +621,81 @@ export class SqliteBackend implements MemoryBackend {
     return evIds.length + belIds.length;
   }
 
-  private rowToMemory(row: any): MemoryRecord {
-    return { ...row, tags: row.tags || '[]', importance: row.importance ?? 0, is_active: row.is_active ?? 1 };
-  }
-
-  private rowToEvidence(row: any): EvidenceRecord {
+  private rowToMemory(row: unknown): MemoryRecord {
+    const r = row as SqlRow;
     return {
-      id: row.id,
-      scope: row.scope,
-      session_id: row.session_id ?? null,
-      event_id: row.event_id ?? null,
-      role: row.role,
-      ts: row.ts,
-      content_hash: row.content_hash,
-      content: row.content,
-      metadata: row.metadata || '{}',
-      deleted_at: row.deleted_at ?? null,
+      id: rowString(r.id),
+      project_path: rowString(r.project_path),
+      type: rowString(r.type) as MemoryRecord['type'],
+      title: rowString(r.title),
+      content: rowString(r.content),
+      tags: rowString(r.tags, '[]'),
+      timestamp: rowNumber(r.timestamp),
+      session_id: rowNullableString(r.session_id),
+      importance: rowNumber(r.importance),
+      is_active: rowNumber(r.is_active, 1),
     };
   }
 
-  private rowToBelief(row: any): BeliefRecord {
+  private rowToEvidence(row: unknown): EvidenceRecord {
+    const r = row as SqlRow;
     return {
-      id: row.id,
-      kind: row.kind,
-      scope: row.scope,
-      title: row.title || '',
-      text: row.text,
-      summary: row.summary ?? null,
-      status: row.status,
-      legacy: row.legacy ?? 0,
-      importance: row.importance ?? 3,
-      is_active: row.is_active ?? 1,
-      created_at: row.created_at,
-      updated_at: row.updated_at,
-      deleted_at: row.deleted_at ?? null,
+      id: rowString(r.id),
+      scope: rowString(r.scope),
+      session_id: rowNullableString(r.session_id),
+      event_id: rowNullableString(r.event_id),
+      role: rowString(r.role) as EvidenceRole,
+      ts: rowNumber(r.ts),
+      content_hash: rowString(r.content_hash),
+      content: rowString(r.content),
+      metadata: rowString(r.metadata, '{}'),
+      deleted_at: rowNullableNumber(r.deleted_at),
     };
   }
 
-  private rowToReadRun(row: any): ReadRunRecord {
+  private rowToBelief(row: unknown): BeliefRecord {
+    const r = row as SqlRow;
     return {
-      id: row.id,
-      query: row.query || '',
-      query_hash: row.query_hash,
-      scope: row.scope,
-      budget_tokens: row.budget_tokens,
-      latency_ms: row.latency_ms,
-      ts: row.ts,
+      id: rowString(r.id),
+      kind: rowString(r.kind) as BeliefKind,
+      scope: rowString(r.scope),
+      title: rowString(r.title),
+      text: rowString(r.text),
+      summary: rowNullableString(r.summary),
+      status: rowString(r.status) as BeliefStatus,
+      legacy: rowNumber(r.legacy),
+      importance: rowNumber(r.importance, 3),
+      is_active: rowNumber(r.is_active, 1),
+      created_at: rowNumber(r.created_at),
+      updated_at: rowNumber(r.updated_at),
+      deleted_at: rowNullableNumber(r.deleted_at),
     };
   }
 
-  private rowToEraseAudit(row: any): EraseAuditRecord {
+  private rowToReadRun(row: unknown): ReadRunRecord {
+    const r = row as SqlRow;
     return {
-      id: row.id,
-      scope: row.scope,
-      actor: row.actor || 'user',
-      reason: row.reason ?? null,
-      ts: row.ts,
-      erasedEvidence: row.erased_evidence ?? 0,
-      erasedBeliefs: row.erased_beliefs ?? 0,
-      erasedReadRuns: row.erased_read_runs ?? 0,
+      id: rowString(r.id),
+      query: rowString(r.query),
+      query_hash: rowString(r.query_hash),
+      scope: rowString(r.scope),
+      budget_tokens: rowNumber(r.budget_tokens),
+      latency_ms: rowNumber(r.latency_ms),
+      ts: rowNumber(r.ts),
+    };
+  }
+
+  private rowToEraseAudit(row: unknown): EraseAuditRecord {
+    const r = row as SqlRow;
+    return {
+      id: rowString(r.id),
+      scope: rowString(r.scope),
+      actor: rowString(r.actor, 'user'),
+      reason: rowNullableString(r.reason),
+      ts: rowNumber(r.ts),
+      erasedEvidence: rowNumber(r.erased_evidence),
+      erasedBeliefs: rowNumber(r.erased_beliefs),
+      erasedReadRuns: rowNumber(r.erased_read_runs),
     };
   }
 }
