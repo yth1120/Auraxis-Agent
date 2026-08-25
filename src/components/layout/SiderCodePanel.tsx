@@ -1,5 +1,5 @@
-import { useEffect, useState, type ReactNode } from 'react';
-import { Dropdown, Input, Popconfirm, Tooltip, message } from 'antd';
+import { type ReactNode } from 'react';
+import { Dropdown, Input, Popconfirm, Tooltip } from 'antd';
 import type { MenuProps } from 'antd';
 import clsx from 'clsx';
 import {
@@ -18,10 +18,10 @@ import type { Project } from '../../stores/useProjectStore';
 import type { Session } from '../../stores/useSessionStore';
 import type { AgentInfo } from '../../types/agent';
 import type { PermissionRequest } from '../../types/advanced';
-import type { PermissionProfile } from '../../types/electron-api';
 import { AgentRow, rowKey } from './SiderNavRows';
 import { useT } from '../../i18n';
 import { buildTaskGroups, orderedProjects, unassignedSessionsOf, orderSessionsByKey } from './SiderCodePanelData';
+import { useSiderProjectProfiles } from './useSiderProjectProfiles';
 
 export type SiderDragState = { kind: 'workspace'; id: string } | { kind: 'session'; id: string; root: string } | null;
 
@@ -87,68 +87,7 @@ export default function SiderCodePanel({
   setDragOverKey,
 }: SiderCodePanelProps) {
   const t = useT();
-  const [projectProfiles, setProjectProfiles] = useState<PermissionProfile[]>([]);
-  const [projectProfileOverrides, setProjectProfileOverrides] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    let alive = true;
-    const pending = window.electronAPI?.permissionProfile?.listProjectProfiles?.();
-    if (pending) {
-      pending
-        .then((r) => {
-          if (!alive || !r?.ok || !r.data) return;
-          setProjectProfiles(r.data.profiles);
-          setProjectProfileOverrides(r.data.overrides ?? {});
-        })
-        .catch(() => {});
-    }
-    return () => {
-      alive = false;
-    };
-  }, []);
-
-  const applyProjectProfile = async (path: string, profileId: string | null) => {
-    const r = await window.electronAPI?.permissionProfile?.setProjectProfile?.(path, profileId);
-    if (!r?.ok) {
-      message.error(r?.error || t('sidebar.projectPermissionSaveFailed'));
-      return;
-    }
-    setProjectProfileOverrides((prev) => {
-      const next = { ...prev };
-      if (profileId) next[path] = profileId;
-      else delete next[path];
-      return next;
-    });
-    message.success(t('sidebar.projectPermissionSaved'));
-  };
-
-  const projectProfileMenu = (path: string): MenuProps['items'] => {
-    const current = projectProfileOverrides[path] ?? null;
-    const items: NonNullable<MenuProps['items']> = [
-      {
-        key: '__global__',
-        label: t('sidebar.projectPermissionGlobal'),
-        icon: current === null ? <CheckOutlined size={12} className="text-primary" /> : undefined,
-      },
-      { type: 'divider' },
-    ];
-    for (const p of projectProfiles) {
-      items.push({
-        key: p.id,
-        label: p.name,
-        icon: current === p.id ? <CheckOutlined size={12} className="text-primary" /> : undefined,
-      });
-    }
-    return items;
-  };
-
-  const addProjectWorkspace = async () => {
-    const result = await window.electronAPI?.project.selectDirectory();
-    if (result?.ok && result.data) {
-      const p = useProjectStore.getState().addProject(result.data);
-      message.success(t('sidebar.addedWorkspace', { name: p.name }));
-    }
-  };
+  const { projectProfileMenu, applyProjectProfile, addProjectWorkspace } = useSiderProjectProfiles();
 
   const renderAgentRow = (a: AgentInfo) => (
     <AgentRow
