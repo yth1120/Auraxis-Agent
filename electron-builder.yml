@@ -45,7 +45,7 @@ mac:
       arch:
         - x64
         - arm64
-  icon: build/icon-512.png
+  icon: build/icon.png
 linux:
   target:
     - AppImage

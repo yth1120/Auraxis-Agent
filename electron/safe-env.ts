@@ -105,7 +105,7 @@ export function safeProcessEnv(extra: Record<string, string | undefined> = {}): 
  * local/development environment where the operator accepts the risk.
  */
 export function unsafeCodeEnabled(): boolean {
-  return process.env.AURAXIS_ALLOW_UNSAFE_CODE === '1';
+  return process.env.AURAXIS_PACKAGED !== '1' && process.env.AURAXIS_ALLOW_UNSAFE_CODE === '1';
 }
 
 export function unsafeCodeDisabledMessage(name: string): string {

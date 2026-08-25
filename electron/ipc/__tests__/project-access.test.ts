@@ -15,7 +15,7 @@ vi.mock('../settings-store', () => ({
   readSettings: vi.fn(),
 }));
 
-import { getKnownProjectRoots, resolveTrustedProjectRoot } from '../project-access';
+import { getKnownProjectRoots, resolveTrustedProjectRoot, seedAuthorizedProjectRoots } from '../project-access';
 import { readSettings } from '../settings-store';
 import { app } from 'electron';
 
@@ -58,6 +58,7 @@ describe('project-access', () => {
   it('rejects unregistered roots in production mode', async () => {
     vi.stubEnv('VITEST', 'false');
     vi.stubEnv('NODE_ENV', 'production');
+    await seedAuthorizedProjectRoots();
     await fs.writeFile(
       path.join(userData, 'auraxis-global-state.json'),
       JSON.stringify({

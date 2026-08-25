@@ -1,7 +1,20 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { promises as fs } from 'fs';
 import os from 'os';
 import path from 'path';
+
+vi.mock('electron', () => ({
+  app: { getPath: vi.fn() },
+  safeStorage: {
+    isEncryptionAvailable: vi.fn(() => true),
+    encryptString: vi.fn((s: string) => Buffer.from(`enc:${s}`, 'utf8')),
+    decryptString: vi.fn((b: Buffer) => {
+      const text = b.toString('utf8');
+      return text.startsWith('enc:') ? text.slice(4) : text;
+    }),
+  },
+}));
+
 import { resolveCredential, describeCredential, setCredential, unsetCredential } from '../../credentials';
 
 let root: string;
@@ -36,8 +49,10 @@ describe('credentials', () => {
     expect(d.writable).toBe(true);
   });
 
-  it('set writes the user .env and unset removes it', async () => {
+  it('set writes encrypted user .env and unset removes it', async () => {
     await setCredential('TEST_CRED_A', 'sk-abc');
+    const raw = await fs.readFile(path.join(root, '.env'), 'utf8');
+    expect(raw).not.toContain('sk-abc');
     expect((await resolveCredential('TEST_CRED_A'))?.value).toBe('sk-abc');
     await unsetCredential('TEST_CRED_A');
     expect(await resolveCredential('TEST_CRED_A')).toBeUndefined();

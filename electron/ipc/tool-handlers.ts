@@ -6,12 +6,24 @@ import { statSync } from 'fs';
 import { createOutputDecoder } from '../text-encoding';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { isPathInside, normalizeWinPath, SAFE_EXTENSIONS, EXCLUDED_DIRS, devLog, isDocumentExtension } from './shared';
-import type { ApprovalPolicy } from '../types';
+import { normalizeWinPath, EXCLUDED_DIRS, devLog, isDocumentExtension } from './shared';
+import type { ToolContext } from './tool-handlers/path-utils';
+import {
+  hasReservedFileName,
+  fixWindowsNullRedirect,
+  resolvePath,
+  ensureSafePath,
+  resolveToolPath,
+  workspaceRootsOf,
+  writableRootsOf,
+  isInsideAnyRoot,
+  outsideWorkspace,
+  isSafeExtension,
+} from './tool-handlers/path-utils';
 import { shouldAutoApprove } from './permission-handlers';
 import { checkPermission as checkPermissionRules } from './permission-handlers';
 import { shouldAskForWorkTier } from '../tool-risk';
-import { workDocsOnlyVerdict, type WorkSurface } from '../work-docs-policy';
+import { workDocsOnlyVerdict } from '../work-docs-policy';
 import type { PermissionContext } from './permission-handlers';
 import { getMainWindowRef } from './window-ref';
 import { ensureSkillsDirectory, listSkills, readSkill, seedBuiltinSkills } from '../skill-store';
@@ -36,155 +48,6 @@ import { getGoal, createGoal, editGoal, pauseGoal, resumeGoal, completeGoal, blo
 
 // Windows reserved filenames that can't be created as regular files
 // (nul, con, prn, aux, com1-com9, lpt1-lpt9)
-const WIN_RESERVED_NAMES = new Set([
-  'nul',
-  'con',
-  'prn',
-  'aux',
-  'com1',
-  'com2',
-  'com3',
-  'com4',
-  'com5',
-  'com6',
-  'com7',
-  'com8',
-  'com9',
-  'lpt1',
-  'lpt2',
-  'lpt3',
-  'lpt4',
-  'lpt5',
-  'lpt6',
-  'lpt7',
-  'lpt8',
-  'lpt9',
-]);
-
-function hasReservedFileName(filePath: string): boolean {
-  // Check each path segment against reserved names (case-insensitive on Windows)
-  const segments = filePath.replace(/\\/g, '/').split('/');
-  return segments.some((s) => {
-    const base = s.includes('.') ? s.slice(0, s.lastIndexOf('.')) : s;
-    return WIN_RESERVED_NAMES.has(base.toLowerCase());
-  });
-}
-
-/**
- * On Windows, ``nul`` is the null device in cmd.exe.
- * But when the shell is Git Bash, ``nul`` is just a regular filename —
- * ``> nul`` creates a literal file instead of discarding output.
- * Convert Windows-style null redirects to Unix-style /dev/null.
- */
-function fixWindowsNullRedirect(cmd: string): string {
-  // Match "N> nul" or "N>> nul" patterns (case-insensitive for "nul")
-  return cmd.replace(/(\d?)\s*(>>?)\s*nul\b/gi, (_full: string, fd: string, op: string) => {
-    return `${fd}${op} /dev/null`;
-  });
-}
-
-function resolvePath(filePath: string, projectRoot: string): string {
-  const normalized = normalizeWinPath(filePath);
-  if (path.isAbsolute(normalized)) {
-    return path.resolve(normalized);
-  }
-  return path.resolve(projectRoot, normalized);
-}
-
-/**
- * Resolve a tool-provided file path and assert it stays inside the project
- * root. Throws if the resolved path escapes (e.g. ../../../etc/hosts).
- * `checkPermission` catches this and auto-denies the tool call.
- */
-function ensureSafePath(filePath: string, projectRoot: string, allowedRoots?: string[]): string {
-  const resolved = resolvePath(filePath, projectRoot);
-  const roots =
-    allowedRoots && allowedRoots.length > 0 ? allowedRoots.map((r) => path.resolve(r)) : [path.resolve(projectRoot)];
-  if (!roots.some((root) => resolved === root || resolved.startsWith(root + path.sep))) {
-    throw new Error(`路径越界: "${filePath}" 不在项目工作区目录内`);
-  }
-  return resolved;
-}
-
-/** Full access may reach outside the project root; confined modes may not. */
-function resolveToolPath(
-  filePath: string,
-  projectRoot: string,
-  sandboxMode?: SandboxMode,
-  allowedRoots?: string[],
-): string {
-  return sandboxMode === 'full'
-    ? resolvePath(filePath, projectRoot)
-    : ensureSafePath(filePath, projectRoot, allowedRoots);
-}
-
-/** 项目工作区根目录（含主根）；工具读写边界由它界定。 */
-function workspaceRootsOf(ctx: ToolContext): string[] {
-  const roots = [ctx.projectRoot, ...(ctx.workspaceRoots ?? [])]
-    .map((r) => (r ? path.resolve(r) : ''))
-    .filter((r): r is string => !!r)
-    .filter((r, i, arr) => arr.indexOf(r) === i);
-  return roots.length > 0 ? roots : [path.resolve(ctx.projectRoot)];
-}
-
-/** 项目可写根目录（默认 = 全部工作区根）。 */
-function writableRootsOf(ctx: ToolContext): string[] {
-  const roots = (ctx.writableRoots && ctx.writableRoots.length > 0 ? ctx.writableRoots : (ctx.workspaceRoots ?? []))
-    .map((r) => (r ? path.resolve(r) : ''))
-    .filter((r): r is string => !!r)
-    .filter((r, i, arr) => arr.indexOf(r) === i);
-  return roots.length > 0 ? roots : workspaceRootsOf(ctx);
-}
-
-function isInsideAnyRoot(target: string, roots: string[]): boolean {
-  return roots.some((root) => target === root || isPathInside(target, root));
-}
-
-/**
- * 多根边界：读工具须在工作区内，写工具还须在可写根内。
- * full 沙箱与 autoApprove 保持原有放行语义。
- */
-function outsideWorkspace(resolved: string, ctx: ToolContext, write: boolean): string | null {
-  if (ctx.sandboxMode === 'full' || ctx.autoApprove) return null;
-  if (!isInsideAnyRoot(resolved, workspaceRootsOf(ctx))) return '路径越权';
-  if (write && !isInsideAnyRoot(resolved, writableRootsOf(ctx))) return '写入越权';
-  return null;
-}
-
-function isSafeExtension(filePath: string): boolean {
-  const ext = path.extname(filePath).toLowerCase();
-  return SAFE_EXTENSIONS.has(ext);
-}
-
-export interface ToolContext {
-  projectRoot: string;
-  requestId: string;
-  checkPermission?: (toolName: string, input: Record<string, unknown>, toolCallId?: string) => Promise<boolean>;
-  onProgress?: (chunk: string) => void;
-  toolCallId?: string;
-  agentId?: string;
-  /** Stable agent/session identity for goal + report tools (agent loop session). */
-  sessionId?: string;
-  /** When true, path bounds, safe extension checks, and blocked URL checks are skipped. */
-  autoApprove?: boolean;
-  /** Parent abort signal — propagated to child agents so they stop when parent is cancelled. */
-  abortSignal?: AbortSignal;
-  mode: ApprovalPolicy;
-  approvedPlanSteps?: string[];
-  /** Work 模式执行自主度档位（smart/full 走分级门禁）。 */
-  workTier?: 'plan' | 'smart' | 'full';
-  /** 项目工作区根目录（含主根）。 */
-  workspaceRoots?: string[];
-  /** 项目可写根目录（roots 的子集）。 */
-  writableRoots?: string[];
-  /** Sub-agent recursion depth. Top-level chat tools omit it (treated as 0);
-   *  the Agent tool passes ctx.depth+1 so runSubAgent can enforce the limit. */
-  depth?: number;
-  /** Per-call sandbox mode ('read' hard-denies mutations). Defaults to full. */
-  sandboxMode?: SandboxMode;
-  /** Which UI surface created this run — 'work' enforces docs-only writes. */
-  surface?: WorkSurface;
-}
 
 // ─── Abort registry for running tools ──────────────────
 const abortRegistry = new Map<string, { abort: () => void }>();

@@ -208,7 +208,7 @@ describe('index — registerIpcHandlers 总注册与窗口/shell/设置处理器
       'shell:openSkillsDirectory',
       'settings:get',
       'settings:set',
-      'settings:getApiKey',
+      'settings:getApiKeyStatus',
       'api:setKey',
       'model:getAll',
       'worktree:getStatus',
@@ -337,14 +337,17 @@ describe('index — registerIpcHandlers 总注册与窗口/shell/设置处理器
     expect(res.ok).toBe(false);
   });
 
-  it('settings:get/set/getApiKey/api:setKey/model:getAll', async () => {
+  it('settings:get/set/getApiKeyStatus/api:setKey/model:getAll', async () => {
     registerIpcHandlers();
     const h = handlers();
     registerFns.readSettings.mockResolvedValue({ deepseekApiKey: 'sk', selectedModel: 'm' });
 
     await expect(h.get('settings:get')!({})).resolves.toEqual({ ok: true, data: { selectedModel: 'm' } });
     await expect(h.get('settings:get')!({}, 'selectedModel')).resolves.toEqual({ ok: true, data: 'm' });
-    await expect(h.get('settings:getApiKey')!({}, 'deepseek')).resolves.toEqual({ ok: true, data: '' });
+    await expect(h.get('settings:getApiKeyStatus')!({}, 'deepseek')).resolves.toEqual({
+      ok: true,
+      data: { configured: true },
+    });
 
     await expect(h.get('settings:set')!({}, 'selectedModel', 'm2')).resolves.toEqual({ ok: true });
     expect(registerFns.writeSettings).toHaveBeenCalledWith(expect.objectContaining({ selectedModel: 'm2' }));

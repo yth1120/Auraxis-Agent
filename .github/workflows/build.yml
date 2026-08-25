@@ -32,6 +32,8 @@ jobs:
       - run: npx vitest run --coverage
       - run: npm run sdk:test:py
       - run: npm audit --audit-level=high
+      - run: npm run format:check
+      - run: npm run check:docs
       - run: npm run lint
 
       - name: Run E2E (Linux)

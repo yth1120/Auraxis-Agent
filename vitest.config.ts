@@ -16,7 +16,7 @@ export default defineConfig({
       // 86.22% 函数。
       // 行/语句已达实际天花板区间，取整锁定；分支/函数留足余量。
       thresholds: { lines: 80, branches: 70, functions: 80, statements: 80 },
-      include: ['electron/ipc/**/*.ts', 'src/stores/**/*.ts', 'src/core/**/*.ts'],
+      include: ['electron/**/*.ts', 'src/stores/**/*.ts', 'src/core/**/*.ts'],
       exclude: ['dist-electron/**', 'dist/**', '**/__tests__/**', '**/*.test.*', '**/node_modules/**'],
     },
     testTimeout: 10000,

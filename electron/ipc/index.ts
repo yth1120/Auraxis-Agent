@@ -54,6 +54,7 @@ import { registerCoverageIpc } from './coverage-handlers';
 import { registerTokenizerIpc } from '../tokenizer';
 import { readSettings, writeSettings, redactSettings } from './settings-store';
 import { getAllModels } from './model-config';
+import { resolveTrustedProjectRoot } from './project-access';
 import { getActiveWorktree } from './tool-handlers';
 
 /** Windows 11 build 22000+ exposes the native Mica/Acrylic material API. */
@@ -251,6 +252,20 @@ export function registerIpcHandlers() {
       if (API_KEY_KEYS.has(key)) {
         return { ok: false, error: '请使用 api:setKey 设置 API Key' };
       }
+      if (key === 'projectPath') {
+        if (value === '' || value === null) {
+          const settings = await readSettings();
+          settings.projectPath = '';
+          await writeSettings(settings);
+          return { ok: true };
+        }
+        if (typeof value !== 'string') return { ok: false, error: '项目路径必须是字符串' };
+        const root = await resolveTrustedProjectRoot(value);
+        const settings = await readSettings();
+        settings.projectPath = root;
+        await writeSettings(settings);
+        return { ok: true };
+      }
       const settings = await readSettings();
       settings[key] = value;
       await writeSettings(settings);
@@ -260,11 +275,13 @@ export function registerIpcHandlers() {
     }
   });
 
-  secureHandle('settings:getApiKey', async (_event, provider: string) => {
+  secureHandle('settings:getApiKeyStatus', async (_event, provider: string) => {
     try {
       const keyField = PROVIDER_KEY_FIELDS[provider];
       if (!keyField) return { ok: false, error: `不支持的 provider: ${provider}` };
-      return { ok: true, data: '' };
+      const settings = await readSettings();
+      const value = settings[keyField];
+      return { ok: true, data: { configured: typeof value === 'string' && value.length > 0 } };
     } catch (error: unknown) {
       return { ok: false, error: errorText(error) };
     }

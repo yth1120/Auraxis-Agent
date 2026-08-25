@@ -4,7 +4,8 @@ import type { IpcMainInvokeEvent } from 'electron';
 const DEV_ORIGINS = new Set(['http://localhost:5173', 'http://127.0.0.1:5173', 'http://[::1]:5173']);
 
 function isTesting(): boolean {
-  return process.env.NODE_ENV === 'test' || process.env.VITEST === 'true';
+  // Test seams are only available in unpackaged/development processes.
+  return process.env.AURAXIS_PACKAGED !== '1' && (process.env.NODE_ENV === 'test' || process.env.VITEST === 'true');
 }
 
 function isTrustedUrl(value: string): boolean {

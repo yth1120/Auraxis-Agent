@@ -12,6 +12,7 @@ vi.mock('electron', () => ({
   BrowserWindow: {
     fromWebContents: () => h.win,
   },
+  app: { getPath: vi.fn(() => '') },
 }));
 
 vi.mock('axios', () => ({

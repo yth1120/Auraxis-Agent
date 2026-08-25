@@ -9,7 +9,7 @@ import type { ApplyCodePayload } from '../types';
 import { EMPTY_PROJECT_GLOBAL_STATE, normalizeProjectGlobalState, type ProjectGlobalState } from '../contracts/project';
 import { isPathInside, isAllowedExtension, EXCLUDED_DIRS, assertString, assertObject } from './shared';
 import { assertTrustedIpcSender } from './trust';
-import { resolveTrustedProjectRoot } from './project-access';
+import { authorizeProjectRoot, resolveTrustedProjectRoot } from './project-access';
 
 function parseGitignore(content: string): string[] {
   return content
@@ -152,6 +152,7 @@ export function registerProjectHandlers() {
         properties: ['openDirectory'],
       });
       if (result.canceled) return { ok: true, data: null };
+      const authorizedRoot = await authorizeProjectRoot(result.filePaths[0]);
       // Reload undo history for the newly selected project so 回退/命名快照
       // work immediately after switching folders.
       try {
@@ -160,7 +161,7 @@ export function registerProjectHandlers() {
       } catch {
         /* non-critical */
       }
-      return { ok: true, data: result.filePaths[0] };
+      return { ok: true, data: authorizedRoot };
     } catch (error: unknown) {
       return { ok: false, error: errorText(error) };
     }

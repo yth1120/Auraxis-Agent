@@ -1,4 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import type { ToolStreamEvent } from './tool-defs';
+import type { AgentInfo, PermissionRequest } from './contracts/advanced';
+import type { TerminalTask } from './ipc/task-monitor';
 import type { ApplyCodePayload, ApiMessage } from './contracts/core';
 
 interface UsageEvent {
@@ -9,12 +12,10 @@ interface UsageEvent {
   cacheMissTokens?: number;
 }
 
-interface QueryEvent {
-  requestId: string;
-  type: string;
-  error?: string;
-  [key: string]: unknown;
-}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type QueryEvent = any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AgentEventPayload = any;
 
 function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
@@ -24,7 +25,7 @@ function generateId(): string {
 const queryCleanups = new Map<string, () => void>();
 const streamCleanups = new Map<string, () => void>();
 
-contextBridge.exposeInMainWorld('electronAPI', {
+const electronAPI = {
   // --- Platform ---
   platform: process.platform,
   // User home directory — terminal prompts collapse it to `~`.
@@ -103,6 +104,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         reasoningEffort?: 'low' | 'high' | 'max';
         isWebSearch: boolean;
         apiKey?: string;
+        surface?: 'chat' | 'work' | 'code';
         prefix?: { content: string; stop?: string[] };
       },
       callbacks: {
@@ -187,7 +189,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         reasoningEffort?: 'low' | 'high' | 'max';
         projectRoot: string;
         autoApprove?: boolean;
-        mode?: string;
+        mode?: 'ask' | 'plan' | 'auto';
         apiKey?: string;
         maxIterations?: number;
       },
@@ -195,7 +197,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ) => {
       const requestId = generateId();
 
-      const eventHandler = (_event: Electron.IpcRendererEvent, data: QueryEvent) => {
+      const eventHandler = (_event: Electron.IpcRendererEvent, raw: QueryEvent) => {
+        const data = raw as ToolStreamEvent;
         if (data.requestId !== requestId) return;
         if (data.type === 'done') {
           callbacks.onEvent(data);
@@ -273,7 +276,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   settings: {
     get: (key?: string) => ipcRenderer.invoke('settings:get', key),
     set: (key: string, value: unknown) => ipcRenderer.invoke('settings:set', key, value),
-    getApiKey: (provider: string) => ipcRenderer.invoke('settings:getApiKey', provider),
+    getApiKeyStatus: (provider: string) => ipcRenderer.invoke('settings:getApiKeyStatus', provider),
     setApiKey: (provider: string, key: string) => ipcRenderer.invoke('api:setKey', provider, key),
   },
 
@@ -311,8 +314,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getRules: () => ipcRenderer.invoke('permission:getRules'),
     removeRule: (ruleId: string) => ipcRenderer.invoke('permission:removeRule', ruleId),
     clearRules: () => ipcRenderer.invoke('permission:clearRules'),
-    onRequest: (callback: (request: unknown) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, request: unknown) => callback(request);
+    onRequest: (callback: (request: PermissionRequest) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, request: PermissionRequest) => callback(request);
       ipcRenderer.on('permission:request', handler);
       return () => {
         ipcRenderer.removeListener('permission:request', handler);
@@ -382,16 +385,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
     schedulerRemove: (agentId: string) => ipcRenderer.invoke('agent:schedulerRemove', agentId),
     clear: () => ipcRenderer.invoke('agent:clear'),
     clearAll: () => ipcRenderer.invoke('agent:clearAll'),
-    onUpdated: (callback: (agent: unknown) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, agent: unknown) => callback(agent);
+    onUpdated: (callback: (agent: AgentInfo) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, agent: AgentInfo) => callback(agent);
       ipcRenderer.on('agent:updated', handler);
       return () => {
         ipcRenderer.removeListener('agent:updated', handler);
       };
     },
-    onEvent: (agentId: string, callback: (event: unknown) => void) => {
+    onEvent: (agentId: string, callback: (event: AgentEventPayload) => void) => {
       const channel = `agent:event:${agentId}`;
-      const handler = (_event: Electron.IpcRendererEvent, data: unknown) => callback(data);
+      const handler = (_event: Electron.IpcRendererEvent, data: AgentEventPayload) => callback(data);
       ipcRenderer.on(channel, handler);
       return () => {
         ipcRenderer.removeListener(channel, handler);
@@ -554,8 +557,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.on(`terminal:event:${id}`, listener);
       return () => ipcRenderer.removeListener(`terminal:event:${id}`, listener);
     },
-    onTasksChanged: (cb: (tasks: unknown[]) => void) => {
-      const listener = (_event: Electron.IpcRendererEvent, tasks: unknown[]) => cb(tasks || []);
+    onTasksChanged: (cb: (tasks: TerminalTask[]) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, tasks: TerminalTask[]) => cb(tasks || []);
       ipcRenderer.on('terminal:tasks:changed', listener);
       return () => ipcRenderer.removeListener('terminal:tasks:changed', listener);
     },
@@ -681,4 +684,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     get: () => ipcRenderer.invoke('stats:get'),
     reset: () => ipcRenderer.invoke('stats:reset'),
   },
-});
+};
+
+contextBridge.exposeInMainWorld('electronAPI', electronAPI);
+
+export { electronAPI };

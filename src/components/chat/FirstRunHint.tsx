@@ -9,7 +9,7 @@ import { useSessionStore } from '../../stores/useSessionStore';
 /** 首次运行引导：无项目且无 API Key 时给出两条最短路径。 */
 export default memo(function FirstRunHint() {
   const t = useT();
-  const hasKey = !!useSettingsStore((s) => s.deepseekApiKey);
+  const hasKey = useSettingsStore((s) => s.deepseekApiKeyConfigured);
   const hasSessions = useSessionStore((s) => s.sessions.length > 0);
 
   // 已有历史会话时不再重复“开始使用”引导，避免长期噪音。

@@ -21,6 +21,8 @@ export interface AccountInfo {
 
 export interface SettingsStore {
   deepseekApiKey: string;
+  /** 主进程是否已配置 DeepSeek Key（不返回密钥本身）。 */
+  deepseekApiKeyConfigured: boolean;
   defaultModel: string;
   fallbackModel: string;
   projectPath: string | null;
@@ -91,6 +93,7 @@ export const useSettingsStore = create<SettingsStore>()(
   persist(
     (set) => ({
       deepseekApiKey: '',
+      deepseekApiKeyConfigured: false,
       defaultModel: 'deepseek-v4-flash',
       fallbackModel: '',
       projectPath: null,
@@ -192,16 +195,16 @@ export const useSettingsStore = create<SettingsStore>()(
 
       setExaApiKey: (key) => {
         set({ exaApiKey: key });
-        window.electronAPI?.settings.set('exaApiKey', key).catch(() => {});
+        window.electronAPI?.settings.setApiKey('exa', key).catch(() => {});
       },
 
       setPerplexityApiKey: (key) => {
         set({ perplexityApiKey: key });
-        window.electronAPI?.settings.set('perplexityApiKey', key).catch(() => {});
+        window.electronAPI?.settings.setApiKey('perplexity', key).catch(() => {});
       },
 
       setApiKey: (key) => {
-        set({ deepseekApiKey: key });
+        set({ deepseekApiKey: key, deepseekApiKeyConfigured: !!key });
         window.electronAPI?.settings.setApiKey('deepseek', key).catch(() => {});
       },
 
@@ -222,7 +225,7 @@ export const useSettingsStore = create<SettingsStore>()(
       },
 
       clearApiKeys: () => {
-        set({ deepseekApiKey: '' });
+        set({ deepseekApiKey: '', deepseekApiKeyConfigured: false });
         const api = window.electronAPI?.settings;
         if (api) {
           api.setApiKey('deepseek', '');
@@ -266,10 +269,10 @@ export const useSettingsStore = create<SettingsStore>()(
       onRehydrateStorage: () => (state) => {
         if (state && window.electronAPI?.settings) {
           window.electronAPI.settings
-            .getApiKey('deepseek')
+            .getApiKeyStatus('deepseek')
             .then((result) => {
               if (result.ok && result.data) {
-                useSettingsStore.setState({ deepseekApiKey: result.data });
+                useSettingsStore.setState({ deepseekApiKeyConfigured: !!result.data?.configured });
               }
             })
             .catch(() => {});

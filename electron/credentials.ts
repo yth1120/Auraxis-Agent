@@ -1,13 +1,12 @@
 /**
  * credentials.ts — 凭证引用式密钥解析.
  *
- * Configuration references secrets by name; values live in the process
- * environment or local .env files, never inline in settings documents.
- * Resolution happens per operation; an empty value counts as absent.
+ * App-owned values are encrypted with the OS safeStorage before they touch
+ * userData. Project .env files remain developer-managed and are read as-is.
  */
 import { promises as fs } from 'fs';
 import path from 'path';
-import { app } from 'electron';
+import { app, safeStorage } from 'electron';
 
 export interface CredentialResolution {
   value: string;
@@ -21,10 +20,29 @@ export interface CredentialDescription {
 }
 
 const IDENTIFIER_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+const ENCRYPTED_PREFIX = 'enc:';
 
 export function credentialRef(name: string): string {
   if (!IDENTIFIER_RE.test(name)) throw new Error(`无效的凭据引用: ${name}`);
   return name;
+}
+
+function encryptSecret(value: string): string {
+  if (!safeStorage.isEncryptionAvailable()) {
+    throw new Error('系统加密不可用，无法安全存储凭据');
+  }
+  return ENCRYPTED_PREFIX + safeStorage.encryptString(value).toString('base64');
+}
+
+function decryptSecret(value: string): string {
+  if (!value.startsWith(ENCRYPTED_PREFIX)) return value;
+  if (!safeStorage.isEncryptionAvailable()) return '';
+  try {
+    const buf = Buffer.from(value.slice(ENCRYPTED_PREFIX.length), 'base64');
+    return safeStorage.decryptString(buf);
+  } catch {
+    return '';
+  }
 }
 
 async function parseEnvFile(file: string): Promise<Record<string, string>> {
@@ -60,11 +78,11 @@ export async function resolveCredential(name: string, projectRoot?: string): Pro
   if (envValue && envValue.length > 0) return { value: envValue, source: 'env' };
 
   const userEnv = await parseEnvFile(userEnvFile());
-  if (userEnv[name]) return { value: userEnv[name], source: 'user-env' };
+  if (userEnv[name]) return { value: decryptSecret(userEnv[name]), source: 'user-env' };
 
   if (projectRoot) {
     const projectEnv = await parseEnvFile(path.join(projectRoot, '.env'));
-    if (projectEnv[name]) return { value: projectEnv[name], source: 'project-env' };
+    if (projectEnv[name]) return { value: decryptSecret(projectEnv[name]), source: 'project-env' };
   }
   return undefined;
 }
@@ -82,7 +100,7 @@ export async function setCredential(name: string, value: string): Promise<void> 
   if (!describe.writable) throw new Error(`凭据 ${name} 由进程环境变量提供，只读，无法写入`);
   const file = userEnvFile();
   const existing = await parseEnvFile(file);
-  existing[name] = value;
+  existing[name] = encryptSecret(value);
   const lines = Object.entries(existing)
     .filter(([, v]) => v.length > 0)
     .map(([k, v]) => `${k}=${JSON.stringify(v)}`);

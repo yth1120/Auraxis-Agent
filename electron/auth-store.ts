@@ -38,6 +38,10 @@ interface StoredAccount {
 /** In-memory session flag for this process boot. */
 let unlocked = false;
 
+function authBypassEnabled(): boolean {
+  return !(typeof app !== 'undefined' && app.isPackaged) && process.env.AURAXIS_AUTH_DISABLED === '1';
+}
+
 /** 持久化限流：写入 userData，重启后仍保留失败计数，防跨重启爆破。 */
 interface ThrottleState {
   count: number;
@@ -124,7 +128,7 @@ function validEmail(email: string): boolean {
 export async function getAuthStatus(): Promise<AuthStatus> {
   // E2E / CI bypass: keeps the automated suite on the workbench without
   // seeding an account. Never set in normal desktop usage.
-  if (process.env.AURAXIS_AUTH_DISABLED === '1') {
+  if (authBypassEnabled()) {
     return { phase: 'unlocked', rememberMe: true };
   }
   const account = await readAccount();
@@ -147,7 +151,7 @@ export async function getAuthStatus(): Promise<AuthStatus> {
  * 由账户邮箱的 SHA-256 派生，不携带明文隐私；AURAXIS_AUTH_DISABLED 或未注册时不传。
  */
 export async function getDeepSeekUserId(): Promise<string | undefined> {
-  if (process.env.AURAXIS_AUTH_DISABLED === '1') return undefined;
+  if (authBypassEnabled()) return undefined;
   const account = await readAccount();
   if (!account?.email) return undefined;
   const digest = createHash('sha256').update(account.email.trim().toLowerCase()).digest('hex').slice(0, 24);

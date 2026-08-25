@@ -7,7 +7,7 @@ vi.stubGlobal('window', {
   electronAPI: {
     settings: {
       setApiKey: vi.fn().mockResolvedValue({ ok: true }),
-      getApiKey: vi.fn().mockResolvedValue({ ok: true, data: 'sk-mocked' }),
+      getApiKeyStatus: vi.fn().mockResolvedValue({ ok: true, data: { configured: true } }),
       set: vi.fn().mockResolvedValue({ ok: true }),
     },
     setBackgroundMaterial: vi.fn().mockResolvedValue({ ok: true }),
@@ -166,13 +166,13 @@ describe('useSettingsStore — setters', () => {
   });
 
   it('外部搜索 key 设置委托主进程', () => {
-    const set = (window as any).electronAPI.settings.set;
+    const setApiKey = (window as any).electronAPI.settings.setApiKey;
     useSettingsStore.getState().setExaApiKey('exa-1');
     useSettingsStore.getState().setPerplexityApiKey('pplx-1');
     expect(useSettingsStore.getState().exaApiKey).toBe('exa-1');
     expect(useSettingsStore.getState().perplexityApiKey).toBe('pplx-1');
-    expect(set).toHaveBeenCalledWith('exaApiKey', 'exa-1');
-    expect(set).toHaveBeenCalledWith('perplexityApiKey', 'pplx-1');
+    expect(setApiKey).toHaveBeenCalledWith('exa', 'exa-1');
+    expect(setApiKey).toHaveBeenCalledWith('perplexity', 'pplx-1');
   });
 });
 

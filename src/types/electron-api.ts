@@ -334,11 +334,7 @@ export interface ElectronAPI {
   };
 
   agent: {
-    create: (
-      request: import('./advanced').AgentCreateRequest,
-    ) => Promise<{ ok: boolean; data?: import('./advanced').AgentInfo }>;
     start: (config: unknown, projectPath: string) => Promise<{ ok: boolean; data?: { agentId: string } }>;
-    stop: (agentId: string) => Promise<{ ok: boolean }>;
     schedulerStop: (agentId: string) => Promise<{ ok: boolean }>;
     pause: (agentId: string) => Promise<{ ok: boolean; data?: { paused: boolean } }>;
     resume: (agentId: string) => Promise<{ ok: boolean; data?: { resumed: boolean } }>;
@@ -353,8 +349,6 @@ export interface ElectronAPI {
     setMaxConcurrent: (n: number) => Promise<{ ok: boolean }>;
     getAll: () => Promise<{ ok: boolean; data?: unknown[] }>;
     getState: (agentId: string) => Promise<{ ok: boolean; data?: unknown }>;
-    list: () => Promise<{ ok: boolean; data?: import('./advanced').AgentInfo[] }>;
-    get: (agentId: string) => Promise<{ ok: boolean; data?: import('./advanced').AgentInfo; error?: string }>;
     remove: (agentId: string) => Promise<{ ok: boolean }>;
     clear: () => Promise<{ ok: boolean }>;
     clearAll: () => Promise<{ ok: boolean; data?: { cleared: number }; error?: string }>;
@@ -505,7 +499,7 @@ export interface ElectronAPI {
   settings: {
     get: (key?: string) => Promise<{ ok: boolean; data?: unknown; error?: string }>;
     set: (key: string, value: unknown) => Promise<{ ok: boolean; error?: string }>;
-    getApiKey: (provider: string) => Promise<{ ok: boolean; data?: string; error?: string }>;
+    getApiKeyStatus: (provider: string) => Promise<{ ok: boolean; data?: { configured: boolean }; error?: string }>;
     setApiKey: (provider: string, key: string) => Promise<{ ok: boolean; error?: string }>;
   };
 
@@ -838,6 +832,10 @@ export interface SystemStats {
   platform: string;
   arch: string;
 }
+
+type PreloadElectronAPISurface = typeof import('../../electron/preload').electronAPI;
+const __apiSurfaceAssignable: ElectronAPI = {} as PreloadElectronAPISurface;
+void __apiSurfaceAssignable;
 
 declare global {
   interface Window {

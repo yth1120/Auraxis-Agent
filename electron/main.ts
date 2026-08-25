@@ -8,6 +8,7 @@ import { registerIpcHandlers, isWindows11, markAcrylicWindowReady } from './ipc'
 import { cleanupWindowStreams } from './ipc/ai-handlers';
 import { setMainWindowRef, clearMainWindowRef } from './ipc/window-ref';
 import { sessionQuerySearch } from './fts';
+import { seedAuthorizedProjectRoots } from './ipc/project-access';
 import { buildConnectSrc, buildFrameSrc } from './network-policy';
 import { errorText } from './errors';
 
@@ -221,6 +222,7 @@ process.on('unhandledRejection', (reason) => {
   }
 });
 
+process.env.AURAXIS_PACKAGED = app.isPackaged ? '1' : '';
 app.setName('Auraxis');
 app.whenReady().then(async () => {
   // 旧版本错误地在 Windows 上把 cache 路径写入后，userData 被解析到了
@@ -272,6 +274,7 @@ app.whenReady().then(async () => {
       /* migration is best-effort; existing data remains in the legacy folder */
     }
   }
+  await seedAuthorizedProjectRoots();
   registerIpcHandlers();
 
   // Restore persisted undo history for the saved project (fresh app start
@@ -355,7 +358,7 @@ app.whenReady().then(async () => {
             projectRoot: root || '',
             requestId: `sdk-${Date.now()}`,
             // 默认保留审批门；只有显式 AURAXIS_SDK_AUTOAPPROVE=1 才允许全自动无头执行。
-            autoApprove: process.env.AURAXIS_SDK_AUTOAPPROVE === '1',
+            autoApprove: process.env.AURAXIS_PACKAGED !== '1' && process.env.AURAXIS_SDK_AUTOAPPROVE === '1',
           });
         },
         searchSessions: (query, limit) => sessionQuerySearch(query, limit),
@@ -391,7 +394,7 @@ app.whenReady().then(async () => {
           subagentType: promptType === 'plan' ? 'Plan' : 'general-purpose',
           projectRoot: root,
           requestId: `acp-${Date.now()}`,
-          autoApprove: process.env.AURAXIS_ACP_AUTOAPPROVE === '1',
+          autoApprove: process.env.AURAXIS_PACKAGED !== '1' && process.env.AURAXIS_ACP_AUTOAPPROVE === '1',
           parentSignal: signal,
         });
       },
