@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { message, Modal } from 'antd';
+import { useCallback, useEffect, useState } from 'react';
+import { Modal } from 'antd';
 import { MagnifyingGlass as SearchOutlined, SidebarSimple as SidebarSimpleIcon } from '@/components/common/icons';
 import { useAgentStore } from '../../stores/useAgentStore';
 import { useAppStore } from '../../stores/useAppStore';
 import { useChatStore } from '../../stores/useChatStore';
 import { useSessionStore, type Session } from '../../stores/useSessionStore';
-import { useProjectStore, type Project } from '../../stores/useProjectStore';
+import { useProjectStore } from '../../stores/useProjectStore';
 import WorkSidebarPanel from '../work/WorkSidebarPanel';
 import { useSettingsStore } from '../../stores/useSettingsStore';
 import SkillsDirectory from '../skills/SkillsDirectory';
@@ -17,7 +17,8 @@ import { SessionRow, SIDEBAR_TOP_NAV } from './SiderNavRows';
 import SiderAccountMenu from './SiderAccountMenu';
 import SiderRootsModal from './SiderRootsModal';
 import SiderChatPanel from './SiderChatPanel';
-import SiderCodePanel, { type SiderDragState } from './SiderCodePanel';
+import SiderCodePanel from './SiderCodePanel';
+import { useSiderNavState } from './useSiderNavState';
 
 /* Agent status → status-dot icon (Code-mode task list). */
 /* ── Component ────────────────────────────────────────── */
@@ -52,7 +53,6 @@ export default function SiderNav({ collapsed }: SiderNavProps) {
   const openToolView = useAppStore((s) => s.openToolView);
 
   const sessions = useSessionStore((s) => s.sessions);
-  const currentSessionId = useSessionStore((s) => s.currentSessionId);
   const projects = useProjectStore((s) => s.projects);
   const currentProjectId = useProjectStore((s) => s.currentProjectId);
   const settingsProjectPath = useSettingsStore((s) => s.projectPath);
@@ -67,218 +67,51 @@ export default function SiderNav({ collapsed }: SiderNavProps) {
   const setCurrentAgent = useAgentStore((s) => s.setCurrentAgent);
   const agentPermissions = useAgentStore((s) => s.agentPermissions);
 
-  const [renamingThreadId, setRenamingThreadId] = useState<string | null>(null);
-  const [renameValue, setRenameValue] = useState('');
-  const [renamingProjectId, setRenamingProjectId] = useState<string | null>(null);
-  const [renameProjectValue, setRenameProjectValue] = useState('');
-  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
-  const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(new Set());
-  const [showAllSessions, setShowAllSessions] = useState<Set<string>>(new Set());
   const [skillsDirOpen, setSkillsDirOpen] = useState(false);
-  const [dragOverKey, setDragOverKey] = useState<string | null>(null);
-  const dragStateRef = useRef<SiderDragState>(null);
-  const [rootsModalProject, setRootsModalProject] = useState<Project | null>(null);
-  const [rootsModalRoots, setRootsModalRoots] = useState<string[]>([]);
-  const [rootsModalWritable, setRootsModalWritable] = useState<string[]>([]);
-
-  const openRootsModal = (p: Project) => {
-    const roots = p.roots.length > 0 ? [...p.roots] : [p.path];
-    setRootsModalProject(p);
-    setRootsModalRoots(roots);
-    setRootsModalWritable(p.writableRoots.length > 0 ? [...p.writableRoots] : roots);
-  };
-
-  const addRootFromPicker = async () => {
-    const result = await window.electronAPI?.project.selectDirectory();
-    const dir = result?.ok ? result.data : null;
-    if (dir && !rootsModalRoots.includes(dir)) {
-      setRootsModalRoots((prev) => [...prev, dir]);
-      setRootsModalWritable((prev) => [...prev, dir]);
-    }
-  };
-
-  const saveRootsModal = () => {
-    const p = rootsModalProject;
-    if (!p) return;
-    const store = useProjectStore.getState();
-    for (const r of rootsModalRoots) {
-      if (!p.roots.includes(r)) store.addProjectRoot(p.id, r);
-    }
-    for (const r of p.roots) {
-      if (!rootsModalRoots.includes(r)) store.removeProjectRoot(p.id, r);
-    }
-    for (const r of rootsModalRoots) {
-      store.setRootWritable(p.id, r, rootsModalWritable.includes(r));
-    }
-    setRootsModalProject(null);
-    message.success(t('sidebar.projectRootsSaved'));
-  };
+  const {
+    currentSessionId,
+    renamingThreadId,
+    setRenamingThreadId,
+    renameValue,
+    setRenameValue,
+    renamingProjectId,
+    renameProjectValue,
+    setRenamingProjectId,
+    setRenameProjectValue,
+    expandedProjects,
+    collapsedProjects,
+    showAllSessions,
+    dragOverKey,
+    setDragOverKey,
+    dragStateRef,
+    rootsModalProject,
+    rootsModalRoots,
+    rootsModalWritable,
+    setRootsModalProject,
+    setRootsModalRoots,
+    setRootsModalWritable,
+    openRootsModal,
+    addRootFromPicker,
+    saveRootsModal,
+    toggleProjectExpanded,
+    toggleShowAllSessions,
+    startSessionInProject,
+    toggleProject,
+    handleNewSession,
+    handleSelectThread,
+    handleForkThread,
+    handleArchiveThread,
+    handleDeleteThread,
+    handleStartRename,
+    handleFinishRename,
+    handleMoveSession,
+    handleSessionDragStart,
+    handleSessionDragOver,
+    handleSessionDrop,
+    handleSessionDragEnd,
+  } = useSiderNavState({ t, sessions, agents, settingsProjectPath, currentProjectId });
 
   const labelCls = visualCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[200px] opacity-100 ml-2';
-  /* ── Project workspaces （项目工作区） ── */
-  useEffect(() => {
-    const st = useProjectStore.getState();
-    for (const s of sessions) {
-      if (s.projectRoot) st.ensureProject(s.projectRoot);
-    }
-    for (const a of agents) {
-      if (a.projectRoot) st.ensureProject(a.projectRoot);
-    }
-    const active = settingsProjectPath ? st.ensureProject(settingsProjectPath) : null;
-    if (active && st.currentProjectId !== active.id) {
-      st.selectProject(active.id);
-    }
-  }, [sessions, agents, settingsProjectPath]);
-
-  useEffect(() => {
-    if (!currentProjectId) return;
-    setExpandedProjects((prev) => {
-      if (prev.has(currentProjectId)) return prev;
-      const next = new Set(prev);
-      next.add(currentProjectId);
-      return next;
-    });
-  }, [currentProjectId]);
-
-  const toggleProjectExpanded = useCallback((id: string) => {
-    setExpandedProjects((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
-
-  const toggleShowAllSessions = useCallback((id: string) => {
-    setShowAllSessions((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
-
-  const startSessionInProject = useCallback((path: string) => {
-    useSettingsStore.getState().setProjectPath(path);
-    useChatStore.getState().setCurrentProjectPath(path);
-    useAppStore.getState().setSidebarMode('chat');
-    useAppStore.getState().setActiveToolView('none');
-    useSessionStore.getState().newSession();
-    useChatStore.getState().clearMessages();
-  }, []);
-
-  const toggleProject = useCallback((key: string) => {
-    setCollapsedProjects((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }, []);
-
-  /* ── Chat-mode actions ─────────────────────────────── */
-  const handleNewSession = useCallback(() => {
-    useAppStore.getState().setSidebarMode('chat');
-    useAppStore.getState().setActiveToolView('none');
-    useSessionStore.getState().newSession();
-    useChatStore.getState().clearMessages();
-  }, []);
-  const handleSelectThread = useCallback(
-    (threadId: string) => {
-      if (renamingThreadId) return;
-      // Clicking a conversation is an explicit "show me chat" gesture: leave
-      // Agent mode entirely so the sidebar and the main surface agree.
-      useAppStore.getState().setSidebarMode('chat');
-      useAppStore.getState().setActiveToolView('none');
-      useChatStore.getState().switchSession(threadId);
-    },
-    [renamingThreadId],
-  );
-  const handleForkThread = useCallback(
-    (e: React.MouseEvent, threadId: string) => {
-      e.stopPropagation();
-      useAppStore.getState().setSidebarMode('chat');
-      useAppStore.getState().setActiveToolView('none');
-      const newId = useSessionStore.getState().forkSession(threadId);
-      if (!newId) {
-        message.error(t('sidebar.forkFailed'));
-        return;
-      }
-      useChatStore.getState().switchSession(newId);
-      message.success(t('sidebar.forked'));
-    },
-    [t],
-  );
-  const handleArchiveThread = useCallback(
-    (e: React.MouseEvent, threadId: string) => {
-      e.stopPropagation();
-      const wasCurrent = threadId === currentSessionId;
-      useSessionStore.getState().toggleArchive(threadId);
-      if (wasCurrent) {
-        const s = useSessionStore.getState();
-        const archived = s.sessions.some((x) => x.id === threadId && x.archived);
-        if (archived) {
-          // 归档当前会话后自动进入新会话，避免停留在已归档的旧对话。
-          useChatStore.getState().clearMessages();
-          useSessionStore.getState().newSession();
-        }
-      }
-    },
-    [currentSessionId],
-  );
-  const handleDeleteThread = useCallback(
-    (e: React.MouseEvent, threadId: string) => {
-      e.stopPropagation();
-      useSessionStore.getState().deleteSession(threadId);
-      if (threadId === currentSessionId) {
-        // 删除当前会话后自动新建一个空会话，避免界面停留在已删除的旧对话上。
-        useChatStore.getState().clearMessages();
-        useSessionStore.getState().newSession();
-      }
-    },
-    [currentSessionId],
-  );
-  const handleStartRename = useCallback((e: React.MouseEvent, threadId: string, currentTitle: string) => {
-    e.stopPropagation();
-    setRenamingThreadId(threadId);
-    setRenameValue(currentTitle);
-  }, []);
-  const handleFinishRename = useCallback(() => {
-    if (renamingThreadId && renameValue.trim()) {
-      useSessionStore.getState().renameSession(renamingThreadId, renameValue.trim());
-    }
-    setRenamingThreadId(null);
-    setRenameValue('');
-  }, [renamingThreadId, renameValue]);
-
-  const handleMoveSession = useCallback((id: string, path: string) => {
-    useSessionStore.getState().moveSessionToProject(id, path);
-  }, []);
-
-  const handleSessionDragStart = (e: React.DragEvent, s: Session) => {
-    e.stopPropagation();
-    dragStateRef.current = { kind: 'session', id: s.id, root: s.projectRoot || '' };
-  };
-  const handleSessionDragOver = (e: React.DragEvent, s: Session) => {
-    if (dragStateRef.current?.kind !== 'session') return;
-    e.preventDefault();
-    setDragOverKey(s.id);
-  };
-  const handleSessionDrop = (e: React.DragEvent, s: Session) => {
-    e.preventDefault();
-    const dragged = dragStateRef.current;
-    if (dragged?.kind === 'session' && dragged.id !== s.id) {
-      const targetRoot = s.projectRoot || '';
-      if (dragged.root !== targetRoot) useSessionStore.getState().moveSessionToProject(dragged.id, targetRoot);
-      useProjectStore.getState().reorderSession(targetRoot, dragged.id, s.id);
-    }
-    dragStateRef.current = null;
-    setDragOverKey(null);
-  };
-  const handleSessionDragEnd = () => {
-    dragStateRef.current = null;
-    setDragOverKey(null);
-  };
 
   const renderSessionRow = (s: Session) => (
     <SessionRow
