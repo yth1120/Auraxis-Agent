@@ -145,7 +145,7 @@ Auraxis/
 │       ├── session-store.ts     # Unified JSONL event logs (chat & agent)
 │       ├── sandbox-runner.ts    # Native sandbox dispatch (restricted/AppContainer/linux/macos)
 │       ├── acp-server.ts / sdk-server.ts / headless-run.ts  # ACP / JSON-RPC SDK / headless
-│       └── __tests__/           # Main-process tests (244 files / 1784 cases repo-wide)
+│       └── __tests__/           # Main-process tests (245 files / 1789 cases repo-wide)
 │
 ├── src/                         # Renderer code (browser environment)
 │   ├── main.tsx                 # React entry
@@ -948,7 +948,7 @@ The app uses `dotenv` to load environment variables from `.env` at the project r
 - **Framework**: Vitest (`describe`, `it`, `expect`, `vi` injected via globals)
 - **Main-process tests**: `electron/**/__tests__/`, node environment; modules depending on `electron` are isolated with `vi.mock('electron', ...)`
 - **Renderer tests**: `src/**/__tests__/`, jsdom environment (@testing-library/react)
-- **Total**: 244 test files / 1,784 cases passing (+3 environment-skips)
+- **Total**: 245 test files / 1,789 cases passing (+3 environment-skips)
 - **Coverage scope**: the gate only counts `electron/ipc/`, `src/stores/`, `src/core/`; UI components (`src/components/`) and main-process entry points (`main.ts` / `preload.ts` etc.) are excluded from the gate and covered by component tests + Playwright E2E (`npm run test:e2e`)
 - **Coverage thresholds**: lines/statements 80%, branches 70%, functions 80% (current: 85.18% lines / 78.85% branches / 87.78% functions)
 - **Coverage report**: `npm run test:coverage` outputs `coverage/coverage-summary.json` (gitignored dev artifact); the Settings "Test coverage" page reads it live via the `coverage:get` IPC; pure browser dev is served by a Vite middleware, and production builds copy it into `dist/coverage/`. When the report is missing, the panel shows the command to run instead of fake numbers
