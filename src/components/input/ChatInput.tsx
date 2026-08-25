@@ -1,7 +1,7 @@
-import { useCallback, useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { errorText } from '../../../electron/errors';
 import { message } from 'antd';
-import { useSmartDropdown, type DropdownPosition } from '../../hooks/useSmartDropdown';
+import { useSmartDropdown } from '../../hooks/useSmartDropdown';
 import clsx from 'clsx';
 import { useChatStore } from '../../stores/useChatStore';
 import { useAppStore } from '../../stores/useAppStore';
@@ -13,6 +13,7 @@ import { useChatInputMentions } from './useChatInputMentions';
 import { recordCommand } from './ChatInputActions';
 import { useChatInputFiles } from './useChatInputFiles';
 import { useChatInputSend } from './useChatInputSend';
+import { useChatInputModePanel } from './useChatInputModePanel';
 import { useT } from '../../i18n';
 import {
   greeting,
@@ -85,101 +86,11 @@ export default function ChatInput({ position, heroSubtitleKey }: ChatInputProps)
   const pendingPlan = useMemo(() => selectPendingPlan(plans, currentAgentId), [plans, currentAgentId]);
   // ── Smart dropdown refs & hooks ──
   const moreTriggerRef = useRef<HTMLButtonElement>(null);
-  const modeTriggerRef = useRef<HTMLButtonElement>(null);
   const smartMore = useSmartDropdown(moreTriggerRef, {
     panelHeight: 180,
     gap: 10,
     direction: heroSizing ? 'down' : 'up',
   });
-
-  // ── Mode panel (direct state, no useSmartDropdown middleman) ──
-  const [modePanelOpen, setModePanelOpen] = useState(false);
-  const [modePanelPos, setModePanelPos] = useState<DropdownPosition | null>(null);
-  const modePanelRef = useRef<HTMLDivElement>(null);
-  // Refs for stable callbacks — avoids useCallback dance with changing deps
-  const modePanelOpenRef = useRef(false);
-  const isStreamingRef = useRef(isStreaming);
-  const messagesLenRef = useRef(messagesLen);
-  const smartMoreCloseRef = useRef(smartMore.close);
-  smartMoreCloseRef.current = smartMore.close;
-
-  // Keep refs in sync (no re-render side effect) — batched + layout for zero-delay
-  useLayoutEffect(() => {
-    modePanelOpenRef.current = modePanelOpen;
-    isStreamingRef.current = isStreaming;
-    messagesLenRef.current = messagesLen;
-  });
-
-  /* ── Panel mutual exclusion ── */
-  const closeModePanel = useCallback(() => setModePanelOpen(false), []);
-
-  // Wrap more-menu toggle with mutual exclusion
-  const toggleMoreMenu = useCallback(
-    (e: React.MouseEvent) => {
-      if (!smartMore.open) setModePanelOpen(false);
-      smartMore.toggle(e);
-    },
-    [smartMore],
-  );
-
-  // STABLE callback — refs bypass stale-closure, functional update avoids !isOpen
-  const toggleModePanel = useCallback((e: React.MouseEvent) => {
-    // 防御1: 斩断事件冒泡，防止触发全局 ClickOutside
-    e.stopPropagation();
-    e.preventDefault();
-
-    if (!modePanelOpenRef.current) smartMoreCloseRef.current();
-
-    // 防御2: 函数式更新，永不依赖过期的闭包值
-    setModePanelOpen((prev) => {
-      const next = !prev;
-      return next;
-    });
-  }, []); // ← 空依赖！永不重建，永不触发 ModeTrigger 重渲染
-
-  // Recalc mode panel position when it opens
-  const recalcModePanelPos = useCallback(() => {
-    const trigger = modeTriggerRef.current;
-    if (!trigger) return;
-    const rect = trigger.getBoundingClientRect();
-    const gap = 10;
-    // Agent/Work input is pinned to the bottom — always pop up.
-    // Chat mode start page has the input centered — pop down.
-    // 统一规则：输入框居中时向下弹，贴底时向上弹。
-    const dropUp = !heroSizing;
-    setModePanelPos({
-      left: rect.left,
-      direction: dropUp ? 'up' : 'down',
-      ...(dropUp ? { bottom: window.innerHeight - rect.top + gap } : { top: rect.bottom + gap }),
-    });
-  }, [heroSizing]);
-
-  useEffect(() => {
-    if (modePanelOpen) {
-      recalcModePanelPos();
-      window.addEventListener('resize', recalcModePanelPos);
-      window.addEventListener('scroll', recalcModePanelPos, true);
-    }
-    return () => {
-      window.removeEventListener('resize', recalcModePanelPos);
-      window.removeEventListener('scroll', recalcModePanelPos, true);
-    };
-  }, [modePanelOpen, recalcModePanelPos]);
-
-  // 状态栏等外部入口请求打开模型选择面板。
-  useEffect(() => {
-    if (modelPanelRequest > 0) {
-      setModePanelOpen(true);
-      recalcModePanelPos();
-      // 消费请求：否则历史请求会在组件重挂载时自动重放打开面板。
-      useChatStore.getState().consumeModelPanelRequest();
-    }
-  }, [modelPanelRequest, recalcModePanelPos]);
-
-  // 切换模式时关闭模型面板，避免面板跨模式“自动弹出”。
-  useEffect(() => {
-    setModePanelOpen(false);
-  }, [sidebarMode]);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const {
@@ -216,6 +127,40 @@ export default function ChatInput({ position, heroSubtitleKey }: ChatInputProps)
     isAgentSurface,
     t,
   });
+
+  const {
+    modeTriggerRef,
+    modePanelRef,
+    modePanelOpen,
+    setModePanelOpen,
+    modePanelPos,
+    closeModePanel,
+    toggleModePanel,
+    handleBlur,
+  } = useChatInputModePanel({
+    heroSizing,
+    isStreaming,
+    messagesLen,
+    sidebarMode,
+    modelPanelRequest,
+    containerRef,
+    moreTriggerRef,
+    smartMoreClose: smartMore.close,
+    smartMorePanelRef: smartMore.panelRef,
+    setDollarOpen,
+    setMentionOpen,
+    setCommandOpen,
+    setIsFocused,
+  });
+
+  // Wrap more-menu toggle with mutual exclusion
+  const toggleMoreMenu = useCallback(
+    (event: React.MouseEvent) => {
+      if (!smartMore.open) setModePanelOpen(false);
+      smartMore.toggle(event);
+    },
+    [smartMore, setModePanelOpen],
+  );
 
   const hasInput = inputValue.trim().length > 0;
   const micSupported = useMemo(() => typeof window !== 'undefined' && !!speechRecognitionConstructor(), []);
@@ -514,39 +459,6 @@ export default function ChatInput({ position, heroSubtitleKey }: ChatInputProps)
       setMentionSelected,
     ],
   );
-
-  /* ── Click outside → close custom panels ── */
-  const { close: smartMoreClose, panelRef: smartMorePanelRef } = smartMore;
-  useEffect(() => {
-    const onMouseDown = (e: MouseEvent) => {
-      const target = e.target as Node;
-      // 触发按钮已在 container 内 → 放行
-      if (containerRef.current?.contains(target)) return;
-      // Portal 面板自身 DOM → 放行（防止菜单项点击被误杀）
-      if (modePanelRef.current?.contains(target)) return;
-      if (smartMorePanelRef.current?.contains(target)) return;
-      setModePanelOpen(false);
-      smartMoreClose();
-      setDollarOpen(false);
-    };
-    document.addEventListener('mousedown', onMouseDown);
-    return () => document.removeEventListener('mousedown', onMouseDown);
-  }, [smartMoreClose, smartMorePanelRef, setDollarOpen]);
-
-  const handleBlur = useCallback(() => {
-    requestAnimationFrame(() => {
-      const activeEl = document.activeElement;
-      if (containerRef.current?.contains(activeEl)) return;
-      // 焦点在 Portal 面板内（面板在 body 上，不在 container 内）→ 放行
-      if (modePanelRef.current?.contains(activeEl)) return;
-      if (smartMorePanelRef.current?.contains(activeEl)) return;
-      setIsFocused(false);
-      smartMoreClose();
-      setMentionOpen(false);
-      setCommandOpen(false);
-      setDollarOpen(false);
-    });
-  }, [smartMoreClose, smartMorePanelRef, setCommandOpen, setDollarOpen, setMentionOpen]);
 
   const {
     pendingImages,
