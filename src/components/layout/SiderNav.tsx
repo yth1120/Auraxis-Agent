@@ -8,11 +8,9 @@ import {
   FolderOpen as FolderOpenOutlined,
   SlidersHorizontal,
   ShieldCheck,
-  SignOut,
   XCircle as CloseCircleOutlined,
   Trash as DeleteOutlined,
   PencilSimple as EditOutlined,
-  GearSix,
   ChatTeardropDots as MessageOutlined,
   MagnifyingGlass as SearchOutlined,
   Plus as PlusOutlined,
@@ -26,7 +24,6 @@ import { useProjectStore, type Project } from '../../stores/useProjectStore';
 import WorkSidebarPanel from '../work/WorkSidebarPanel';
 import { useSettingsStore } from '../../stores/useSettingsStore';
 import SkillsDirectory from '../skills/SkillsDirectory';
-import Avatar from '../auth/Avatar';
 import { useAuthStore } from '../../stores/useAuthStore';
 import clsx from 'clsx';
 import logoPng from '../../assets/auraxis-logo.png';
@@ -34,6 +31,7 @@ import { useT } from '../../i18n';
 import type { PermissionProfile } from '../../types/electron-api';
 import { SessionRow, AgentRow, rowKey, SIDEBAR_TOP_NAV } from './SiderNavRows';
 import { groupSessionsByTime, groupSessionsByProject } from '../../utils/groupSessions';
+import SiderAccountMenu from './SiderAccountMenu';
 
 /* Agent status → status-dot icon (Code-mode task list). */
 /* ── Component ────────────────────────────────────────── */
@@ -91,7 +89,6 @@ export default function SiderNav({ collapsed }: SiderNavProps) {
   const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(new Set());
   const [showAllSessions, setShowAllSessions] = useState<Set<string>>(new Set());
   const [skillsDirOpen, setSkillsDirOpen] = useState(false);
-  const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
   const dragStateRef = useRef<{ kind: 'workspace'; id: string } | { kind: 'session'; id: string; root: string } | null>(
     null,
@@ -968,106 +965,21 @@ export default function SiderNav({ collapsed }: SiderNavProps) {
             : renderChatPanel()}
       </div>
 
-      {/* ── 账户：头像菜单（账户信息 / 设置 / 退出） ── */}
-      <div
-        className={clsx(
-          'mt-auto shrink-0 border-t border-[var(--color-border-dim)]',
-          visualCollapsed ? 'flex flex-col items-center gap-2 px-1 pt-2.5 pb-0' : 'flex items-center px-2.5 pt-2 pb-0',
-        )}
-      >
-        <Dropdown
-          open={avatarMenuOpen}
-          onOpenChange={setAvatarMenuOpen}
-          trigger={['click']}
-          placement="topLeft"
-          overlayClassName="account-popup"
-          menu={{ items: [] }}
-          popupRender={() => (
-            <div className="w-[236px] p-1 gap-1 bg-[var(--color-bg-elevated)] rounded-xl shadow-[var(--shadow-md)] flex flex-col opacity-0 translate-y-1 animate-[smartPanelInUp_0.18s_ease_forwards]">
-              <div className="flex items-center gap-2 px-2 pt-2 pb-2 min-w-0">
-                <Avatar name={accountName || accountEmail} src={accountAvatar} size={34} />
-                <span className="min-w-0 flex flex-col">
-                  <span className="overflow-hidden text-ellipsis whitespace-nowrap text-sm font-medium leading-[20px] text-text-primary">
-                    {accountName || t('auth.account')}
-                  </span>
-                  {accountEmail && (
-                    <span className="overflow-hidden text-ellipsis whitespace-nowrap text-2xs leading-[16px] text-text-muted">
-                      {accountEmail}
-                    </span>
-                  )}
-                </span>
-              </div>
-              <div className="mx-2 my-1 h-px bg-[var(--color-border-dim)]" />
-              <button
-                type="button"
-                className="flex items-center gap-2 w-full min-h-8 px-2 py-1.5 border-none rounded-lg bg-transparent text-left cursor-pointer transition-colors duration-150 hover:bg-[var(--color-hover)]"
-                onClick={() => {
-                  setAvatarMenuOpen(false);
-                  useAppStore.getState().setSettingsInitialKey('account');
-                  setShowSettings(true);
-                }}
-              >
-                <span className="flex flex-none w-5 items-center justify-center text-text-muted">
-                  <GearSix size={16} />
-                </span>
-                <span className="flex-1 min-w-0 text-sm leading-[20px] text-text-primary">{t('auth.account')}</span>
-              </button>
-              <button
-                type="button"
-                className="flex items-center gap-2 w-full min-h-8 px-2 py-1.5 border-none rounded-lg bg-transparent text-left cursor-pointer transition-colors duration-150 hover:bg-[var(--color-hover)]"
-                onClick={() => {
-                  setAvatarMenuOpen(false);
-                  useAppStore.getState().setSettingsInitialKey('general');
-                  setShowSettings(true);
-                }}
-              >
-                <span className="flex flex-none w-5 items-center justify-center text-text-muted">
-                  <GearSix size={16} />
-                </span>
-                <span className="flex-1 min-w-0 text-sm leading-[20px] text-text-primary">{t('nav.settings')}</span>
-              </button>
-              <div className="mx-2 my-1 h-px bg-[var(--color-border-dim)]" />
-              <button
-                type="button"
-                className="flex items-center gap-2 w-full min-h-8 px-2 py-1.5 border-none rounded-lg bg-transparent text-left cursor-pointer transition-colors duration-150 hover:bg-[var(--color-hover)] text-danger"
-                onClick={() => {
-                  setAvatarMenuOpen(false);
-                  confirmLogout();
-                }}
-              >
-                <span className="flex flex-none w-5 items-center justify-center">
-                  <SignOut size={16} />
-                </span>
-                <span className="flex-1 min-w-0 text-sm leading-[20px]">{t('auth.logout')}</span>
-              </button>
-            </div>
-          )}
-        >
-          <button
-            type="button"
-            className={clsx(
-              'flex items-center min-w-0 rounded-xl border-none bg-transparent cursor-pointer transition-colors duration-150 hover:bg-[var(--color-hover)]',
-              visualCollapsed ? 'justify-center w-11 h-11' : 'gap-2.5 h-11 flex-1 px-2 text-left',
-            )}
-            title={accountName || accountEmail || t('auth.account')}
-            aria-label={t('auth.account')}
-          >
-            <Avatar name={accountName || accountEmail} src={accountAvatar} size={30} />
-            {!visualCollapsed && (
-              <span className="min-w-0 flex flex-col">
-                <span className="overflow-hidden text-ellipsis whitespace-nowrap text-sm font-medium leading-[20px] text-text-primary">
-                  {accountName || t('auth.account')}
-                </span>
-                {accountEmail && (
-                  <span className="overflow-hidden text-ellipsis whitespace-nowrap text-2xs leading-[16px] text-text-muted">
-                    {accountEmail}
-                  </span>
-                )}
-              </span>
-            )}
-          </button>
-        </Dropdown>
-      </div>
+      <SiderAccountMenu
+        collapsed={visualCollapsed}
+        accountName={accountName}
+        accountEmail={accountEmail}
+        accountAvatar={accountAvatar}
+        onOpenAccount={() => {
+          useAppStore.getState().setSettingsInitialKey('account');
+          setShowSettings(true);
+        }}
+        onOpenSettings={() => {
+          useAppStore.getState().setSettingsInitialKey('general');
+          setShowSettings(true);
+        }}
+        onLogout={confirmLogout}
+      />
 
       <SkillsDirectory open={skillsDirOpen} onClose={() => setSkillsDirOpen(false)} />
 
