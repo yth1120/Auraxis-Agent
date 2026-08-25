@@ -8,10 +8,7 @@ import { useAppStore } from '@/stores/useAppStore';
 import type { AgentLogEntry } from '@/types/agent';
 import AgentViewFilter from '../agent/AgentViewFilter';
 import {
-  fmtDuration,
   rowKey,
-  toolSummary,
-  turnStats,
   type Turn,
 } from './TimelineUtils';
 import { type TimelineDetailTab } from './TimelineRows';
@@ -25,6 +22,7 @@ import {
 } from './TimelineModel';
 import { TimelineStream } from './TimelineStream';
 import { TimelineDetailPanel } from './TimelineDetailPanel';
+import { exportTrajectory, exportTrajectoryMarkdown } from './TimelineExport';
 
 /** Right-panel trajectory table: per-turn ledger with expandable tool details. */
 export default function TimelinePanel() {
@@ -236,61 +234,6 @@ export default function TimelinePanel() {
     return [...set].sort();
   }, [turns]);
 
-  const exportTrajectory = () => {
-    if (!agent) return;
-    const payload = {
-      agent: agent.name,
-      description: agent.description,
-      exportedAt: new Date().toISOString(),
-      log: agent.log,
-    };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${(agent.name || 'agent').replace(/[\\/:*?"<>|]/g, '_')}.trajectory.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const exportTrajectoryMarkdown = () => {
-    if (!agent) return;
-    const lines: string[] = [
-      `# ${agent.name}`,
-      '',
-      agent.description ? `${agent.description}` : '',
-      '',
-      tPanel('timeline.exportStatus', { status: agent.status }),
-      tPanel('timeline.exportRound', { n: agent.iteration ?? 0 }),
-      tPanel('timeline.exportToolCalls', { n: agent.toolCallCount ?? 0 }),
-      '',
-    ];
-    for (const turn of turns) {
-      lines.push(
-        `${tPanel('timeline.exportTurn', { n: turn.iteration })}${turnStats(turn.end) ? ` · ${turnStats(turn.end)}` : ''}`,
-        '',
-      );
-      for (const entry of turn.entries) {
-        if (entry.type !== 'tool_start' && entry.type !== 'tool_end' && entry.type !== 'tool_error') {
-          if (entry.type === 'text' && entry.text) lines.push(`> ${entry.text.replace(/\n/g, ' ').slice(0, 120)}`);
-          continue;
-        }
-        const mark = entry.type === 'tool_error' ? '❌' : entry.type === 'tool_start' ? '🔄' : '✅';
-        const summary = toolSummary(entry);
-        const duration = entry.durationMs != null ? ` · ${fmtDuration(entry.durationMs)}` : '';
-        lines.push(`- ${mark} **${entry.toolName}** ${summary ? `\`${summary}\`` : ''}${duration}`);
-      }
-      lines.push('');
-    }
-    const blob = new Blob([lines.filter((l) => l !== null).join('\n')], { type: 'text/markdown' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${(agent.name || 'agent').replace(/[\\/:*?"<>|]/g, '_')}.trajectory.md`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
   if (!agent) {
     return (
       <div className="h-full flex items-center justify-center px-6">
@@ -409,8 +352,8 @@ export default function TimelinePanel() {
               trigger={['click']}
               menu={{
                 items: [
-                  { key: 'json', label: tPanel('tl.exportJson'), onClick: exportTrajectory },
-                  { key: 'md', label: tPanel('tl.exportMd'), onClick: exportTrajectoryMarkdown },
+                  { key: 'json', label: tPanel('tl.exportJson'), onClick: () => exportTrajectory(agent) },
+                  { key: 'md', label: tPanel('tl.exportMd'), onClick: () => exportTrajectoryMarkdown(agent, turns, tPanel) },
                   { type: 'divider' as const },
                   {
                     key: 'raw',
