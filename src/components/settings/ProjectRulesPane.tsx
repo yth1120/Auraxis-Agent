@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Input, Segmented, message } from 'antd';
 import { useT } from '../../i18n';
 import { useSettingsStore } from '../../stores/useSettingsStore';
@@ -29,34 +29,34 @@ export default function ProjectRulesPane() {
   const [targetPath, setTargetPath] = useState('');
 
   const folderOptions = useMemo(() => {
-    const list = folders.length > 0 ? folders : [];
+    const list = folders.length > 0 ? [...folders] : [];
     if (projectPath && !list.some((f) => f.relPath === '.')) {
       list.unshift({ relPath: '.', hasOverride: false, hasAgents: false });
     }
     return list;
   }, [folders, projectPath]);
 
-  const loadFolders = async () => {
+  const loadFolders = useCallback(async () => {
     if (!projectPath) {
       setFolders([]);
       return;
     }
     try {
-      const r = await window.electronAPI?.instructions?.listProject(projectPath);
-      setFolders(r?.ok && r.data ? r.data : []);
+      const result = await window.electronAPI?.instructions?.listProject(projectPath);
+      setFolders(result?.ok && result.data ? result.data : []);
     } catch {
       setFolders([]);
     }
-  };
+  }, [projectPath]);
 
-  const loadContent = async (nextScope: Scope, folderRel = selectedFolder) => {
+  const loadContent = useCallback(async (nextScope: Scope, folderRel = selectedFolder) => {
     setLoading(true);
     try {
       if (nextScope === 'global') {
-        const r = await window.electronAPI?.instructions?.getGlobal();
-        if (r?.ok && r.data) {
-          setContent(r.data.content);
-          setTargetPath(r.data.path);
+        const result = await window.electronAPI?.instructions?.getGlobal();
+        if (result?.ok && result.data) {
+          setContent(result.data.content);
+          setTargetPath(result.data.path);
         } else {
           setContent('');
           setTargetPath('');
@@ -69,10 +69,10 @@ export default function ProjectRulesPane() {
         return;
       }
       const rel = nextScope === 'project' ? '.' : folderRel || '.';
-      const r = await window.electronAPI?.instructions?.get(projectPath, rel);
-      if (r?.ok && r.data) {
-        setContent(r.data.content);
-        setTargetPath(r.data.path);
+      const result = await window.electronAPI?.instructions?.get(projectPath, rel);
+      if (result?.ok && result.data) {
+        setContent(result.data.content);
+        setTargetPath(result.data.path);
       } else {
         setContent('');
         setTargetPath('');
@@ -83,13 +83,15 @@ export default function ProjectRulesPane() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [projectPath, selectedFolder]);
+
+  const loadContentRef = useRef(loadContent);
+  loadContentRef.current = loadContent;
 
   useEffect(() => {
     void loadFolders();
-    void loadContent(scope);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectPath, scope]);
+    void loadContentRef.current(scope);
+  }, [projectPath, scope, loadFolders]);
 
   const save = async () => {
     setSaving(true);
