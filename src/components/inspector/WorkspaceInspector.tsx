@@ -5,10 +5,6 @@ import { shallow } from 'zustand/shallow';
 import { useStoreWithEqualityFn } from 'zustand/traditional';
 import {
   TreeStructure as ApartmentOutlined,
-  FileText,
-  MagnifyingGlass,
-  Terminal,
-  Globe,
 } from '@/components/common/icons';
 import { useInspectorStore, mapTodosToTasks } from '../../stores/useInspectorStore';
 import { useChatStore } from '../../stores/useChatStore';
@@ -18,11 +14,12 @@ import { useSettingsStore } from '../../stores/useSettingsStore';
 import { backfillComposer } from '../../utils/backfillComposer';
 import { collectQualityRuns, findLatestFailure, deriveNextSteps } from '../../utils/agentQuality';
 import TaskChecklist from './TaskChecklist';
-import ContextManifest, { type ContextGroup } from './ContextManifest';
+import ContextManifest from './ContextManifest';
 import ExecutingIndicator from '../common/ExecutingIndicator';
 import { useT, type I18nKey } from '../../i18n';
 import AgentTasksCard from './AgentTasksCard';
 import SnapshotCard from './SnapshotCard';
+import { collectFilePaths, collectContextGroups, collectDeliverables } from './WorkspaceInspectorData';
 import {
   AgentInspectorHeader,
   AgentSummaryCard,
@@ -34,11 +31,8 @@ import {
 } from './WorkspaceInspectorSections';
 import {
   AGENT_STATUS_META,
-  agentToolInvocations,
   basename,
   latestAgentTodos,
-  latestChatToolInvocations,
-  type ToolInvocation,
 } from './WorkspaceInspectorUtils';
 
 export default function WorkspaceInspector() {
@@ -68,22 +62,7 @@ export default function WorkspaceInspector() {
     : null;
   const statusLabel = statusMeta ? tPanel(statusMeta.labelKey) : null;
 
-  const deliverables = useMemo(() => {
-    const seen = new Set<string>();
-    const out: string[] = [];
-    for (const e of agent?.log ?? []) {
-      if (e.type === 'tool_start' || e.type === 'tool_end') {
-        if (e.toolName === 'Write' || e.toolName === 'Edit' || e.toolName === 'NotebookEdit') {
-          const p = e.input?.file_path;
-          if (typeof p === 'string' && p.trim() && !seen.has(p)) {
-            seen.add(p);
-            out.push(p);
-          }
-        }
-      }
-    }
-    return out;
-  }, [agent]);
+  const deliverables = useMemo(() => collectDeliverables(agent), [agent]);
 
   const elapsed = agent?.startTime ? Math.max(0, Math.floor((now - agent.startTime) / 1000)) : 0;
   const totalTokens = (agent?.totalInputTokens ?? 0) + (agent?.totalOutputTokens ?? 0);
@@ -91,18 +70,7 @@ export default function WorkspaceInspector() {
   const qualityRuns = useMemo(() => (agent ? collectQualityRuns(agent.log ?? []) : []), [agent]);
   const latestFailure = useMemo(() => (agent ? findLatestFailure(agent.log ?? [], agent.error) : null), [agent]);
   const [fileTokens, setFileTokens] = useState<Record<string, number | null>>({});
-  const filePaths = useMemo(() => {
-    const seen = new Set<string>();
-    const out: string[] = [];
-    for (const tc of isCode ? agentToolInvocations(agent) : latestChatToolInvocations(messages)) {
-      const fp = (tc.input as Record<string, unknown>).file_path;
-      if (typeof fp === 'string' && fp.trim() && !seen.has(fp)) {
-        seen.add(fp);
-        out.push(fp);
-      }
-    }
-    return out;
-  }, [isCode, agent, messages]);
+  const filePaths = useMemo(() => collectFilePaths({ isCode, agent, messages }), [isCode, agent, messages]);
   useEffect(() => {
     const api = window.electronAPI?.file;
     const projectRoot = agent?.projectRoot || useSettingsStore.getState().projectPath;
@@ -270,56 +238,10 @@ export default function WorkspaceInspector() {
 
   const activeToolCount = isCode ? (agent?.status === 'running' ? 1 : 0) : inspectorActiveTools;
 
-  const groups = useMemo<ContextGroup[]>(() => {
-    const toolCalls: ToolInvocation[] = isCode ? agentToolInvocations(agent) : latestChatToolInvocations(messages);
-    const files = new Set<string>();
-    const searches: string[] = [];
-    const commands: string[] = [];
-    const web: string[] = [];
-
-    for (const tc of toolCalls) {
-      const input = tc.input as Record<string, unknown>;
-      switch (tc.toolName) {
-        case 'Read':
-        case 'Write':
-        case 'Edit': {
-          const fp = input.file_path as string | undefined;
-          if (fp) files.add(fp);
-          break;
-        }
-        case 'Grep':
-        case 'Glob': {
-          const p = input.pattern as string | undefined;
-          if (p) searches.push(p);
-          break;
-        }
-        case 'Bash': {
-          const c = (input.command as string | undefined)?.replace(/\s+/g, ' ').trim();
-          if (c) commands.push(c.length > 60 ? c.slice(0, 60) + '…' : c);
-          break;
-        }
-        case 'WebFetch': {
-          const u = input.url as string | undefined;
-          if (u) web.push(u);
-          break;
-        }
-        case 'WebSearch': {
-          const q = input.query as string | undefined;
-          if (q) web.push(q);
-          break;
-        }
-        default:
-          break;
-      }
-    }
-
-    return [
-      { key: 'files', icon: <FileText />, label: tPanel('ctx.group.files'), items: [...files] },
-      { key: 'search', icon: <MagnifyingGlass />, label: tPanel('ctx.group.search'), items: searches },
-      { key: 'cmd', icon: <Terminal />, label: tPanel('ctx.group.cmd'), items: commands },
-      { key: 'web', icon: <Globe />, label: tPanel('ctx.group.web'), items: web },
-    ];
-  }, [isCode, agent, messages, tPanel]);
+  const groups = useMemo(
+    () => collectContextGroups({ isCode, agent, messages, t: tPanel }),
+    [isCode, agent, messages, tPanel],
+  );
 
   // System prompts only apply to the foreground chat inspector.
   const sysMessages = isCode ? [] : systemMessages;
