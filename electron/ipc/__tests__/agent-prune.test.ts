@@ -55,7 +55,7 @@ describe('agent prune — decision logic', () => {
 
 describe('agent prune — wiring is in place', () => {
   it('scheduler pruneStale drops terminal instances (AG-4) and is called on completion', () => {
-    const src = read('agent-scheduler.ts');
+    const src = read('agent-scheduler-core.ts');
     const pruneMatch = src.match(/pruneStale\([^)]*\)\s*:\s*number\s*\{[\s\S]*?\n {2}\}/);
     expect(pruneMatch).toBeTruthy();
     expect(pruneMatch![0]).toContain('instances.delete(id)');
