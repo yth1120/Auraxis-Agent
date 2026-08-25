@@ -16,8 +16,11 @@ describe('RollbackToMessage — 按消息回退', () => {
     useAppStore.setState({ fileTreeVersion: 0 });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     Modal.destroyAll();
+    // 让 AntD 的 portal/定时任务在 jsdom 环境销毁前完成，避免 CI 上
+    // 出现未处理的 window is not defined。
+    await new Promise((resolve) => setTimeout(resolve, 50));
   });
 
   it('confirms before reverting the later sessions', async () => {

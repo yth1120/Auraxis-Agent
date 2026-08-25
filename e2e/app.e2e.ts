@@ -94,8 +94,12 @@ test('Chat 模式发送消息并渲染用户气泡', async () => {
   // 测试环境未配置 API Key：助手应返回明确错误而不是静默失败
   await expect(page.getByText(/API Key/).first()).toBeVisible({ timeout: 20_000 });
 
-  // 会话开始后顶部分割线应常驻显示（任务结束也不消失）
-  await expect(page.locator('[data-divider="on"]')).toBeVisible();
+  // 会话开始后顶部分割线应常驻显示（任务结束也不消失）；窗口最大化时
+  // 应用会刻意隐藏分隔线，因此仅在还原状态下断言。
+  const maximized = await page.evaluate(async () => !!(await window.electronAPI?.isMaximized?.()));
+  if (!maximized) {
+    await expect(page.locator('[data-divider="on"]')).toBeVisible();
+  }
 });
 
 test('设置面板打开并切换主题', async () => {

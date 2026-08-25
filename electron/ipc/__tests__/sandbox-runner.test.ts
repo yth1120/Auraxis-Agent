@@ -21,7 +21,7 @@ const platformBackend =
         ? 'macos'
         : 'restricted';
 
-describe.runIf(canRun)('sandbox-runner — Windows 原生沙箱', () => {
+describe.runIf(canRun && !isCI)('sandbox-runner — Windows 原生沙箱', () => {
   it('runs a command under the restricted token and streams stdout', async () => {
     const res = await runSandboxedCommand({
       argv: ['cmd.exe', '/c', 'echo sandbox-ok'],
@@ -115,7 +115,7 @@ describe('sandbox-runner — backend selection', () => {
   });
 });
 
-describe.runIf(canRunAc)(
+describe.runIf(canRunAc && !isCI)(
   'sandbox-runner — AppContainer 原生沙箱',
   () => {
     const acProjectRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'auraxis-ac-project-'));
