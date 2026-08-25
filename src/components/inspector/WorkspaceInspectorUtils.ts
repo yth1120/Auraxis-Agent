@@ -1,7 +1,27 @@
 import { useChatStore } from '../../stores/useChatStore';
 import type { AgentInfo } from '../../types/agent';
 import type { RawTodo } from '../../stores/useInspectorStore';
-import { t } from '../../i18n';
+import { t, type I18nKey } from '../../i18n';
+
+/** Shared status metadata for the inspector header and task list. */
+export const AGENT_STATUS_META: Record<string, { labelKey: I18nKey; cls: string }> = {
+  running: { labelKey: 'status.running', cls: 'bg-primary' },
+  queued: { labelKey: 'status.queued', cls: 'bg-[var(--color-text-faint)]' },
+  paused: { labelKey: 'status.paused', cls: 'bg-warning' },
+  completed: { labelKey: 'status.completed', cls: 'bg-success' },
+  error: { labelKey: 'status.error', cls: 'bg-danger' },
+  stopped: { labelKey: 'status.stopped', cls: 'bg-[var(--color-text-faint)]' },
+};
+
+export function formatElapsed(seconds: number): string {
+  if (seconds >= 3600) return `${(seconds / 3600).toFixed(1)}h`;
+  if (seconds >= 60) return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+  return `${seconds}s`;
+}
+
+export function formatTokens(tokens: number): string {
+  return tokens >= 1000 ? `~${(tokens / 1000).toFixed(1)}k` : `${tokens}`;
+}
 
 export interface ToolInvocation {
   toolName: string;

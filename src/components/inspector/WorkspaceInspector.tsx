@@ -1,6 +1,6 @@
 import { errorText } from '../../../electron/errors';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Input, Modal, Dropdown, message } from 'antd';
+import { Modal, message } from 'antd';
 import clsx from 'clsx';
 import { shallow } from 'zustand/shallow';
 import {
@@ -11,7 +11,6 @@ import {
   MagnifyingGlass,
   Terminal,
   Globe,
-  MoreHorizontal,
 } from '@/components/common/icons';
 import { useInspectorStore, mapTodosToTasks } from '../../stores/useInspectorStore';
 import { useChatStore } from '../../stores/useChatStore';
@@ -23,13 +22,16 @@ import { collectQualityRuns, findLatestFailure, deriveNextSteps } from '../../ut
 import TaskChecklist from './TaskChecklist';
 import ContextManifest, { type ContextGroup } from './ContextManifest';
 import ExecutingIndicator from '../common/ExecutingIndicator';
-import type { NamedSnapshot } from '../../types/electron-api';
 import { useT, type I18nKey } from '../../i18n';
 import DeliverablesRow from '../common/DeliverablesRow';
+import AgentTasksCard from './AgentTasksCard';
+import SnapshotCard from './SnapshotCard';
 import {
+  AGENT_STATUS_META,
   agentToolInvocations,
   basename,
-  fmtRelative,
+  formatElapsed,
+  formatTokens,
   latestAgentTodos,
   latestChatToolInvocations,
   type ToolInvocation,
@@ -57,16 +59,8 @@ export default function WorkspaceInspector() {
   const agent = useAgentStore((s) => s.agents.find((a) => a.id === currentAgentId), shallow);
   const agents = useAgentStore((s) => s.agents);
 
-  const STATUS_META: Record<string, { labelKey: I18nKey; cls: string }> = {
-    running: { labelKey: 'status.running', cls: 'bg-primary' },
-    queued: { labelKey: 'status.queued', cls: 'bg-[var(--color-text-faint)]' },
-    paused: { labelKey: 'status.paused', cls: 'bg-warning' },
-    completed: { labelKey: 'status.completed', cls: 'bg-success' },
-    error: { labelKey: 'status.error', cls: 'bg-danger' },
-    stopped: { labelKey: 'status.stopped', cls: 'bg-[var(--color-text-faint)]' },
-  };
   const statusMeta = agent
-    ? (STATUS_META[agent.status] ?? { labelKey: 'status.stopped' as I18nKey, cls: 'bg-[var(--color-text-faint)]' })
+    ? (AGENT_STATUS_META[agent.status] ?? { labelKey: 'status.stopped' as I18nKey, cls: 'bg-[var(--color-text-faint)]' })
     : null;
   const statusLabel = statusMeta ? tPanel(statusMeta.labelKey) : null;
 
@@ -88,10 +82,7 @@ export default function WorkspaceInspector() {
   }, [agent]);
 
   const elapsed = agent?.startTime ? Math.max(0, Math.floor((now - agent.startTime) / 1000)) : 0;
-  const fmtElapsed = (s: number) =>
-    s >= 3600 ? `${(s / 3600).toFixed(1)}h` : s >= 60 ? `${Math.floor(s / 60)}m ${s % 60}s` : `${s}s`;
   const totalTokens = (agent?.totalInputTokens ?? 0) + (agent?.totalOutputTokens ?? 0);
-  const fmtTokens = (n: number) => (n >= 1000 ? `~${(n / 1000).toFixed(1)}k` : `${n}`);
 
   const qualityRuns = useMemo(() => (agent ? collectQualityRuns(agent.log ?? []) : []), [agent]);
   const latestFailure = useMemo(() => (agent ? findLatestFailure(agent.log ?? [], agent.error) : null), [agent]);
@@ -232,93 +223,6 @@ export default function WorkspaceInspector() {
 
   // ── Named snapshots (project-scoped, chat + code modes) ──
   const projectRoot = useSettingsStore((s) => s.projectPath);
-  const [snapshots, setSnapshots] = useState<NamedSnapshot[]>([]);
-  const [snapshotModalOpen, setSnapshotModalOpen] = useState(false);
-  const [snapshotName, setSnapshotName] = useState('');
-  const [snapshotBusy, setSnapshotBusy] = useState(false);
-
-  const loadSnapshots = useCallback(async () => {
-    if (!projectRoot) {
-      setSnapshots([]);
-      return;
-    }
-    const r = await window.electronAPI?.snapshot?.list(projectRoot);
-    if (r?.ok && r.data) setSnapshots(r.data);
-  }, [projectRoot]);
-
-  useEffect(() => {
-    void loadSnapshots();
-  }, [loadSnapshots]);
-
-  const createSnapshot = useCallback(async () => {
-    if (!projectRoot) return;
-    const name = snapshotName.trim();
-    if (!name) {
-      message.warning(tPanel('snapshot.nameRequired'));
-      return;
-    }
-    setSnapshotBusy(true);
-    try {
-      const r = await window.electronAPI?.snapshot?.create(projectRoot, name);
-      if (!r?.ok) throw new Error(r?.error || tPanel('snapshot.createFailed'));
-      message.success(tPanel('snapshot.created', { name: r.data?.name ?? '', n: r.data?.files.length ?? 0 }));
-      setSnapshotModalOpen(false);
-      setSnapshotName('');
-      void loadSnapshots();
-    } catch (e: unknown) {
-      message.error(errorText(e) || tPanel('snapshot.createFailed'));
-    } finally {
-      setSnapshotBusy(false);
-    }
-  }, [projectRoot, snapshotName, loadSnapshots, tPanel]);
-
-  const restoreSnapshot = useCallback(
-    (snap: NamedSnapshot) => {
-      if (!projectRoot) return;
-      Modal.confirm({
-        title: tPanel('snapshot.restoreTitle', { name: snap.name }),
-        content: tPanel('snapshot.restoreBody', { n: snap.files.length }),
-        okText: tPanel('snapshot.restore'),
-        okButtonProps: { danger: true },
-        cancelText: tPanel('snapshot.cancel'),
-        onOk: async () => {
-          try {
-            const r = await window.electronAPI?.snapshot?.restore(snap.id, projectRoot);
-            if (!r?.ok) throw new Error(r?.error || tPanel('snapshot.restoreFailed'));
-            message.success(tPanel('snapshot.restoreOk', { n: r.data?.restored ?? 0 }));
-            useAppStore.getState().incrementFileTreeVersion();
-          } catch (e: unknown) {
-            message.error(errorText(e) || tPanel('snapshot.restoreFailed'));
-          }
-        },
-      });
-    },
-    [projectRoot, tPanel],
-  );
-
-  const deleteSnapshot = useCallback(
-    (snap: NamedSnapshot) => {
-      if (!projectRoot) return;
-      Modal.confirm({
-        title: tPanel('snapshot.deleteTitle', { name: snap.name }),
-        content: tPanel('snapshot.deleteBody'),
-        okText: tPanel('snapshot.delete'),
-        okButtonProps: { danger: true },
-        cancelText: tPanel('snapshot.cancel'),
-        onOk: async () => {
-          try {
-            const r = await window.electronAPI?.snapshot?.delete(snap.id, projectRoot);
-            if (!r?.ok) throw new Error(r?.error || tPanel('snapshot.deleteFailed'));
-            message.success(tPanel('snapshot.deleted'));
-            void loadSnapshots();
-          } catch (e: unknown) {
-            message.error(errorText(e) || tPanel('snapshot.deleteFailed'));
-          }
-        },
-      });
-    },
-    [projectRoot, loadSnapshots, tPanel],
-  );
 
   const [preview, setPreview] = useState<{ path: string; mime: string; base64: string } | null>(null);
   const openPreview = useCallback(
@@ -417,10 +321,6 @@ export default function WorkspaceInspector() {
   const sysMessages = isCode ? [] : systemMessages;
   const hasContent = tasks.length > 0 || groups.some((g) => g.items.length > 0) || sysMessages.length > 0;
 
-  const selectAgent = (id: string) => {
-    useAgentStore.getState().setCurrentAgent(id);
-  };
-
   const redoTask = (task: { title: string }) => {
     if (!agent) return;
     backfillComposer(
@@ -429,153 +329,12 @@ export default function WorkspaceInspector() {
     );
   };
 
-  const renderAllTasksCard = () => (
-    <section className="px-3.5 py-2.5 mb-2.5 rounded-xl bg-[var(--color-bg-secondary)]">
-      <header className="flex items-center justify-between mb-1.5">
-        <span className="text-2xs font-semibold text-text-muted tracking-wide">{tPanel('inspector.allTasks')}</span>
-        <span className="text-2xs text-text-muted">
-          {tPanel('inspector.runningCount', { n: agents.filter((a) => a.status === 'running').length })}
-          {agents.filter((a) => a.status === 'queued').length > 0 &&
-            ` · ${tPanel('inspector.queuedCount', { n: agents.filter((a) => a.status === 'queued').length })}`}
-        </span>
-      </header>
-      <ul className="list-none m-0 p-0 flex flex-col gap-[2px]">
-        {agents.map((a) => {
-          const meta = STATUS_META[a.status] ?? {
-            labelKey: 'status.stopped' as I18nKey,
-            cls: 'bg-[var(--color-text-faint)]',
-          };
-          const active = a.id === currentAgentId;
-          const busy = a.status === 'running' || a.status === 'paused' || a.status === 'queued';
-          return (
-            <li
-              key={a.id}
-              className={clsx(
-                'flex items-center gap-2 px-2 py-[6px] rounded-md cursor-pointer hover:bg-[var(--color-hover)]',
-                active && 'bg-primary-soft',
-              )}
-              onClick={() => selectAgent(a.id)}
-            >
-              <span className={clsx('shrink-0 w-1.5 h-1.5 rounded-full', meta.cls)} />
-              <span
-                className={clsx(
-                  'flex-1 min-w-0 truncate text-xs',
-                  active ? 'font-medium text-text-primary' : 'text-text-secondary',
-                )}
-              >
-                {a.description || a.name}
-              </span>
-              <span className="shrink-0 text-2xs text-text-muted tabular-nums">
-                {a.status === 'running'
-                  ? fmtElapsed(Math.max(0, Math.floor((now - (a.startTime || now)) / 1000)))
-                  : tPanel(meta.labelKey)}
-              </span>
-              {busy && (
-                <span className="shrink-0 flex items-center gap-0.5">
-                  {a.status === 'running' && (
-                    <button
-                      type="button"
-                      className="text-2xs text-text-muted px-1 py-[2px] rounded-md cursor-pointer hover:bg-[var(--color-hover)] hover:text-text-secondary"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void useAgentStore.getState().pauseAgent(a.id);
-                      }}
-                    >
-                      {tPanel('inspector.pause')}
-                    </button>
-                  )}
-                  {a.status === 'paused' && (
-                    <button
-                      type="button"
-                      className="text-2xs text-text-muted px-1 py-[2px] rounded-md cursor-pointer hover:bg-[var(--color-hover)] hover:text-text-secondary"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void useAgentStore.getState().resumeAgent(a.id);
-                      }}
-                    >
-                      {tPanel('inspector.resume')}
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    className="text-2xs text-text-muted px-1 py-[2px] rounded-md cursor-pointer hover:bg-[var(--color-hover)] hover:text-text-secondary"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      void useAgentStore.getState().stopAgent(a.id);
-                    }}
-                  >
-                    {tPanel('inspector.stop')}
-                  </button>
-                </span>
-              )}
-            </li>
-          );
-        })}
-      </ul>
-    </section>
-  );
-
-  const renderSnapshotCard = () =>
-    projectRoot ? (
-      <section className="px-3.5 py-2.5 mt-3 mb-2.5 rounded-xl bg-[var(--color-bg-secondary)]">
-        <header className="flex items-center justify-between mb-1.5">
-          <span className="text-2xs font-semibold text-text-muted tracking-wide">{tPanel('snapshot.cardTitle')}</span>
-          <button
-            type="button"
-            className="h-6 px-2.5 rounded-full text-2xs font-medium text-[var(--color-primary)] bg-primary-soft border-none cursor-pointer transition-colors duration-150 hover:bg-[var(--color-primary-strong)]"
-            onClick={() => setSnapshotModalOpen(true)}
-          >
-            {tPanel('snapshot.new')}
-          </button>
-        </header>
-        {snapshots.length === 0 ? (
-          <p className="text-2xs text-text-muted leading-[1.5]">{tPanel('snapshot.emptyHint')}</p>
-        ) : (
-          <ul className="list-none m-0 p-0 flex flex-col gap-1">
-            {snapshots.slice(0, 8).map((s) => (
-              <li key={s.id} className="flex items-center gap-2 rounded-md bg-[var(--color-bg-inset)] px-2 py-[5px]">
-                <span className="flex-1 min-w-0">
-                  <span className="block truncate text-xs font-medium text-text-primary">{s.name}</span>
-                  <span className="block text-2xs text-text-muted tabular-nums">
-                    {fmtRelative(s.createdAt, now)} · {tPanel('snapshot.fileCount', { n: s.files.length })}
-                  </span>
-                </span>
-                <Dropdown
-                  trigger={['click']}
-                  placement="bottomRight"
-                  menu={{
-                    items: [
-                      { key: 'restore', label: tPanel('snapshot.restore'), onClick: () => restoreSnapshot(s) },
-                      {
-                        key: 'delete',
-                        label: tPanel('snapshot.delete'),
-                        danger: true,
-                        onClick: () => deleteSnapshot(s),
-                      },
-                    ],
-                  }}
-                >
-                  <button
-                    type="button"
-                    className="shrink-0 flex items-center justify-center w-6 h-6 rounded-md text-text-muted cursor-pointer hover:bg-[var(--color-hover)] hover:text-text-secondary"
-                    aria-label={tPanel('snapshot.actions')}
-                  >
-                    <MoreHorizontal size={14} />
-                  </button>
-                </Dropdown>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-    ) : null;
-
   if (!hasContent) {
     if (isCode && agents.length > 0) {
       return (
         <div className="h-full overflow-y-auto px-3 pb-6 pt-3">
-          {renderAllTasksCard()}
-          {renderSnapshotCard()}
+          <AgentTasksCard now={now} />
+          <SnapshotCard projectRoot={projectRoot} now={now} />
         </div>
       );
     }
@@ -594,7 +353,7 @@ export default function WorkspaceInspector() {
               : tPanel('inspector.emptyChat')}
           </p>
         </div>
-        {renderSnapshotCard()}
+        <SnapshotCard projectRoot={projectRoot} now={now} />
       </div>
     );
   }
@@ -611,7 +370,7 @@ export default function WorkspaceInspector() {
             <span className="flex-1 min-w-0 truncate text-xs font-medium text-text-primary">
               {agent.description || agent.name}
             </span>
-            <span className="shrink-0 text-2xs text-text-muted tabular-nums">{fmtElapsed(elapsed)}</span>
+            <span className="shrink-0 text-2xs text-text-muted tabular-nums">{formatElapsed(elapsed)}</span>
             {(agent.status === 'running' || agent.status === 'paused') && (
               <span className="shrink-0 flex items-center gap-0.5">
                 <button
@@ -639,7 +398,7 @@ export default function WorkspaceInspector() {
               {tPanel('inspector.tools', { n: agent.toolCallCount ?? 0 })}
             </span>
             <span className="inline-flex items-center h-5 px-2 rounded-full bg-[var(--color-bg-inset)] text-2xs text-text-muted tabular-nums">
-              {fmtTokens(totalTokens)} tokens
+              {formatTokens(totalTokens)} tokens
             </span>
             {agent.goal && (
               <span
@@ -653,7 +412,7 @@ export default function WorkspaceInspector() {
         </div>
       )}
 
-      {isCode && agents.length > 1 && agent && renderAllTasksCard()}
+      {isCode && agents.length > 1 && agent && <AgentTasksCard now={now} />}
 
       {activeToolCount > 0 && (
         <div className="flex items-center gap-2 px-4 py-2 mb-3 rounded-lg text-xs text-primary bg-primary-soft">
@@ -812,7 +571,7 @@ export default function WorkspaceInspector() {
         </section>
       )}
 
-      {renderSnapshotCard()}
+      <SnapshotCard projectRoot={projectRoot} now={now} />
 
       {sysMessages.length > 0 && (
         <section className="px-0.5 pt-[10px] border-t border-[var(--color-border-dim)] mt-1">
@@ -861,31 +620,6 @@ export default function WorkspaceInspector() {
         ) : null}
       </Modal>
 
-      <Modal
-        open={snapshotModalOpen}
-        title={tPanel('snapshot.modalTitle')}
-        okText={tPanel('snapshot.create')}
-        cancelText={tPanel('snapshot.cancel')}
-        confirmLoading={snapshotBusy}
-        width={420}
-        transitionName=""
-        maskTransitionName=""
-        onOk={() => void createSnapshot()}
-        onCancel={() => {
-          setSnapshotModalOpen(false);
-          setSnapshotName('');
-        }}
-      >
-        <p className="text-xs text-text-muted leading-[1.6] mb-3">{tPanel('snapshot.modalBody')}</p>
-        <Input
-          autoFocus
-          value={snapshotName}
-          onChange={(e) => setSnapshotName(e.target.value)}
-          onPressEnter={() => void createSnapshot()}
-          placeholder={tPanel('snapshot.placeholder')}
-          maxLength={60}
-        />
-      </Modal>
     </div>
   );
 }
