@@ -1,5 +1,43 @@
 # Auraxis Changelog
 
+## v3.2.0 (2026-08-25)
+
+> Feature release: official Feishu/Lark OpenAPI MCP, DeepSeek Harness MCP
+> preset, MCP routing hardening, Windows shim reliability, and UI polish.
+
+### MCP & Connectors
+
+- Added official Feishu/Lark OpenAPI MCP preset (`@larksuiteoapi/lark-mcp`):
+  one-click stdio setup, Feishu/Lark domain selection, lightweight / IM / full
+  tool presets, and encrypted App ID / App Secret storage.
+- Added Feishu/Lark credential configuration in Settings → Connectors,
+  including a live `tenant_access_token` connectivity test.
+- Added one-click DeepSeek Harness MCP preset with local Harness Web session
+  support and automatic Auraxis DeepSeek key injection.
+- Fixed MCP tool discovery/routing so tools are namespaced by server ID
+  (`mcp__<serverId>__<toolName>`) instead of matching only by raw tool name.
+- Added a self-contained Windows command-shim bridge so packaged MCP servers
+  can launch `npx.cmd` reliably; the MCP initialize timeout is now 180s for
+  first-run package downloads.
+
+### UI & Icons
+
+- Replaced the DeepSeek Harness MCP button icon with the official fish mark.
+- Replaced Agent robot icons with a non-robot waypoint mark.
+- Fixed the dark line artifact at 100% sidebar glass by fading the sidebar
+  border with transparency; non-glass mode keeps the original hairline.
+
+### Quality
+
+- Full check passes: 245 test files / 1,802 passing cases (+3 environment skips).
+- Production smoke, Electron IPC, skill seeding, and MCP handshake tests pass.
+- Docs and changelog updated for the 3.2.0 release.
+
+### Release Artifacts
+
+- Windows: [Auraxis.Setup.3.2.0.exe](https://github.com/yth1120/Auraxis-Agent/releases/download/v3.2.0/Auraxis.Setup.3.2.0.exe)
+- Windows blockmap: [Auraxis.Setup.3.2.0.exe.blockmap](https://github.com/yth1120/Auraxis-Agent/releases/download/v3.2.0/Auraxis.Setup.3.2.0.exe.blockmap)
+
 ## v3.1.0 (2026-08-25)
 
 > Engineering release: dependency supply-chain hardening, stricter runtime

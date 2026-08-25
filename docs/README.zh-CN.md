@@ -11,7 +11,7 @@ Auraxis v3.2.0 是一款基于 Electron 的桌面端智能体工作台，融合�
 项目采用**论文驱动开发**：已落地 7 篇 arXiv 论文的核心技术——Eywa（溯源长期记忆）、MAP-Graph（多 Agent 共享记忆授权）、AGORA（步骤级上下文压缩）、SWE-Touch（工作区漂移感知）、Oversight Has a Capacity（审批疲劳守卫）、AutoTool（工具使用惯性）、Verifier-as-Gatekeeper（技能库污染门禁）；另落地 4 项缓存方向论文/系统技术——RadixAttention（规范历史重放 / 公共前缀最大化）、Prompt Cache（稳定块组织）、Cache-Aware Prompt Compression（动态内容尾部化）、Byte-Exact Deduplication（记忆块字节级去重）。论文地址、技术映射与落地模块详见「[第五章 研究论文与技术落地](#五研究论文与技术落地)」。产品侧新增本地账户登录、Chat / Work / Code 三模式、思考与联网搜索开关、Agent 执行流程视图、会话事件时间轴、上下文缓存对齐等能力。
 
 - **主进程**：Electron 主进程（`electron/`），负责窗口管理、IPC 通信、工具执行、智能体调度
-- **渲染进程**：React 18 + Vite（`src/`），负责 UI 渲染、状态管理、用户交互
+- **渲染进程**：React 19 + Vite 8（`src/`），负责 UI 渲染、状态管理、用户交互
 - **进程通信**：通过 Electron IPC（`contextBridge` + `ipcMain/ipcRenderer`）进行双向通信
 
 ### 技术栈
@@ -20,10 +20,10 @@ Auraxis v3.2.0 是一款基于 Electron 的桌面端智能体工作台，融合�
 
 | 层            | 技术                                                                                                     |
 | ------------- | -------------------------------------------------------------------------------------------------------- |
-| 桌面框架      | Electron 43（Node 24，内置 `node:sqlite`），无边框窗口，`contextIsolation: true`                         |
-| 前端          | React 18 + TypeScript 5.5 + Vite 7                                                                       |
-| UI 组件库     | Ant Design 5，自定义深色/浅色主题                                                                        |
-| 状态管理      | Zustand 4；会话/设置/插件状态以主进程为权威，localStorage 仅作渲染层缓存                                 |
+| 桌面框架      | Electron 44（Node 24，内置 `node:sqlite`），无边框窗口，`contextIsolation: true`                         |
+| 前端          | React 19 + TypeScript 6 + Vite 8                                                                        |
+| UI 组件库     | Ant Design 6，自定义深色/浅色主题                                                                        |
+| 状态管理      | Zustand 5；会话/设置/插件状态以主进程为权威，localStorage 仅作渲染层缓存                                 |
 | 存储与检索    | 会话/Agent 统一 JSONL 事件日志 + SQLite 投影缓存 + FTS5 全文搜索 + 长期记忆（better-sqlite3，JSON 回退） |
 | Markdown 渲染 | react-markdown + remark-gfm + rehype-highlight + rehype-katex + mermaid                                  |
 | AI API        | axios（SSE 流式请求），支持 DeepSeek/OpenAI 格式和 Anthropic 格式；MCP、AGENTS.md、生命周期 hooks 协议   |
@@ -59,7 +59,7 @@ Auraxis v3.2.0 是一款基于 Electron 的桌面端智能体工作台，融合�
 Electron Main Process (electron/)            Renderer Process (src/)
 ┌──────────────────────────────────┐    ┌──────────────────────────────┐
 │ main.ts — 窗口创建, CSP, 单实例锁  │    │ main.tsx → App.tsx            │
-│ preload.ts — contextBridge API   │◄──►│ React 18 + Ant Design 5       │
+│ preload.ts — contextBridge API   │◄──►│ React 19 + Ant Design 6       │
 │                                      │    │                              │
 │ ipc/index.ts — 注册 30+ 模块处理器 │IPC │ Zustand Stores (18个)         │
 │ ipc/step-engine.ts — 统一ReAct步进 │    │                              │
@@ -942,7 +942,7 @@ dist-electron/ + dist/ ──→ electron-builder ──→ release/
 - **语言**：用户界面文本、内联注释、文档使用**中文**
 - **IPC 处理程序**：全部异步，返回 `IpcResponse<T>` 格式
 - **状态管理**：全局状态仅使用 Zustand Store，不使用 Redux 或 React Context
-- **组件**：功能组件 + Hooks，UI 组件库统一使用 Ant Design 5
+- **组件**：功能组件 + Hooks，UI 组件库统一使用 Ant Design 6
 
 ### 13.2 测试
 
@@ -951,7 +951,7 @@ dist-electron/ + dist/ ──→ electron-builder ──→ release/
 - **渲染进程测试**：`src/**/__tests__/`，jsdom 环境（@testing-library/react）
 - **测试总数**：245 个测试文件 / 1789 个用例通过（另有 3 例环境性跳过）
 - **覆盖率口径**：门槛统计范围仅为 `electron/ipc/`、`src/stores/`、`src/core/`；UI 组件（`src/components/`）与主进程入口（`main.ts` / `preload.ts` 等）不计入该门槛，另有组件级测试与 Playwright 端到端测试（`npm run test:e2e`）覆盖
-- **覆盖率阈值**：行/语句 80%，分支 70%，函数 80%（scope: `electron/ipc/`, `src/stores/`, `src/core/`；当前实际 85.18% 行/语句、78.85% 分支、87.78% 函数）
+- **覆盖率阈值**：行/语句 80%，分支 70%，函数 80%（scope: `electron/ipc/`, `src/stores/`, `src/core/`；最近一次全量报告为 77.55% statements / 79.90% lines / 66.99% branches / 73.84% functions，当前低于门槛）
 - **覆盖率报告**：`npm run test:coverage` 同时输出 `coverage/coverage-summary.json`（gitignore 的开发期产物）；设置面板「测试覆盖率」页经 `coverage:get` IPC 实时读取，纯浏览器 dev 由 Vite 中间件提供同一路径，生产构建将其拷入 `dist/coverage/`。报告缺失时面板提示运行命令，不显示伪造数字。
 - **端到端测试**：16 条 Playwright UI 链路通过（真实 Electron，含本地注册 → 登录 → 记住我持久化）
 - **实战验收（DeepSeek 真实 API）**：Chat 流式回答、Code 自动代批 Bash、Code「每次确认」权限卡（允许一次后写入文件）、Work 智能放行执行流、Work 计划审批面板均跑通；沙箱脚本直启 `dist-electron/main.js` 时增加 cwd 回退（`electron/sandbox-runner.ts`）。

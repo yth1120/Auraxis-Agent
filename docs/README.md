@@ -11,7 +11,7 @@ Auraxis v3.2.0 is an Electron-based desktop agentic workbench that combines a un
 The project follows **paper-driven development**: 7 arXiv papers' core techniques — Eywa (provenance-grounded long-term memory), MAP-Graph (multi-agent shared-memory authorization), AGORA (step-level context compression), SWE-Touch (workspace drift detection), Oversight Has a Capacity (approval fatigue guard), AutoTool (tool usage inertia), Verifier-as-Gatekeeper (skill pollution gating); plus 4 caching-oriented techniques — RadixAttention (canonical history replay / shared-prefix maximization), Prompt Cache (stable block organization), Cache-Aware Prompt Compression (dynamic content tailing), and Byte-Exact Deduplication (byte-exact dedup of memory blocks). Paper links, technical mappings, and landing modules are detailed in [Section 5](#5-research-papers--technical-implementation). Product-side additions include local account login, Chat / Work / Code modes, thinking and web-search toggles, Agent execution flow views, session event timelines, and context-cache alignment.
 
 - **Main process**: Electron main process (`electron/`) — window management, IPC communication, tool execution, agent scheduling
-- **Renderer**: React 18 + Vite (`src/`) — UI rendering, state management, user interaction
+- **Renderer**: React 19 + Vite 8 (`src/`) — UI rendering, state management, user interaction
 - **IPC**: bidirectional communication via Electron IPC (`contextBridge` + `ipcMain/ipcRenderer`)
 
 ### Tech Stack
@@ -20,10 +20,10 @@ The project follows **paper-driven development**: 7 arXiv papers' core technique
 
 | Layer               | Technology                                                                                                                                            |
 | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Desktop framework   | Electron 43 (Node 24, built-in `node:sqlite`), frameless window, `contextIsolation: true`                                                             |
-| Frontend            | React 18 + TypeScript 5.5 + Vite 7                                                                                                                    |
-| UI components       | Ant Design 5 with custom dark / light themes                                                                                                          |
-| State management    | Zustand 4; session/settings/plugin state is authoritative in the main process, localStorage is only a renderer cache                                  |
+| Desktop framework   | Electron 44 (Node 24, built-in `node:sqlite`), frameless window, `contextIsolation: true`                                                             |
+| Frontend            | React 19 + TypeScript 6 + Vite 8                                                                                                                      |
+| UI components       | Ant Design 6 with custom dark / light themes                                                                                                          |
+| State management    | Zustand 5; session/settings/plugin state is authoritative in the main process, localStorage is only a renderer cache                                  |
 | Storage & retrieval | Unified JSONL event logs for sessions/agents + SQLite projection cache + FTS5 full-text search + long-term memory (better-sqlite3 with JSON fallback) |
 | Markdown rendering  | react-markdown + remark-gfm + rehype-highlight + rehype-katex + mermaid                                                                               |
 | AI API              | axios (SSE streaming), DeepSeek / OpenAI and Anthropic formats; MCP, AGENTS.md, and lifecycle hooks protocols                                         |
@@ -59,7 +59,7 @@ The project follows **paper-driven development**: 7 arXiv papers' core technique
 Electron Main Process (electron/)            Renderer Process (src/)
 ┌──────────────────────────────────┐    ┌──────────────────────────────┐
 │ main.ts — window, CSP, lock      │    │ main.tsx → App.tsx            │
-│ preload.ts — contextBridge API   │◄──►│ React 18 + Ant Design 5       │
+│ preload.ts — contextBridge API   │◄──►│ React 19 + Ant Design 6       │
 │                                  │    │                              │
 │ ipc/index.ts — 30+ modules       │IPC │ Zustand Stores (18)           │
 │ ipc/step-engine.ts — ReAct step  │    │                              │
@@ -943,7 +943,7 @@ The app uses `dotenv` to load environment variables from `.env` at the project r
 - **Language**: UI text and inline comments use **Chinese**; documentation is maintained in English (Chinese version: `docs/README.zh-CN.md`)
 - **IPC handlers**: all async, returning `IpcResponse<T>`
 - **State management**: global state only via Zustand stores; no Redux or React Context
-- **Components**: function components + hooks; UI library is Ant Design 5
+- **Components**: function components + hooks; UI library is Ant Design 6
 
 ### 13.2 Testing
 
@@ -952,7 +952,7 @@ The app uses `dotenv` to load environment variables from `.env` at the project r
 - **Renderer tests**: `src/**/__tests__/`, jsdom environment (@testing-library/react)
 - **Total**: 245 test files / 1,789 cases passing (+3 environment-skips)
 - **Coverage scope**: the gate only counts `electron/ipc/`, `src/stores/`, `src/core/`; UI components (`src/components/`) and main-process entry points (`main.ts` / `preload.ts` etc.) are excluded from the gate and covered by component tests + Playwright E2E (`npm run test:e2e`)
-- **Coverage thresholds**: lines/statements 80%, branches 70%, functions 80% (current: 85.18% lines / 78.85% branches / 87.78% functions)
+- **Coverage thresholds**: lines/statements 80%, branches 70%, functions 80% (latest full report: 77.55% statements / 79.90% lines / 66.99% branches / 73.84% functions; currently below thresholds)
 - **Coverage report**: `npm run test:coverage` outputs `coverage/coverage-summary.json` (gitignored dev artifact); the Settings "Test coverage" page reads it live via the `coverage:get` IPC; pure browser dev is served by a Vite middleware, and production builds copy it into `dist/coverage/`. When the report is missing, the panel shows the command to run instead of fake numbers
 - **E2E**: 16 Playwright UI flows passing (real Electron, including register → login → remember-me persistence)
 - **Real-API acceptance (DeepSeek)**: chat streaming, Code auto-approve Bash, Code "confirm each time" permission card (write after one approval), Work smart-execution flow, and Work plan-approval panel all verified; sandbox scripts add cwd fallback when launching `dist-electron/main.js` directly (`electron/sandbox-runner.ts`)

@@ -1,6 +1,6 @@
 # AGENTS.md — Auraxis 工程与 UI 规范
 
-桌面端 AI 智能体工作台（Electron + React 18 + TypeScript + Zustand）。本项目是**普通桌面客户端**：功能与工具面覆盖业界主流 Agent 能力，架构与开发细节见 `docs/README.md`。
+桌面端 AI 智能体工作台（Electron + React 19 + TypeScript + Zustand）。本项目是**普通桌面客户端**：功能与工具面覆盖业界主流 Agent 能力，架构与开发细节见 `docs/README.md`。
 
 ## 常用命令
 
@@ -85,7 +85,7 @@ npm run check            # lint + 主进程编译 + 渲染层类型检查 + 全�
 ## 测试与验证
 
 - 新增/改动必须过：`npx tsc --noEmit`（渲染层）、`npm run electron:compile`（主进程）、`npx vitest run`（全量）、`npx vite build`（构建）。
-- 测试覆盖门槛：lines/statements ≥ 80%、branches ≥ 70%、functions ≥ 80%（`vitest.config.ts`，校准后的可守住水平；当前实际 85.18% 行/语句、78.85% 分支、87.78% 函数）；只允许有意上调、不允许跌破当前门槛。
+- 测试覆盖门槛：lines/statements ≥ 80%、branches ≥ 70%、functions ≥ 80%（`vitest.config.ts`）；最近一次全量报告为 77.55% statements / 79.90% lines / 66.99% branches / 73.84% functions，当前低于门槛，需要补测试后再将门槛视为可守住水平。
 - 覆盖率报告：`npm run test:coverage` 同时输出 `coverage/coverage-summary.json`（gitignore，开发期产物），设置面板「测试覆盖率」页经 `coverage:get` IPC 实时读取该文件；README / AGENTS / docs 中的用例数与覆盖率数字以最近一次全量覆盖率为准，更新后必须同步。
 - 覆盖率统计范围：`electron/ipc/`、`src/stores/`、`src/core/`（不含 `src/components/` 与主进程入口）；UI 由组件级测试覆盖，桌面端到端链路由 `npm run test:smoke` 覆盖。
 - 端到端：`npm run test:e2e`（Playwright 启动真实 Electron，覆盖启动/模式切换/发消息/快捷卡片/设置主题/本地注册登录等 16 条链路）；改动渲染层或主进程启动链路后必须重跑。
