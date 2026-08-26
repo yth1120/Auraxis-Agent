@@ -3,7 +3,8 @@
 ## v3.2.0 (2026-08-25)
 
 > Feature release: official Feishu/Lark OpenAPI MCP, DeepSeek Harness MCP
-> preset, MCP routing hardening, Windows shim reliability, and UI polish.
+> preset, MCP routing hardening, Windows shim reliability, and release
+> engineering.
 
 ### Models
 
@@ -12,10 +13,8 @@
 - Vision model accepts JPEG / PNG / GIF / WebP in `user` messages and routes
   `ReadImage` results through OpenAI-compatible image content blocks; non-vision
   DeepSeek models automatically degrade those attachments to text.
-- Unified the model switch panel around the three built-ins (Flash / Pro /
-  Vision Exp), kept the experimental badge inline with the model name, and
-  retained per-model context / max-output metadata in Settings and the model
-  layer.
+- Retained per-model context-window / max-output metadata and unified model
+  resolution across Settings, IPC, and the model layer.
 
 ### MCP & Connectors
 
@@ -53,15 +52,6 @@
   Windows `userData` (with legacy-cache migration), and accepted the Vite dev
   origin with a trailing slash so IPC trust validation no longer rejects local
   development.
-
-### UI & Icons
-
-- Replaced the DeepSeek Harness MCP button icon with the official fish mark.
-- Replaced Agent robot icons with a non-robot waypoint mark.
-- Fixed the dark line artifact at 100% sidebar glass by fading the sidebar
-  border with transparency; non-glass mode keeps the original hairline.
-- Polished the model switch panel so the experimental "实验" badge sits on the
-  same line as the model title and all three rows keep a consistent height.
 
 ### Quality
 

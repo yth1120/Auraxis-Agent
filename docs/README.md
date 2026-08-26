@@ -34,9 +34,8 @@ The project follows **paper-driven development**: 7 arXiv papers' core technique
   Zustand selectors and deprecated AntD props migrated; IPC / agent / store
   typings hardened; login and Windows userData recovery; test / E2E / CI
   matrix stabilization and local `image-size` pinning.
-- **UI & quality**: inline experimental badge in the model panel, official
-  Harness fish icon, non-robot waypoint Agent marker, sidebar glass border
-  fix, 245 test files / 1,802 passing cases (+3 environment skips).
+- **Quality gates**: 245 test files / 1,802 passing cases (+3 environment
+  skips), SDK build, E2E, audit, and three-platform release CI.
 
 ### Tech Stack
 

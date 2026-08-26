@@ -32,9 +32,8 @@ Auraxis v3.2.0 是一款基于 Electron 的桌面端智能体工作台，融合�
   聚焦模块；移除生产代码剩余 `any`；迁移 Zustand selector 与废弃 AntD props；
   加固 IPC / Agent / Store 类型；修复登录与 Windows userData；稳定测试、
   E2E 与三平台 CI，并本地锁定 `image-size`。
-- **UI 与质量**：模型面板实验徽标同行显示、Harness 官方鱼形图标、非机器人
-  waypoint Agent 图标、侧边栏玻璃边界修复；245 个测试文件 / 1,802 用例通过
-  （另有 3 例环境性跳过）。
+- **质量门禁**：245 个测试文件 / 1,802 用例通过（另有 3 例环境性跳过），
+  SDK 构建、E2E、审计与三平台 Release CI 均通过。
 
 ### 技术栈
 
