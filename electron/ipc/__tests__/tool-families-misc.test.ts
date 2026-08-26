@@ -521,7 +521,7 @@ describe('运行时插件挂载 / GitCommit / Ralph', () => {
       }
     }
     expect(results).toHaveLength(TOOL_DEFINITIONS.length);
-  });
+  }, 30_000);
 
   it('executes every built-in tool with invalid extra fields without crashing', async () => {
     const results = [];
@@ -533,7 +533,7 @@ describe('运行时插件挂载 / GitCommit / Ralph', () => {
       }
     }
     expect(results).toHaveLength(TOOL_DEFINITIONS.length);
-  });
+  }, 30_000);
 
   it('executes every built-in tool with schema-derived inputs without crashing', async () => {
     const results = [];

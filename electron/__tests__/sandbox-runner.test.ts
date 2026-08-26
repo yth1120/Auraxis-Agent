@@ -89,7 +89,8 @@ describe('sandbox-runner — backend and script resolution', () => {
     process.env.AURAXIS_SANDBOX_BACKEND = 'appcontainer';
     expect(sandboxBackend()).toBe('appcontainer');
     process.env.AURAXIS_SANDBOX_BACKEND = 'linux';
-    expect(sandboxBackend()).toBe(process.platform === 'win32' ? 'restricted' : 'linux');
+    const nonWinDefault = process.platform === 'darwin' ? 'macos' : 'linux';
+    expect(sandboxBackend()).toBe(process.platform === 'win32' ? 'restricted' : nonWinDefault);
   });
 
   it('uses env scripts and finds repo layout/package paths', () => {
