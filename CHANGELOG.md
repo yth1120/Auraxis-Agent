@@ -5,6 +5,18 @@
 > Feature release: official Feishu/Lark OpenAPI MCP, DeepSeek Harness MCP
 > preset, MCP routing hardening, Windows shim reliability, and UI polish.
 
+### Models
+
+- Added `DeepSeek V4 Flash Vision Exp` (`deepseek-v4-flash-vision-exp`) as a
+  first-class built-in experimental model with image understanding.
+- Vision model accepts JPEG / PNG / GIF / WebP in `user` messages and routes
+  `ReadImage` results through OpenAI-compatible image content blocks; non-vision
+  DeepSeek models automatically degrade those attachments to text.
+- Unified the model switch panel around the three built-ins (Flash / Pro /
+  Vision Exp), kept the experimental badge inline with the model name, and
+  retained per-model context / max-output metadata in Settings and the model
+  layer.
+
 ### MCP & Connectors
 
 - Added official Feishu/Lark OpenAPI MCP preset (`@larksuiteoapi/lark-mcp`):
@@ -20,23 +32,54 @@
   can launch `npx.cmd` reliably; the MCP initialize timeout is now 180s for
   first-run package downloads.
 
+### Dependency, Refactor & CI
+
+- Upgraded the major stack and fixed compatibility: React 18 → 19,
+  Ant Design 5 → 6, Zustand 4 → 5, Electron 43 → 44, Vite 7 → 8,
+  TypeScript 5 → 6 (+ TS7-compatible native compiler), Vitest 3 → 4,
+  Node target 20 → 22, KaTeX, PDFKit, jsdom, testing-library, and related
+  typings.
+- Migrated deprecated Ant Design props and Zustand shallow selectors; split
+  large components into focused hooks / subcomponents; extracted agent log,
+  scheduler, memory, workbench, composer, sidebar, inspector, settings, and
+  timeline modules; removed remaining production `any` and hardened
+  IPC / agent / store typings.
+- Fixed the SDK TypeScript module-resolution build, guarded real sandbox /
+  AppContainer integration tests on GitHub runners, stabilized Ant Design
+  portal teardown, updated E2E selectors for Ant Design 6, made the release
+  matrix fail-fast off, and pinned the local safe `image-size` package so
+  Windows / Linux packaging resolves it in clean CI installs.
+- Recovered the login setup flow, locked account mutations, restored standard
+  Windows `userData` (with legacy-cache migration), and accepted the Vite dev
+  origin with a trailing slash so IPC trust validation no longer rejects local
+  development.
+
 ### UI & Icons
 
 - Replaced the DeepSeek Harness MCP button icon with the official fish mark.
 - Replaced Agent robot icons with a non-robot waypoint mark.
 - Fixed the dark line artifact at 100% sidebar glass by fading the sidebar
   border with transparency; non-glass mode keeps the original hairline.
+- Polished the model switch panel so the experimental "实验" badge sits on the
+  same line as the model title and all three rows keep a consistent height.
 
 ### Quality
 
 - Full check passes: 245 test files / 1,802 passing cases (+3 environment skips).
 - Production smoke, Electron IPC, skill seeding, and MCP handshake tests pass.
+- Latest coverage: 79.94% lines, 77.58% statements, 67.01% branches,
+  73.85% functions; coverage reports continue to be generated and shown in
+  Settings while the configured thresholds are not used to block platform
+  releases.
 - Docs and changelog updated for the 3.2.0 release.
 
 ### Release Artifacts
 
 - Windows: [Auraxis.Setup.3.2.0.exe](https://github.com/yth1120/Auraxis-Agent/releases/download/v3.2.0/Auraxis.Setup.3.2.0.exe)
 - Windows blockmap: [Auraxis.Setup.3.2.0.exe.blockmap](https://github.com/yth1120/Auraxis-Agent/releases/download/v3.2.0/Auraxis.Setup.3.2.0.exe.blockmap)
+- macOS Intel: [Auraxis-3.2.0.dmg](https://github.com/yth1120/Auraxis-Agent/releases/download/v3.2.0/Auraxis-3.2.0.dmg)
+- macOS Apple Silicon: [Auraxis-3.2.0-arm64.dmg](https://github.com/yth1120/Auraxis-Agent/releases/download/v3.2.0/Auraxis-3.2.0-arm64.dmg)
+- Linux: [Auraxis-3.2.0.AppImage](https://github.com/yth1120/Auraxis-Agent/releases/download/v3.2.0/Auraxis-3.2.0.AppImage)
 
 ## v3.1.0 (2026-08-25)
 

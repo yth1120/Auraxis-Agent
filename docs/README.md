@@ -14,6 +14,30 @@ The project follows **paper-driven development**: 7 arXiv papers' core technique
 - **Renderer**: React 19 + Vite 8 (`src/`) — UI rendering, state management, user interaction
 - **IPC**: bidirectional communication via Electron IPC (`contextBridge` + `ipcMain/ipcRenderer`)
 
+### 1.1 v3.2.0 Release Highlights
+
+- **Models**: built-in DeepSeek V4 Flash, V4 Pro, and the new experimental
+  V4 Flash Vision Exp. Vision routes JPEG / PNG / GIF / WebP image content and
+  `ReadImage` output through image blocks; non-vision DeepSeek models degrade to text.
+- **Feishu / Lark MCP**: official OpenAPI preset (`@larksuiteoapi/lark-mcp`)
+  with one-click stdio setup, domain selection, lightweight / IM / full tool
+  presets, encrypted App ID / Secret storage, and a live
+  `tenant_access_token` connectivity test.
+- **DeepSeek Harness MCP**: one-click local Harness Web preset with Auraxis
+  DeepSeek key injection and Windows `npx.cmd` shim support.
+- **MCP reliability**: tools are namespaced as `mcp__<serverId>__<toolName>`,
+  discovery / calls are server-scoped, the initialize timeout is 180s, and a
+  self-contained Windows command shim keeps packaged MCP servers launchable.
+- **Tech-debt cleanup**: React 19 / Ant Design 6 / Zustand 5 / Electron 44 /
+  Vite 8 / TypeScript 6+ / Vitest 4 / Node 22 upgrade and compatibility fixes;
+  large components split into focused modules; production `any` removed;
+  Zustand selectors and deprecated AntD props migrated; IPC / agent / store
+  typings hardened; login and Windows userData recovery; test / E2E / CI
+  matrix stabilization and local `image-size` pinning.
+- **UI & quality**: inline experimental badge in the model panel, official
+  Harness fish icon, non-robot waypoint Agent marker, sidebar glass border
+  fix, 245 test files / 1,802 passing cases (+3 environment skips).
+
 ### Tech Stack
 
 <img width="1198" height="776" alt="auraxis-ui" src="https://github.com/user-attachments/assets/88f118c2-fc15-4779-8be3-928cb9c04ae8" />
@@ -145,7 +169,7 @@ Auraxis/
 │       ├── session-store.ts     # Unified JSONL event logs (chat & agent)
 │       ├── sandbox-runner.ts    # Native sandbox dispatch (restricted/AppContainer/linux/macos)
 │       ├── acp-server.ts / sdk-server.ts / headless-run.ts  # ACP / JSON-RPC SDK / headless
-│       └── __tests__/           # Main-process tests (245 files / 1789 cases repo-wide)
+│       └── __tests__/           # Main-process tests (245 files / 1802 cases repo-wide)
 │
 ├── src/                         # Renderer code (browser environment)
 │   ├── main.tsx                 # React entry
@@ -950,9 +974,9 @@ The app uses `dotenv` to load environment variables from `.env` at the project r
 - **Framework**: Vitest (`describe`, `it`, `expect`, `vi` injected via globals)
 - **Main-process tests**: `electron/**/__tests__/`, node environment; modules depending on `electron` are isolated with `vi.mock('electron', ...)`
 - **Renderer tests**: `src/**/__tests__/`, jsdom environment (@testing-library/react)
-- **Total**: 245 test files / 1,789 cases passing (+3 environment-skips)
+- **Total**: 245 test files / 1,802 cases passing (+3 environment-skips)
 - **Coverage scope**: the gate only counts `electron/ipc/`, `src/stores/`, `src/core/`; UI components (`src/components/`) and main-process entry points (`main.ts` / `preload.ts` etc.) are excluded from the gate and covered by component tests + Playwright E2E (`npm run test:e2e`)
-- **Coverage thresholds**: lines/statements 80%, branches 70%, functions 80% (latest full report: 77.55% statements / 79.90% lines / 66.99% branches / 73.84% functions; currently below thresholds)
+- **Coverage thresholds**: lines/statements 80%, branches 70%, functions 80% (latest full report: 77.58% statements / 79.94% lines / 67.01% branches / 73.85% functions; currently below thresholds)
 - **Coverage report**: `npm run test:coverage` outputs `coverage/coverage-summary.json` (gitignored dev artifact); the Settings "Test coverage" page reads it live via the `coverage:get` IPC; pure browser dev is served by a Vite middleware, and production builds copy it into `dist/coverage/`. When the report is missing, the panel shows the command to run instead of fake numbers
 - **E2E**: 16 Playwright UI flows passing (real Electron, including register → login → remember-me persistence)
 - **Real-API acceptance (DeepSeek)**: chat streaming, Code auto-approve Bash, Code "confirm each time" permission card (write after one approval), Work smart-execution flow, and Work plan-approval panel all verified; sandbox scripts add cwd fallback when launching `dist-electron/main.js` directly (`electron/sandbox-runner.ts`)

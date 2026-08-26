@@ -14,6 +14,28 @@ Auraxis v3.2.0 是一款基于 Electron 的桌面端智能体工作台，融合�
 - **渲染进程**：React 19 + Vite 8（`src/`），负责 UI 渲染、状态管理、用户交互
 - **进程通信**：通过 Electron IPC（`contextBridge` + `ipcMain/ipcRenderer`）进行双向通信
 
+### 1.1 v3.2.0 发布亮点
+
+- **模型**：内置 DeepSeek V4 Flash、V4 Pro 与新增的实验版 V4 Flash Vision Exp；
+  视觉模型接收 JPEG / PNG / GIF / WebP 图片与 `ReadImage` 结果，非视觉 DeepSeek
+  模型自动降级为文本。
+- **飞书 / Lark MCP**：官方 OpenAPI 预设（`@larksuiteoapi/lark-mcp`），支持
+  一键 stdio 配置、域名选择、轻量 / IM / 全量工具预设、加密 App ID / App Secret
+  存储，以及 `tenant_access_token` 实时连接测试。
+- **DeepSeek Harness MCP**：一键本地 Harness Web 预设，自动注入 Auraxis
+  DeepSeek Key，并兼容 Windows `npx.cmd` 启动。
+- **MCP 可靠性**：工具统一命名空间 `mcp__<serverId>__<toolName>`，发现与调用
+  按服务器隔离，初始化超时 180 秒，内置 Windows 命令 shim 保证打包后 MCP
+  可正常启动。
+- **技术债清理**：React 19 / Ant Design 6 / Zustand 5 / Electron 44 / Vite 8 /
+  TypeScript 6+ / Vitest 4 / Node 22 大版本升级与兼容修复；大型组件拆分为
+  聚焦模块；移除生产代码剩余 `any`；迁移 Zustand selector 与废弃 AntD props；
+  加固 IPC / Agent / Store 类型；修复登录与 Windows userData；稳定测试、
+  E2E 与三平台 CI，并本地锁定 `image-size`。
+- **UI 与质量**：模型面板实验徽标同行显示、Harness 官方鱼形图标、非机器人
+  waypoint Agent 图标、侧边栏玻璃边界修复；245 个测试文件 / 1,802 用例通过
+  （另有 3 例环境性跳过）。
+
 ### 技术栈
 
 <img width="1462" height="861" alt="" src="https://github.com/user-attachments/assets/7f6f67f1-d32c-4d82-a374-dd5d4174fdcc" />
@@ -145,7 +167,7 @@ Auraxis/
 │       ├── session-store.ts     # 聊天/Agent 统一 JSONL 事件日志
 │       ├── sandbox-runner.ts    # 原生沙箱调度（restricted/AppContainer/linux/macos）
 │       ├── acp-server.ts / sdk-server.ts / headless-run.ts  # ACP / JSON-RPC SDK / 无头执行
- │       └── __tests__/           # 主进程测试（全仓 245 个测试文件 / 1789 用例）
+ │       └── __tests__/           # 主进程测试（全仓 245 个测试文件 / 1802 用例）
 │
 ├── src/                         # 渲染进程代码（浏览器环境）
 │   ├── main.tsx                 # React 入口
@@ -949,9 +971,9 @@ dist-electron/ + dist/ ──→ electron-builder ──→ release/
 - **测试框架**：Vitest（`describe`, `it`, `expect`, `vi` 通过 globals 注入）
 - **主进程测试**：`electron/**/__tests__/`，node 环境，依赖 `electron` 的模块用 `vi.mock('electron', ...)` 隔离
 - **渲染进程测试**：`src/**/__tests__/`，jsdom 环境（@testing-library/react）
-- **测试总数**：245 个测试文件 / 1789 个用例通过（另有 3 例环境性跳过）
+- **测试总数**：245 个测试文件 / 1802 个用例通过（另有 3 例环境性跳过）
 - **覆盖率口径**：门槛统计范围仅为 `electron/ipc/`、`src/stores/`、`src/core/`；UI 组件（`src/components/`）与主进程入口（`main.ts` / `preload.ts` 等）不计入该门槛，另有组件级测试与 Playwright 端到端测试（`npm run test:e2e`）覆盖
-- **覆盖率阈值**：行/语句 80%，分支 70%，函数 80%（scope: `electron/ipc/`, `src/stores/`, `src/core/`；最近一次全量报告为 77.55% statements / 79.90% lines / 66.99% branches / 73.84% functions，当前低于门槛）
+- **覆盖率阈值**：行/语句 80%，分支 70%，函数 80%（scope: `electron/ipc/`, `src/stores/`, `src/core/`；最近一次全量报告为 77.58% statements / 79.94% lines / 67.01% branches / 73.85% functions，当前低于门槛）
 - **覆盖率报告**：`npm run test:coverage` 同时输出 `coverage/coverage-summary.json`（gitignore 的开发期产物）；设置面板「测试覆盖率」页经 `coverage:get` IPC 实时读取，纯浏览器 dev 由 Vite 中间件提供同一路径，生产构建将其拷入 `dist/coverage/`。报告缺失时面板提示运行命令，不显示伪造数字。
 - **端到端测试**：16 条 Playwright UI 链路通过（真实 Electron，含本地注册 → 登录 → 记住我持久化）
 - **实战验收（DeepSeek 真实 API）**：Chat 流式回答、Code 自动代批 Bash、Code「每次确认」权限卡（允许一次后写入文件）、Work 智能放行执行流、Work 计划审批面板均跑通；沙箱脚本直启 `dist-electron/main.js` 时增加 cwd 回退（`electron/sandbox-runner.ts`）。

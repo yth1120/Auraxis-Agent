@@ -85,7 +85,7 @@ npm run check            # lint + 主进程编译 + 渲染层类型检查 + 全�
 ## 测试与验证
 
 - 新增/改动必须过：`npx tsc --noEmit`（渲染层）、`npm run electron:compile`（主进程）、`npx vitest run`（全量）、`npx vite build`（构建）。
-- 测试覆盖门槛：lines/statements ≥ 80%、branches ≥ 70%、functions ≥ 80%（`vitest.config.ts`）；最近一次全量报告为 77.55% statements / 79.90% lines / 66.99% branches / 73.84% functions，当前低于门槛，需要补测试后再将门槛视为可守住水平。
+- 测试覆盖门槛：lines/statements ≥ 80%、branches ≥ 70%、functions ≥ 80%（`vitest.config.ts`）；最近一次全量报告为 77.58% statements / 79.94% lines / 67.01% branches / 73.85% functions，当前低于门槛，需要补测试后再将门槛视为可守住水平。
 - CI 当前把全量单元测试作为阻断项；覆盖率门槛未达时仍生成报告并在设置页展示，但不再阻断平台 Release（见 `.github/workflows/build.yml`）。
 - 覆盖率报告：`npm run test:coverage` 同时输出 `coverage/coverage-summary.json`（gitignore，开发期产物），设置面板「测试覆盖率」页经 `coverage:get` IPC 实时读取该文件；README / AGENTS / docs 中的用例数与覆盖率数字以最近一次全量覆盖率为准，更新后必须同步。
 - 覆盖率统计范围：`electron/ipc/`、`src/stores/`、`src/core/`（不含 `src/components/` 与主进程入口）；UI 由组件级测试覆盖，桌面端到端链路由 `npm run test:smoke` 覆盖。
