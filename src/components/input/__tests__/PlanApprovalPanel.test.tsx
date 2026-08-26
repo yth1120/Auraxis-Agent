@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, fireEvent, waitFor } from '@testing-library/react';
+import { render, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import { message } from 'antd';
 import PlanApprovalPanel from '../PlanApprovalPanel';
 import { useInspectorStore } from '@/stores/useInspectorStore';
@@ -32,8 +32,9 @@ describe('PlanApprovalPanel — 审批接管输入区', () => {
   afterEach(async () => {
     // AntD message 的静态 portal/定时任务若在 jsdom 销毁后才触发，会留下
     // 未处理的 `window is not defined`，导致 vitest 以非零码退出。
+    cleanup();
     message.destroy();
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await new Promise((resolve) => setTimeout(resolve, 150));
   });
 
   it('renders amber takeover with steps, tool tags and saved path', () => {
