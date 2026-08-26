@@ -88,7 +88,6 @@ beforeEach(() => {
 
 const create = (payload: any) => h.handlers.get('terminal:create')!({ sender: {} }, payload);
 const attach = (agentId: any) => h.handlers.get('agentShell:attach')!({ sender: {} }, agentId);
-const agentWrite = (agentId: any, data: any) => h.handlers.get('agentShell:write')!({ sender: {} }, agentId, data);
 
 describe('terminal:create / input / resize / kill', () => {
   it('校验窗口/ID/重复', () => {
