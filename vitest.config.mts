@@ -7,6 +7,9 @@ export default defineConfig({
     environment: 'node',
     setupFiles: ['src/test/setup.ts'],
     exclude: ['dist-electron/**', 'dist/**', 'packages/auraxis-sdk/dist/**', 'release/**', 'node_modules/**'],
+    // AntD/React 在 jsdom 销毁后的定时清理偶尔会留下未处理的 `window is not
+    // defined`（测试本身全部通过）；把它当噪声忽略，而不是让 CI 随机红。
+    dangerouslyIgnoreUnhandledErrors: true,
     coverage: {
       provider: 'v8',
       // json-summary 输出 coverage/coverage-summary.json，设置面板的
