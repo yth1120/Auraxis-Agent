@@ -450,7 +450,10 @@ describe('ai-handlers edge branches', () => {
     vi.mocked(executeToolCall)
       .mockResolvedValueOnce({ output: null, error: undefined })
       .mockRejectedValueOnce(new Error('web down'))
-      .mockResolvedValueOnce({ output: { results: [null, { title: 'T', snippet: 'S', url: 'https://e.com' }] }, error: undefined });
+      .mockResolvedValueOnce({
+        output: { results: [null, { title: 'T', snippet: 'S', url: 'https://e.com' }] },
+        error: undefined,
+      });
     for (const payload of [
       chatPayload({ isWebSearch: true }),
       chatPayload({ isWebSearch: true }),
@@ -462,7 +465,9 @@ describe('ai-handlers edge branches', () => {
   });
 
   it('covers query settings presets and clarifies fallback model', async () => {
-    vi.mocked(runQuery).mockReset().mockResolvedValue(undefined as any);
+    vi.mocked(runQuery)
+      .mockReset()
+      .mockResolvedValue(undefined as any);
     vi.mocked(readSettings).mockResolvedValue({
       deepseekApiKey: 'sk',
       permissionPreset: 'full',

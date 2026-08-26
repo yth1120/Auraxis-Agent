@@ -141,7 +141,10 @@ export class JsonlSessionStore implements SessionStore {
     const next = prev.then(write, write);
     // The stored tail swallows errors so one failed append never blocks the
     // next one, while `next` still propagates to this caller.
-    this.appendTails.set(sessionId, next.catch(() => {}));
+    this.appendTails.set(
+      sessionId,
+      next.catch(() => {}),
+    );
     await next;
   }
 

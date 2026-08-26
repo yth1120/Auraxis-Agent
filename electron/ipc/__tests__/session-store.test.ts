@@ -173,10 +173,7 @@ describe('JsonlSessionStore', () => {
   });
 
   it('forks with an invalid boundary and handles cold/distinct files', async () => {
-    await store.append('s1', [
-      ev('user', { text: 'a' }),
-      ev('assistant_chunk', { text: 'b' }),
-    ]);
+    await store.append('s1', [ev('user', { text: 'a' }), ev('assistant_chunk', { text: 'b' })]);
     await store.append('.hidden', [ev('user', { text: 'x' })]);
     await fs.writeFile(path.join(root, 'not-jsonl.txt'), 'x', 'utf8');
     const list = await store.list();

@@ -105,9 +105,7 @@ describe('document-tools — real file round trips', () => {
 
     const xlsx2 = path.join(root, 'fallback.xlsx');
     await writeDocument(xlsx2, {
-      blocks: [
-        { type: 'table', rows: [['a'], [null, 'b' as never]] },
-      ],
+      blocks: [{ type: 'table', rows: [['a'], [null, 'b' as never]] }],
     });
     expect((await readDocument(xlsx2)).sheets?.[0]?.rows).toHaveLength(1);
 

@@ -227,9 +227,7 @@ describe('connectors — 连接器配置与后端', () => {
     readSettingsMock.mockResolvedValue({ driveToken: 'drive' });
     axiosMock.get.mockResolvedValueOnce({ data: {} });
     expect(await driveList('  ', 0)).toEqual([]);
-    axiosMock.get
-      .mockResolvedValueOnce({ data: {} })
-      .mockResolvedValueOnce({ data: Buffer.alloc(0) });
+    axiosMock.get.mockResolvedValueOnce({ data: {} }).mockResolvedValueOnce({ data: Buffer.alloc(0) });
     expect(await driveRead('f')).toMatchObject({ name: 'f', bytes: 0, base64: '' });
 
     readSettingsMock.mockResolvedValue({ notionToken: 'notion' });

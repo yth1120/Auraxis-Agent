@@ -515,7 +515,9 @@ describe('agentLoopRun — unified step-engine loop', () => {
 
     const replanInvalid = makeHarness({ mode: 'plan' });
     llmQueue.push(planAssistant(PLAN_JSON));
-    llmQueue.push(toolAssistant([{ id: 'rp3', name: 'Replan', input: { currentPlanStatus: 'blocked', blockedTasks: ['1'] } }]));
+    llmQueue.push(
+      toolAssistant([{ id: 'rp3', name: 'Replan', input: { currentPlanStatus: 'blocked', blockedTasks: ['1'] } }]),
+    );
     llmQueue.push(planAssistant('not-json'));
     llmQueue.push(finalAssistant());
     await agentLoopRun(replanInvalid.cfg);
@@ -542,7 +544,7 @@ describe('agentLoopRun — unified step-engine loop', () => {
     llmQueue.push(finalAssistant());
     const allowedResult = await agentLoopRun(allowed.cfg);
     expect(allowedResult.iterations).toBeGreaterThan(0);
-    expect((allowed.cfg.checkPermission as ReturnType<typeof vi.fn>)).toHaveBeenCalled();
+    expect(allowed.cfg.checkPermission as ReturnType<typeof vi.fn>).toHaveBeenCalled();
 
     const denied = makeHarness({
       mode: 'auto',
@@ -552,7 +554,7 @@ describe('agentLoopRun — unified step-engine loop', () => {
     });
     llmQueue.push(toolAssistant([{ id: 'rv2', name: 'ReviewArtifact', input: { check_type: 'lint' } }]));
     await agentLoopRun(denied.cfg);
-    expect((denied.cfg.checkPermission as ReturnType<typeof vi.fn>)).toHaveBeenCalled();
+    expect(denied.cfg.checkPermission as ReturnType<typeof vi.fn>).toHaveBeenCalled();
   });
 
   it('covers repeated deviance failures and active-plan resume', async () => {
@@ -566,7 +568,10 @@ describe('agentLoopRun — unified step-engine loop', () => {
     llmQueue.push(finalAssistant());
     await agentLoopRun(failed.cfg);
 
-    const resumePlan: { tasks: { id: string; status: string; description: string; dependencies: string[] }[]; createdAt: number } = {
+    const resumePlan: {
+      tasks: { id: string; status: string; description: string; dependencies: string[] }[];
+      createdAt: number;
+    } = {
       createdAt: 1,
       tasks: [{ id: '1', status: 'pending', description: 'run', dependencies: [] }],
     };

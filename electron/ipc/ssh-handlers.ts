@@ -111,10 +111,12 @@ export function registerSshHandlers() {
     let client: Client | null = null;
     try {
       client = await connectTo(conn);
-      const output = (await runRemoteCommand(client, 'echo ssh-ok && hostname', {
-        failOnNonZero: true,
-        timeoutMs: CONNECT_READY_TIMEOUT_MS,
-      })).trim();
+      const output = (
+        await runRemoteCommand(client, 'echo ssh-ok && hostname', {
+          failOnNonZero: true,
+          timeoutMs: CONNECT_READY_TIMEOUT_MS,
+        })
+      ).trim();
       return { ok: true, data: { output } };
     } catch (error: unknown) {
       return { ok: false, error: errorText(error) };

@@ -195,10 +195,16 @@ describe('step-compressor（AGORA）', () => {
         { id: 'w', type: 'function', function: { name: 'Write', arguments: '{"file_path":"src/app.ts"}' } },
       ],
     } as never;
-    const { steps } = groupIntoSteps([rawAssistant, { role: 'tool', content: '{"pattern":"x","results":[{"file":"src/app.ts"}]}' }]);
+    const { steps } = groupIntoSteps([
+      rawAssistant,
+      { role: 'tool', content: '{"pattern":"x","results":[{"file":"src/app.ts"}]}' },
+    ]);
     expect(steps).toHaveLength(1);
     const directWrite = {
-      assistant: { role: 'assistant', content: [{ type: 'tool_use', id: 'w', name: 'Write', input: { path: 'src/app.ts' } }] },
+      assistant: {
+        role: 'assistant',
+        content: [{ type: 'tool_use', id: 'w', name: 'Write', input: { path: 'src/app.ts' } }],
+      },
       tail: [],
     } as never;
     expect(isCriticalStep(directWrite, plan())).toBe(true);
@@ -223,17 +229,21 @@ describe('step-compressor（AGORA）', () => {
       { role: 'system', content: 'sys' },
       { role: 'user', content: '用户原始请求' },
       { role: 'tool', content: '孤儿工具结果' },
-      ...anthropicStep('r1', 'Read', { file_path: 'src/app.ts' }, '{"file_path":"src/app.ts","content":"x","total_lines":8}'),
+      ...anthropicStep(
+        'r1',
+        'Read',
+        { file_path: 'src/app.ts' },
+        '{"file_path":"src/app.ts","content":"x","total_lines":8}',
+      ),
       ...anthropicStep('r2', 'Write', { file_path: 'src/app.ts' }, 'ok'),
       ...anthropicStep('r3', 'Grep', { pattern: 'x' }, 'no'),
     ];
     const result = compressHistorySteps(messages, { keepRecentSteps: 0, summaryHeader: '[自定义]', plan: plan() });
     expect(result.some((m) => String(m.content).includes('[自定义]'))).toBe(true);
     expect(result.some((m) => m.role === 'tool')).toBe(true); // orphan
-    const withNull = compressHistorySteps(
-      [{ role: 'assistant', content: null, tool_calls: null as never }],
-      { keepRecentSteps: 1 },
-    );
+    const withNull = compressHistorySteps([{ role: 'assistant', content: null, tool_calls: null as never }], {
+      keepRecentSteps: 1,
+    });
     expect(withNull).toHaveLength(1);
   });
 });

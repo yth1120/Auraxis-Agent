@@ -60,9 +60,7 @@ function safeToolName(name: string): boolean {
   return /^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(name);
 }
 
-function compileHandler(
-  handler: string,
-): { fn: DynamicToolDef['compiled']; context: vm.Context } | { error: string } {
+function compileHandler(handler: string): { fn: DynamicToolDef['compiled']; context: vm.Context } | { error: string } {
   const sandbox: Record<string, unknown> = {
     JSON,
     Math,

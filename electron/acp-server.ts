@@ -165,8 +165,8 @@ export class AcpServer {
           const session = this.sessions.get(String(p.sessionId ?? ''));
           if (!session) {
             this.send({ jsonrpc: '2.0', id: msg.id ?? null, error: { code: -32001, message: 'Session not found' } });
-              return;
-            }
+            return;
+          }
           if (typeof p.content !== 'string') {
             this.send({ jsonrpc: '2.0', id: msg.id ?? null, error: { code: -32602, message: 'content is required' } });
             return;

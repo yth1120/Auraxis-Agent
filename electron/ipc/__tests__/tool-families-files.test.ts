@@ -337,21 +337,24 @@ describe('file-tools direct edge branches', () => {
     expect((await runStrReplaceEditor({ path: 'a.ts', command: 'view' }, ctx())).output).toMatchObject({
       total_lines: 3,
     });
-    expect((await runStrReplaceEditor({ path: 'new-editor.ts', command: 'create', file_text: 'x' }, ctx())).output).toMatchObject(
-      { action: 'created' },
-    );
-    expect((await runStrReplaceEditor({ path: 'new-editor.ts', command: 'create', file_text: 'y' }, ctx())).error).toContain(
-      '已存在',
-    );
-    expect((await runStrReplaceEditor({ path: 'a.ts', command: 'str_replace', old_str: 'a = 1', new_str: 'a = 2' }, ctx())).output).toMatchObject(
-      { replaced: true },
-    );
-    expect((await runStrReplaceEditor({ path: 'a.ts', command: 'insert', new_str: 'line' }, ctx())).output).toMatchObject({
+    expect(
+      (await runStrReplaceEditor({ path: 'new-editor.ts', command: 'create', file_text: 'x' }, ctx())).output,
+    ).toMatchObject({ action: 'created' });
+    expect(
+      (await runStrReplaceEditor({ path: 'new-editor.ts', command: 'create', file_text: 'y' }, ctx())).error,
+    ).toContain('已存在');
+    expect(
+      (await runStrReplaceEditor({ path: 'a.ts', command: 'str_replace', old_str: 'a = 1', new_str: 'a = 2' }, ctx()))
+        .output,
+    ).toMatchObject({ replaced: true });
+    expect(
+      (await runStrReplaceEditor({ path: 'a.ts', command: 'insert', new_str: 'line' }, ctx())).output,
+    ).toMatchObject({
       inserted: true,
     });
-    expect((await runStrReplaceEditor({ path: 'a.ts', command: 'insert', new_str: 'x', insert_line: 99 }, ctx())).error).toContain(
-      '超出',
-    );
+    expect(
+      (await runStrReplaceEditor({ path: 'a.ts', command: 'insert', new_str: 'x', insert_line: 99 }, ctx())).error,
+    ).toContain('超出');
     expect((await runStrReplaceEditor({ path: 'a.ts', command: 'str_replace' }, ctx())).error).toContain('需要');
 
     vi.mocked(spawnSync).mockReturnValueOnce({ status: 1, stderr: 'add failed' } as any);

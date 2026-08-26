@@ -293,9 +293,7 @@ describe('headless-run — 无头任务执行', () => {
 
   it('returns 130 on SIGINT and emits JSON errors from thrown agent runs', async () => {
     let resolveRun: (value: unknown) => void = () => {};
-    agentLoopRunMock.mockImplementation(
-      (() => new Promise((resolve) => (resolveRun = resolve))) as any,
-    );
+    agentLoopRunMock.mockImplementation((() => new Promise((resolve) => (resolveRun = resolve))) as any);
     const running = runHeadlessTask({ task: 'x', apiKey: 'sk-test', json: false, autoApprove: true } as any);
     await new Promise((r) => setTimeout(r, 0));
     process.emit('SIGINT');

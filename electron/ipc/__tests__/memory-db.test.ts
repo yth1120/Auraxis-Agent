@@ -50,7 +50,14 @@ import {
   setBackendModeForTest,
 } from '../memory-db';
 import { JsonBackend } from '../memory-db-backends';
-import type { MemoryInput, EvidenceInput, SignalInput, BeliefInput, BeliefRejectionInput, ReadRunRecord } from '../memory-db-types';
+import type {
+  MemoryInput,
+  EvidenceInput,
+  SignalInput,
+  BeliefInput,
+  BeliefRejectionInput,
+  ReadRunRecord,
+} from '../memory-db-types';
 
 function mem(overrides: Record<string, unknown> = {}) {
   return {
@@ -372,9 +379,7 @@ describe('JsonBackend — direct edge branches', () => {
     const legacyFile = path.join(root, 'legacy.json');
     writeFileSync(
       legacyFile,
-      JSON.stringify([
-        { ...memory1, id: 'legacy1', tags: '[]', importance: 0, is_active: 0 },
-      ]),
+      JSON.stringify([{ ...memory1, id: 'legacy1', tags: '[]', importance: 0, is_active: 0 }]),
       'utf-8',
     );
     const legacy = new JsonBackend(legacyFile);

@@ -370,9 +370,7 @@ describe('agent-loop-core — pure branch coverage', () => {
     expect(Planner.markCompleted(mismatchPlan, 'Bash', { file_path: 'src/app.ts' }, true)).toMatchObject({
       updated: false,
     });
-    expect(
-      Planner.getSummary({ ...plan, tasks: [{ ...plan.tasks[0], status: 'blocked' }] }),
-    ).toContain('已阻塞');
+    expect(Planner.getSummary({ ...plan, tasks: [{ ...plan.tasks[0], status: 'blocked' }] })).toContain('已阻塞');
     expect(Planner.mergePlan(plan, [{ description: '新增', dependencies: null as never }]).tasks).toHaveLength(3);
 
     const arrayNudges: LoopMessage[] = [
@@ -393,7 +391,10 @@ describe('agent-loop-core — pure branch coverage', () => {
     ).toBe(false);
     expect(
       isCriticalResult(
-        { role: 'tool', content: [{ type: 'tool_result', content: { file_path: 'src/app.ts', total_lines: 20, content: 'x' } }] },
+        {
+          role: 'tool',
+          content: [{ type: 'tool_result', content: { file_path: 'src/app.ts', total_lines: 20, content: 'x' } }],
+        },
         plan,
       ),
     ).toBe(true);
@@ -467,26 +468,41 @@ describe('agent-loop-core — pure branch coverage', () => {
     expect(tokenResult.length).toBeGreaterThan(0);
 
     invoke.mockResolvedValueOnce({ rawText: `llm summary ${'z'.repeat(50)}`, tools: [] } as never);
-    const llmResult = await ContextManager.compressHistory(rich, plan, {
-      maxRounds: 1,
-      compressRatio: 1,
-      useLLMSummary: true,
-    }, { model: 'm', apiKey: 'k', apiBase: 'b', signal: new AbortController().signal });
+    const llmResult = await ContextManager.compressHistory(
+      rich,
+      plan,
+      {
+        maxRounds: 1,
+        compressRatio: 1,
+        useLLMSummary: true,
+      },
+      { model: 'm', apiKey: 'k', apiBase: 'b', signal: new AbortController().signal },
+    );
     expect(llmResult.some((m) => String(m.content).includes('LLM 生成的上下文摘要'))).toBe(true);
 
     invoke.mockResolvedValueOnce({ rawText: 'short', tools: [] } as never);
-    await ContextManager.compressHistory(rich, plan, {
-      maxRounds: 1,
-      compressRatio: 1,
-      useLLMSummary: true,
-    }, { model: 'm', apiKey: 'k', apiBase: 'b' });
+    await ContextManager.compressHistory(
+      rich,
+      plan,
+      {
+        maxRounds: 1,
+        compressRatio: 1,
+        useLLMSummary: true,
+      },
+      { model: 'm', apiKey: 'k', apiBase: 'b' },
+    );
 
     invoke.mockRejectedValueOnce(new Error('llm failed'));
-    const fallback = await ContextManager.compressHistory(rich, plan, {
-      maxRounds: 1,
-      compressRatio: 1,
-      useLLMSummary: true,
-    }, { model: 'm', apiKey: 'k', apiBase: 'b' });
+    const fallback = await ContextManager.compressHistory(
+      rich,
+      plan,
+      {
+        maxRounds: 1,
+        compressRatio: 1,
+        useLLMSummary: true,
+      },
+      { model: 'm', apiKey: 'k', apiBase: 'b' },
+    );
     expect(fallback.length).toBeGreaterThan(0);
 
     const roundMessages: LoopMessage[] = [

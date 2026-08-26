@@ -334,5 +334,4 @@ describe('agent-handlers — settings and lifecycle edge branches', () => {
       'stopped',
     );
   });
-
 });

@@ -297,9 +297,7 @@ describe('step-engine', () => {
       };
     });
     const executeTool = vi.fn(async (name: string) =>
-      name === 'Read'
-        ? { output: { image: 'data:image/png;base64,AA==' } }
-        : { output: 'x'.repeat(40_000) },
+      name === 'Read' ? { output: { image: 'data:image/png;base64,AA==' } } : { output: 'x'.repeat(40_000) },
     );
     const { cfg, events } = makeCfg({
       model: 'deepseek-v4-flash-vision-exp',
