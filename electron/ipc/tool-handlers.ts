@@ -87,6 +87,14 @@ function isPrivateIpv4(ip: string): boolean {
   if (parts[0] === 169 && parts[1] === 254) return true;
   if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
   if (parts[0] === 192 && parts[1] === 168) return true;
+  // CGNAT（含 Tailscale/WireGuard 使用的 100.64.0.0/10）
+  if (parts[0] === 100 && parts[1] >= 64 && parts[1] <= 127) return true;
+  // 基准测试与文档/保留网段，以及组播/广播——一律拒绝
+  if (parts[0] === 192 && parts[1] === 0 && (parts[2] === 0 || parts[2] === 2)) return true;
+  if (parts[0] === 198 && (parts[1] === 18 || parts[1] === 19)) return true;
+  if (parts[0] === 198 && parts[1] === 51 && parts[2] === 100) return true;
+  if (parts[0] === 203 && parts[1] === 0 && parts[2] === 113) return true;
+  if (parts[0] >= 224) return true;
   return false;
 }
 
@@ -97,6 +105,8 @@ function isPrivateIp(ip: string): boolean {
   if (normalized.includes(':')) {
     // IPv6 loopback / ULA (fc00::/7) / link-local (fe80::/10)
     if (normalized.startsWith('fc') || normalized.startsWith('fd')) return true;
+    // IPv6 组播（ff00::/8）与文档前缀，避免内网侧探测
+    if (normalized.startsWith('ff')) return true;
     if (
       normalized.startsWith('fe8') ||
       normalized.startsWith('fe9') ||
@@ -180,8 +190,11 @@ async function runWebFetch(params: { url: string; prompt?: string }, _ctx: ToolC
             return { output: null, error: `HTTP ${response.status}: 缺少重定向地址` };
           }
           const next = new URL(location, current).toString();
-          if (isBlockedUrl(next)) {
-            return { output: null, error: `禁止跟随重定向到内部/本地网络地址: ${next}` };
+          // 每一跳都要像初始 URL 一样重新做“字符串 + DNS 解析”双重校验：
+          // 只查字符串会放过解析到内网的域名（重定向 SSRF）。
+          const hopError = await redirectHopBlockedError(next);
+          if (hopError) {
+            return { output: null, error: hopError };
           }
           current = next;
           continue;
@@ -217,6 +230,28 @@ async function runWebFetch(params: { url: string; prompt?: string }, _ctx: ToolC
   } catch (err: unknown) {
     return { output: null, error: `请求失败: ${errorText(err)}` };
   }
+}
+
+/** 对重定向目标做字符串 + DNS 双重内网校验，失败即关闭（fail-closed）。 */
+async function redirectHopBlockedError(target: string): Promise<string | null> {
+  if (isBlockedUrl(target)) {
+    return `禁止跟随重定向到内部/本地网络地址: ${target}`;
+  }
+  let hostname = target;
+  try {
+    hostname = new URL(target).hostname;
+  } catch {
+    return `禁止跟随重定向到内部/本地网络地址: ${target}`;
+  }
+  try {
+    const addresses = await dns.promises.lookup(hostname, { all: true });
+    if (addresses.some((a) => isPrivateIp(a.address))) {
+      return `禁止跟随重定向到内部/本地网络地址: ${hostname}`;
+    }
+  } catch {
+    return `无法解析重定向目标主机名: ${hostname}`;
+  }
+  return null;
 }
 
 // ─── WebSearch ─────────────────────────────────────────

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import os from 'os';
 
 vi.mock('electron', () => ({
@@ -419,6 +419,23 @@ describe('ListAgents / Goal 工具', () => {
 });
 
 describe('运行时插件挂载 / GitCommit / Ralph', () => {
+  // 全工具扫描会触发 WebFetch/WebSearch；把 fetch 固定为本地 stub，避免
+  // 测试真实联网（此前在并行负载下偶发 60s 超时）。
+  let originalFetch: typeof globalThis.fetch;
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      headers: { get: () => 'text/html' },
+      text: async () => '<html><body>stub</body></html>',
+    })) as unknown as typeof fetch;
+  });
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
   it('MountPlugin / UnmountPlugin', async () => {
     expect((await executeToolCall('MountPlugin', {}, ctx())).error).toBe('tools 至少需要一个工具定义');
     const m = await executeToolCall(
@@ -670,6 +687,28 @@ describe('运行时插件挂载 / GitCommit / Ralph', () => {
       if (originalFetch === undefined) delete (globalThis as any).fetch;
       else (globalThis as any).fetch = originalFetch;
     }
+  });
+
+  it('WebFetch 对重定向目标执行 DNS 内网校验并拦截 CGNAT 段', async () => {
+    const fetchMock = globalThis.fetch as ReturnType<typeof vi.fn>;
+    dnsLookupMock.mockImplementation(async (hostname: string) => {
+      if (hostname === 'evil.example.com') return [{ address: '10.0.0.1', family: 4 }] as any;
+      return [{ address: '93.184.216.34', family: 4 }] as any;
+    });
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 302,
+      statusText: 'Found',
+      headers: { get: vi.fn((key: string) => (key === 'location' ? 'https://evil.example.com/next' : null)) },
+      text: vi.fn(async () => ''),
+    });
+    const redirect = await executeToolCall('WebFetch', { url: 'https://example.com/redirect' }, ctx());
+    expect(redirect.error).toContain('禁止跟随重定向');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    // CGNAT（Tailscale/WireGuard 100.64.0.0/10）也应被初始 URL 检查拦截。
+    const cgnat = await executeToolCall('WebFetch', { url: 'http://100.64.1.1/x' }, ctx());
+    expect(cgnat.error).toContain('禁止访问');
   });
 
   it('WebSearch delegates to provider and surfaces errors', async () => {

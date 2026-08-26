@@ -99,6 +99,20 @@ describe('settings-store API key encryption', () => {
     expect(settings.exaApiKey).toBe('sk-exa');
   });
 
+  it('serializes concurrent writes so the file never tears', async () => {
+    const { writeSettings } = await loadStore();
+    await Promise.all(
+      Array.from({ length: 20 }, (_, i) =>
+        writeSettings({ theme: 'dark', marker: i, deepseekApiKey: `sk-${i}`, model: 'deepseek-v4-pro' }),
+      ),
+    );
+    const raw = await readRawSettings();
+    expect(raw.theme).toBe('dark');
+    expect(typeof raw.marker).toBe('number');
+    expect(raw.model).toBe('deepseek-v4-pro');
+    expect(String(raw.deepseekApiKey)).toMatch(/^enc:/);
+  });
+
   it('migrates legacy plaintext keys to safeStorage encryption (write-once)', async () => {
     await fs.mkdir(userData, { recursive: true });
     await fs.writeFile(

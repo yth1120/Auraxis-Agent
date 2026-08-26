@@ -58,6 +58,21 @@ describe('credentials', () => {
     expect(await resolveCredential('TEST_CRED_A')).toBeUndefined();
   });
 
+  it('concurrent setCredential calls keep every key', async () => {
+    await Promise.all([
+      setCredential('TEST_CRED_A', 'a'),
+      setCredential('TEST_CRED_B', 'b'),
+      setCredential('TEST_CRED_C', 'c'),
+    ]);
+    expect((await resolveCredential('TEST_CRED_A'))?.value).toBe('a');
+    expect((await resolveCredential('TEST_CRED_B'))?.value).toBe('b');
+    expect((await resolveCredential('TEST_CRED_C'))?.value).toBe('c');
+    const raw = await fs.readFile(path.join(root, '.env'), 'utf8');
+    for (const key of ['TEST_CRED_A', 'TEST_CRED_B', 'TEST_CRED_C']) {
+      expect(raw).toContain(key);
+    }
+  });
+
   it('process-env shadowing is read-only', async () => {
     process.env.TEST_CRED_A = 'shadow';
     const d = await describeCredential('TEST_CRED_A');

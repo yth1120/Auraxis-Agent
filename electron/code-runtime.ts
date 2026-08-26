@@ -33,7 +33,12 @@ const DEFAULT_TIMEOUT = 30_000;
 function languageBinary(language: CodeLanguage): { bin: string; file: string; args?: string[] } {
   switch (language) {
     case 'python':
-      return { bin: 'python3', file: 'main.py' };
+      // Windows 官方安装的是 python.exe（没有 python3.exe）；用环境变量可
+      // 覆盖为完整路径，例如 winget 安装的 Python310。
+      return {
+        bin: process.env.AURAXIS_PYTHON_BIN || (process.platform === 'win32' ? 'python' : 'python3'),
+        file: 'main.py',
+      };
     case 'shell':
       return process.platform === 'win32'
         ? { bin: process.env.ComSpec || 'cmd.exe', file: 'run.cmd', args: ['/d', '/s', '/c'] }

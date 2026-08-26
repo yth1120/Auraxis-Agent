@@ -1,10 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { spawnSync } from 'child_process';
 import { runCode } from '../../code-runtime';
+import { getShellExecutor, setShellExecutor } from '../shell-executor';
 
 const hasPython = (() => {
+  const bin = process.env.AURAXIS_PYTHON_BIN || (process.platform === 'win32' ? 'python' : 'python3');
   try {
-    return spawnSync('python3', ['-c', 'print(1)'], { timeout: 5000 }).status === 0;
+    return spawnSync(bin, ['-c', 'print(1)'], { timeout: 5000 }).status === 0;
   } catch {
     return false;
   }
@@ -30,6 +32,30 @@ describe('code-runtime', () => {
     const r = await runCode({ language: 'shell', code: 'echo auraxis-code' });
     expect(r.exitCode).toBe(0);
     expect(r.stdout).toContain('auraxis-code');
+  });
+
+  it('选择平台正确的 Python 解释器并支持环境变量覆盖', async () => {
+    const previous = getShellExecutor();
+    const captured: Array<{ command: string }> = [];
+    setShellExecutor({
+      run: async (req) => {
+        captured.push({ command: req.command });
+        return { stdout: '', stderr: '', exitCode: 0, timedOut: false, truncated: false };
+      },
+    });
+    const oldBin = process.env.AURAXIS_PYTHON_BIN;
+    try {
+      await runCode({ language: 'python', code: 'print(1)' });
+      expect(captured.at(-1)?.command).toBe(process.platform === 'win32' ? 'python' : 'python3');
+
+      process.env.AURAXIS_PYTHON_BIN = 'C:/Python310/python.exe';
+      await runCode({ language: 'python', code: 'print(1)' });
+      expect(captured.at(-1)?.command).toBe('C:/Python310/python.exe');
+    } finally {
+      setShellExecutor(previous);
+      if (oldBin === undefined) delete process.env.AURAXIS_PYTHON_BIN;
+      else process.env.AURAXIS_PYTHON_BIN = oldBin;
+    }
   });
 
   it('kills runaway programs on timeout', async () => {

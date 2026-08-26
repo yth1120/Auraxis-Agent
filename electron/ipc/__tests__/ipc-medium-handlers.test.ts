@@ -371,6 +371,22 @@ describe('IPC 中型处理器（project/file/context/ssh/stats）', () => {
         }),
       );
       await expect(h.get('ssh:save')!({}, { host: '  ' })).resolves.toEqual({ ok: false, error: '主机地址无效' });
+      await expect(h.get('ssh:save')!({}, { host: 'h', port: 0 })).resolves.toEqual({
+        ok: false,
+        error: '端口必须在 1-65535 之间',
+      });
+      await expect(h.get('ssh:save')!({}, { host: 'h', port: 99999 })).resolves.toEqual({
+        ok: false,
+        error: '端口必须在 1-65535 之间',
+      });
+      await h.get('ssh:save')!({}, { host: 'h', port: 22 });
+      await h.get('ssh:save')!({}, { host: 'h', port: 22 });
+      const savedIds = vi
+        .mocked(saveSshConnection)
+        .mock.calls.filter((c) => (c[0] as { host?: string }).host === 'h')
+        .map((c) => (c[0] as { id?: string }).id);
+      expect(savedIds.filter((id) => typeof id === 'string')).toHaveLength(2);
+      expect(savedIds[0]).not.toBe(savedIds[1]);
 
       vi.mocked(removeSshConnection).mockResolvedValue([]);
       await expect(h.get('ssh:remove')!({}, 'c1')).resolves.toMatchObject({ ok: true });
@@ -425,6 +441,27 @@ describe('IPC 中型处理器（project/file/context/ssh/stats）', () => {
         ok: false,
         error: 'exec failed',
       });
+    });
+
+    it('exec 挂起时按超时终止并断开连接', async () => {
+      vi.useFakeTimers();
+      try {
+        const h = await capture(registerSshHandlers);
+        sshMock.setExecImpl((_cmd, _opts, stream, cb) => {
+          cb(null, stream);
+          // 永不 close，模拟远端挂起
+        });
+        const pending = h.get('ssh:exec')!({}, { host: 'h', username: 'u' }, 'sleep 999');
+        // 先让 connect ready 与 exec 注册超时定时器，再推进超过 120s。
+        await vi.advanceTimersByTimeAsync(1);
+        await vi.advanceTimersByTimeAsync(121_000);
+        await expect(pending).resolves.toMatchObject({
+          ok: false,
+          error: expect.stringContaining('超时'),
+        });
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 

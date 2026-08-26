@@ -46,6 +46,7 @@ import {
   setBackendModeForTest,
   updateBeliefStatus,
 } from '../memory-db';
+import type { MemoryRecord } from '../memory-db-types';
 
 describe.skipIf(!sqliteAvailable())('SQLite 后端（node:sqlite 通道）', () => {
   beforeAll(() => {
@@ -141,6 +142,30 @@ describe.skipIf(!sqliteAvailable())('SQLite 后端（node:sqlite 通道）', () 
     const migrated = getBeliefsByScope('C:/sqlite-legacy', { activeOnly: true });
     expect(migrated).toHaveLength(1);
     expect(migrated[0]).toMatchObject({ id: 'sq-legacy', legacy: 1, kind: 'project', status: 'active' });
+  });
+
+  it('updateMemory 只允许白名单列名拼入 SQL', () => {
+    const scope = 'C:/sqlite-guard';
+    addMemory({
+      id: 'sq-guard',
+      project_path: scope,
+      type: 'decision',
+      title: 'old',
+      content: 'content',
+      tags: '[]',
+      timestamp: 1,
+      session_id: null,
+    });
+    expect(() =>
+      updateMemory('sq-guard', {
+        title: 'safe',
+        "content = 'x'; DROP TABLE memories; --": 'boom',
+      } as unknown as Partial<MemoryRecord>),
+    ).not.toThrow();
+    const row = getMemoriesByProject(scope).find((m) => m.id === 'sq-guard');
+    expect(row?.title).toBe('safe');
+    // memories 表仍然存在且可查询（恶意列名未被拼进 SQL）
+    expect(getMemoriesByProject(scope)).toHaveLength(1);
   });
 
   it('covers SQLite sparse operations, duplicates and scope-wide audits', () => {

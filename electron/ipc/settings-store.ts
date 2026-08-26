@@ -103,6 +103,9 @@ export async function readSettings(): Promise<Record<string, unknown>> {
   }
 }
 
+/** Serializes physical writes so concurrent writers never tear the JSON file. */
+let settingsWriteTail: Promise<void> = Promise.resolve();
+
 export async function writeSettings(settings: Record<string, unknown>): Promise<void> {
   const toWrite = { ...settings };
   // Encrypt API keys
@@ -138,6 +141,13 @@ export async function writeSettings(settings: Record<string, unknown>): Promise<
     }
   }
   const settingsPath = getSettingsPath();
-  await mkdir(path.dirname(settingsPath), { recursive: true });
-  await writeFile(settingsPath, JSON.stringify(toWrite, null, 2), 'utf-8');
+  const run = async (): Promise<void> => {
+    await mkdir(path.dirname(settingsPath), { recursive: true });
+    await writeFile(settingsPath, JSON.stringify(toWrite, null, 2), 'utf-8');
+  };
+  const next = settingsWriteTail.then(run, run);
+  // Stored tail swallows failures so one bad write never blocks the next one;
+  // `next` still propagates the error to this caller.
+  settingsWriteTail = next.catch(() => {});
+  return next;
 }

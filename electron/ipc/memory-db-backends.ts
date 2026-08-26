@@ -39,6 +39,19 @@ function rowNullableNumber(value: unknown): number | null {
   return typeof value === 'number' ? value : null;
 }
 
+/** UPDATE 允许的列名白名单——字段名会拼进 SQL，绝不能透传任意键。 */
+const MEMORY_UPDATE_COLUMNS = new Set([
+  'title',
+  'content',
+  'tags',
+  'timestamp',
+  'session_id',
+  'importance',
+  'is_active',
+  'type',
+  'project_path',
+]);
+
 // ─── SQLite backend ────────────────────────────────────
 
 export class SqliteBackend implements MemoryBackend {
@@ -263,7 +276,7 @@ export class SqliteBackend implements MemoryBackend {
   }
 
   updateMemory(id: string, updates: Partial<MemoryRecord>): void {
-    const fields = Object.keys(updates).filter((k) => k !== 'id');
+    const fields = Object.keys(updates).filter((k) => k !== 'id' && MEMORY_UPDATE_COLUMNS.has(k));
     if (fields.length === 0) return;
     const sets = fields.map((f) => `${f} = ?`);
     const values = fields.map((f) =>

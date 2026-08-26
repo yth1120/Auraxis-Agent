@@ -72,6 +72,18 @@ function userEnvFile(): string {
   return path.join(app.getPath('userData'), '.env');
 }
 
+/** Serializes read-modify-write of the user .env file across callers. */
+let envWriteTail: Promise<void> = Promise.resolve();
+
+function withEnvWriteLock<T>(fn: () => Promise<T>): Promise<T> {
+  const run = envWriteTail.then(fn, fn);
+  envWriteTail = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
 export async function resolveCredential(name: string, projectRoot?: string): Promise<CredentialResolution | undefined> {
   credentialRef(name);
   const envValue = process.env[name];
@@ -98,26 +110,30 @@ export async function setCredential(name: string, value: string): Promise<void> 
   credentialRef(name);
   const describe = await describeCredential(name);
   if (!describe.writable) throw new Error(`凭据 ${name} 由进程环境变量提供，只读，无法写入`);
-  const file = userEnvFile();
-  const existing = await parseEnvFile(file);
-  existing[name] = encryptSecret(value);
-  const lines = Object.entries(existing)
-    .filter(([, v]) => v.length > 0)
-    .map(([k, v]) => `${k}=${JSON.stringify(v)}`);
-  await fs.mkdir(path.dirname(file), { recursive: true });
-  await fs.writeFile(file, lines.join('\n') + '\n', 'utf8');
+  await withEnvWriteLock(async () => {
+    const file = userEnvFile();
+    const existing = await parseEnvFile(file);
+    existing[name] = encryptSecret(value);
+    const lines = Object.entries(existing)
+      .filter(([, v]) => v.length > 0)
+      .map(([k, v]) => `${k}=${JSON.stringify(v)}`);
+    await fs.mkdir(path.dirname(file), { recursive: true });
+    await fs.writeFile(file, lines.join('\n') + '\n', 'utf8');
+  });
 }
 
 export async function unsetCredential(name: string): Promise<void> {
   credentialRef(name);
   const describe = await describeCredential(name);
   if (!describe.writable) throw new Error(`凭据 ${name} 由进程环境变量提供，只读，无法删除`);
-  const file = userEnvFile();
-  const existing = await parseEnvFile(file);
-  if (!existing[name]) return;
-  delete existing[name];
-  const lines = Object.entries(existing)
-    .filter(([, v]) => v.length > 0)
-    .map(([k, v]) => `${k}=${JSON.stringify(v)}`);
-  await fs.writeFile(file, lines.join('\n') + '\n', 'utf8');
+  await withEnvWriteLock(async () => {
+    const file = userEnvFile();
+    const existing = await parseEnvFile(file);
+    if (!existing[name]) return;
+    delete existing[name];
+    const lines = Object.entries(existing)
+      .filter(([, v]) => v.length > 0)
+      .map(([k, v]) => `${k}=${JSON.stringify(v)}`);
+    await fs.writeFile(file, lines.join('\n') + '\n', 'utf8');
+  });
 }

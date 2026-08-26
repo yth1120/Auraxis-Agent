@@ -140,6 +140,56 @@ describe('acp-server — Agent Client Protocol', () => {
     expect(sent.at(-1)?.error?.code).toBe(-32602);
   });
 
+  it('refuses file access for sessions created without a project root', async () => {
+    const s = server();
+    await s.handle({ jsonrpc: '2.0', id: 1, method: 'session/new' });
+    const sessionId = (sent.at(-1)?.result as { sessionId: string }).sessionId;
+    const outside = path.join(root, '..', 'outside-secret.txt');
+    await fs.writeFile(outside, 'secret', 'utf8');
+    try {
+      await s.handle({
+        jsonrpc: '2.0',
+        id: 2,
+        method: 'session/read_file',
+        params: { sessionId, filePath: outside },
+      });
+      expect(sent.at(-1)?.error?.code).toBe(-32603);
+      await s.handle({
+        jsonrpc: '2.0',
+        id: 3,
+        method: 'session/update_file',
+        params: { sessionId, filePath: outside, content: 'pwn' },
+      });
+      expect(sent.at(-1)?.error?.code).toBe(-32603);
+    } finally {
+      await fs.rm(outside, { force: true });
+    }
+  });
+
+  it('rejects a second prompt while the previous one is still running', async () => {
+    const s = server();
+    await s.handle({ jsonrpc: '2.0', id: 1, method: 'session/new', params: { cwd: root } });
+    const sessionId = (sent.at(-1)?.result as { sessionId: string }).sessionId;
+    runAgentMock.mockImplementationOnce(
+      () => new Promise((resolve) => setTimeout(() => resolve({ output: 'later' }), 40)),
+    );
+    await s.handle({
+      jsonrpc: '2.0',
+      id: 2,
+      method: 'session/prompt',
+      params: { sessionId, prompt: { text: 'first' } },
+    });
+    await s.handle({
+      jsonrpc: '2.0',
+      id: 3,
+      method: 'session/prompt',
+      params: { sessionId, prompt: { text: 'second' } },
+    });
+    expect(sent.at(-1)?.error?.code).toBe(-32002);
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    expect(sent.at(-1)).toMatchObject({ method: 'session/update', params: { state: 'idle' } });
+  });
+
   it('cancels and deletes a session, and reports runAgent errors', async () => {
     const s = server();
     await s.handle({ jsonrpc: '2.0', id: 1, method: 'session/new' });
