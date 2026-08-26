@@ -529,7 +529,10 @@ export async function runGlob(params: { pattern: string; path?: string }, ctx: T
         if (entry.isDirectory()) {
           await walk(fullPath, depth + 1);
         } else if (ctx.autoApprove || isSafeExtension(entry.name)) {
-          if (regex.test(fullPath)) {
+          // Glob 模式相对于搜索根匹配；Windows 绝对路径里的反斜杠此前会让
+          // `[^/]*` 误吞目录分隔符（目录型 glob 失效），统一转成相对斜杠路径。
+          const relativePath = path.relative(searchRoot, fullPath).replace(/\\/g, '/');
+          if (regex.test(relativePath)) {
             results.push(fullPath);
           }
         }

@@ -182,15 +182,22 @@ describe('Bash — 参数校验', () => {
 });
 
 describe('Pwsh — 本地 PowerShell 执行', () => {
-  it('validates command and routes to powershell fallback', async () => {
+  it('validates command and routes to the platform shell', async () => {
     expect((await executeToolCall('Pwsh', {}, ctx())).error).toContain('缺少 command');
-    const promise = executeToolCall('Pwsh', { command: 'Write-Output hi', workdir: '.', timeout: 1000 }, ctx());
-    await vi.waitFor(() => expect(childMocks.spawn).toHaveBeenCalled());
-    expect(childMocks.spawn.mock.calls[0][0]).toBe('powershell.exe');
-    lastChild.stdout.emit('data', Buffer.from('hi\n'));
-    lastChild.emit('close', 0);
-    const result = await promise;
-    expect(result.output).toMatchObject({ stdout: 'hi\n', exitCode: 0 });
+    if (process.platform === 'win32') {
+      const promise = executeToolCall('Pwsh', { command: 'Write-Output hi', workdir: '.', timeout: 1000 }, ctx());
+      await vi.waitFor(() => expect(childMocks.spawn).toHaveBeenCalled());
+      expect(childMocks.spawn.mock.calls[0][0]).toBe('powershell.exe');
+      lastChild.stdout.emit('data', Buffer.from('hi\n'));
+      lastChild.emit('close', 0);
+      const result = await promise;
+      expect(result.output).toMatchObject({ stdout: 'hi\n', exitCode: 0 });
+    } else {
+      // POSIX：execSync 默认抛错 → pwsh 未找到，直接返回不可用且不 spawn。
+      const result = await executeToolCall('Pwsh', { command: 'Write-Output hi', workdir: '.', timeout: 1000 }, ctx());
+      expect(result.error).toContain('pwsh 不可用');
+      expect(childMocks.spawn).not.toHaveBeenCalled();
+    }
   });
 
   it('uses pwsh when detected and rejects invalid timeout', async () => {

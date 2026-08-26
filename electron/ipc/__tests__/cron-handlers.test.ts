@@ -71,12 +71,22 @@ describe('cron 解析与持久化', () => {
 
   it('日与星期同时受限时按标准 cron 的 OR 语义计算', () => {
     vi.useFakeTimers();
-    // 2026-08-24 是周一（且不是 1 日）。`0 0 1 * 1` 应按 OR 语义命中
-    // 下一个周一（8-31），而不是 AND 语义下的下一个“1 日且周一”（2027-02-01）。
-    vi.setSystemTime(new Date('2026-08-24T00:01:00+08:00'));
+    // 用“本地时间的某个周一、且不是 1 日”作为起点，避免依赖运行机器的时区。
+    const start = new Date(2026, 7, 1, 0, 1, 0);
+    while (start.getDay() !== 1 || start.getDate() === 1) start.setDate(start.getDate() + 1);
+    vi.setSystemTime(start);
     const r = createCronJob({ name: 'n', prompt: 'p', cron: '0 0 1 * 1', recurring: true });
     expect(r.ok).toBe(true);
-    expect(r.data!.nextFireAt).toBe(new Date('2026-08-31T00:00:00+08:00').getTime());
+
+    const next = new Date(r.data!.nextFireAt);
+    // OR 语义：命中“下一个周一”或“下一个 1 日”中更早的一个。
+    expect(next.getDay() === 1 || next.getDate() === 1).toBe(true);
+    // 且早于 AND 语义的结果——下一个“既是周一又是 1 日”的日期。
+    const andNext = new Date(start);
+    andNext.setDate(andNext.getDate() + 1);
+    while (andNext.getDay() !== 1 || andNext.getDate() !== 1) andNext.setDate(andNext.getDate() + 1);
+    andNext.setHours(0, 0, 0, 0);
+    expect(next.getTime()).toBeLessThan(andNext.getTime());
     vi.useRealTimers();
   });
 

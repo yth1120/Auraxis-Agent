@@ -31,6 +31,29 @@ const appGetAppPathMock = vi.mocked(app.getAppPath);
 
 let tempDir: string;
 
+type SandboxBackendName = 'restricted' | 'appcontainer' | 'linux' | 'macos';
+
+/** 当前平台对应的默认沙箱后端（测试在三平台 CI 上都要可运行）。 */
+function currentBackend(): SandboxBackendName {
+  if (process.platform === 'win32') return 'restricted';
+  if (process.platform === 'darwin') return 'macos';
+  return 'linux';
+}
+
+const BACKEND_SPEC: Record<SandboxBackendName, { file: string; envKey: string }> = {
+  restricted: { file: 'sandbox-windows.ps1', envKey: 'AURAXIS_SANDBOX_PS1' },
+  appcontainer: { file: 'sandbox-appcontainer.ps1', envKey: 'AURAXIS_APPCONTAINER_PS1' },
+  linux: { file: 'sandbox-linux.sh', envKey: 'AURAXIS_LINUX_SCRIPT' },
+  macos: { file: 'sandbox-macos.sh', envKey: 'AURAXIS_MACOS_SCRIPT' },
+};
+
+function provisionScript(backend: SandboxBackendName): void {
+  const spec = BACKEND_SPEC[backend];
+  const script = path.join(tempDir, spec.file);
+  writeFileSync(script, '#', 'utf8');
+  process.env[spec.envKey] = script;
+}
+
 function fakeChild() {
   const child = new EventEmitter() as EventEmitter & {
     stdout: EventEmitter;
@@ -61,12 +84,12 @@ afterEach(() => {
 });
 
 describe('sandbox-runner — backend and script resolution', () => {
-  it('resolves backend from env and defaults to Windows restricted', () => {
-    expect(sandboxBackend()).toBe('restricted');
+  it('resolves backend from env and defaults to the current platform', () => {
+    expect(sandboxBackend()).toBe(currentBackend());
     process.env.AURAXIS_SANDBOX_BACKEND = 'appcontainer';
     expect(sandboxBackend()).toBe('appcontainer');
     process.env.AURAXIS_SANDBOX_BACKEND = 'linux';
-    expect(sandboxBackend()).toBe('restricted');
+    expect(sandboxBackend()).toBe(process.platform === 'win32' ? 'restricted' : 'linux');
   });
 
   it('uses env scripts and finds repo layout/package paths', () => {
@@ -89,25 +112,27 @@ describe('sandbox-runner — backend and script resolution', () => {
   });
 
   it('reports platform support and missing script as unsupported', () => {
-    const script = path.join(tempDir, 'sandbox-windows.ps1');
-    writeFileSync(script, '#', 'utf8');
-    process.env.AURAXIS_SANDBOX_PS1 = script;
-    expect(isSandboxSupported('restricted')).toBe(true);
-    expect(isSandboxSupported('linux')).toBe(false);
-    expect(isSandboxSupported('macos')).toBe(false);
+    const backend = currentBackend();
+    provisionScript(backend);
+    expect(isSandboxSupported(backend)).toBe(true);
+    for (const other of (['restricted', 'linux', 'macos'] as const).filter((b) => b !== backend)) {
+      expect(isSandboxSupported(other)).toBe(false);
+    }
   });
 });
 
 describe('sandbox-runner — command execution', () => {
   it('rejects mismatched platform and missing scripts', async () => {
-    expect(await runSandboxedCommand({ argv: [], cwd: tempDir, backend: 'linux' })).toMatchObject({
+    // 用与当前平台不匹配的后端，任何平台上都应直接拒绝。
+    const mismatched = process.platform === 'win32' ? 'linux' : 'restricted';
+    expect(await runSandboxedCommand({ argv: [], cwd: tempDir, backend: mismatched })).toMatchObject({
       supported: false,
     });
   });
 
   it('streams output, handles close success and spawn errors', async () => {
-    const script = path.join(tempDir, 'sandbox-windows.ps1');
-    writeFileSync(script, '#', 'utf8');
+    const backend = currentBackend();
+    provisionScript(backend);
     const child = fakeChild();
     spawnMock.mockReturnValue(child as never);
     const onStdout = vi.fn();
@@ -115,7 +140,7 @@ describe('sandbox-runner — command execution', () => {
       argv: ['echo', 'hello'],
       cwd: tempDir,
       projectRoot: tempDir,
-      backend: 'restricted',
+      backend,
       onStdout,
     });
     await vi.waitFor(() => expect(spawnMock).toHaveBeenCalled());
@@ -126,16 +151,27 @@ describe('sandbox-runner — command execution', () => {
 
     const errorChild = fakeChild();
     spawnMock.mockReturnValue(errorChild as never);
-    const errorPromise = runSandboxedCommand({ argv: [], cwd: tempDir, backend: 'restricted' });
+    const errorPromise = runSandboxedCommand({ argv: [], cwd: tempDir, backend });
     await vi.waitFor(() => expect(spawnMock).toHaveBeenCalled());
     errorChild.emit('error', new Error('spawn failed'));
     expect(await errorPromise).toMatchObject({ supported: true, error: expect.stringContaining('spawn failed') });
   });
 
   it('covers appcontainer write dir and launch-error fail-closed branches', async () => {
-    const script = path.join(tempDir, 'sandbox-appcontainer.ps1');
-    writeFileSync(script, '#', 'utf8');
-    process.env.AURAXIS_APPCONTAINER_PS1 = script;
+    provisionScript('appcontainer');
+    if (process.platform !== 'win32') {
+      // 非 Windows 上 appcontainer 直接 fail-closed，spawn 不应发生。
+      expect(
+        await runSandboxedCommand({
+          argv: [],
+          cwd: tempDir,
+          projectRoot: tempDir,
+          mode: 'read',
+          backend: 'appcontainer',
+        }),
+      ).toMatchObject({ supported: false, error: expect.stringContaining('不适用于当前平台') });
+      return;
+    }
     const child = fakeChild();
     spawnMock.mockReturnValue(child as never);
     const promise = runSandboxedCommand({
@@ -174,21 +210,21 @@ describe('sandbox-runner — command execution', () => {
   });
 
   it('kills timeout and abort paths', async () => {
-    const script = path.join(tempDir, 'sandbox-windows.ps1');
-    writeFileSync(script, '#', 'utf8');
-    process.env.AURAXIS_SANDBOX_PS1 = script;
+    const backend = currentBackend();
+    provisionScript(backend);
 
     const timeoutChild = fakeChild();
     spawnMock.mockReturnValue(timeoutChild as never);
     const timeoutPromise = runSandboxedCommand({
       argv: [],
       cwd: tempDir,
-      backend: 'restricted',
+      backend,
       timeoutMs: 1,
     });
     await vi.waitFor(() => expect(spawnMock).toHaveBeenCalled());
     await new Promise((r) => setTimeout(r, 5));
-    expect(timeoutChild.kill).toHaveBeenCalled();
+    // POSIX 后端用进程组 process.kill 终止整棵树；Windows 直接 kill 子进程。
+    if (process.platform === 'win32') expect(timeoutChild.kill).toHaveBeenCalled();
     timeoutChild.emit('close', 0);
     expect(await timeoutPromise).toMatchObject({ timedOut: true });
 
@@ -198,12 +234,12 @@ describe('sandbox-runner — command execution', () => {
     const abortPromise = runSandboxedCommand({
       argv: [],
       cwd: tempDir,
-      backend: 'restricted',
+      backend,
       signal: ctrl.signal,
     });
     await vi.waitFor(() => expect(spawnMock).toHaveBeenCalled());
     ctrl.abort();
-    expect(abortChild.kill).toHaveBeenCalled();
+    if (process.platform === 'win32') expect(abortChild.kill).toHaveBeenCalled();
     abortChild.emit('close', 0);
     expect(await abortPromise).toMatchObject({ supported: true });
   });
