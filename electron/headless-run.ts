@@ -122,6 +122,7 @@ export async function runHeadlessTask(opts: HeadlessRunOptions): Promise<number>
 
   const emitEvent = (e: AgentLoopEvent) => {
     if (e.type === 'text_chunk') streamedText += e.text;
+    if (e.type === 'error') hadError = true;
     if (e.type === 'iteration_start') {
       // The driver and step-engine both emit iteration_start for the same
       // round — keep one for clean machine output.
@@ -168,7 +169,6 @@ export async function runHeadlessTask(opts: HeadlessRunOptions): Promise<number>
         process.stderr.write(`[压缩] ${e.tokensBefore} → ${e.tokensAfter} tokens\n`);
         break;
       case 'error':
-        hadError = true;
         process.stderr.write(`[错误] ${e.error}\n`);
         break;
       case 'usage':

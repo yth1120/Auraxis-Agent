@@ -183,4 +183,57 @@ describe('step-compressor（AGORA）', () => {
     const { steps } = groupIntoSteps(messages);
     expect(isCriticalStep(steps[0], plan())).toBe(true);
   });
+
+  it('covers helper edge cases and summary fallbacks', () => {
+    const rawAssistant = {
+      role: 'assistant',
+      content: null,
+      tool_calls: [
+        { id: 'x', type: 'function', function: { name: 'Bash', arguments: { command: 'x' } } },
+        { id: 'y', type: 'function', function: { name: 'Read', arguments: '{"file_path":"src/app.ts"}' } },
+        { id: 'z', type: 'function', function: { name: 'Read', arguments: '{bad' } },
+        { id: 'w', type: 'function', function: { name: 'Write', arguments: '{"file_path":"src/app.ts"}' } },
+      ],
+    } as never;
+    const { steps } = groupIntoSteps([rawAssistant, { role: 'tool', content: '{"pattern":"x","results":[{"file":"src/app.ts"}]}' }]);
+    expect(steps).toHaveLength(1);
+    const directWrite = {
+      assistant: { role: 'assistant', content: [{ type: 'tool_use', id: 'w', name: 'Write', input: { path: 'src/app.ts' } }] },
+      tail: [],
+    } as never;
+    expect(isCriticalStep(directWrite, plan())).toBe(true);
+    expect(isCriticalStep({ assistant: { role: 'assistant', content: [] }, tail: [] } as never, null)).toBe(false);
+
+    const errorStep = {
+      assistant: { role: 'assistant', content: 'x' },
+      tail: [{ role: 'user', content: [{ type: 'tool_result', content: 'FAILED' }] }],
+    } as never;
+    expect(scoreStep(errorStep, null)).toBeGreaterThan(0);
+    expect(scoreStep({ assistant: { role: 'assistant', content: 'x' }, tail: [] } as never, null)).toBe(0);
+
+    const summary = buildStepSummary([], plan(), '[摘要]');
+    expect(summary).toContain('[摘要]');
+    expect(summary).toContain('中间步骤无关键信息');
+    const noPending = buildStepSummary([], { tasks: [{ status: 'completed', description: 'done' }] });
+    expect(noPending).not.toContain('剩余计划任务');
+  });
+
+  it('compresses with default options and preserves custom header/orphans', () => {
+    const messages = [
+      { role: 'system', content: 'sys' },
+      { role: 'user', content: '用户原始请求' },
+      { role: 'tool', content: '孤儿工具结果' },
+      ...anthropicStep('r1', 'Read', { file_path: 'src/app.ts' }, '{"file_path":"src/app.ts","content":"x","total_lines":8}'),
+      ...anthropicStep('r2', 'Write', { file_path: 'src/app.ts' }, 'ok'),
+      ...anthropicStep('r3', 'Grep', { pattern: 'x' }, 'no'),
+    ];
+    const result = compressHistorySteps(messages, { keepRecentSteps: 0, summaryHeader: '[自定义]', plan: plan() });
+    expect(result.some((m) => String(m.content).includes('[自定义]'))).toBe(true);
+    expect(result.some((m) => m.role === 'tool')).toBe(true); // orphan
+    const withNull = compressHistorySteps(
+      [{ role: 'assistant', content: null, tool_calls: null as never }],
+      { keepRecentSteps: 1 },
+    );
+    expect(withNull).toHaveLength(1);
+  });
 });

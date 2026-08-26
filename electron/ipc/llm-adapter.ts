@@ -730,6 +730,7 @@ async function invokeDeepSeekOpenAI(params: LlmInvokeParams): Promise<AssistantM
   if (toolCalls.length === 0 && finalMarkerRe.test(rawText)) {
     isFinal = true;
   }
+  finalMarkerRe.lastIndex = 0;
   // Always strip <FINAL_ANSWER> from rawText and contentTimeline, even in
   // non-terminal rounds. If the model hallucinates the marker mid-execution,
   // we must not leak it into the next round's message history.

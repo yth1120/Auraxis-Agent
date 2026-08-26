@@ -19,6 +19,7 @@ vi.mock('../agent-scheduler', () => ({
     startAgent: vi.fn(() => 'agent-1'),
     onAgentTerminal: vi.fn(() => () => {}),
   },
+  createUnattendedPermissionChecker: vi.fn(() => () => Promise.resolve(false)),
 }));
 
 import {
@@ -175,5 +176,50 @@ describe('定时触发', () => {
     vi.advanceTimersByTime(30_000);
     expect(spy).toHaveBeenCalledTimes(1);
     expect(vi.mocked(scheduler.startAgent)).not.toHaveBeenCalled();
+  });
+});
+
+describe('cron 无人值守启动与解析边界', () => {
+  it('supports stepped ranges and reports missing project/key errors', async () => {
+    const stepped = createCronJob({ name: 'n', prompt: 'p', cron: '5-10/2 1-2/3 * * *', recurring: true });
+    expect(stepped.ok).toBe(true);
+
+    vi.mocked(readSettings).mockResolvedValue({});
+    const { registerCronIpc } = await import('../cron-handlers');
+    registerCronIpc();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-15T00:00:30+08:00'));
+    const bad = createCronJob({ name: 'bad', prompt: 'p', cron: '* * * * *', recurring: true });
+    expect(bad.ok).toBe(true);
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(scheduler.startAgent).not.toHaveBeenCalled();
+    expect(getCronJob(bad.data!.jobId)?.lastRun?.status).toBe('error');
+    vi.useRealTimers();
+  });
+
+  it('starts an unattended auto agent and handles terminal callbacks', async () => {
+    process.env.AURAXIS_UNATTENDED_AUTOAPPROVE = '1';
+    try {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-08-15T00:00:30+08:00'));
+      const { registerCronIpc } = await import('../cron-handlers');
+      registerCronIpc();
+      const terminalCb = vi.mocked(scheduler.onAgentTerminal).mock.calls.at(-1)![0] as any;
+      const r = createCronJob({ name: 'auto', prompt: 'p', cron: '* * * * *', recurring: true });
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(scheduler.startAgent).toHaveBeenCalledTimes(1);
+      const [config] = vi.mocked(scheduler.startAgent).mock.calls[0] as any;
+      expect(config.mode).toBe('auto');
+      expect(config.autoApprove).toBe(true);
+
+      terminalCb({ config: { metadata: { cronJobId: r.data!.jobId } }, status: 'completed', result: 'ok' });
+      expect(getCronJob(r.data!.jobId)?.lastRun).toMatchObject({ status: 'success', result: 'ok' });
+      terminalCb({ config: { metadata: { cronJobId: r.data!.jobId } }, status: 'error', error: 'bad' });
+      expect(getCronJob(r.data!.jobId)?.lastRun).toMatchObject({ status: 'error', error: 'bad' });
+      terminalCb({ config: { metadata: {} }, status: 'completed', result: 'noop' });
+    } finally {
+      delete process.env.AURAXIS_UNATTENDED_AUTOAPPROVE;
+      vi.useRealTimers();
+    }
   });
 });

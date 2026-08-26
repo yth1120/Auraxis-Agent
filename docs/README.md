@@ -34,8 +34,8 @@ The project follows **paper-driven development**: 7 arXiv papers' core technique
   Zustand selectors and deprecated AntD props migrated; IPC / agent / store
   typings hardened; login and Windows userData recovery; test / E2E / CI
   matrix stabilization and local `image-size` pinning.
-- **Quality gates**: 245 test files / 1,802 passing cases (+3 environment
-  skips), SDK build, E2E, audit, and three-platform release CI.
+- **Quality gates**: 261 test files / 1,992 passing cases (+3 environment
+  skips), SDK build, SDK live smoke, E2E, audit, and three-platform release CI.
 
 ### Tech Stack
 
@@ -168,7 +168,7 @@ Auraxis/
 │       ├── session-store.ts     # Unified JSONL event logs (chat & agent)
 │       ├── sandbox-runner.ts    # Native sandbox dispatch (restricted/AppContainer/linux/macos)
 │       ├── acp-server.ts / sdk-server.ts / headless-run.ts  # ACP / JSON-RPC SDK / headless
-│       └── __tests__/           # Main-process tests (245 files / 1802 cases repo-wide)
+│       └── __tests__/           # Main-process tests (261 files / 1,992 cases repo-wide)
 │
 ├── src/                         # Renderer code (browser environment)
 │   ├── main.tsx                 # React entry
@@ -229,7 +229,7 @@ Auraxis/
 ├── tsconfig.node.json           # Vite config (composite project reference)
 ├── tsconfig.electron.json       # Main process TS config (CommonJS → dist-electron/, rootDir: electron/)
 ├── vite.config.mts              # Vite build config
-├── vitest.config.ts             # Test config (coverage thresholds: 80% lines / 70% branches / 80% functions)
+├── vitest.config.mts            # Test config (coverage thresholds: ≥80% lines/statements/branches/functions)
 ├── electron-builder.yml         # Packaging config (NSIS/DMG/AppImage)
 └── .env.example                 # Environment variable template
 ```
@@ -973,14 +973,14 @@ The app uses `dotenv` to load environment variables from `.env` at the project r
 - **Framework**: Vitest (`describe`, `it`, `expect`, `vi` injected via globals)
 - **Main-process tests**: `electron/**/__tests__/`, node environment; modules depending on `electron` are isolated with `vi.mock('electron', ...)`
 - **Renderer tests**: `src/**/__tests__/`, jsdom environment (@testing-library/react)
-- **Total**: 245 test files / 1,802 cases passing (+3 environment-skips)
-- **Coverage scope**: the gate only counts `electron/ipc/`, `src/stores/`, `src/core/`; UI components (`src/components/`) and main-process entry points (`main.ts` / `preload.ts` etc.) are excluded from the gate and covered by component tests + Playwright E2E (`npm run test:e2e`)
-- **Coverage thresholds**: lines/statements 80%, branches 70%, functions 80% (latest full report: 77.58% statements / 79.94% lines / 67.01% branches / 73.85% functions; currently below thresholds)
+- **Total**: 261 test files / 1,992 cases passing (+3 environment-skips)
+- **Coverage scope**: the branch gate counts `electron/**`, `src/stores/**`, `src/core/**`; UI components (`src/components/`) and main-process entry points (`main.ts` / `preload.ts` etc.) are excluded from the gate and covered by component tests + Playwright E2E (`npm run test:e2e`)
+- **Coverage thresholds**: lines/statements ≥ 80%, branches ≥ 80%, functions ≥ 80% (latest full branch gate: 88.50% statements / 90.79% lines / 80.04% branches / 87.08% functions; Electron main entry is verified by E2E and SDK smoke; Linux CI runs the coverage gate by default)
 - **Coverage report**: `npm run test:coverage` outputs `coverage/coverage-summary.json` (gitignored dev artifact); the Settings "Test coverage" page reads it live via the `coverage:get` IPC; pure browser dev is served by a Vite middleware, and production builds copy it into `dist/coverage/`. When the report is missing, the panel shows the command to run instead of fake numbers
 - **E2E**: 16 Playwright UI flows passing (real Electron, including register → login → remember-me persistence)
 - **Real-API acceptance (DeepSeek)**: chat streaming, Code auto-approve Bash, Code "confirm each time" permission card (write after one approval), Work smart-execution flow, and Work plan-approval panel all verified; sandbox scripts add cwd fallback when launching `dist-electron/main.js` directly (`electron/sandbox-runner.ts`)
 - **Stress testing (local mock LLM + real Electron)**: 200 sessions cold start ~1.4s, session switch ~155ms, FTS rebuild ~178ms; 18 agents (6 concurrent) and 30 agents (8 concurrent) all completed without failure; under extreme load (30 tasks + 200 sidebar rows) fast mode switches occasionally stalled 8–11s with one >15s, recovering automatically after load; no issue at the default 3-concurrency setting
-- **Environment limits**: no real Python on this machine (only Microsoft Store placeholder), so `npm run sdk:test:py` cannot run; JS SDK 7 cases pass
+- **Environment**: Python 3.10.11 installed via winget; `npm run sdk:test:py` passes 7 cases and `npm run sdk:smoke` verifies the live headless runtime
 - **Commands**: `npm test` (all), `npm run test:backend` (main process), `npm run test:frontend` (renderer), `npm run test:coverage` (coverage report)
 
 ### 13.3 Type Contracts

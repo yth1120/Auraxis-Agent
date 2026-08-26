@@ -150,6 +150,22 @@ describe('AgentScheduler — 启动与生命周期', () => {
     expect(h.loops[0].opts.systemPrompt).toBe('CUSTOM');
   });
 
+  it('notifies frontend when a live window exists and contains listener errors', async () => {
+    const send = vi.fn();
+    h.windows = [{ isDestroyed: () => false, webContents: { send } }];
+    const onTerminal = vi.fn(() => {
+      throw new Error('listener boom');
+    });
+    const off = scheduler.onAgentTerminal(onTerminal);
+    scheduler.clearAll();
+    h.loops.length = 0;
+    scheduler.startAgent(makeCfg(), projectRoot);
+    await vi.waitFor(() => expect(h.loops).toHaveLength(1));
+    expect(send).toHaveBeenCalled();
+    off();
+    h.windows = [];
+  });
+
   it('按 tools 白名单过滤工具定义', async () => {
     scheduler.startAgent(makeCfg({ tools: ['Read'] }), projectRoot);
     await vi.waitFor(() => expect(h.loops).toHaveLength(1));
@@ -545,6 +561,91 @@ describe('AgentScheduler — 清理与持久化', () => {
     // 重复 id 跳过
     await scheduler.restoreSnapshots();
     expect(scheduler.getAgentInstances()).toHaveLength(1);
+  });
+});
+
+describe('AgentScheduler — work delivery, restore and queue edge cases', () => {
+  it('captures work delivery files, enters review and approves once', async () => {
+    const id = scheduler.startAgent(
+      makeCfg({
+        surface: 'work',
+        workTier: 'smart',
+      }),
+      projectRoot,
+    );
+    await vi.waitFor(() => expect(h.loops).toHaveLength(1));
+    const obs = h.loops[0].opts.observer;
+    obs.emit({
+      type: 'tool_end',
+      toolName: 'Write',
+      input: { file_path: 'a.ts' },
+    });
+    obs.emit({
+      type: 'tool_end',
+      toolName: 'Write',
+      input: { file_path: '' },
+    });
+    h.loops[0].resolve(settledLoop());
+    await vi.waitFor(() => expect(scheduler.getAgentInstances()[0].status).toBe('review'));
+    expect(scheduler.approveDelivery(id)).toBe(true);
+    expect(scheduler.approveDelivery(id)).toBe(false);
+  });
+
+  it('stops queued agents and reports missing/completed stop requests', async () => {
+    scheduler.setMaxConcurrent(1);
+    const a1 = scheduler.startAgent(makeCfg({ name: 'A1' }), projectRoot);
+    const a2 = scheduler.startAgent(makeCfg({ name: 'A2' }), projectRoot);
+    await vi.waitFor(() => expect(h.loops).toHaveLength(1));
+    expect(scheduler.stopAgent(a2)).toBe(true);
+    expect(scheduler.getAgentInstances().find((a) => a.agentId === a2)?.status).toBe('stopped');
+    expect(scheduler.stopAgent('nope')).toBe(false);
+    expect(scheduler.stopAgent(a1)).toBe(true);
+  });
+
+  it('restores sparse snapshots and continues rehydrated tasks', async () => {
+    const record = {
+      id: 'agent-sparse',
+      name: 'Sparse',
+      model: 'deepseek-v4-pro',
+      projectPath: projectRoot,
+      status: 'completed',
+      startTime: Date.now(),
+      endTime: Date.now(),
+      priority: 'normal',
+      iteration: 1,
+      toolCallCount: 1,
+      messagesCount: 1,
+      log: [],
+      result: 'DONE',
+      systemPrompt: 'SYS',
+      description: 'work',
+      lastMessages: [],
+      config: undefined,
+      autoApprove: false,
+    };
+    vi.mocked(loadAgentSnapshots).mockResolvedValue([record as any]);
+    await scheduler.restoreSnapshots();
+    expect(scheduler.getAgentInstances()[0]?.status).toBe('completed');
+
+    const continued = await scheduler.continueAgent('agent-sparse', '继续');
+    expect(continued.ok).toBe(true);
+    await vi.waitFor(() => expect(h.loops).toHaveLength(1));
+    expect(h.loops[0].opts.resumeFrom.messages[0]).toMatchObject({ role: 'system', content: 'SYS' });
+  });
+
+  it('handles platform fallback and undefined task labels', async () => {
+    const original = process.platform;
+    Object.defineProperty(process, 'platform', { value: 'linux' });
+    try {
+      scheduler.startAgent(
+        makeCfg({ name: undefined, description: undefined, systemPrompt: undefined, type: undefined }),
+        projectRoot,
+      );
+      await vi.waitFor(() => expect(h.loops).toHaveLength(1));
+      expect(h.loops[0].opts.systemPrompt).toContain('完成用户指定的任务');
+    } finally {
+      Object.defineProperty(process, 'platform', { value: original });
+    }
   });
 });
 

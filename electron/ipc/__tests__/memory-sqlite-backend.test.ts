@@ -11,6 +11,7 @@ vi.mock('electron', () => ({
 
 import { sqliteAvailable } from '../../session-projection-cache';
 import {
+  archiveMemory,
   addBelief,
   addBeliefEvidence,
   addEvidence,
@@ -18,10 +19,19 @@ import {
   addReadResult,
   addReadRun,
   addSignal,
+  archiveBelief,
+  deleteBelief,
+  deleteMemory,
+  deleteSignalsByEvidence,
   eraseScope,
   evidenceContentHash,
+  getActiveMemories,
   getBeliefById,
   getBeliefsByScope,
+  getMemoriesByProject,
+  getMemoriesByTag,
+  getMemoriesByType,
+  searchMemories,
   getReadRun,
   listBeliefEvidence,
   listBeliefRevisions,
@@ -29,6 +39,7 @@ import {
   listEvidence,
   listReadResults,
   listReadRuns,
+  updateMemory,
   listSignals,
   searchBeliefs,
   searchEvidence,
@@ -130,5 +141,59 @@ describe.skipIf(!sqliteAvailable())('SQLite 后端（node:sqlite 通道）', () 
     const migrated = getBeliefsByScope('C:/sqlite-legacy', { activeOnly: true });
     expect(migrated).toHaveLength(1);
     expect(migrated[0]).toMatchObject({ id: 'sq-legacy', legacy: 1, kind: 'project', status: 'active' });
+  });
+
+  it('covers SQLite sparse operations, duplicates and scope-wide audits', () => {
+    const scope = 'C:/sqlite-sparse';
+    addMemory({
+      id: 'sq-sparse-mem',
+      project_path: scope,
+      type: 'preference',
+      title: 'S',
+      content: 'content',
+      tags: '["x"]',
+      timestamp: 1,
+      session_id: 's',
+    });
+    updateMemory('sq-sparse-mem', {});
+    updateMemory('missing', {});
+    expect(getMemoriesByProject(scope)).toHaveLength(1);
+    expect(getMemoriesByType(scope, 'preference')).toHaveLength(1);
+    expect(getMemoriesByTag(scope, 'x')).toHaveLength(1);
+    expect(searchMemories(scope, 'content')).toHaveLength(1);
+    expect(getActiveMemories(scope)).toHaveLength(1);
+    archiveMemory('missing');
+    deleteMemory('missing');
+
+    addEvidence({
+      id: 'sq-sparse-ev',
+      scope,
+      session_id: null,
+      event_id: null,
+      role: 'assistant',
+      ts: 1,
+      content_hash: evidenceContentHash(scope, 'assistant', 'ev'),
+      content: 'ev',
+      metadata: '{}',
+      deleted_at: null,
+    });
+    expect(searchEvidence(scope, 'ev')).toHaveLength(1);
+    const b = addBelief({ id: 'sq-sparse-b', kind: 'reference', scope, title: 't', text: 'text' });
+    addBeliefEvidence({ belief_id: b.id, evidence_id: 'sq-sparse-ev', support_strength: 1 });
+    addBeliefEvidence({ belief_id: b.id, evidence_id: 'sq-sparse-ev', support_strength: 1 });
+    expect(listBeliefEvidence()).toHaveLength(1);
+    expect(listBeliefRevisions()).toHaveLength(0);
+    expect(updateBeliefStatus('missing', 'active')).toBe(false);
+    archiveBelief('missing');
+    deleteBelief('missing');
+    expect(getBeliefsByScope(scope, { activeOnly: false, limit: 2000 })).toHaveLength(1);
+    expect(listSignals('missing')).toEqual([]);
+    expect(listSignals(undefined, 1)).toEqual([]);
+    deleteSignalsByEvidence('missing');
+    expect(getReadRun('missing')).toBeNull();
+    expect(listReadResults('missing')).toEqual([]);
+    expect(listEraseAudits('missing')).toEqual([]);
+    expect(eraseScope(scope)).toBeGreaterThanOrEqual(0);
+    expect(listEraseAudits(scope)).toHaveLength(1);
   });
 });

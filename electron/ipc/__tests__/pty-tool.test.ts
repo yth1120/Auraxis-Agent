@@ -92,6 +92,18 @@ describe('pty-tool registry', () => {
     expect(registry.clearOwner('a')).toBe(2);
     expect(registry.list('a')).toHaveLength(0);
   });
+
+  it('read times out and rejects missing sessions / invalid owners', async () => {
+    const { registry } = makeRegistry();
+    const { id } = registry.create({ owner: 'a', command: 'node' });
+    const timedOut = await registry.read(id, 'a', 10);
+    expect(timedOut).toEqual({ output: '' });
+    expect(await registry.read('missing', 'a', 10)).toBeNull();
+    expect(await registry.read(id, 'wrong', 10)).toBeNull();
+    expect(registry.write('missing', 'a', 'x', false)).toBe(false);
+    expect(registry.close('missing', 'a')).toBe(false);
+    expect(registry.clearOwner('missing')).toBe(0);
+  });
 });
 
 describe('runPtyTool routing', () => {
@@ -119,5 +131,17 @@ describe('runPtyTool routing', () => {
     expect(bad.error).toContain('未知 PTY 动作');
     const missing = await runPtyTool('write', { data: 'x' }, 'a', registry);
     expect(missing.error).toContain('session_id');
+  });
+
+  it('rejects invalid write/close/read requests and clears an owner', async () => {
+    const { registry } = makeRegistry();
+    const created = await runPtyTool('create', { command: 'node' }, 'a', registry);
+    const id = (created.output as { session_id: string }).session_id;
+    expect((await runPtyTool('write', { session_id: id, data: '' }, 'a', registry)).error).toContain('data');
+    expect((await runPtyTool('read', { session_id: 'missing' }, 'a', registry)).error).toBeDefined();
+    expect((await runPtyTool('close', { session_id: 'missing' }, 'a', registry)).error).toBeDefined();
+    const cleared = await runPtyTool('clear', {}, 'a', registry);
+    expect(cleared.error).toBeUndefined();
+    expect((cleared.output as { closed: number }).closed).toBe(1);
   });
 });

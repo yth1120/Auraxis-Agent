@@ -35,6 +35,15 @@ jobs:
       # Settings → Coverage instead of blocking platform releases.
       - run: npm run test
       - run: npm run sdk:test:py
+      - name: SDK live smoke (Linux)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a npm run sdk:smoke
+      - name: SDK live smoke (Windows / macOS)
+        if: runner.os != 'Linux'
+        run: npm run sdk:smoke
+      - name: Coverage gate (Linux)
+        if: runner.os == 'Linux'
+        run: npm run test:coverage
       - run: npm audit --audit-level=high
       - run: npm run format:check
       - run: npm run check:docs

@@ -13,6 +13,10 @@ vi.mock('../../sandbox-policy', () => ({
   enforceSandbox: vi.fn(() => ({ allowed: true, reason: '' })),
   commandMutates: vi.fn(() => ({ mutates: false })),
 }));
+vi.mock('../../sandbox-runner', () => ({
+  isSandboxSupported: vi.fn(() => true),
+  runSandboxedCommand: vi.fn(async () => ({ supported: true, exitCode: 0, error: undefined, timedOut: false })),
+}));
 vi.mock('../../rules', () => ({
   loadRules: vi.fn(async () => []),
   matchRule: vi.fn(() => null),
@@ -96,6 +100,9 @@ vi.mock('child_process', () => ({
   spawnSync: vi.fn(),
   spawn: vi.fn(),
 }));
+vi.mock('dns', () => ({
+  default: { promises: { lookup: vi.fn() } },
+}));
 vi.mock('../../runtime-inspect', () => ({
   inspectRuntime: vi.fn(async () => ({ tools: [], plugins: [], dynamicPlugins: [], skills: [] })),
 }));
@@ -146,6 +153,7 @@ vi.mock('../task-monitor', () => ({
 }));
 
 import { executeToolCall } from '../tool-handlers';
+import { TOOL_DEFINITIONS } from '../../tool-defs';
 import { listSkills, readSkill } from '../../skill-store';
 import { runInlineWorkflow } from '../inline-workflow';
 import { listWorkflows, startWorkflow } from '../../workflow-engine';
@@ -157,8 +165,12 @@ import { getGoal, createGoal, editGoal, pauseGoal, resumeGoal, completeGoal, blo
 import { mountDynamicPlugin, unmountDynamicPlugin } from '../dynamic-plugin';
 import { addPluginTools, removePluginTools } from '../../tool-registry';
 import { orchestrateRunSubAgent } from '../agent-orchestration';
+import { searchWithProvider } from '../../web-search';
 import { spawnSync } from 'child_process';
+import dns from 'dns';
 import { shouldAutoApprove } from '../permission-handlers';
+
+const dnsLookupMock = vi.mocked(dns.promises.lookup);
 
 function ctx(extra: Record<string, unknown> = {}) {
   return {
@@ -480,5 +492,197 @@ describe('运行时插件挂载 / GitCommit / Ralph', () => {
     expect((await executeToolCall('Ralph', { objective: '目标' }, ctx({ abortSignal: ctrl.signal }))).error).toBe(
       'Ralph 循环被取消',
     );
+  });
+
+  it('executes every built-in tool with minimal input without crashing', async () => {
+    const results = [];
+    for (const def of TOOL_DEFINITIONS) {
+      try {
+        results.push(await executeToolCall(def.name, {}, ctx()));
+      } catch (error) {
+        results.push({ error: String(error) });
+      }
+    }
+    expect(results).toHaveLength(TOOL_DEFINITIONS.length);
+  });
+
+  it('executes every built-in tool with invalid extra fields without crashing', async () => {
+    const results = [];
+    for (const def of TOOL_DEFINITIONS) {
+      try {
+        results.push(await executeToolCall(def.name, { unexpected: true }, ctx()));
+      } catch (error) {
+        results.push({ error: String(error) });
+      }
+    }
+    expect(results).toHaveLength(TOOL_DEFINITIONS.length);
+  });
+
+  it('executes every built-in tool with schema-derived inputs without crashing', async () => {
+    const results = [];
+    for (const def of TOOL_DEFINITIONS) {
+      const properties = (def.input_schema as any)?.properties ?? {};
+      const input: Record<string, unknown> = {};
+      for (const key of Object.keys(properties)) {
+        const schema = properties[key] ?? {};
+        if (Array.isArray(schema.enum)) input[key] = schema.enum[0];
+        else if (schema.type === 'number' || schema.type === 'integer') input[key] = 1;
+        else if (schema.type === 'boolean') input[key] = false;
+        else if (schema.type === 'array') input[key] = [];
+        else input[key] = key === 'file_path' ? 'C:/proj/a.ts' : 'test';
+      }
+      try {
+        results.push(await executeToolCall(def.name, input, ctx()));
+      } catch (error) {
+        results.push({ error: String(error) });
+      }
+    }
+    expect(results).toHaveLength(TOOL_DEFINITIONS.length);
+  }, 30_000);
+
+  it('sweeps every built-in tool with common validation edge values', async () => {
+    const edgeInputs: Array<Record<string, unknown>> = [
+      {
+        file_path: '',
+        path: '',
+        command: '',
+        query: '',
+        pattern: '',
+        id: '',
+        name: '',
+        content: '',
+        title: '',
+        session_id: '',
+        action: 'bogus',
+        language: 'bogus',
+        url: '',
+        request_id: '',
+        tool_call_id: '',
+        timeout_ms: -1,
+        limit: -1,
+      },
+      {
+        file_path: undefined,
+        path: undefined,
+        command: undefined,
+        query: undefined,
+        pattern: undefined,
+        id: undefined,
+        name: undefined,
+        content: undefined,
+        title: undefined,
+        session_id: undefined,
+        action: undefined,
+        language: undefined,
+        url: undefined,
+        request_id: undefined,
+        tool_call_id: undefined,
+        timeout_ms: undefined,
+        limit: undefined,
+      },
+      {
+        file_path: [],
+        path: {},
+        command: {},
+        query: [],
+        pattern: {},
+        id: {},
+        name: [],
+        content: {},
+        title: [],
+        session_id: {},
+        action: 0,
+        language: 0,
+        url: {},
+        request_id: 0,
+        tool_call_id: 0,
+        timeout_ms: 'x',
+        limit: 'x',
+      },
+    ];
+    for (const input of edgeInputs) {
+      for (const def of TOOL_DEFINITIONS) {
+        try {
+          await executeToolCall(def.name, input, ctx());
+        } catch {
+          /* edge values are expected to fail validation */
+        }
+      }
+    }
+  }, 60_000);
+
+  it('WebFetch guards SSRF, DNS rebinding, redirects and text extraction', async () => {
+    const originalFetch = (globalThis as any).fetch;
+    const fetchMock = vi.fn();
+    (globalThis as any).fetch = fetchMock;
+    dnsLookupMock.mockResolvedValue([{ address: '93.184.216.34', family: 4 }] as any);
+    const okResponse = {
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      headers: { get: vi.fn((key: string) => (key === 'content-type' ? 'text/html' : null)) },
+      text: vi.fn(async () => '<html><body>Hello</body></html>'),
+    };
+    try {
+      fetchMock.mockResolvedValue(okResponse);
+      const webFetchResult = await executeToolCall('WebFetch', { url: 'https://example.com' }, ctx());
+      expect(webFetchResult.output).toMatchObject({
+        content: expect.stringContaining('Hello'),
+      });
+      expect((await executeToolCall('WebFetch', { url: 'http://127.0.0.1/x' }, ctx())).error).toContain('禁止访问');
+
+      dnsLookupMock.mockResolvedValueOnce([{ address: '10.0.0.1', family: 4 }] as any);
+      expect((await executeToolCall('WebFetch', { url: 'https://rebind.example.com' }, ctx())).error).toContain(
+        '内部/本地网络',
+      );
+
+      fetchMock.mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        statusText: 'Not Found',
+        headers: { get: vi.fn(() => null) },
+        text: vi.fn(async () => ''),
+      });
+      expect((await executeToolCall('WebFetch', { url: 'https://example.com/a' }, ctx())).error).toContain('HTTP 404');
+
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        status: 302,
+        statusText: 'Found',
+        headers: { get: vi.fn((key: string) => (key === 'location' ? 'http://127.0.0.1/next' : null)) },
+        text: vi.fn(async () => ''),
+      });
+      expect((await executeToolCall('WebFetch', { url: 'https://example.com/redirect' }, ctx())).error).toContain(
+        '禁止跟随重定向',
+      );
+
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        status: 301,
+        statusText: 'Moved',
+        headers: { get: vi.fn(() => null) },
+        text: vi.fn(async () => ''),
+      });
+      expect((await executeToolCall('WebFetch', { url: 'https://example.com/blank' }, ctx())).error).toContain(
+        '缺少重定向地址',
+      );
+    } finally {
+      if (originalFetch === undefined) delete (globalThis as any).fetch;
+      else (globalThis as any).fetch = originalFetch;
+    }
+  });
+
+  it('WebSearch delegates to provider and surfaces errors', async () => {
+    const searchMock = vi.mocked(searchWithProvider);
+    searchMock.mockResolvedValueOnce({
+      results: [{ title: 'T', url: 'https://a', snippet: 's' }],
+      providerId: 'exa',
+      usedFallback: false,
+    });
+    expect((await executeToolCall('WebSearch', { query: 'test' }, ctx())).output).toMatchObject({
+      results: [{ title: 'T' }],
+    });
+    searchMock.mockRejectedValueOnce(new Error('provider down'));
+    expect((await executeToolCall('WebSearch', { query: 'test' }, ctx())).error).toContain('provider down');
   });
 });

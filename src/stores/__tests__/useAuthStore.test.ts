@@ -111,4 +111,38 @@ describe('useAuthStore — 账户名修改', () => {
     expect(useAuthStore.getState().ready).toBe(true);
     expect(useAuthStore.getState().phase).toBe('setup');
   });
+
+  it('setup/login/avatar/password/hydrate failure branches', async () => {
+    vi.mocked(electronApi.auth.status).mockRejectedValueOnce(new Error('status down'));
+    await useAuthStore.getState().hydrate();
+    expect(useAuthStore.getState().ready).toBe(true);
+    expect(useAuthStore.getState().phase).toBe('setup');
+
+    vi.mocked(electronApi.auth.setup).mockResolvedValueOnce({ ok: false, error: 'setup rejected' } as any);
+    expect(
+      await useAuthStore.getState().setup({ name: 'A', email: 'a@b.com', password: 'p', rememberMe: false }),
+    ).toMatchObject({ ok: false });
+    vi.mocked(electronApi.auth.setup).mockRejectedValueOnce(new Error('setup boom'));
+    expect(
+      await useAuthStore.getState().setup({ name: 'A', email: 'a@b.com', password: 'p', rememberMe: false }),
+    ).toMatchObject({ ok: false, error: 'setup boom' });
+
+    vi.mocked(electronApi.auth.login).mockResolvedValueOnce({ ok: false, error: 'login rejected' } as any);
+    expect(await useAuthStore.getState().login({ email: 'a', password: 'p', rememberMe: false })).toMatchObject({
+      ok: false,
+    });
+    vi.mocked(electronApi.auth.setAvatar).mockResolvedValueOnce({ ok: false, error: 'avatar rejected' } as any);
+    expect(await useAuthStore.getState().setAvatar('data:image/png;base64,AA')).toMatchObject({ ok: false });
+    vi.mocked(electronApi.auth.setAvatar).mockRejectedValueOnce(new Error('avatar boom'));
+    expect(await useAuthStore.getState().setAvatar('data:image/png;base64,AA')).toMatchObject({
+      ok: false,
+      error: 'avatar boom',
+    });
+    vi.mocked(electronApi.auth.changePassword).mockRejectedValueOnce(new Error('pw boom'));
+    expect(await useAuthStore.getState().changePassword({ currentPassword: 'p', newPassword: 'q' })).toMatchObject({
+      ok: false,
+    });
+    vi.mocked(electronApi.auth.changeName).mockRejectedValueOnce(new Error('name boom'));
+    expect(await useAuthStore.getState().changeName('B')).toMatchObject({ ok: false });
+  });
 });

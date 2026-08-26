@@ -47,6 +47,7 @@ shots/
 # Temp files
 *.tmp
 *.temp
+spill/
 **/temp/
 **/tmp/
 

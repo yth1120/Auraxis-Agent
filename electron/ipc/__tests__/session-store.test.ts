@@ -1,9 +1,16 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { promises as fs } from 'fs';
 import os from 'os';
 import path from 'path';
 import { JsonlSessionStore } from '../../session-store';
 import type { SessionEvent } from '../../contracts/session-types';
+
+vi.mock('../../session-projection-cache', async () => {
+  const actual = await vi.importActual<typeof import('../../session-projection-cache')>(
+    '../../session-projection-cache',
+  );
+  return { ...actual, sqliteAvailable: () => false };
+});
 
 let root: string;
 let store: JsonlSessionStore;
@@ -102,5 +109,69 @@ describe('JsonlSessionStore', () => {
     expect(await fs.readdir(root)).toEqual(['agent-a1.jsonl']);
     const list = await agentStore.list();
     expect(list[0]).toMatchObject({ id: 'a1', kind: 'agent' });
+  });
+
+  it('validates ids, empty events and reserved debug names', async () => {
+    await store.append('', []);
+    await store.append('bad/id', [ev('user', { text: 'x' })]);
+    await store.meta('bad/id', { title: 'x' });
+    await store.meta('__ax-nav-trace__', { title: 'x' });
+    expect(await store.read('bad/id')).toHaveLength(1);
+    expect(await store.delete('bad/id')).toBe(false);
+    expect(await store.project('missing')).toBeNull();
+    expect(await store.fork('missing')).toBeNull();
+  });
+
+  it('lists and projects rich event streams through the cache', async () => {
+    const cached = new JsonlSessionStore({ root: () => root, kind: 'agent', cacheDir: () => root });
+    await cached.append('edge', [
+      ev('user', { text: '这是一个非常长的用户消息，用来测试标题截断行为是否生效' }),
+      ev('system', {
+        event: 'session_meta',
+        meta: {
+          kind: 'agent',
+          title: '自定义标题',
+          model: 'm',
+          mode: 'code',
+          pinned: true,
+          messageCount: 9,
+          branchedFrom: { sessionId: 's1', messageId: 'user-1', title: 't' },
+        },
+      }),
+      ev('agent_status', { text: 'status' }),
+      ev('thinking_chunk', { text: 'think' }),
+      ev('tool', { action: 'start', toolName: 'Read', toolCallId: '', input: { file_path: 'a.ts' } }),
+      ev('tool', { action: 'progress', toolName: 'Read' }),
+      ev('tool', { action: 'end', toolName: 'Read', output: 'done' }),
+      ev('tool', { action: 'error', toolName: 'Write', toolCallId: 'w', error: '' }),
+      ev('system', { text: 'system text' }),
+      ev('user', { text: 123 }),
+      ev('assistant_chunk', { text: '' }),
+    ]);
+
+    const list = await cached.list();
+    expect(list).toHaveLength(1);
+    const p1 = await cached.project('edge');
+    expect(p1).not.toBeNull();
+    expect(p1!.messages.some((m) => m.role === 'system' && m.content === 'system text')).toBe(true);
+    expect(p1!.messages.some((m) => m.toolCalls?.some((tc) => tc.toolName === 'Read' && tc.status === 'done'))).toBe(
+      true,
+    );
+    const p2 = await cached.project('edge');
+    expect(p2).not.toBeNull();
+  });
+
+  it('forks with an invalid boundary and handles cold/distinct files', async () => {
+    await store.append('s1', [
+      ev('user', { text: 'a' }),
+      ev('assistant_chunk', { text: 'b' }),
+    ]);
+    await store.append('.hidden', [ev('user', { text: 'x' })]);
+    await fs.writeFile(path.join(root, 'not-jsonl.txt'), 'x', 'utf8');
+    const list = await store.list();
+    expect(list).toHaveLength(2);
+    const forked = await store.fork('s1', 'bad-boundary');
+    expect(forked).not.toBeNull();
+    expect(await store.prune()).toBe(0);
   });
 });

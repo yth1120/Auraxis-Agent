@@ -25,8 +25,32 @@ import {
   getEvidenceById,
   findEvidenceByHash,
   deleteEvidence,
+  addSignal,
+  listSignals,
+  deleteSignalsByEvidence,
+  addBelief,
+  getBeliefById,
+  getBeliefsByScope,
+  searchBeliefs,
+  updateBeliefStatus,
+  archiveBelief,
+  deleteBelief,
+  addBeliefEvidence,
+  listBeliefEvidence,
+  listBeliefRevisions,
+  addBeliefRejection,
+  listBeliefRejections,
+  addReadRun,
+  addReadResult,
+  getReadRun,
+  listReadResults,
+  listReadRuns,
+  listEraseAudits,
+  eraseScope,
   setBackendModeForTest,
 } from '../memory-db';
+import { JsonBackend } from '../memory-db-backends';
+import type { MemoryInput, EvidenceInput, SignalInput, BeliefInput, BeliefRejectionInput, ReadRunRecord } from '../memory-db-types';
 
 function mem(overrides: Record<string, unknown> = {}) {
   return {
@@ -158,5 +182,207 @@ describe('MemoryDatabase — 不可变证据（Eywa M1）', () => {
     deleteEvidence('ev2');
     expect(getEvidenceById('ev2')).toBeNull();
     expect(listEvidence('C:/proj').map((e) => e.id)).toEqual(['ev1']);
+  });
+
+  it('signals, beliefs, read runs and erase audits round-trip', () => {
+    addSignal({
+      id: 'sig-1',
+      evidence_id: 'ev1',
+      type: 'entity',
+      value: 'React',
+      confidence: 0.9,
+      created_at: 1,
+    } as any);
+    expect(listSignals('ev1')).toHaveLength(1);
+    expect(listSignals()).toHaveLength(1);
+    deleteSignalsByEvidence('ev1');
+    expect(listSignals('ev1')).toHaveLength(0);
+
+    addBelief({
+      id: 'b1',
+      kind: 'project',
+      scope: 'C:/proj',
+      title: '使用 React',
+      text: '项目使用 React',
+      status: 'active',
+      importance: 1,
+      is_active: 1,
+    } as any);
+    expect(getBeliefById('b1')?.title).toBe('使用 React');
+    expect(getBeliefsByScope('C:/proj')).toHaveLength(1);
+    expect(getBeliefsByScope('C:/proj', { activeOnly: true, limit: 1 })).toHaveLength(1);
+    expect(searchBeliefs('C:/proj', 'React')).toHaveLength(1);
+    expect(updateBeliefStatus('b1', 'superseded', '需要人工')).toBe(true);
+    archiveBelief('b1');
+    expect(getBeliefById('b1')?.is_active).toBe(0);
+    addBeliefEvidence({ belief_id: 'b1', evidence_id: 'ev1', support_strength: 0.8 } as any);
+    expect(listBeliefEvidence('b1')).toHaveLength(1);
+    expect(listBeliefRevisions('b1')).toHaveLength(1);
+    addBeliefRejection({ id: 'rej-1', belief_id: 'b1', scope: 'C:/proj', reason: '低置信', created_at: 1 } as any);
+    expect(listBeliefRejections('C:/proj')).toHaveLength(1);
+    deleteBelief('b1');
+    expect(getBeliefById('b1')?.status).toBe('deleted');
+
+    addReadRun({ id: 'run-1', scope: 'C:/proj', query: 'q', created_at: 1, actor: 'test' } as any);
+    addReadResult({
+      id: 'res-1',
+      read_run_id: 'run-1',
+      belief_id: 'b1',
+      score: 0.5,
+      evidence_ids: [],
+      route: 'keyword',
+      rank: 1,
+    } as any);
+    expect(getReadRun('run-1')?.query).toBe('q');
+    expect(listReadResults('run-1')).toHaveLength(1);
+    expect(listReadRuns('C:/proj')).toHaveLength(1);
+    expect(listEraseAudits()).toHaveLength(0);
+    expect(eraseScope('C:/proj', { actor: 'test', reason: 'clean' })).toBeGreaterThan(0);
+    expect(listEraseAudits('C:/proj')).toHaveLength(1);
+  });
+});
+
+describe('JsonBackend — direct edge branches', () => {
+  it('round-trips backends with missing optional values and legacy/array persistence', () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'auraxis-json-direct-'));
+    const file = path.join(root, 'nested', 'memory.json');
+    const backend = new JsonBackend(file);
+
+    const memory1: MemoryInput = {
+      id: 'dm1',
+      project_path: 'C:/direct',
+      type: 'decision',
+      title: 't1',
+      content: 'c1',
+      tags: '["a","b"]',
+      timestamp: 1,
+      session_id: null,
+    };
+    backend.addMemory(memory1);
+    backend.addMemory({
+      ...memory1,
+      id: 'dm2',
+      tags: '["x"]',
+      timestamp: 2,
+      importance: 0,
+      is_active: 0,
+    } as MemoryInput);
+
+    expect(backend.getMemoriesByProject('C:/direct')).toHaveLength(2);
+    expect(backend.getMemoriesByProject('C:/direct', 1)).toHaveLength(1);
+    expect(backend.getMemoriesByType('C:/direct', 'decision')).toHaveLength(2);
+    expect(backend.getMemoriesByTag('C:/direct', 'x')).toHaveLength(1);
+    expect(backend.searchMemories('C:/direct', 'C1')).toHaveLength(2);
+    expect(backend.getActiveMemories('C:/direct').map((m) => m.id)).toEqual(['dm1']);
+    backend.updateMemory('dm1', { tags: ['updated'] } as never);
+    backend.updateMemory('dm1', {});
+    backend.updateMemory('missing', {});
+    backend.archiveMemory('missing');
+    backend.deleteMemory('missing');
+    backend.deleteMemory('dm2');
+
+    const evidence: EvidenceInput = {
+      id: 'dev1',
+      scope: 'C:/direct',
+      session_id: null,
+      event_id: null,
+      role: 'tool',
+      ts: 1,
+      content_hash: evidenceContentHash('C:/direct', 'tool', 'x'),
+      content: 'x',
+      metadata: '{}',
+      deleted_at: null,
+    };
+    backend.addEvidence(evidence);
+    expect(backend.listEvidence('C:/direct')).toHaveLength(1);
+    expect(backend.getEvidenceById('dev1')?.content).toBe('x');
+    expect(backend.getEvidenceById('missing')).toBeNull();
+    expect(backend.findEvidenceByHash('C:/direct', 'tool', evidence.content_hash)).not.toBeNull();
+    expect(backend.searchEvidence('C:/direct', 'x', 0)).toHaveLength(0);
+
+    const signal: SignalInput = {
+      evidence_id: 'dev1',
+      signal_type: 'entity',
+      value: 'a',
+      confidence: 1,
+      detector: 'rule',
+    };
+    backend.addSignal(signal);
+    backend.addSignal(signal);
+    expect(backend.listSignals('dev1')).toHaveLength(1);
+    expect(backend.listSignals(undefined, 1)).toHaveLength(1);
+    expect(backend.listSignals()).toHaveLength(1);
+    backend.deleteSignalsByEvidence('missing');
+
+    const belief: BeliefInput = {
+      id: 'db1',
+      kind: 'project',
+      scope: 'C:/direct',
+      title: '',
+      text: 'text',
+    };
+    const added = backend.addBelief(belief);
+    expect(added.status).toBe('draft');
+    expect(backend.getBeliefById('missing')).toBeNull();
+    expect(backend.getBeliefsByScope('C:/direct', { activeOnly: false, limit: 0 })).toHaveLength(1);
+    expect(backend.searchBeliefs('C:/direct', 'text')).toHaveLength(1);
+    expect(backend.updateBeliefStatus('db1', 'active', 'reason', 'actor')).toBe(true);
+    expect(backend.updateBeliefStatus('missing', 'active')).toBe(false);
+    backend.archiveBelief('missing');
+    backend.archiveBelief('db1');
+    expect(backend.getBeliefById('db1')?.is_active).toBe(0);
+    backend.deleteBelief('missing');
+    backend.deleteBelief('db1');
+
+    backend.addBeliefEvidence({ belief_id: 'db1', evidence_id: 'dev1', support_strength: 0.5 });
+    backend.addBeliefEvidence({ belief_id: 'db1', evidence_id: 'dev1', support_strength: 0.5 });
+    expect(backend.listBeliefEvidence()).toHaveLength(1);
+    expect(backend.listBeliefEvidence('missing')).toHaveLength(0);
+    expect(backend.listBeliefRevisions()).toHaveLength(2);
+    expect(backend.listBeliefRevisions('missing')).toHaveLength(0);
+    const rejection: BeliefRejectionInput = {
+      scope: 'C:/direct',
+      text: 'reject',
+      evidence_ids: '[]',
+      reasons: '',
+      actor: 'system',
+      ts: 1,
+    };
+    backend.addBeliefRejection(rejection);
+    expect(backend.listBeliefRejections('C:/direct')).toHaveLength(1);
+
+    const run: ReadRunRecord = {
+      id: 'run-d',
+      query: 'q',
+      query_hash: 'h',
+      scope: 'C:/direct',
+      budget_tokens: 10,
+      latency_ms: 1,
+      ts: 1,
+    };
+    backend.addReadRun(run);
+    expect(backend.getReadRun('missing')).toBeNull();
+    expect(backend.getReadRun('run-d')?.id).toBe('run-d');
+    expect(backend.listReadRuns('C:/direct')).toHaveLength(1);
+    expect(backend.listReadResults('run-d')).toEqual([]);
+    expect(backend.eraseScope('C:/direct')).toBeGreaterThan(0);
+    expect(backend.listEraseAudits()).toHaveLength(1);
+    expect(backend.listEraseAudits('C:/direct', 1)).toHaveLength(1);
+
+    const legacyFile = path.join(root, 'legacy.json');
+    writeFileSync(
+      legacyFile,
+      JSON.stringify([
+        { ...memory1, id: 'legacy1', tags: '[]', importance: 0, is_active: 0 },
+      ]),
+      'utf-8',
+    );
+    const legacy = new JsonBackend(legacyFile);
+    expect(legacy.getBeliefsByScope('C:/direct')).toHaveLength(1);
+
+    writeFileSync(path.join(root, 'object.json'), JSON.stringify({ memories: [], evidence: [], signals: [] }), 'utf-8');
+    const objectFile = new JsonBackend(path.join(root, 'object.json'));
+    expect(objectFile.listEvidence('C:/direct')).toEqual([]);
+    expect(objectFile.listSignals()).toEqual([]);
   });
 });

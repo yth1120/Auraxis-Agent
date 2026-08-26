@@ -219,6 +219,51 @@ describe('小型 Zustand Store 行为', () => {
     expect(useFileTreeStore.getState().fileStatus['/p/a.ts']).toBeUndefined();
   });
 
+  it('useFileTreeStore：错误、清空与目录切换', async () => {
+    stubApi({
+      project: {
+        getTree: vi.fn(async () => ({ ok: false, error: 'tree down' })),
+      },
+    });
+    await useFileTreeStore.getState().fetchTree('/p');
+    expect(useFileTreeStore.getState().error).toBe('tree down');
+
+    stubApi({
+      project: {
+        getTree: vi.fn(async () => {
+          throw new Error('boom');
+        }),
+      },
+    });
+    await useFileTreeStore.getState().fetchTree('/p2');
+    expect(useFileTreeStore.getState().error).toContain('boom');
+    useFileTreeStore.getState().clear();
+    expect(useFileTreeStore.getState().tree).toBeNull();
+    expect(useFileTreeStore.getState().projectRoot).toBeNull();
+    await useFileTreeStore.getState().fetchTree('');
+  });
+
+  it('useFileTreeStore：Windows 路径、空 children、重复 toggle 与缺失清理', async () => {
+    useFileTreeStore.getState().clear();
+    useFileTreeStore.getState().toggleExpand('C:/p');
+    useFileTreeStore.getState().toggleExpand('C:/p');
+    expect(useFileTreeStore.getState().expandedPaths.has('C:/p')).toBe(false);
+    useFileTreeStore.getState().expandToPath('C:\\p\\src\\a.ts');
+    expect(useFileTreeStore.getState().expandedPaths.has('C:\\p\\src')).toBe(true);
+    useFileTreeStore.getState().clearFileStatus('missing');
+    useFileTreeStore.getState().clearFileStatus('missing');
+    stubApi({
+      project: {
+        getTree: vi.fn(async () => ({
+          ok: true,
+          data: { path: '/p', name: 'p', isDirectory: true, children: undefined },
+        })),
+      },
+    });
+    await useFileTreeStore.getState().fetchTree('/p');
+    expect(useFileTreeStore.getState().expandedPaths.size).toBe(0);
+  });
+
   it('useMessageFeedbackStore：加载与切换评分', async () => {
     const message = vi.fn(async () => ({ ok: true }));
     const messageList = vi.fn(async () => ({
@@ -236,5 +281,20 @@ describe('小型 Zustand Store 行为', () => {
     await s.rate('m1', 's1', 'down');
     expect(useMessageFeedbackStore.getState().ratings.m1).toBe('down');
     expect(message).toHaveBeenCalled();
+  });
+
+  it('useMessageFeedbackStore：无效评分、空 API 与相同评分切换', async () => {
+    const message = vi.fn(async () => ({ ok: true }));
+    stubApi({
+      feedback: { messageList: vi.fn(async () => ({ ok: true, data: [{ messageId: 'm2', rating: 'bad' }] })), message },
+    });
+    await useMessageFeedbackStore.getState().load('s2');
+    expect(useMessageFeedbackStore.getState().ratings.m2).toBeUndefined();
+    await useMessageFeedbackStore.getState().rate('m1', 's3', 'up');
+    await useMessageFeedbackStore.getState().rate('m1', 's3', 'up');
+    stubApi({ feedback: { message: vi.fn(async () => ({ ok: true })) } });
+    await useMessageFeedbackStore.getState().load('s4');
+    expect(useMessageFeedbackStore.getState().loadedSessions).not.toContain('s4');
+    await useMessageFeedbackStore.getState().rate('m1', 's4', 'down');
   });
 });

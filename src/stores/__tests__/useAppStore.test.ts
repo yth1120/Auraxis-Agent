@@ -31,6 +31,9 @@ describe('useAppStore — theme & sidebar', () => {
     expect(useAppStore.getState().theme).toBe('dark');
     useAppStore.getState().setTheme('light');
     expect(useAppStore.getState().theme).toBe('light');
+    useAppStore.getState().setTheme('system');
+    useAppStore.getState().toggleTheme();
+    expect(useAppStore.getState().theme).toBe('light');
   });
 
   it('首次启动默认展开侧边栏', () => {
@@ -102,6 +105,32 @@ describe('useAppStore — theme & sidebar', () => {
     expect(req?.requestId).toBeGreaterThan(0);
     useAppStore.getState().clearOpenFileRequest();
     expect(useAppStore.getState().openFileRequest).toBeNull();
+  });
+
+  it('openToolView 重复切换关闭，终端高度钳制', () => {
+    useAppStore.getState().openToolView('terminal');
+    expect(useAppStore.getState().activeToolView).toBe('terminal');
+    useAppStore.getState().openToolView('terminal');
+    expect(useAppStore.getState().activeToolView).toBe('none');
+    useAppStore.getState().setTerminalHeight(1);
+    expect(useAppStore.getState().terminalHeight).toBe(160);
+    useAppStore.getState().setTerminalHeight(9999);
+    expect(useAppStore.getState().terminalHeight).toBe(560);
+  });
+
+  it('普通视口、Agent 过滤与导航请求 setter 分支', () => {
+    const s = useAppStore.getState();
+    s.setShowSettings(true);
+    s.setActiveToolView('terminal');
+    s.setAgentRunningFollow(false);
+    s.setAgentTextOnly(true);
+    s.setAgentErrorsOnly(true);
+    s.requestAgentRawLog();
+    s.requestAgentErrorNav(1);
+    expect(useAppStore.getState().agentRawLogRequest).toBeGreaterThan(0);
+    expect(useAppStore.getState().agentErrorNavRequest?.dir).toBe(1);
+    s.clearAgentErrorNav();
+    expect(useAppStore.getState().agentErrorNavRequest).toBeNull();
   });
 });
 
@@ -187,6 +216,15 @@ describe('useAppStore — 文件多 Tab', () => {
     expect(useAppStore.getState().activeFilePath).toBe('C:/proj/new.ts');
   });
 
+  it('超过 8 个且首 Tab 激活时淘汰第二个', () => {
+    for (let i = 0; i < 8; i++) useAppStore.getState().openFileTab(`C:/proj/f${i}.ts`);
+    useAppStore.getState().setActiveFilePath('C:/proj/f0.ts');
+    useAppStore.getState().openFileTab('C:/proj/new.ts');
+    const paths = useAppStore.getState().fileTabs.map((t) => t.path);
+    expect(paths).toHaveLength(8);
+    expect(paths).not.toContain('C:/proj/f1.ts');
+  });
+
   it('关闭激活 Tab 后激活相邻 Tab', () => {
     useAppStore.getState().openFileTab('C:/proj/a.ts');
     useAppStore.getState().openFileTab('C:/proj/b.ts');
@@ -204,11 +242,29 @@ describe('useAppStore — 文件多 Tab', () => {
     expect(useAppStore.getState().activeFilePath).toBeNull();
   });
 
+  it('关闭活跃但非最后 Tab 时选下一个，关闭最后活跃时选前一个', () => {
+    useAppStore.getState().openFileTab('C:/proj/a.ts');
+    useAppStore.getState().openFileTab('C:/proj/b.ts');
+    useAppStore.getState().openFileTab('C:/proj/c.ts');
+    useAppStore.getState().setActiveFilePath('C:/proj/b.ts');
+    useAppStore.getState().closeFileTab('C:/proj/b.ts');
+    expect(useAppStore.getState().activeFilePath).toBe('C:/proj/c.ts');
+    useAppStore.getState().setActiveFilePath('C:/proj/c.ts');
+    useAppStore.getState().closeFileTab('C:/proj/c.ts');
+    expect(useAppStore.getState().activeFilePath).toBe('C:/proj/a.ts');
+  });
+
   it('clearFileTabs 清空所有文件 Tab', () => {
     useAppStore.getState().openFileTab('C:/proj/a.ts');
     useAppStore.getState().clearFileTabs();
     expect(useAppStore.getState().fileTabs).toEqual([]);
     expect(useAppStore.getState().activeFilePath).toBeNull();
+  });
+
+  it('关闭未知文件 Tab 保持状态不变', () => {
+    useAppStore.getState().openFileTab('C:/proj/a.ts');
+    useAppStore.getState().closeFileTab('missing');
+    expect(useAppStore.getState().fileTabs).toHaveLength(1);
   });
 });
 

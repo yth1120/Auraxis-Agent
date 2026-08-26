@@ -408,3 +408,113 @@ describe('ai:testConnection / cleanupWindowStreams', () => {
     await p;
   });
 });
+
+describe('ai-handlers edge branches', () => {
+  const edgeQueryPayload = () => ({
+    requestId: 'q-edge',
+    model: 'deepseek-v4-pro',
+    messages: [{ role: 'user', content: '做点事' }],
+    isDeepThink: false,
+    projectRoot: 'C:/proj',
+    surface: 'code' as const,
+  });
+
+  it('resolves keys from environment and credentials and covers missing keys', async () => {
+    process.env.DEEPSEEK_API_KEY = 'env-key';
+    try {
+      vi.mocked(axios.get).mockResolvedValueOnce({ status: 200, data: { data: [{ id: 'env-model' }] } } as any);
+      await handler('ai:testConnection')({}, { apiKey: '' });
+      expect(vi.mocked(axios.get).mock.calls.at(-1)![1]).toMatchObject({
+        headers: { Authorization: 'Bearer env-key' },
+      });
+
+      delete process.env.DEEPSEEK_API_KEY;
+      vi.mocked(resolveCredential).mockResolvedValueOnce({ value: 'credential-key' } as any);
+      vi.mocked(axios.get).mockResolvedValueOnce({ status: 200, data: { data: [{ id: 'cred-model' }] } } as any);
+      await handler('ai:testConnection')({}, { apiKey: '' });
+      expect(vi.mocked(axios.get).mock.calls.at(-1)![1]).toMatchObject({
+        headers: { Authorization: 'Bearer credential-key' },
+      });
+
+      vi.mocked(resolveCredential).mockResolvedValueOnce(null as any);
+      vi.mocked(readSettings).mockResolvedValueOnce({ deepseekApiKey: '' } as any);
+      vi.mocked(axios.get).mockClear();
+      expect((await handler('ai:testConnection')({}, { apiKey: '' })).ok).toBe(false);
+      expect(axios.get).not.toHaveBeenCalled();
+    } finally {
+      delete process.env.DEEPSEEK_API_KEY;
+    }
+  });
+
+  it('handles search failures, empty message queries and search result filtering', async () => {
+    vi.mocked(executeToolCall)
+      .mockResolvedValueOnce({ output: null, error: undefined })
+      .mockRejectedValueOnce(new Error('web down'))
+      .mockResolvedValueOnce({ output: { results: [null, { title: 'T', snippet: 'S', url: 'https://e.com' }] }, error: undefined });
+    for (const payload of [
+      chatPayload({ isWebSearch: true }),
+      chatPayload({ isWebSearch: true }),
+      chatPayload({ isWebSearch: true, messages: [] }),
+    ]) {
+      await handler('ai:chatStream')({ sender: { send: vi.fn() } }, payload);
+    }
+    expect(executeToolCall).toHaveBeenCalledTimes(2);
+  });
+
+  it('covers query settings presets and clarifies fallback model', async () => {
+    vi.mocked(runQuery).mockReset().mockResolvedValue(undefined as any);
+    vi.mocked(readSettings).mockResolvedValue({
+      deepseekApiKey: 'sk',
+      permissionPreset: 'full',
+      fallbackModel: 'fallback-model',
+      clarifyBeforeWork: false,
+    } as any);
+    await handler('ai:sendQuery')({ sender: { send: vi.fn() } }, edgeQueryPayload());
+    const req = vi.mocked(runQuery).mock.calls.at(-1)![0] as any;
+    expect(req.fallbackModel).toBe('fallback-model');
+    expect(req.clarifyBeforeWork).toBe(false);
+  });
+
+  it('covers non-200 test responses, malformed model lists and more error statuses', async () => {
+    vi.mocked(axios.get).mockResolvedValueOnce({ status: 500, statusText: 'bad' } as any);
+    expect((await handler('ai:testConnection')({}, { apiKey: 'sk' })).error).toContain('HTTP 500');
+
+    vi.mocked(axios.get).mockResolvedValueOnce({ status: 200, data: 'not-object' } as any);
+    expect((await handler('ai:testConnection')({}, { apiKey: 'sk' })).data.models).toEqual([]);
+
+    vi.mocked(axios.get).mockResolvedValueOnce({ status: 200, data: { data: [42, null] } } as any);
+    expect((await handler('ai:testConnection')({}, { apiKey: 'sk' })).data.models).toEqual([]);
+
+    for (const [err, pattern] of [
+      [{ response: { status: 402 } }, /余额/],
+      [{ response: { status: 503 } }, /服务繁忙/],
+      [{ code: 'ECONNREFUSED' }, /无法连接/],
+    ] as Array<[unknown, RegExp]>) {
+      vi.mocked(axios.get).mockRejectedValueOnce(err as any);
+      expect((await handler('ai:testConnection')({}, { apiKey: 'sk' })).error).toMatch(pattern);
+    }
+  });
+
+  it('covers FIM fallbacks and abort stream/query cleanup', async () => {
+    vi.mocked(axios.post).mockResolvedValue({ data: { choices: [{}] } } as any);
+    const fim = await handler('ai:fim')({}, { model: 'deepseek-v4-pro', prompt: 'x', maxTokens: 0 });
+    expect(fim.ok).toBe(true);
+    expect(fim.data.text).toBe('');
+    const body = vi.mocked(axios.post).mock.calls.at(-1)![1] as any;
+    expect(body.max_tokens).toBe(16);
+    expect(body.suffix).toBeUndefined();
+
+    let resolvePost: (value: any) => void = () => {};
+    vi.mocked(axios.post).mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolvePost = resolve;
+      }) as any,
+    );
+    const stream = handler('ai:chatStream')({ sender: { send: vi.fn() } }, chatPayload());
+    await vi.waitFor(() => expect(vi.mocked(axios.post).mock.calls.length).toBeGreaterThan(0));
+    await handler('ai:abortStream')({}, 'r1');
+    resolvePost({ data: sse('data: [DONE]\n\n') });
+    await stream;
+    expect(await handler('ai:abortQuery')({}, 'q1')).toBeUndefined();
+  });
+});

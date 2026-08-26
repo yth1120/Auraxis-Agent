@@ -184,6 +184,62 @@ describe('llm-adapter format helpers', () => {
     const content = buildToolResultContent({ stdout: 'ok', exitCode: 0 });
     expect(content).toBe(JSON.stringify({ stdout: 'ok', exitCode: 0 }));
     expect(buildToolResultContent(null, 'boom')).toBe('Error: boom');
+    expect(buildToolResultContent(null)).toBe('null');
+    expect(buildToolResultText(null)).toBe('null');
+  });
+
+  it('handles empty/invalid schemas and nested strict schemas', () => {
+    const empty = buildOpenAIFormatTools([
+      {
+        name: 'EmptyTool',
+        description: 'd',
+        isConcurrencySafe: true,
+        input_schema: { type: 'object', properties: {}, required: [] } as never,
+      },
+    ]);
+    expect(empty[0].function.parameters).toEqual({ type: 'object' });
+
+    const nested = buildOpenAIFormatTools(
+      [
+        {
+          name: 'Nested',
+          description: 'd',
+          isConcurrencySafe: true,
+          input_schema: {
+            type: 'object',
+            properties: {
+              outer: { type: 'object', properties: { inner: { type: 'string', default: 'x' } }, required: ['inner'] },
+            },
+            required: [],
+          },
+        },
+      ],
+      { strict: true },
+    );
+    expect(nested[0].function.strict).toBe(true);
+    const params = nested[0].function.parameters as any;
+    expect(params.properties.outer.required).toEqual(['inner']);
+    expect(params.properties.outer.properties.inner.default).toBeUndefined();
+  });
+
+  it('sanitizeToolCallPairing drops orphans and repairs duplicate/lost results', () => {
+    const messages = [
+      { role: 'tool', tool_call_id: 'orphan', content: 'x' },
+      { role: 'user', content: 'u' },
+      {
+        role: 'assistant',
+        content: 'a',
+        tool_calls: [{ id: 'call_1', type: 'function', function: { name: 'Read', arguments: '{}' } }],
+      },
+      { role: 'tool', tool_call_id: 'duplicate', content: 'other' },
+      { role: 'user', content: 'nudge' },
+    ] as any;
+    const repaired = sanitizeToolCallPairing(messages);
+    expect(repaired.some((m: any) => m.role === 'tool' && m.tool_call_id === 'orphan')).toBe(false);
+    expect(repaired.some((m: any) => m.role === 'tool' && m.content === 'Error: 工具结果丢失（已自动修补）')).toBe(
+      true,
+    );
+    expect(repaired.filter((m: any) => m.role === 'tool')).toHaveLength(1);
   });
 
   it('detects image-capable routes', () => {
@@ -501,5 +557,215 @@ describe('invokeDeepSeekAnthropic — 流式解析', () => {
     );
     const out = await llmClientInvoke(anthropicBase());
     expect(out!.rawText).toBe('ok');
+  });
+});
+
+describe('llm-adapter edge branches', () => {
+  it('falls back to the built-in deepseek adapter when the registry entry is missing', async () => {
+    vi.mocked(axios.post).mockResolvedValue(openaiBody(['data: [DONE]\n\n']) as any);
+    registerLlmAdapter('deepseek', undefined as never);
+    try {
+      const out = await invokeLlm(baseParams());
+      expect(out).toMatchObject({ rawText: '', toolCalls: [] });
+    } finally {
+      registerLlmAdapter('deepseek', llmClientInvoke);
+    }
+  });
+
+  it('covers invalid schema nodes, list items and image metadata fallbacks', () => {
+    const weird = buildOpenAIFormatTools([
+      {
+        name: 'Weird',
+        description: 'd',
+        isConcurrencySafe: true,
+        input_schema: {
+          type: 'object',
+          properties: {
+            scalar: 42,
+            nested: { type: 'object', properties: {} },
+          },
+          required: ['scalar', 'missing'],
+          items: { type: 'object', properties: {} },
+        } as never,
+      },
+    ]);
+    expect(weird[0].function.parameters).toMatchObject({
+      type: 'object',
+      properties: { scalar: 42 },
+    });
+    expect(weird[0].function.parameters).not.toHaveProperty('items');
+
+    const empty = buildOpenAIFormatTools([
+      {
+        name: 'Empty',
+        description: 'd',
+        isConcurrencySafe: true,
+        input_schema: null as never,
+      },
+    ]);
+    expect(empty[0].function.parameters).toEqual({ type: 'object' });
+
+    const imageText = buildToolResultText({
+      image: 'data:image/png;base64,AA==',
+      mime: undefined,
+      file_path: undefined,
+      bytes: 0,
+    });
+    expect(imageText).toContain('image');
+    expect(buildToolResultText(null)).toBe('null');
+  });
+
+  it('normalizes image and tool content for OpenAI and Anthropic routes', async () => {
+    const messages = [
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: 'hi' },
+          { type: 'image_url', image_url: { url: 'data:image/svg+xml;base64,AA==' } },
+          { type: 'image', image: { url: 'x' } },
+          { type: 'file', file: { url: 'x' } },
+        ],
+      },
+      {
+        role: 'assistant',
+        tool_calls: [
+          {
+            id: 'call_1',
+            type: 'function',
+            function: { name: 'Read', arguments: '{}' },
+          },
+        ],
+      },
+      {
+        role: 'tool',
+        tool_call_id: 'call_1',
+        content: [
+          { type: 'text', text: 'result' },
+          { type: 'image_url', image_url: { url: 'data:image/png;base64,AA==' } },
+        ],
+      },
+    ];
+    vi.mocked(axios.post).mockResolvedValue(openaiBody(['data: [DONE]\n\n']) as any);
+    await llmClientInvoke({
+      ...baseParams(),
+      model: 'deepseek-v4-flash-vision-exp',
+      messages: messages as never,
+    });
+    const body = vi.mocked(axios.post).mock.calls.at(-1)![1] as any;
+    expect(body.messages[3].content).toContain('result');
+
+    vi.mocked(axios.post).mockResolvedValue(openaiBody(['data: [DONE]\n\n']) as any);
+    await llmClientInvoke({
+      ...baseParams(),
+      apiBase: 'https://x/anthropic/v1/messages',
+      model: 'example-vision-model',
+      messages: [
+        {
+          role: 'user',
+          content: [{ type: 'image_url', image_url: { url: 'https://example.com/a.png' } }],
+        },
+      ] as never,
+    });
+    const anthropicBody = vi.mocked(axios.post).mock.calls.at(-1)![1] as any;
+    expect(anthropicBody.messages[0].content[0]).toEqual({
+      type: 'image',
+      source: { type: 'url', url: 'https://example.com/a.png' },
+    });
+  });
+
+  it('handles token usage fallbacks and mid-stream abort', async () => {
+    vi.mocked(axios.post).mockResolvedValue(
+      openaiBody([
+        'data: {"choices":[],"usage":{"prompt_tokens":0,"completion_tokens":0}}\n\n',
+        'data: [DONE]\n\n',
+      ]) as any,
+    );
+    const onUsage = vi.fn();
+    await llmClientInvoke({ ...baseParams(), onUsage });
+    expect(onUsage).toHaveBeenCalledWith(
+      expect.objectContaining({ inputTokens: 0, outputTokens: 0, cacheHitTokens: undefined }),
+    );
+
+    const ctrl = new AbortController();
+    async function* abortedStream() {
+      yield Buffer.from('data: {"choices":[{"delta":{"content":"x"}}]}\n\n');
+      ctrl.abort();
+      yield Buffer.from('data: [DONE]\n\n');
+    }
+    vi.mocked(axios.post).mockResolvedValue({ data: abortedStream() } as any);
+    expect(await llmClientInvoke({ ...baseParams(), signal: ctrl.signal })).toBeNull();
+  });
+
+  it('handles tool deltas without ids/names and malformed JSON arguments', async () => {
+    vi.mocked(axios.post).mockResolvedValue(
+      openaiBody([
+        'data: {"choices":[{"delta":{"reasoning_content":"reason"}}]}\n\n',
+        'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{bad"}}]}}]}\n\n',
+        'data: {"choices":[{"delta":{"content":"after"}}]}\n\n',
+        'data: {"choices":[{"finish_reason":"tool_calls"}]}\n\n',
+        'data: [DONE]\n\n',
+      ]) as any,
+    );
+    const out = await llmClientInvoke(baseParams());
+    expect(out!.toolCalls).toEqual([{ id: 'call_0', name: '', input: { raw: '{bad' } }]);
+    expect(out!.contentTimeline.map((b) => b.type)).toEqual(['tool_use', 'text']);
+  });
+
+  it('covers nested strict schemas, repair boundaries and provider normalization variants', async () => {
+    const nested = buildOpenAIFormatTools(
+      [
+        {
+          name: 'Nested',
+          description: 'd',
+          isConcurrencySafe: true,
+          input_schema: {
+            type: 'object',
+            properties: {
+              nested: {
+                type: 'object',
+                properties: {
+                  empty: { type: 'object', properties: {} },
+                  scalar: 42,
+                },
+              },
+              arr: {
+                type: 'array',
+                items: { type: 'object', properties: {} },
+              },
+            },
+            required: ['nested'],
+          } as never,
+        },
+      ],
+      { strict: true },
+    );
+    expect(nested[0].function.parameters).toHaveProperty('properties');
+
+    const repaired = sanitizeToolCallPairing([
+      { role: 'assistant', content: 'a', tool_calls: [{ id: 'c1', function: { name: 'Read' } }] },
+      { role: 'assistant', content: 'b', tool_calls: [{ id: 'c2', function: { name: 'Read' } }] },
+      { role: 'tool', tool_call_id: 'c2', content: 'ok' },
+    ] as never);
+    expect(repaired.some((m: any) => m.tool_call_id === 'c1' && String(m.content).includes('丢失'))).toBe(true);
+
+    vi.mocked(axios.post).mockResolvedValue(openaiBody(['data: [DONE]\n\n']) as any);
+    await llmClientInvoke({
+      ...baseParams(),
+      apiBase: 'https://api.example.com/anthropic/v1/messages',
+      isDeepThink: true,
+      model: 'other-model',
+      tools: [
+        {
+          name: 'Read',
+          description: 'd',
+          isConcurrencySafe: true,
+          input_schema: { type: 'object', properties: {}, required: [] },
+        },
+      ],
+      toolChoice: 'none',
+    });
+    const anthropicBody = vi.mocked(axios.post).mock.calls.at(-1)![1] as any;
+    expect(anthropicBody.tool_choice).toEqual({ type: 'none' });
+    expect(anthropicBody.thinking).toBeUndefined();
   });
 });

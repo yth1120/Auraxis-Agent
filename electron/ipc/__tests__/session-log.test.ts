@@ -67,6 +67,44 @@ describe('session-log', () => {
     });
   });
 
+  it('covers every remaining engine event mapping branch', () => {
+    const cases: Array<[Record<string, unknown>, string | null]> = [
+      [{ type: 'user', text: 'u', timestamp: 1 }, 'user'],
+      [{ type: 'text', text: 't', timestamp: 1 }, 'assistant_chunk'],
+      [{ type: 'assistant_chunk', text: 'a', timestamp: 1 }, 'assistant_chunk'],
+      [{ type: 'tool_start', toolName: 'Read', toolCallId: 'c', input: {}, timestamp: 1 }, 'tool'],
+      [
+        { type: 'tool_end', toolName: 'Read', toolCallId: 'c', input: {}, output: 'x', durationMs: 1, timestamp: 1 },
+        'tool',
+      ],
+      [{ type: 'tool_aborted', toolName: 'Read', toolCallId: 'c', input: {}, error: 'x', timestamp: 1 }, 'tool'],
+      [{ type: 'tool_progress', toolName: 'Read', toolCallId: 'c', progress: '1', timestamp: 1 }, 'tool'],
+      [{ type: 'plan_updated', plan: {}, timestamp: 1 }, 'system'],
+      [{ type: 'deviance_warning', message: 'x', timestamp: 1 }, 'system'],
+      [{ type: 'context_compressed', tokensBefore: 1, tokensAfter: 2, timestamp: 1 }, 'system'],
+      [{ type: 'usage', inputTokens: 1, outputTokens: 2, timestamp: 1 }, 'system'],
+      [{ type: 'usage_update', inputTokens: 1, outputTokens: 2, timestamp: 1 }, 'system'],
+      [{ type: 'system_message', level: 'info', content: 'x', timestamp: 1 }, 'system'],
+      [{ type: 'user_message', text: 'x', timestamp: 1 }, 'system'],
+      [{ type: 'iteration_end', iteration: 1, timestamp: 1 }, 'system'],
+      [{ type: 'turn_start', turnId: 't', timestamp: 1 }, 'system'],
+      [{ type: 'turn_end', turnId: 't', reason: 'x', timestamp: 1 }, 'system'],
+      [{ type: 'step_start', iteration: 1, timestamp: 1 }, 'system'],
+      [{ type: 'step_end', iteration: 1, timestamp: 1 }, 'system'],
+      [{ type: 'request_start', model: 'm', provider: 'p', timestamp: 1 }, 'system'],
+      [{ type: 'error', error: 'e', timestamp: 1 }, 'system'],
+      [{ type: 'system', data: { event: 'raw' }, timestamp: 1 }, 'system'],
+      [{ type: 'agent_status', status: 'running', text: 'x', timestamp: 1 }, 'agent_status'],
+      [{ type: 'unknown-x', timestamp: 1 }, 'system'],
+      [{ timestamp: 1 }, null],
+    ];
+    for (const [input, type] of cases) {
+      const mapped = mapAgentEventToSessionEvent(input);
+      if (type === null) expect(mapped).toBeNull();
+      else expect(mapped?.type).toBe(type);
+    }
+  });
+
   it('projects an agent run into the shared session shape', async () => {
     await appendAgentLog('agent-3', [
       { type: 'user', text: '帮我读文件', timestamp: 100 },

@@ -12,6 +12,7 @@ npm run test             # vitest 全量
 npm run test:coverage    # 全量 + 覆盖率报告（生成 coverage/coverage-summary.json）
 npm run sdk:build        # packages/auraxis-sdk 编译
 npm run sdk:test         # SDK 测试
+npm run sdk:smoke        # 启动真实无头 runtime 并验证 SDK 连通性
 npm run lint             # ESLint（含 React Hooks 规则，阻断规则错误）
 npm run format:check     # Prettier 格式校验
 npm run check            # lint + 主进程编译 + 渲染层类型检查 + 全量测试
@@ -85,9 +86,9 @@ npm run check            # lint + 主进程编译 + 渲染层类型检查 + 全�
 ## 测试与验证
 
 - 新增/改动必须过：`npx tsc --noEmit`（渲染层）、`npm run electron:compile`（主进程）、`npx vitest run`（全量）、`npx vite build`（构建）。
-- 测试覆盖门槛：lines/statements ≥ 80%、branches ≥ 70%、functions ≥ 80%（`vitest.config.ts`）；最近一次全量报告为 77.58% statements / 79.94% lines / 67.01% branches / 73.85% functions，当前低于门槛，需要补测试后再将门槛视为可守住水平。
-- CI 当前把全量单元测试作为阻断项；覆盖率门槛未达时仍生成报告并在设置页展示，但不再阻断平台 Release（见 `.github/workflows/build.yml`）。
+- 单元覆盖率门槛：lines/statements ≥ 80%、branches ≥ 80%、functions ≥ 80%（`vitest.config.mts`）；最近一次全仓库分支门禁报告为 88.50% statements / 90.79% lines / 80.04% branches / 87.08% functions，四项均已达标。
+- 全仓库分支门禁统计范围：`electron/**`、`src/stores/**`、`src/core/**`；`main.ts` / `preload.ts` 依赖真实 Electron 窗口生命周期，由真实 Electron E2E、SDK smoke 与 headless CLI 验证并明确排除。CI 全量单元测试是三项平台阻断项，Linux 默认执行单元 coverage gate（见 `.github/workflows/build.yml`）。
 - 覆盖率报告：`npm run test:coverage` 同时输出 `coverage/coverage-summary.json`（gitignore，开发期产物），设置面板「测试覆盖率」页经 `coverage:get` IPC 实时读取该文件；README / AGENTS / docs 中的用例数与覆盖率数字以最近一次全量覆盖率为准，更新后必须同步。
-- 覆盖率统计范围：`electron/ipc/`、`src/stores/`、`src/core/`（不含 `src/components/` 与主进程入口）；UI 由组件级测试覆盖，桌面端到端链路由 `npm run test:smoke` 覆盖。
-- 端到端：`npm run test:e2e`（Playwright 启动真实 Electron，覆盖启动/模式切换/发消息/快捷卡片/设置主题/本地注册登录等 16 条链路）；改动渲染层或主进程启动链路后必须重跑。
+- 覆盖率统计范围：全仓库可单测部分（不含 `src/components/` 与主进程入口）；UI 由组件级测试覆盖，桌面端到端链路由 `npm run test:smoke` 覆盖。
+- 端到端：`npm run test:e2e`（Playwright 启动真实 Electron，覆盖启动/模式切换/发消息/快捷卡片/设置主题/本地注册登录等 16 条链路）；改动渲染层或主进程启动链路后必须重跑。SDK 链路必须通过 `npm run sdk:smoke` 启动真实无头 runtime 并验证 `ping`。
 - 主进程模块依赖 `electron` 的测试需 `vi.mock('electron', ...)`；纯逻辑优先抽成可测函数。

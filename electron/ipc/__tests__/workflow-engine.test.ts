@@ -6,6 +6,7 @@ import {
   topoOrder,
   renderTemplate,
   listWorkflows,
+  listWorkflowRuns,
   getWorkflowRun,
   startWorkflow,
   parseMarkdownWorkflow,
@@ -166,5 +167,37 @@ describe('workflow-engine', () => {
 
   it('returns null for a missing run', async () => {
     expect(await getWorkflowRun('missing')).toBeNull();
+  });
+
+  it('lists, filters and sorts workflow runs', async () => {
+    const oldRun = {
+      runId: 'old',
+      workflowId: 'wf-1',
+      workflowName: '测试工作流',
+      status: 'completed',
+      startedAt: 1,
+      endedAt: 2,
+      steps: {},
+    };
+    const newRun = {
+      ...oldRun,
+      runId: 'new',
+      startedAt: 3,
+      endedAt: 4,
+    };
+    await fs.writeFile(path.join(runsDir, 'old.json'), JSON.stringify(oldRun), 'utf8');
+    await fs.writeFile(path.join(runsDir, 'new.json'), JSON.stringify(newRun), 'utf8');
+    await fs.writeFile(path.join(runsDir, 'broken.json'), '{bad json', 'utf8');
+
+    expect(await listWorkflowRuns()).toEqual([newRun, oldRun]);
+    expect(await listWorkflowRuns('wf-1')).toHaveLength(2);
+    expect(await listWorkflowRuns('missing')).toEqual([]);
+  });
+
+  it('ignores malformed workflow files and empty directories', async () => {
+    await fs.writeFile(path.join(wfDir, 'bad.json'), '{bad json', 'utf8');
+    await fs.writeFile(path.join(wfDir, 'empty.md'), '没有步骤', 'utf8');
+    expect(await listWorkflows()).toEqual([]);
+    expect(await listWorkflowRuns()).toEqual([]);
   });
 });

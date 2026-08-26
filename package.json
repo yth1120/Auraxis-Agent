@@ -3,6 +3,22 @@
   "version": "3.2.0",
   "description": "Auraxis - 桌面端 AI 智能体工作台：编码 / 文档 / 自动化，支持多智能体调度与插件扩展",
   "author": "Auraxis",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yth1120/Auraxis-Agent.git"
+  },
+  "homepage": "https://github.com/yth1120/Auraxis-Agent#readme",
+  "bugs": {
+    "url": "https://github.com/yth1120/Auraxis-Agent/issues"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "electron",
+    "mcp",
+    "desktop",
+    "workbench"
+  ],
   "license": "MIT",
   "main": "dist-electron/main.js",
   "scripts": {
@@ -17,6 +33,7 @@
     "sdk:build": "tsc -p packages/auraxis-sdk/tsconfig.json",
     "sdk:test": "vitest run packages/auraxis-sdk",
     "sdk:test:py": "python -m unittest discover -s python/auraxis_sdk/tests -t python/auraxis_sdk",
+    "sdk:smoke": "node scripts/sdk-smoke.cjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",

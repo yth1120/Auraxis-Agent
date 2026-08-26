@@ -299,3 +299,40 @@ describe('registerAgentHandlers', () => {
     expect(getSubAgentStates()).toHaveLength(0);
   });
 });
+
+describe('agent-handlers — settings and lifecycle edge branches', () => {
+  it('derives model/plan/sandbox settings and honors active parent signals', async () => {
+    const { readSettings } = await import('../settings-store');
+    vi.mocked(readSettings).mockResolvedValue({
+      deepseekApiKey: 'sk',
+      executeModel: '',
+      selectedModel: 'selected-model',
+      planModel: 'plan-model',
+      fallbackModel: 'fallback-model',
+      agentMaxIterations: 7,
+      sandboxMode: 'read',
+      timeContext: false,
+    } as any);
+    const parent = new AbortController();
+    const p = runSubAgent(baseParams({ background: true, parentSignal: parent.signal }));
+    await vi.waitFor(() => expect(h.loops).toHaveLength(1));
+    expect(h.loops[0].opts).toMatchObject({
+      model: 'selected-model',
+      planModel: 'plan-model',
+      fallbackModel: 'fallback-model',
+      maxIterations: 7,
+      sandboxMode: 'read',
+      timeContext: false,
+    });
+    parent.abort();
+    h.loops[0].resolve(settledResult({ allText: '' }));
+    await p;
+    await vi.waitFor(() => expect(cacheTaskResult).toHaveBeenCalled());
+    expect(cacheTaskResult).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ status: 'stopped', result: '任务完成' }),
+      'stopped',
+    );
+  });
+
+});

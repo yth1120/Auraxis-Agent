@@ -55,12 +55,11 @@
 
 ### Quality
 
-- Full check passes: 245 test files / 1,802 passing cases (+3 environment skips).
-- Production smoke, Electron IPC, skill seeding, and MCP handshake tests pass.
-- Latest coverage: 79.94% lines, 77.58% statements, 67.01% branches,
-  73.85% functions; coverage reports continue to be generated and shown in
-  Settings while the configured thresholds are not used to block platform
-  releases.
+- Full check passes: 261 test files / 1,992 passing cases (+3 environment skips).
+- Production smoke, SDK live runtime smoke, Electron IPC, skill seeding, and MCP handshake tests pass.
+- Latest full branch coverage gate: 90.79% lines, 88.50% statements, 80.04% branches,
+  87.08% functions; the gate covers all unit-testable Electron + stores/core code,
+  while Electron main entry remains verified by real E2E and SDK smoke.
 - Docs and changelog updated for the 3.2.0 release.
 
 ### Release Artifacts

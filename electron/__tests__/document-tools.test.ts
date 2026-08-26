@@ -1,102 +1,139 @@
-import { describe, it, expect, afterAll } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { promises as fs } from 'fs';
 import os from 'os';
 import path from 'path';
 import { readDocument, writeDocument } from '../document-tools';
 
-const tmp = fs.mkdtemp(path.join(os.tmpdir(), 'auraxis-docs-'));
-const cleanup: string[] = [];
+let root: string;
 
-afterAll(async () => {
-  for (const dir of cleanup) {
-    await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
-  }
+beforeEach(async () => {
+  root = await fs.mkdtemp(path.join(os.tmpdir(), 'auraxis-doc-'));
 });
 
-async function scratch(): Promise<string> {
-  const dir = await tmp;
-  const sub = path.join(dir, `case-${Math.random().toString(36).slice(2, 8)}`);
-  await fs.mkdir(sub, { recursive: true });
-  cleanup.push(sub);
-  return sub;
-}
+afterEach(async () => {
+  await fs.rm(root, { recursive: true, force: true });
+});
 
-describe('document-tools', () => {
-  it('writes and reads docx', async () => {
-    const dir = await scratch();
-    const file = path.join(dir, 'report.docx');
-    await writeDocument(file, {
-      title: '测试报告',
+describe('document-tools — real file round trips', () => {
+  it('writes and reads docx with headings, bullets, tables and page breaks', async () => {
+    const file = path.join(root, 'demo.docx');
+    const written = await writeDocument(file, {
+      title: 'Auraxis',
+      author: 'Test',
       blocks: [
-        { type: 'heading', text: '第一章', level: 1 },
-        { type: 'paragraph', text: '这是段落内容 hello world' },
-        {
-          type: 'table',
-          rows: [
-            ['A', 'B'],
-            ['1', '2'],
-          ],
-        },
+        { type: 'heading', text: 'Heading', level: 3 },
+        { type: 'bullet', text: 'bullet' },
+        { type: 'numbered', text: 'number', level: 2 },
+        { type: 'table', rows: [['a', 'b']] },
+        { type: 'pageBreak' },
+        { type: 'paragraph', text: 'last' },
       ],
     });
-    const r = await readDocument(file);
-    expect(r.format).toBe('docx');
-    expect(r.text).toContain('这是段落内容 hello world');
-    expect(r.bytes).toBeGreaterThan(0);
+    expect(written).toMatchObject({ format: 'docx' });
+    const read = await readDocument(file);
+    expect(read.format).toBe('docx');
+    expect(read.text).toContain('Heading');
+    expect(read.bytes).toBeGreaterThan(0);
   });
 
-  it('writes and reads xlsx with sheets', async () => {
-    const dir = await scratch();
-    const file = path.join(dir, 'data.xlsx');
+  it('writes and reads xlsx sheets and rejects empty sheets', async () => {
+    const file = path.join(root, 'demo.xlsx');
     await writeDocument(file, {
       sheets: [
         {
-          name: '数据',
+          name: 'Sheet1',
           rows: [
-            ['列A', '列B'],
-            ['1', '2'],
+            ['a', 'b'],
+            ['c', 'd'],
           ],
         },
       ],
     });
-    const r = await readDocument(file);
-    expect(r.format).toBe('xlsx');
-    expect(r.sheets).toHaveLength(1);
-    expect(r.sheets?.[0].rows[1]).toEqual(['1', '2']);
-    expect(r.text).toContain('列A');
+    const read = await readDocument(file);
+    expect(read.sheets?.[0].rows).toHaveLength(2);
+    await expect(writeDocument(path.join(root, 'empty.xlsx'), { sheets: [] })).rejects.toThrow('至少需要一个');
   });
 
   it('writes and reads pptx slides', async () => {
-    const dir = await scratch();
-    const file = path.join(dir, 'deck.pptx');
+    const file = path.join(root, 'demo.pptx');
     await writeDocument(file, {
-      slides: [{ title: '季度汇报', bullets: ['第一点', '第二点'], notes: '讲解备注' }],
+      slides: [{ title: 'Title', subtitle: 'Sub', bullets: ['one', 'two'], notes: 'note' }],
     });
-    const r = await readDocument(file);
-    expect(r.format).toBe('pptx');
-    expect(r.text).toContain('季度汇报');
-    expect(r.text).toContain('第一点');
+    const read = await readDocument(file);
+    expect(read.format).toBe('pptx');
+    expect(read.text).toContain('Title');
+    await expect(writeDocument(path.join(root, 'empty.pptx'), {})).rejects.toThrow('至少需要一个 slides');
   });
 
-  it('writes and reads pdf', async () => {
-    const dir = await scratch();
-    const file = path.join(dir, 'doc.pdf');
+  it('writes and reads pdf with headings, paragraphs and page breaks', async () => {
+    const file = path.join(root, 'demo.pdf');
     await writeDocument(file, {
-      title: 'PDF 标题',
+      title: 'PDF',
       blocks: [
-        { type: 'heading', text: '第一节', level: 1 },
-        { type: 'paragraph', text: 'PDF content hello world 中文' },
+        { type: 'heading', text: 'A heading', level: 2 },
+        { type: 'paragraph', text: 'body text' },
+        { type: 'pageBreak' },
       ],
     });
-    const r = await readDocument(file);
-    expect(r.format).toBe('pdf');
-    expect(r.text).toContain('PDF content hello world');
-    expect(r.pageCount).toBeGreaterThanOrEqual(1);
+    const read = await readDocument(file);
+    expect(read.format).toBe('pdf');
+    expect(read.text).toContain('A heading');
+    expect(read.pageCount).toBeGreaterThan(0);
   });
 
-  it('rejects unsupported extensions', async () => {
-    const dir = await scratch();
-    await expect(writeDocument(path.join(dir, 'x.txt'), { title: 'x' })).rejects.toThrow('不支持');
-    await expect(readDocument(path.join(dir, 'x.txt'))).rejects.toThrow('不支持');
+  it('rejects unsupported extensions on read and write', async () => {
+    const file = path.join(root, 'demo.txt');
+    await fs.writeFile(file, 'x', 'utf8');
+    await expect(readDocument(file)).rejects.toThrow('不支持的文件类型');
+    await expect(writeDocument(file, {})).rejects.toThrow('不支持的目标类型');
+  });
+
+  it('covers document spec fallbacks, heading levels and null cells', async () => {
+    const docx2 = path.join(root, 'fallback.docx');
+    await writeDocument(docx2, {
+      blocks: [
+        { type: 'heading', text: 'H1', level: 1 },
+        { type: 'heading', text: 'H2', level: 2 },
+        { type: 'heading', text: 'H4', level: 4 },
+        { type: 'heading', text: 'H5', level: 5 },
+        { type: 'heading', text: 'H6', level: 6 },
+        { type: 'table', rows: [[null, undefined, 'x' as never]] },
+        { type: 'paragraph', text: 'plain' },
+      ],
+    });
+    expect(await readDocument(docx2)).toMatchObject({ format: 'docx' });
+
+    const xlsx2 = path.join(root, 'fallback.xlsx');
+    await writeDocument(xlsx2, {
+      blocks: [
+        { type: 'table', rows: [['a'], [null, 'b' as never]] },
+      ],
+    });
+    expect((await readDocument(xlsx2)).sheets?.[0]?.rows).toHaveLength(1);
+
+    const pptx2 = path.join(root, 'fallback.pptx');
+    await writeDocument(pptx2, {
+      title: 'Title only',
+      blocks: [{ type: 'bullet', text: 'bullet' }],
+    });
+    expect(await readDocument(pptx2)).toMatchObject({ format: 'pptx' });
+
+    const pptx3 = path.join(root, 'minimal.pptx');
+    await writeDocument(pptx3, { slides: [{ title: 'Slide' }] });
+    expect(await readDocument(pptx3)).toMatchObject({ format: 'pptx' });
+
+    const pdf2 = path.join(root, 'fallback.pdf');
+    await writeDocument(pdf2, {
+      blocks: [
+        { type: 'heading', text: 'heading', level: 5 },
+        { type: 'paragraph', text: 'body' },
+      ],
+    });
+    expect(await readDocument(pdf2)).toMatchObject({ format: 'pdf' });
+
+    const noExt = path.join(root, 'no-extension');
+    await fs.writeFile(noExt, 'x', 'utf8');
+    await expect(readDocument(noExt)).rejects.toThrow('无扩展名');
+    await expect(writeDocument(noExt, {})).rejects.toThrow('无扩展名');
   });
 });

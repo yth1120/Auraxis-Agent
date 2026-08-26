@@ -39,6 +39,25 @@ describe('web-search providers', () => {
     expect(results[0]).toMatchObject({ title: '结果 A', snippet: '这是摘要 A', url: 'https://example.com/a' });
   });
 
+  it('handles empty and partial provider responses', () => {
+    expect(parseDuckDuckGoHtml('')).toEqual([]);
+    expect(parseExaResponse({})).toEqual([]);
+    expect(parseExaResponse({ results: [{ title: 'no-url', text: 'x' }] })).toEqual([
+      { title: 'no-url', snippet: 'x', url: '' },
+    ]);
+    expect(parsePerplexityResponse({})).toEqual([]);
+    expect(parsePerplexityResponse({ choices: [{ message: { content: '' } }], citations: [] })).toEqual([]);
+    expect(parseDeepSeekSearchResponse({ content: [] })).toEqual([]);
+    expect(
+      parseDeepSeekSearchResponse({
+        content: [
+          { type: 'web_search_tool_result', content: [{ type: 'unknown', url: 'https://a' }] },
+          { type: 'web_search_tool_result', content: [{ type: 'web_search_result', url: 'https://b' }] },
+        ],
+      }),
+    ).toEqual([{ title: '', snippet: '', url: 'https://b' }]);
+  });
+
   it('builds Exa requests and parses responses', () => {
     const req = buildExaRequest('hello', 'exa-key');
     expect(req.url).toBe('https://api.exa.ai/search');
@@ -105,6 +124,7 @@ describe('web-search providers', () => {
     expect(resolveWebSearchProvider({ webSearchProvider: 'exa', exaApiKey: 'k1' }).apiKey).toBe('env-key');
     delete process.env.EXA_API_KEY;
     expect(resolveWebSearchProvider({ webSearchProvider: 'unknown' }).provider.id).toBe('duckduckgo');
+    expect(resolveWebSearchProvider({ webSearchProvider: 123 }).provider.id).toBe('deepseek');
   });
 
   it('falls back to DuckDuckGo when the preferred provider fails', async () => {

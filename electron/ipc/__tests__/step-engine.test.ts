@@ -274,6 +274,133 @@ describe('step-engine', () => {
     );
   });
 
+  it('appends image results, spills oversized tool output and forwards metadata', async () => {
+    llmMock.mockImplementation(async (params: any) => {
+      params.onUsage?.({
+        inputTokens: 1,
+        outputTokens: 2,
+        reasoningTokens: undefined,
+        cacheHitTokens: undefined,
+        cacheMissTokens: undefined,
+      });
+      params.onTextChunk?.('hello');
+      return {
+        contentTimeline: [],
+        toolCalls: [
+          { id: 'img1', name: 'Read', input: { file_path: 'a.ts' } },
+          { id: 'big1', name: 'Bash', input: { command: 'echo x' } },
+        ],
+        rawText: '',
+        thinkingText: '',
+        isFinal: false,
+        completionStopReason: 'tool_use',
+      };
+    });
+    const executeTool = vi.fn(async (name: string) =>
+      name === 'Read'
+        ? { output: { image: 'data:image/png;base64,AA==' } }
+        : { output: 'x'.repeat(40_000) },
+    );
+    const { cfg, events } = makeCfg({
+      model: 'deepseek-v4-flash-vision-exp',
+      executeTool: executeTool as any,
+      getPendingNudge: () => 'follow up',
+    });
+    const state = createStepState([]);
+    state.iteration = 1;
+    const outcome = await runStep(cfg, state, 'g1');
+    expect(outcome.status).toBe('continue');
+    expect(state.messages.some((m) => Array.isArray(m.content) && String(m.content[0]?.type) === 'image_url')).toBe(
+      true,
+    );
+    expect(events.some((e) => e.type === 'usage')).toBe(true);
+    expect(state.messages.some((m) => String(m.content).includes('follow up'))).toBe(true);
+  });
+
+  it('switches to a fallback model after repeated retryable failures', async () => {
+    llmMock
+      .mockRejectedValueOnce({ response: { status: 500 }, code: 'ERR' })
+      .mockRejectedValueOnce({ response: { status: 500 }, code: 'ERR' })
+      .mockRejectedValueOnce({ response: { status: 500 }, code: 'ERR' })
+      .mockResolvedValueOnce(finalAssistant);
+    const { cfg, events } = makeCfg({ fallbackModel: 'deepseek-v4-flash' });
+    const state = createStepState([]);
+    state.iteration = 1;
+    const outcome = await runStep(cfg, state, 'g1');
+    expect(outcome.status).toBe('stop');
+    expect(events.some((e) => e.type === 'system_message' && String((e as any).content).includes('降级模型'))).toBe(
+      true,
+    );
+  });
+
+  it('injects pending nudges only when present and forwards tmux context', async () => {
+    resetTmuxLocationCache();
+    process.env.TMUX = 'tmux';
+    setShellExecutor({
+      run: async () => ({ stdout: 'main:code.1\n', stderr: '', exitCode: 0, timedOut: false, truncated: false }),
+    });
+    try {
+      llmMock.mockResolvedValue(finalAssistant);
+      const { cfg } = makeCfg({
+        tmuxContext: true,
+        getPendingNudge: () => '',
+      });
+      const state = createStepState([]);
+      state.iteration = 1;
+      await runStep(cfg, state, 'g1');
+      expect(state.messages.some((m) => String(m.content).includes('tmux main:code.1'))).toBe(true);
+      expect(state.messages.some((m) => String(m.content).includes('follow up'))).toBe(false);
+    } finally {
+      delete process.env.TMUX;
+    }
+  });
+
+  it('forwards complete usage metadata and non-retryable API error bodies', async () => {
+    llmMock.mockImplementation(async (params: any) => {
+      params.onTextChunk?.('first');
+      params.onUsage?.({
+        inputTokens: 1,
+        outputTokens: 2,
+        reasoningTokens: 3,
+        cacheHitTokens: 4,
+        cacheMissTokens: 5,
+      });
+      return finalAssistant;
+    });
+    const { cfg, events } = makeCfg();
+    const state = createStepState([]);
+    state.iteration = 1;
+    await runStep(cfg, state, 'g1');
+    expect(events.some((e) => e.type === 'usage')).toBe(true);
+
+    llmMock.mockRejectedValueOnce({ response: { status: 400, statusText: 'Bad Request' } });
+    const errorState = createStepState([]);
+    errorState.iteration = 2;
+    await expect(runStep(makeCfg().cfg, errorState, 'g2')).rejects.toMatchObject({
+      response: { status: 400 },
+    });
+  });
+
+  it('covers sandbox env fallback and default compress mode', async () => {
+    process.env.AURAXIS_SANDBOX_MODE = 'read';
+    try {
+      llmMock.mockResolvedValue({
+        contentTimeline: [],
+        toolCalls: [{ id: 's1', name: 'Read', input: { file_path: 'a.ts' } }],
+        rawText: '',
+        thinkingText: '',
+        isFinal: false,
+        completionStopReason: 'tool_use',
+      });
+      const { cfg } = makeCfg({ compressMode: undefined });
+      const state = createStepState([]);
+      state.iteration = 1;
+      await runStep(cfg, state, 'g1');
+    } finally {
+      delete process.env.AURAXIS_SANDBOX_MODE;
+    }
+  });
+
   describe('tmux context', () => {
     beforeEach(() => {
       resetTmuxLocationCache();

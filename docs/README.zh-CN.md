@@ -32,8 +32,8 @@ Auraxis v3.2.0 是一款基于 Electron 的桌面端智能体工作台，融合�
   聚焦模块；移除生产代码剩余 `any`；迁移 Zustand selector 与废弃 AntD props；
   加固 IPC / Agent / Store 类型；修复登录与 Windows userData；稳定测试、
   E2E 与三平台 CI，并本地锁定 `image-size`。
-- **质量门禁**：245 个测试文件 / 1,802 用例通过（另有 3 例环境性跳过），
-  SDK 构建、E2E、审计与三平台 Release CI 均通过。
+- **质量门禁**：261 个测试文件 / 1,992 用例通过（另有 3 例环境性跳过），
+  SDK 构建、SDK 真实 runtime 冒烟、E2E、审计与三平台 Release CI 均通过。
 
 ### 技术栈
 
@@ -166,7 +166,7 @@ Auraxis/
 │       ├── session-store.ts     # 聊天/Agent 统一 JSONL 事件日志
 │       ├── sandbox-runner.ts    # 原生沙箱调度（restricted/AppContainer/linux/macos）
 │       ├── acp-server.ts / sdk-server.ts / headless-run.ts  # ACP / JSON-RPC SDK / 无头执行
- │       └── __tests__/           # 主进程测试（全仓 245 个测试文件 / 1802 用例）
+│       └── __tests__/           # 主进程测试（全仓 261 个测试文件 / 1,992 用例）
 │
 ├── src/                         # 渲染进程代码（浏览器环境）
 │   ├── main.tsx                 # React 入口
@@ -227,7 +227,7 @@ Auraxis/
 ├── tsconfig.node.json           # Vite 配置专用（composite project reference）
 ├── tsconfig.electron.json       # 主进程 TS 配置（CommonJS → dist-electron/, rootDir: electron/）
 ├── vite.config.mts              # Vite 构建配置
-├── vitest.config.ts             # 测试配置（覆盖率阈值：80% 行 / 70% 分支 / 80% 函数）
+├── vitest.config.mts            # 测试配置（阈值：行/语句/分支/函数 ≥80%）
 ├── electron-builder.yml         # 打包配置（NSIS/DMG/AppImage）
 └── .env.example                 # 环境变量模板
 ```
@@ -970,14 +970,14 @@ dist-electron/ + dist/ ──→ electron-builder ──→ release/
 - **测试框架**：Vitest（`describe`, `it`, `expect`, `vi` 通过 globals 注入）
 - **主进程测试**：`electron/**/__tests__/`，node 环境，依赖 `electron` 的模块用 `vi.mock('electron', ...)` 隔离
 - **渲染进程测试**：`src/**/__tests__/`，jsdom 环境（@testing-library/react）
-- **测试总数**：245 个测试文件 / 1802 个用例通过（另有 3 例环境性跳过）
-- **覆盖率口径**：门槛统计范围仅为 `electron/ipc/`、`src/stores/`、`src/core/`；UI 组件（`src/components/`）与主进程入口（`main.ts` / `preload.ts` 等）不计入该门槛，另有组件级测试与 Playwright 端到端测试（`npm run test:e2e`）覆盖
-- **覆盖率阈值**：行/语句 80%，分支 70%，函数 80%（scope: `electron/ipc/`, `src/stores/`, `src/core/`；最近一次全量报告为 77.58% statements / 79.94% lines / 67.01% branches / 73.85% functions，当前低于门槛）
+- **测试总数**：261 个测试文件 / 1,992 个用例通过（另有 3 例环境性跳过）
+- **覆盖率口径**：门槛统计范围包括 `electron/**`、`src/stores/**`、`src/core/**`；UI 组件（`src/components/`）与主进程入口（`main.ts` / `preload.ts` 等）不计入该门槛，另有组件级测试与 Playwright 端到端测试（`npm run test:e2e`）覆盖
+- **覆盖率阈值**：行/语句 ≥ 80%，分支 ≥ 80%，函数 ≥ 80%（最近一次全仓库分支门禁报告为 88.50% statements / 90.79% lines / 80.04% branches / 87.08% functions，四项均已达标；Electron 主入口由真实 E2E、SDK smoke 与 headless CLI 验证，Linux CI 默认执行覆盖率门禁）
 - **覆盖率报告**：`npm run test:coverage` 同时输出 `coverage/coverage-summary.json`（gitignore 的开发期产物）；设置面板「测试覆盖率」页经 `coverage:get` IPC 实时读取，纯浏览器 dev 由 Vite 中间件提供同一路径，生产构建将其拷入 `dist/coverage/`。报告缺失时面板提示运行命令，不显示伪造数字。
 - **端到端测试**：16 条 Playwright UI 链路通过（真实 Electron，含本地注册 → 登录 → 记住我持久化）
 - **实战验收（DeepSeek 真实 API）**：Chat 流式回答、Code 自动代批 Bash、Code「每次确认」权限卡（允许一次后写入文件）、Work 智能放行执行流、Work 计划审批面板均跑通；沙箱脚本直启 `dist-electron/main.js` 时增加 cwd 回退（`electron/sandbox-runner.ts`）。
 - **压力测试（本地 mock LLM + 真实 Electron）**：200 会话冷启动约 1.4s、会话切换约 155ms、FTS 重建约 178ms；18 个 Agent（6 并发）与 30 个 Agent（8 并发）全部完成、无失败；极端负载（30 个任务 + 200 行侧栏同时渲染）下快速模式切换偶发 8–11s 卡顿并有一次超过 15s，负载结束后自动恢复；默认 3 并发下无此现象。
-- **环境限制**：本机未安装真实 Python（仅 Microsoft Store 占位符），`npm run sdk:test:py` 无法执行；JS SDK 7 个用例通过。
+- **环境**：已通过 winget 安装 Python 3.10.11；`npm run sdk:test:py` 7 个用例通过，`npm run sdk:smoke` 已验证真实无头 runtime。
 - **运行命令**：`npm test`（全量）、`npm run test:backend`（主进程）、`npm run test:frontend`（渲染进程）、`npm run test:coverage`（覆盖率报告）
 
 ### 13.3 类型契约

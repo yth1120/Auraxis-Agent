@@ -181,6 +181,29 @@ describe('Bash — 参数校验', () => {
   });
 });
 
+describe('Pwsh — 本地 PowerShell 执行', () => {
+  it('validates command and routes to powershell fallback', async () => {
+    expect((await executeToolCall('Pwsh', {}, ctx())).error).toContain('缺少 command');
+    const promise = executeToolCall('Pwsh', { command: 'Write-Output hi', workdir: '.', timeout: 1000 }, ctx());
+    await vi.waitFor(() => expect(childMocks.spawn).toHaveBeenCalled());
+    expect(childMocks.spawn.mock.calls[0][0]).toBe('powershell.exe');
+    lastChild.stdout.emit('data', Buffer.from('hi\n'));
+    lastChild.emit('close', 0);
+    const result = await promise;
+    expect(result.output).toMatchObject({ stdout: 'hi\n', exitCode: 0 });
+  });
+
+  it('uses pwsh when detected and rejects invalid timeout', async () => {
+    childMocks.execSync.mockRestore();
+    vi.mocked(childMocks.execSync).mockImplementation(() => '');
+    const promise = executeToolCall('Pwsh', { command: 'Get-Date', timeout: -1 }, ctx());
+    await vi.waitFor(() => expect(childMocks.spawn).toHaveBeenCalled());
+    expect(childMocks.spawn.mock.calls[0][0]).toBe('pwsh');
+    lastChild.emit('close', 0);
+    await promise;
+  });
+});
+
 describe('Bash — 一次性执行', () => {
   it('正常输出与退出码', async () => {
     const p = executeToolCall('Bash', { command: 'echo hi', timeout: 10000 }, ctx());

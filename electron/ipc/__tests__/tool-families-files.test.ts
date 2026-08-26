@@ -10,6 +10,9 @@ vi.mock('electron', () => ({
   ipcMain: { handle: vi.fn(), on: vi.fn(), removeListener: vi.fn() },
   BrowserWindow: { fromWebContents: () => null, getAllWindows: () => [] },
 }));
+vi.mock('child_process', () => ({
+  spawnSync: vi.fn(),
+}));
 vi.mock('../permission-profile', () => ({
   evaluateToolProfileGate: vi.fn(async () => ({ allowed: true, reason: '' })),
 }));
@@ -45,6 +48,17 @@ vi.mock('../settings-store', () => ({
 }));
 
 import { executeToolCall } from '../tool-handlers';
+import {
+  runRead,
+  runWrite,
+  runEdit,
+  runStrReplaceEditor,
+  runDelete,
+  runGitCommit,
+  runGrep,
+  runGlob,
+} from '../tool-handlers/file-tools';
+import { spawnSync } from 'child_process';
 import { attachmentMimeFor, storeAttachment } from '../../attachments';
 import { searchWithProvider } from '../../web-search';
 
@@ -297,5 +311,67 @@ describe('WebFetch / WebSearch', () => {
 
     vi.mocked(searchWithProvider).mockRejectedValueOnce(new Error('provider down'));
     expect((await executeToolCall('WebSearch', { query: 'q' }, ctx())).error).toContain('搜索失败');
+  });
+});
+
+describe('file-tools direct edge branches', () => {
+  it('covers read/write/edit/delete validation and abort branches', async () => {
+    const ctrl = new AbortController();
+    ctrl.abort();
+    expect((await runRead({ file_path: 'a.ts' }, ctx({ abortSignal: ctrl.signal }))).error).toBe('操作已取消');
+    expect((await runWrite({ file_path: 'a.docx', content: 'x' }, ctx())).error).toContain('WriteDocument');
+    expect((await runWrite({ file_path: 'evil.exe', content: 'x' }, ctx({ autoApprove: false }))).error).toContain(
+      '不允许',
+    );
+    expect((await runEdit({ file_path: 'a.docx', old_string: 'x', new_string: 'y' }, ctx())).error).toContain(
+      'ReadDocument',
+    );
+    expect((await runEdit({ file_path: 'a.ts', old_string: '', new_string: 'y' }, ctx())).error).toContain(
+      'old_string',
+    );
+    expect((await runDelete({ file_path: '' }, ctx())).error).toContain('缺少');
+  });
+
+  it('covers the str_replace editor commands and git commit failures', async () => {
+    expect((await runStrReplaceEditor({ path: 'a.ts', command: '' }, ctx())).error).toContain('不支持');
+    expect((await runStrReplaceEditor({ path: 'a.ts', command: 'view' }, ctx())).output).toMatchObject({
+      total_lines: 3,
+    });
+    expect((await runStrReplaceEditor({ path: 'new-editor.ts', command: 'create', file_text: 'x' }, ctx())).output).toMatchObject(
+      { action: 'created' },
+    );
+    expect((await runStrReplaceEditor({ path: 'new-editor.ts', command: 'create', file_text: 'y' }, ctx())).error).toContain(
+      '已存在',
+    );
+    expect((await runStrReplaceEditor({ path: 'a.ts', command: 'str_replace', old_str: 'a = 1', new_str: 'a = 2' }, ctx())).output).toMatchObject(
+      { replaced: true },
+    );
+    expect((await runStrReplaceEditor({ path: 'a.ts', command: 'insert', new_str: 'line' }, ctx())).output).toMatchObject({
+      inserted: true,
+    });
+    expect((await runStrReplaceEditor({ path: 'a.ts', command: 'insert', new_str: 'x', insert_line: 99 }, ctx())).error).toContain(
+      '超出',
+    );
+    expect((await runStrReplaceEditor({ path: 'a.ts', command: 'str_replace' }, ctx())).error).toContain('需要');
+
+    vi.mocked(spawnSync).mockReturnValueOnce({ status: 1, stderr: 'add failed' } as any);
+    expect((await runGitCommit({ message: 'm' }, ctx())).error).toContain('add failed');
+    vi.mocked(spawnSync)
+      .mockReturnValueOnce({ status: 0 } as any)
+      .mockReturnValueOnce({ status: 1, stderr: 'nothing to commit' } as any);
+    expect((await runGitCommit({ message: 'm' }, ctx())).output).toMatchObject({ committed: false });
+    vi.mocked(spawnSync)
+      .mockReturnValueOnce({ status: 0 } as any)
+      .mockReturnValueOnce({ status: 1, stderr: 'commit failed' } as any);
+    expect((await runGitCommit({ message: 'm' }, ctx())).error).toContain('commit failed');
+  });
+
+  it('covers grep/glob boundary, file targets and direct request paths', async () => {
+    expect((await runGrep({ pattern: 'a', path: '../outside' }, ctx({ autoApprove: false }))).error).toContain('越权');
+    expect((await runGrep({ pattern: 'a', path: 'a.ts' }, ctx())).output).toMatchObject({ match_count: 1 });
+    expect((await runGlob({ pattern: '**', path: '../outside' }, ctx({ autoApprove: false }))).error).toContain('越权');
+    expect((await runGlob({ pattern: '*.md', path: '.' }, ctx({ autoApprove: false }))).output).toMatchObject({
+      match_count: 1,
+    });
   });
 });

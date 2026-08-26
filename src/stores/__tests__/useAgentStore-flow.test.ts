@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   pause: vi.fn(),
   resume: vi.fn(),
   continue: vi.fn(),
+  approveDelivery: vi.fn(),
   setPriority: vi.fn(),
   setMaxConcurrent: vi.fn(),
   getAll: vi.fn(),
@@ -29,6 +30,7 @@ function setAgentIpc() {
       pause: mocks.pause,
       resume: mocks.resume,
       continue: mocks.continue,
+      approveDelivery: mocks.approveDelivery,
       setPriority: mocks.setPriority,
       setMaxConcurrent: mocks.setMaxConcurrent,
       getAll: mocks.getAll,
@@ -69,6 +71,7 @@ beforeEach(async () => {
   mocks.pause.mockResolvedValue({ ok: true });
   mocks.resume.mockResolvedValue({ ok: true });
   mocks.continue.mockResolvedValue({ ok: true });
+  mocks.approveDelivery.mockResolvedValue({ ok: true });
   mocks.setPriority.mockResolvedValue({ ok: true });
   mocks.setMaxConcurrent.mockResolvedValue({ ok: true });
   mocks.getAll.mockResolvedValue({ ok: true, data: [] });
@@ -190,6 +193,42 @@ describe('useAgentStore — 事件流与日志', () => {
     expect(a.plan).toEqual({
       todos: [{ content: '步骤', status: 'pending', activeForm: '执行: 步骤' }],
     });
+  });
+
+  it('event subscription covers missing ids, Planning progress and Work delivery', async () => {
+    sharedOnUpdated({ name: 'no-id' });
+    sharedOnUpdated({ id: 'a1', name: 'T', status: 'completed' });
+    useAgentStore.setState({
+      agents: [
+        {
+          id: 'a1',
+          name: 'T',
+          description: '',
+          type: 'x',
+          status: 'running',
+          priority: 'normal',
+          startTime: 1,
+          iteration: 0,
+          maxIterations: 200,
+          toolCallCount: 0,
+          messagesCount: 0,
+          log: [],
+          surface: 'work',
+          config: { surface: 'work' },
+        } as any,
+      ],
+    });
+    sharedOnEvent({ type: 'tool_progress', toolName: 'Planning', progress: 'progress' });
+    sharedOnEvent({ type: 'tool_start', toolName: 'Write', toolCallId: 'w1', input: { file_path: 'a.md' } });
+    sharedOnEvent({
+      type: 'tool_end',
+      toolName: 'Write',
+      toolCallId: 'w1',
+      input: { file_path: 'a.md' },
+      output: { oldContent: 'old', newContent: 'new' },
+    });
+    sharedOnEvent({ type: 'usage', inputTokens: 1 });
+    await tick();
   });
 });
 
@@ -352,5 +391,192 @@ describe('useAgentStore — 控制动作与状态刷新', () => {
     expect(useAgentStore.getState().agentPermissions.a1.map((r) => r.requestId)).toEqual(['r2']);
     useAgentStore.getState().removeAgentPermission('a1', 'r2');
     expect(useAgentStore.getState().agentPermissions.a1).toBeUndefined();
+  });
+
+  it('IPC action branches handle absent/errored APIs', async () => {
+    useAgentStore.setState({
+      agents: [
+        {
+          id: 'a1',
+          name: 'T',
+          description: '',
+          type: 'x',
+          status: 'running',
+          priority: 'normal',
+          startTime: 1,
+          iteration: 0,
+          maxIterations: 200,
+          toolCallCount: 0,
+          messagesCount: 0,
+          log: [],
+        } as any,
+      ],
+      currentAgentId: 'a1',
+    });
+    (window as any).electronAPI = undefined;
+    await useAgentStore.getState().stopAgent('a1');
+    await useAgentStore.getState().pauseAgent('a1');
+    await useAgentStore.getState().resumeAgent('a1');
+    await useAgentStore.getState().setAgentPriority('a1', 'high');
+    await useAgentStore.getState().setMaxConcurrent(5);
+    expect(useAgentStore.getState().agents[0].status).toBe('running');
+    expect(useAgentStore.getState().maxConcurrent).toBe(5);
+    expect(await useAgentStore.getState().continueAgent('a1', 'x')).toMatchObject({ ok: false });
+    expect(await useAgentStore.getState().approveDelivery('a1')).toMatchObject({ ok: false });
+
+    setAgentIpc();
+    mocks.pause.mockRejectedValueOnce(new Error('pause down'));
+    mocks.resume.mockRejectedValueOnce(new Error('resume down'));
+    mocks.setPriority.mockRejectedValueOnce(new Error('priority down'));
+    mocks.setMaxConcurrent.mockRejectedValueOnce(new Error('concurrent down'));
+    mocks.continue.mockRejectedValueOnce(new Error('continue down'));
+    mocks.approveDelivery.mockResolvedValueOnce({ ok: false, error: 'rejected' });
+    await useAgentStore.getState().pauseAgent('a1');
+    await useAgentStore.getState().resumeAgent('a1');
+    await useAgentStore.getState().setAgentPriority('a1', 'low');
+    await useAgentStore.getState().setMaxConcurrent(2);
+    expect(await useAgentStore.getState().continueAgent('a1', 'x')).toMatchObject({ ok: false });
+    expect(await useAgentStore.getState().approveDelivery('a1')).toMatchObject({ ok: false, error: 'rejected' });
+    await useAgentStore.getState().stopAllAgents();
+  });
+
+  it('covers plan file null, custom tools, start/stop/continue/approve/refresh state branches', async () => {
+    useAgentStore.setState({
+      agents: [
+        {
+          id: 'a1',
+          name: 'T',
+          description: '',
+          type: 'general-purpose',
+          status: 'running',
+          priority: 'normal',
+          startTime: 1,
+          iteration: 0,
+          maxIterations: 200,
+          toolCallCount: 0,
+          messagesCount: 0,
+          log: [],
+        } as any,
+      ],
+      currentAgentId: 'a1',
+    });
+    useAgentStore.getState().setPlanFile(null);
+    expect(useAgentStore.getState().agents[0].planFile).toBeUndefined();
+
+    mocks.start.mockResolvedValueOnce({ ok: true, data: { agentId: 'a2' } });
+    const id = await useAgentStore.getState().startAgent(
+      {
+        name: 'T2',
+        description: 'd',
+        type: 'general-purpose',
+        model: 'm',
+        customTools: ['Read'],
+      },
+      'C:/p',
+    );
+    expect(id).toBe('a2');
+    expect(mocks.start).toHaveBeenCalledWith(expect.objectContaining({ tools: ['Read'] }), 'C:/p');
+
+    mocks.start.mockReset();
+    mocks.start.mockRejectedValueOnce('plain string');
+    await expect(
+      useAgentStore.getState().startAgent({ name: 'x', description: 'd', type: 'general-purpose', model: 'm' }, 'C:/p'),
+    ).rejects.toBeInstanceOf(Error);
+
+    mocks.schedulerStop.mockResolvedValueOnce({ ok: false, error: 'stopped elsewhere' });
+    await useAgentStore.getState().stopAgent('a1');
+    mocks.continue.mockResolvedValueOnce({ ok: false, error: 'no continue' });
+    expect(await useAgentStore.getState().continueAgent('a1', 'x')).toMatchObject({ ok: false });
+    mocks.approveDelivery.mockResolvedValueOnce({ ok: true });
+    expect(await useAgentStore.getState().approveDelivery('a1')).toMatchObject({ ok: true });
+    expect(useAgentStore.getState().agents[0].status).toBe('completed');
+
+    mocks.getAll.mockResolvedValueOnce({ ok: false, error: 'down' });
+    await useAgentStore.getState().refreshStates();
+  });
+
+  it('covers remove/append/start error/stop-all/clear branches', async () => {
+    setAgentIpc();
+    const api = (window as any).electronAPI.agent;
+    api.remove = undefined;
+    api.schedulerRemove = undefined;
+    useAgentStore.setState({
+      agents: [
+        {
+          id: 'a1',
+          name: 'T',
+          description: '',
+          type: 'x',
+          status: 'completed',
+          priority: 'normal',
+          startTime: 1,
+          iteration: 0,
+          maxIterations: 200,
+          toolCallCount: 0,
+          messagesCount: 0,
+          log: [],
+        } as any,
+      ],
+      currentAgentId: 'a1',
+      agentPermissions: { a1: [] },
+    });
+    await useAgentStore.getState().removeAgent('a1');
+    expect(useAgentStore.getState().agents).toHaveLength(0);
+    expect(useAgentStore.getState().currentAgentId).toBeNull();
+
+    useAgentStore.getState().appendAgentLog('missing', [{ type: 'text', text: 'ignored', timestamp: 1 }]);
+    mocks.start.mockResolvedValueOnce({ ok: false, error: '' });
+    await expect(
+      useAgentStore.getState().startAgent({ name: 'x', description: 'd', type: 'general-purpose', model: 'm' }, 'C:/p'),
+    ).rejects.toThrow('Agent 启动失败');
+    await useAgentStore.getState().stopAllAgents();
+    mocks.clear.mockResolvedValueOnce({ ok: true });
+    await useAgentStore.getState().clearAgents();
+  });
+
+  it('covers update missing agent, append empty chunks and permission list branches', () => {
+    useAgentStore.setState({ agents: [] });
+    useAgentStore.getState().updateAgent('missing', { name: 'noop' });
+    useAgentStore.setState({
+      agents: [
+        {
+          id: 'a1',
+          name: 'T',
+          description: '',
+          type: 'x',
+          status: 'running',
+          priority: 'normal',
+          startTime: 1,
+          iteration: 0,
+          maxIterations: 200,
+          toolCallCount: 0,
+          messagesCount: 0,
+          log: [{ type: 'text', text: '', timestamp: 1 }],
+        } as any,
+      ],
+      agentPermissions: { a1: [] },
+    });
+    useAgentStore.getState().appendAgentLog('a1', [
+      { type: 'text', text: '', timestamp: 2 },
+      { type: 'thinking', text: 'think', timestamp: 3 },
+    ]);
+    useAgentStore.getState().appendAgentLog('missing', []);
+    useAgentStore.getState().removeAgentPermission('a1', 'missing');
+    useAgentStore.setState({
+      agentPermissions: {
+        a1: [{ requestId: 'r1', toolName: 'Write', input: {}, message: 'x', timestamp: 1, mode: 'ask' }],
+      },
+    });
+    useAgentStore.getState().removeAgentPermission('a1', 'missing');
+  });
+
+  it('covers clear/clearAll absent API and missing permission map', async () => {
+    setAgentIpc();
+    const api = (window as any).electronAPI.agent;
+    api.clear = undefined;
+    api.clearAll = undefined;
+    useAgentStore.setState({ agentPermissions: {} });
+    useAgentStore.getState().removeAgentPermission('a1', 'missing');
+    await useAgentStore.getState().clearAgents();
   });
 });

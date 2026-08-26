@@ -2,6 +2,15 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { promises as fs } from 'fs';
 import os from 'os';
 import path from 'path';
+import { vi } from 'vitest';
+
+vi.mock('../../session-projection-cache', async () => {
+  const actual = await vi.importActual<typeof import('../../session-projection-cache')>(
+    '../../session-projection-cache',
+  );
+  return { ...actual, sqliteAvailable: () => false };
+});
+
 import {
   tokenize,
   addFtsDoc,
