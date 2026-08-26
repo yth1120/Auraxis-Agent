@@ -693,6 +693,7 @@ describe('运行时插件挂载 / GitCommit / Ralph', () => {
     const fetchMock = globalThis.fetch as ReturnType<typeof vi.fn>;
     dnsLookupMock.mockImplementation(async (hostname: string) => {
       if (hostname === 'evil.example.com') return [{ address: '10.0.0.1', family: 4 }] as any;
+      if (hostname === 'bad.example.com') throw new Error('ENOTFOUND');
       return [{ address: '93.184.216.34', family: 4 }] as any;
     });
     fetchMock.mockResolvedValueOnce({
@@ -705,6 +706,16 @@ describe('运行时插件挂载 / GitCommit / Ralph', () => {
     const redirect = await executeToolCall('WebFetch', { url: 'https://example.com/redirect' }, ctx());
     expect(redirect.error).toContain('禁止跟随重定向');
     expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 302,
+      statusText: 'Found',
+      headers: { get: vi.fn((key: string) => (key === 'location' ? 'https://bad.example.com/next' : null)) },
+      text: vi.fn(async () => ''),
+    });
+    const dnsFail = await executeToolCall('WebFetch', { url: 'https://example.com/redirect2' }, ctx());
+    expect(dnsFail.error).toContain('无法解析重定向目标主机名');
 
     // CGNAT（Tailscale/WireGuard 100.64.0.0/10）也应被初始 URL 检查拦截。
     const cgnat = await executeToolCall('WebFetch', { url: 'http://100.64.1.1/x' }, ctx());

@@ -23,9 +23,17 @@ beforeEach(() => {
   );
 });
 
-afterEach(() => {
+afterEach(async () => {
   delete process.env.FAKE_LINT_EXIT;
-  fs.rmSync(testDir, { recursive: true, force: true });
+  // 超时测试刚 kill 的子进程在 Windows 上可能仍短暂占用目录，重试清理。
+  for (let i = 0; i < 20; i++) {
+    try {
+      fs.rmSync(testDir, { recursive: true, force: true });
+      return;
+    } catch {
+      await new Promise((r) => setTimeout(r, 50));
+    }
+  }
 });
 
 describe('lint-handlers', () => {
@@ -67,5 +75,16 @@ describe('lint-handlers', () => {
     });
     expect(result.exitCode).toBeNull();
     expect(result.error).toMatch(/npx|eslint|ENOENT|spawn/i);
+  });
+
+  it('kills and reports a hanging fixer on timeout', async () => {
+    fs.writeFileSync(fixture, 'setInterval(() => {}, 1000);', 'utf8');
+    const result = await runLintFix(testDir, undefined, {
+      command: process.execPath,
+      args: [fixture],
+      timeoutMs: 150,
+    });
+    expect(result.exitCode).toBeNull();
+    expect(result.error).toBe('lint 执行超时');
   });
 });
