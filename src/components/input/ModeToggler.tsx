@@ -131,14 +131,19 @@ export const ModePanelContent = memo(function ModePanelContent({ onSelect }: { o
             }}
           >
             <span className="flex-1 min-w-0 flex flex-col">
-              <span className="overflow-hidden text-ellipsis whitespace-nowrap text-sm leading-5 font-medium text-text-primary">
-                {m.name}
-              </span>
-              {m.experimental && (
-                <span className="shrink-0 text-[10px] leading-4 px-1.5 rounded-full bg-[var(--color-warning-soft)] text-warning">
-                  {t('model.experimental')}
+              <span className="flex min-w-0 items-center gap-1.5">
+                <span
+                  title={m.name}
+                  className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm leading-5 font-medium text-text-primary"
+                >
+                  {m.name}
                 </span>
-              )}
+                {m.experimental && (
+                  <span className="inline-flex h-4 shrink-0 items-center whitespace-nowrap rounded-full px-1.5 text-[10px] leading-4 font-medium bg-[var(--color-warning-soft)] text-warning">
+                    {t('model.experimental')}
+                  </span>
+                )}
+              </span>
               <span className="overflow-hidden text-ellipsis whitespace-nowrap text-xs leading-[17px] text-text-muted">
                 {t(modelDescriptionKey(m.id))}
               </span>
