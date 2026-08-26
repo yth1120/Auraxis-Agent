@@ -26,6 +26,14 @@ jobs:
 
       - run: npm ci
 
+      # GitHub Linux runner 上 npm ci 解包出的 chrome-sandbox 不满足 SUID 沙箱
+      # 的 root/4755 要求，Electron 会直接 FATAL 退出；修复后 smoke/E2E 才能启动。
+      - name: Fix Electron SUID sandbox (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo chown root:root node_modules/electron/dist/chrome-sandbox
+          sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
+
       - run: npm run electron:compile
       - run: npx tsc --noEmit -p tsconfig.json
       - run: npm run sdk:build
