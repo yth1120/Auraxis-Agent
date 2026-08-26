@@ -2,7 +2,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, fireEvent, waitFor } from '@testing-library/react';
-import { Modal } from 'antd';
+import { Modal, message } from 'antd';
 import RollbackToMessage from '../RollbackToMessage';
 import { useAppStore } from '@/stores/useAppStore';
 
@@ -18,6 +18,7 @@ describe('RollbackToMessage — 按消息回退', () => {
 
   afterEach(async () => {
     Modal.destroyAll();
+    message.destroy();
     // 让 AntD 的 portal/定时任务在 jsdom 环境销毁前完成，避免 CI 上
     // 出现未处理的 window is not defined。
     await new Promise((resolve) => setTimeout(resolve, 50));
