@@ -107,6 +107,28 @@ describe('dynamic-plugin', () => {
     expect(badId.ok).toBe(false);
   });
 
+  it('rejects empty tools, non-function handlers and oversized handlers', () => {
+    expect(mountDynamicPlugin({ id: 'test-empty', name: 'Empty', tools: [] }).ok).toBe(false);
+    expect(
+      mountDynamicPlugin({
+        id: 'test-not-fn',
+        name: 'NotFn',
+        tools: [{ name: 'NotFnTool', description: 'd', handler: '42' }],
+      }).ok,
+    ).toBe(false);
+    expect(
+      mountDynamicPlugin({
+        id: 'test-long',
+        name: 'Long',
+        tools: [{ name: 'LongTool', description: 'd', handler: `() => (${'a'.repeat(40_100)})` }],
+      }).ok,
+    ).toBe(false);
+  });
+
+  it('executeDynamicTool returns null for unmounted tools', async () => {
+    expect(await executeDynamicTool('missing-tool', {}, { projectRoot: 'C:/x', requestId: 'r1' })).toBeNull();
+  });
+
   it('unmount removes the plugin and its tools', async () => {
     mountDynamicPlugin({
       id: 'test-remove',

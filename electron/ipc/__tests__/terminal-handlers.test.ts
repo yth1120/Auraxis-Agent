@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { EventEmitter } from 'events';
 
 const h = vi.hoisted(() => ({
   handlers: new Map<string, Function>(),
@@ -10,6 +11,13 @@ const h = vi.hoisted(() => ({
 // 通过 setPtyModuleForTests 注入可控的假 PTY，验证 handler 接线与生命周期。
 const ptyMock = vi.hoisted(() => ({
   spawn: vi.fn(),
+}));
+const childMock = vi.hoisted(() => ({
+  spawn: vi.fn(),
+}));
+
+vi.mock('child_process', () => ({
+  spawn: childMock.spawn,
 }));
 
 vi.mock('electron', () => ({
@@ -60,6 +68,19 @@ beforeEach(() => {
       kill: vi.fn(() => listeners.exit?.({ exitCode: 0 })),
     };
   });
+  childMock.spawn.mockImplementation(() => {
+    const child = new EventEmitter() as EventEmitter & {
+      stdout: EventEmitter;
+      stderr: EventEmitter;
+      stdin: EventEmitter;
+      kill: ReturnType<typeof vi.fn>;
+    };
+    child.stdout = new EventEmitter();
+    child.stderr = new EventEmitter();
+    child.stdin = new EventEmitter();
+    child.kill = vi.fn();
+    return child;
+  });
   setPtyModuleForTests({ spawn: ptyMock.spawn });
   registerTerminalHandlers();
   registerAgentShellHandlers();
@@ -67,6 +88,7 @@ beforeEach(() => {
 
 const create = (payload: any) => h.handlers.get('terminal:create')!({ sender: {} }, payload);
 const attach = (agentId: any) => h.handlers.get('agentShell:attach')!({ sender: {} }, agentId);
+const agentWrite = (agentId: any, data: any) => h.handlers.get('agentShell:write')!({ sender: {} }, agentId, data);
 
 describe('terminal:create / input / resize / kill', () => {
   it('校验窗口/ID/重复', () => {
@@ -92,6 +114,13 @@ describe('terminal:create / input / resize / kill', () => {
 
     // 退出后同 ID 可重建（真实 PTY 退出可能稍慢）
     await vi.waitFor(() => expect(create({ id: 't2' })).toEqual({ ok: true }), { timeout: 8000 });
+  });
+
+  it('pipe 回退路径创建会话并在 kill 后清理', () => {
+    setPtyModuleForTests(null);
+    expect(create({ id: 't9' })).toEqual({ ok: true });
+    const kill = h.handlers.get('terminal:kill')! as any;
+    expect(kill({}, 't9')).toEqual({ ok: true });
   });
 });
 

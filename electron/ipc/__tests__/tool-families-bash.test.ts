@@ -179,6 +179,17 @@ describe('Bash — 参数校验', () => {
       (await executeToolCall('Bash', { command: 'ls', sandbox_permissions: 'bogus', justification: 'x' }, ctx())).error,
     ).toContain('无效的 sandbox_permissions');
   });
+
+  it('受限沙箱下拒绝后台执行', async () => {
+    const r = await executeToolCall('Bash', { command: 'ls', run_in_background: true }, ctx({ sandboxMode: 'read' }));
+    expect(r.error).toContain('受限沙箱模式暂不支持后台');
+  });
+
+  it('原生沙箱不可用时拒绝受限执行', async () => {
+    vi.mocked(isSandboxSupported).mockReturnValueOnce(false);
+    const r = await executeToolCall('Bash', { command: 'ls' }, ctx({ sandboxMode: 'workspace-write' }));
+    expect(r.error).toContain('原生沙箱不可用');
+  });
 });
 
 describe('Pwsh — 本地 PowerShell 执行', () => {
@@ -209,9 +220,42 @@ describe('Pwsh — 本地 PowerShell 执行', () => {
     lastChild.emit('close', 0);
     await promise;
   });
+
+  it('covers the Windows powershell.exe fallback on any host', async () => {
+    const original = process.platform;
+    Object.defineProperty(process, 'platform', { value: 'win32' });
+    try {
+      childMocks.spawn.mockClear();
+      childMocks.execSync.mockImplementation(() => {
+        throw new Error('not found');
+      });
+      const promise = executeToolCall('Pwsh', { command: 'Write-Output hi', workdir: '.', timeout: 1000 }, ctx());
+      await vi.waitFor(() => expect(childMocks.spawn).toHaveBeenCalled());
+      expect(childMocks.spawn.mock.calls[0][0]).toBe('powershell.exe');
+      lastChild.emit('close', 0);
+      await promise;
+    } finally {
+      Object.defineProperty(process, 'platform', { value: original });
+    }
+  });
 });
 
 describe('Bash — 一次性执行', () => {
+  it('covers the Windows shell fallback chain on any host', async () => {
+    const original = process.platform;
+    Object.defineProperty(process, 'platform', { value: 'win32' });
+    try {
+      childMocks.spawn.mockClear();
+      const promise = executeToolCall('Bash', { command: 'echo hi', timeout: 1000 }, ctx());
+      await vi.waitFor(() => expect(childMocks.spawn).toHaveBeenCalled());
+      expect(typeof childMocks.spawn.mock.calls[0][0]).toBe('string');
+      lastChild.emit('close', 0);
+      await promise;
+    } finally {
+      Object.defineProperty(process, 'platform', { value: original });
+    }
+  });
+
   it('正常输出与退出码', async () => {
     const p = executeToolCall('Bash', { command: 'echo hi', timeout: 10000 }, ctx());
     await vi.waitFor(() => expect(childMocks.spawn).toHaveBeenCalled());

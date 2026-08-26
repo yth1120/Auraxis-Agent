@@ -54,6 +54,23 @@ function provisionScript(backend: SandboxBackendName): void {
   process.env[spec.envKey] = script;
 }
 
+const PLATFORM_FOR: Record<SandboxBackendName, NodeJS.Platform> = {
+  restricted: 'win32',
+  appcontainer: 'win32',
+  linux: 'linux',
+  macos: 'darwin',
+};
+
+async function withFakePlatform(platform: NodeJS.Platform, fn: () => Promise<void>): Promise<void> {
+  const original = process.platform;
+  Object.defineProperty(process, 'platform', { value: platform });
+  try {
+    await fn();
+  } finally {
+    Object.defineProperty(process, 'platform', { value: original });
+  }
+}
+
 function fakeChild() {
   const child = new EventEmitter() as EventEmitter & {
     stdout: EventEmitter;
@@ -132,38 +149,63 @@ describe('sandbox-runner — command execution', () => {
   });
 
   it('streams output, handles close success and spawn errors', async () => {
-    const backend = currentBackend();
-    provisionScript(backend);
-    const child = fakeChild();
-    spawnMock.mockReturnValue(child as never);
-    const onStdout = vi.fn();
-    const promise = runSandboxedCommand({
-      argv: ['echo', 'hello'],
-      cwd: tempDir,
-      projectRoot: tempDir,
-      backend,
-      onStdout,
-    });
-    await vi.waitFor(() => expect(spawnMock).toHaveBeenCalled());
-    child.stdout.emit('data', Buffer.from('hello\n'));
-    child.emit('close', 0);
-    expect(await promise).toMatchObject({ supported: true, exitCode: 0 });
-    expect(onStdout).toHaveBeenCalledWith('hello\n');
+    // 每个后端都伪造对应平台跑一遍：Linux/macOS CI 也会覆盖 Windows 专属分支。
+    for (const backend of ['restricted', 'linux', 'macos'] as const) {
+      await withFakePlatform(PLATFORM_FOR[backend], async () => {
+        provisionScript(backend);
+        spawnMock.mockReset();
 
-    const errorChild = fakeChild();
-    spawnMock.mockReturnValue(errorChild as never);
-    const errorPromise = runSandboxedCommand({ argv: [], cwd: tempDir, backend });
-    // linux/macos 后端在 spawn 前会先 mkdtemp 写目录，第二次 spawn 是异步的；
-    // 必须等第二次调用真正发生，否则 error 事件会在监听器挂上之前被 emit。
-    await vi.waitFor(() => expect(spawnMock).toHaveBeenCalledTimes(2));
-    errorChild.emit('error', new Error('spawn failed'));
-    expect(await errorPromise).toMatchObject({ supported: true, error: expect.stringContaining('spawn failed') });
+        const child = fakeChild();
+        spawnMock.mockReturnValue(child as never);
+        const onStdout = vi.fn();
+        const promise = runSandboxedCommand({
+          argv: ['echo', 'hello'],
+          cwd: tempDir,
+          projectRoot: tempDir,
+          backend,
+          onStdout,
+        });
+        await vi.waitFor(() => expect(spawnMock).toHaveBeenCalledTimes(1));
+        child.stdout.emit('data', Buffer.from('hello\n'));
+        child.emit('close', 0);
+        expect(await promise).toMatchObject({ supported: true, exitCode: 0 });
+        expect(onStdout).toHaveBeenCalledWith('hello\n');
+
+        const errorChild = fakeChild();
+        spawnMock.mockReturnValue(errorChild as never);
+        const errorPromise = runSandboxedCommand({ argv: [], cwd: tempDir, backend });
+        await vi.waitFor(() => expect(spawnMock).toHaveBeenCalledTimes(2));
+        errorChild.emit('error', new Error('spawn failed'));
+        expect(await errorPromise).toMatchObject({
+          supported: true,
+          error: expect.stringContaining('spawn failed'),
+        });
+      });
+    }
   });
 
   it('covers appcontainer write dir and launch-error fail-closed branches', async () => {
-    provisionScript('appcontainer');
-    if (process.platform !== 'win32') {
-      // 非 Windows 上 appcontainer 直接 fail-closed，spawn 不应发生。
+    // Windows 专属的 spawn + fail-closed 流程：任何宿主上伪造 win32 执行。
+    await withFakePlatform('win32', async () => {
+      provisionScript('appcontainer');
+      spawnMock.mockReset();
+      const child = fakeChild();
+      spawnMock.mockReturnValue(child as never);
+      const promise = runSandboxedCommand({
+        argv: [],
+        cwd: tempDir,
+        projectRoot: tempDir,
+        mode: 'read',
+        backend: 'appcontainer',
+      });
+      await vi.waitFor(() => expect(spawnMock).toHaveBeenCalled());
+      child.stderr.emit('data', Buffer.from('SANDBOX_LAUNCH_ERROR\n'));
+      child.emit('close', 0);
+      expect(await promise).toMatchObject({ error: expect.stringContaining('fail-closed') });
+    });
+
+    // 非 Windows 平台的 mismatch 分支。
+    await withFakePlatform('linux', async () => {
       expect(
         await runSandboxedCommand({
           argv: [],
@@ -173,21 +215,7 @@ describe('sandbox-runner — command execution', () => {
           backend: 'appcontainer',
         }),
       ).toMatchObject({ supported: false, error: expect.stringContaining('不适用于当前平台') });
-      return;
-    }
-    const child = fakeChild();
-    spawnMock.mockReturnValue(child as never);
-    const promise = runSandboxedCommand({
-      argv: [],
-      cwd: tempDir,
-      projectRoot: tempDir,
-      mode: 'read',
-      backend: 'appcontainer',
     });
-    await vi.waitFor(() => expect(spawnMock).toHaveBeenCalled());
-    child.stderr.emit('data', Buffer.from('SANDBOX_LAUNCH_ERROR\n'));
-    child.emit('close', 0);
-    expect(await promise).toMatchObject({ error: expect.stringContaining('fail-closed') });
   });
 
   it('resolves linux/macos platform backends and runs shell spawns', async () => {
@@ -213,37 +241,40 @@ describe('sandbox-runner — command execution', () => {
   });
 
   it('kills timeout and abort paths', async () => {
-    const backend = currentBackend();
-    provisionScript(backend);
+    for (const backend of ['restricted', 'linux', 'macos'] as const) {
+      await withFakePlatform(PLATFORM_FOR[backend], async () => {
+        provisionScript(backend);
+        spawnMock.mockReset();
 
-    const timeoutChild = fakeChild();
-    spawnMock.mockReturnValue(timeoutChild as never);
-    const timeoutPromise = runSandboxedCommand({
-      argv: [],
-      cwd: tempDir,
-      backend,
-      timeoutMs: 1,
-    });
-    await vi.waitFor(() => expect(spawnMock).toHaveBeenCalled());
-    await new Promise((r) => setTimeout(r, 5));
-    // POSIX 后端用进程组 process.kill 终止整棵树；Windows 直接 kill 子进程。
-    if (process.platform === 'win32') expect(timeoutChild.kill).toHaveBeenCalled();
-    timeoutChild.emit('close', 0);
-    expect(await timeoutPromise).toMatchObject({ timedOut: true });
+        const timeoutChild = fakeChild();
+        spawnMock.mockReturnValue(timeoutChild as never);
+        const timeoutPromise = runSandboxedCommand({
+          argv: [],
+          cwd: tempDir,
+          backend,
+          timeoutMs: 1,
+        });
+        await vi.waitFor(() => expect(spawnMock).toHaveBeenCalledTimes(1));
+        await new Promise((r) => setTimeout(r, 5));
+        if (backend === 'restricted') expect(timeoutChild.kill).toHaveBeenCalled();
+        timeoutChild.emit('close', 0);
+        expect(await timeoutPromise).toMatchObject({ timedOut: true });
 
-    const abortChild = fakeChild();
-    spawnMock.mockReturnValue(abortChild as never);
-    const ctrl = new AbortController();
-    const abortPromise = runSandboxedCommand({
-      argv: [],
-      cwd: tempDir,
-      backend,
-      signal: ctrl.signal,
-    });
-    await vi.waitFor(() => expect(spawnMock).toHaveBeenCalledTimes(2));
-    ctrl.abort();
-    if (process.platform === 'win32') expect(abortChild.kill).toHaveBeenCalled();
-    abortChild.emit('close', 0);
-    expect(await abortPromise).toMatchObject({ supported: true });
+        const abortChild = fakeChild();
+        spawnMock.mockReturnValue(abortChild as never);
+        const ctrl = new AbortController();
+        const abortPromise = runSandboxedCommand({
+          argv: [],
+          cwd: tempDir,
+          backend,
+          signal: ctrl.signal,
+        });
+        await vi.waitFor(() => expect(spawnMock).toHaveBeenCalledTimes(2));
+        ctrl.abort();
+        if (backend === 'restricted') expect(abortChild.kill).toHaveBeenCalled();
+        abortChild.emit('close', 0);
+        expect(await abortPromise).toMatchObject({ supported: true });
+      });
+    }
   });
 });

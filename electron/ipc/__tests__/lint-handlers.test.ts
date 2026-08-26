@@ -8,7 +8,8 @@ vi.mock('electron', () => ({
   app: { getPath: () => os.tmpdir() },
 }));
 
-import { buildLintArgs, runLintFix } from '../lint-handlers';
+import { buildLintArgs, runLintFix, registerLintHandlers } from '../lint-handlers';
+import { ipcMain } from 'electron';
 
 let testDir: string;
 let fixture: string;
@@ -86,5 +87,13 @@ describe('lint-handlers', () => {
     });
     expect(result.exitCode).toBeNull();
     expect(result.error).toBe('lint 执行超时');
+  });
+
+  it('registerLintHandlers rejects missing project roots', async () => {
+    registerLintHandlers();
+    const map = new Map(vi.mocked(ipcMain.handle).mock.calls as unknown as [string, Function][]);
+    const handler = map.get('lint:fix')!;
+    await expect(handler({}, {})).resolves.toEqual({ ok: false, error: '缺少项目目录' });
+    await expect(handler({}, { projectRoot: '' })).resolves.toEqual({ ok: false, error: '缺少项目目录' });
   });
 });

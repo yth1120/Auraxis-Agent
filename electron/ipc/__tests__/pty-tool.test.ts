@@ -112,6 +112,14 @@ describe('pty-tool registry', () => {
     expect(peek?.buffer.endsWith(tail)).toBe(true);
   });
 
+  it('peek/subscribe return null for missing sessions and owners', () => {
+    const { registry } = makeRegistry();
+    const { id } = registry.create({ owner: 'a', command: 'node' });
+    expect(registry.peek('missing', 'a')).toBeNull();
+    expect(registry.peek(id, 'other')).toBeNull();
+    expect(registry.subscribe('missing', 'a', () => {})).toBeNull();
+  });
+
   it('read times out and rejects missing sessions / invalid owners', async () => {
     const { registry } = makeRegistry();
     const { id } = registry.create({ owner: 'a', command: 'node' });
@@ -150,6 +158,13 @@ describe('runPtyTool routing', () => {
     expect(bad.error).toContain('未知 PTY 动作');
     const missing = await runPtyTool('write', { data: 'x' }, 'a', registry);
     expect(missing.error).toContain('session_id');
+  });
+
+  it('create reports failure when the PTY factory cannot start a process', async () => {
+    const registry = new PtyRegistry(() => null);
+    const created = await runPtyTool('create', { command: 'node' }, 'a', registry);
+    expect(created.output).toBeNull();
+    expect(created.error).toContain('PTY 不可用');
   });
 
   it('rejects invalid write/close/read requests and clears an owner', async () => {
