@@ -152,7 +152,9 @@ describe('sandbox-runner — command execution', () => {
     const errorChild = fakeChild();
     spawnMock.mockReturnValue(errorChild as never);
     const errorPromise = runSandboxedCommand({ argv: [], cwd: tempDir, backend });
-    await vi.waitFor(() => expect(spawnMock).toHaveBeenCalled());
+    // linux/macos 后端在 spawn 前会先 mkdtemp 写目录，第二次 spawn 是异步的；
+    // 必须等第二次调用真正发生，否则 error 事件会在监听器挂上之前被 emit。
+    await vi.waitFor(() => expect(spawnMock).toHaveBeenCalledTimes(2));
     errorChild.emit('error', new Error('spawn failed'));
     expect(await errorPromise).toMatchObject({ supported: true, error: expect.stringContaining('spawn failed') });
   });
@@ -237,7 +239,7 @@ describe('sandbox-runner — command execution', () => {
       backend,
       signal: ctrl.signal,
     });
-    await vi.waitFor(() => expect(spawnMock).toHaveBeenCalled());
+    await vi.waitFor(() => expect(spawnMock).toHaveBeenCalledTimes(2));
     ctrl.abort();
     if (process.platform === 'win32') expect(abortChild.kill).toHaveBeenCalled();
     abortChild.emit('close', 0);
