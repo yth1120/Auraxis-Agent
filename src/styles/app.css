@@ -576,6 +576,12 @@ body,
   background: rgba(255, 255, 255, 0.32);
 }
 
+/* 主聊天区：滚动条贴到主界面最右；右侧为时间轴轨道预留空间，
+   从右往左依次是 8px 滚动条、10px 间距、22px 轨道、4px 内容间隙。 */
+.chat-scroll-full [data-virtuoso-scroller] {
+  padding-right: 44px;
+}
+
 /* Selection */
 ::selection {
   background: var(--color-violet-strong);

@@ -182,13 +182,15 @@ export default function MessageList({
         </div>
       )}
       <div
-        className="flex-1 min-h-0 flex flex-row min-w-0"
+        className="flex-1 min-h-0 relative min-w-0"
         role="log"
         aria-live="polite"
         aria-busy={isStreaming}
         aria-label={t('msglist.aria')}
       >
-        <div className="flex-1 min-w-0 max-w-[var(--content-max-width,880px)] mx-auto w-full flex flex-col overflow-hidden">
+        {/* 滚动层占满整个界面宽度：滚动条因此贴在主界面最右，
+            而时间轴轨道浮在滚动条左侧并保持间距。 */}
+        <div className="chat-scroll-full absolute inset-0 flex flex-col overflow-hidden">
           <Virtuoso
             ref={virtuosoRef}
             scrollerRef={(ref) => {
@@ -216,7 +218,7 @@ export default function MessageList({
                 .filter((v, i, a) => !!v && a.indexOf(v) === i);
               const projectRoot = settingsProjectPath || currentProjectPath || '';
               return (
-                <>
+                <div className="max-w-[var(--content-max-width,880px)] mx-auto w-full">
                   <MessageBubble message={msg} />
                   {files.length > 0 && <DeliverablesRow files={files} />}
                   {laterSessionIds.length > 0 && projectRoot && (
@@ -224,19 +226,21 @@ export default function MessageList({
                       <RollbackToMessage sessionIds={laterSessionIds} projectRoot={projectRoot} />
                     </div>
                   )}
-                </>
+                </div>
               );
             }}
             components={{ Header, Footer }}
           />
         </div>
-        <ConversationTimeline
-          messages={messages}
-          scrollerRef={scrollerRef}
-          scrollToIndex={(index, behavior) => {
-            virtuosoRef.current?.scrollToIndex({ index, behavior, align: 'start' });
-          }}
-        />
+        <div className="absolute inset-y-0 right-[18px] z-20 flex">
+          <ConversationTimeline
+            messages={messages}
+            scrollerRef={scrollerRef}
+            scrollToIndex={(index, behavior) => {
+              virtuosoRef.current?.scrollToIndex({ index, behavior, align: 'start' });
+            }}
+          />
+        </div>
       </div>
       {!isAtBottom && messages.length > 0 && (
         <button
