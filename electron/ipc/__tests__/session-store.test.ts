@@ -36,6 +36,17 @@ describe('JsonlSessionStore', () => {
     expect(events.map((e) => e.seq)).toEqual([1, 2, 3]);
   });
 
+  it('serializes concurrent appends so seq values stay unique', async () => {
+    const batch = (base: number) =>
+      Array.from({ length: 50 }, (_, i) => ev('user', { text: `m${base}-${i}` }, base * 1000 + i));
+    await Promise.all([store.append('s1', batch(1)), store.append('s1', batch(2))]);
+    const events = await store.read('s1');
+    const seqs = events.map((e) => e.seq);
+    expect(seqs).toHaveLength(100);
+    expect(new Set(seqs).size).toBe(100);
+    expect(seqs[seqs.length - 1]).toBe(100);
+  });
+
   it('rejects reserved debug session ids so they never pollute history', async () => {
     await store.append('__ax-nav-trace__', [ev('system', { event: 'setSidebarMode(chat)' })]);
     const list = await store.list();

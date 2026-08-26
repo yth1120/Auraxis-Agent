@@ -248,6 +248,9 @@ async function connectServer(serverId: string): Promise<MCPStatus> {
 
     conn.process = child;
     conn.buffer = '';
+    // The server can exit between writes; async EPIPE on stdin must not
+    // escape as an uncaught exception.
+    child.stdin?.on?.('error', () => {});
 
     child.stdout?.on('data', (data: Buffer) => handleMcpData(conn, data.toString()));
     child.stderr?.on('data', (data: Buffer) => {

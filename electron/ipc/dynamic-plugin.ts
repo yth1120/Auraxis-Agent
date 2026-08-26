@@ -21,11 +21,16 @@ import type { ToolResult } from './tool-handlers';
 const MAX_PLUGINS = 12;
 const MAX_TOOLS_PER_PLUGIN = 8;
 const MAX_HANDLER_LENGTH = 40_000;
+/** Runtime ceiling for a dynamic tool call (synchronous + asynchronous). */
+const DYNAMIC_TOOL_TIMEOUT_MS = 30_000;
 
 interface DynamicToolDef extends ToolDef {
   pluginId: string;
   handler: string;
   compiled: (input: Record<string, unknown>, sandboxCtx: Record<string, unknown>) => unknown;
+  /** The vm context the handler was compiled in — lets us re-enter it under
+   *  the vm watchdog so even a blocking `while(true)` is terminated. */
+  context: vm.Context;
 }
 
 export interface DynamicPluginSpec {
@@ -55,7 +60,9 @@ function safeToolName(name: string): boolean {
   return /^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(name);
 }
 
-function compileHandler(handler: string): { fn: DynamicToolDef['compiled'] } | { error: string } {
+function compileHandler(
+  handler: string,
+): { fn: DynamicToolDef['compiled']; context: vm.Context } | { error: string } {
   const sandbox: Record<string, unknown> = {
     JSON,
     Math,
@@ -75,10 +82,13 @@ function compileHandler(handler: string): { fn: DynamicToolDef['compiled'] } | {
     clearTimeout,
     structuredClone,
   };
+  const context = vm.createContext(sandbox);
   try {
-    const fn = vm.runInNewContext(`(${handler})`, sandbox, { timeout: 5000 });
+    const fn = vm.runInContext(`(${handler})`, context, { timeout: 5000 });
     if (typeof fn !== 'function') return { error: 'handler 必须是一个函数表达式' };
-    return { fn: fn as DynamicToolDef['compiled'] };
+    // Re-enter the same context later for guarded invocation.
+    sandbox.__axInvoke = fn;
+    return { fn: fn as DynamicToolDef['compiled'], context };
   } catch (err: unknown) {
     return { error: `handler 编译失败: ${errorText(err)}` };
   }
@@ -140,6 +150,7 @@ export function mountDynamicPlugin(spec: DynamicPluginSpec): {
       pluginId: id,
       handler,
       compiled: compiledResult.fn,
+      context: compiledResult.context,
     });
   }
 
@@ -148,7 +159,7 @@ export function mountDynamicPlugin(spec: DynamicPluginSpec): {
   return {
     ok: true,
     toolNames: compiled.map((t) => t.name as string),
-    defs: compiled.map(({ compiled: _c, handler: _h, pluginId: _p, ...def }) => def as ToolDef),
+    defs: compiled.map(({ compiled: _c, handler: _h, pluginId: _p, context: _ctx, ...def }) => def as ToolDef),
   };
 }
 
@@ -189,14 +200,43 @@ export async function executeDynamicTool(
   toolName: string,
   input: Record<string, unknown>,
   caller: OrchestrationCaller & { log?: (line: string) => void },
+  timeoutMs: number = DYNAMIC_TOOL_TIMEOUT_MS,
 ): Promise<ToolResult | null> {
   const def = toolIndex.get(toolName);
   if (!def) return null;
   const sandboxCtx = buildSandboxCtx(caller);
+  const context = def.context as vm.Context & Record<string, unknown>;
+  const inputKey = '__axInput';
+  const ctxKey = '__axCtx';
+  const prevInput = context[inputKey];
+  const prevCtx = context[ctxKey];
+  // Pass arguments through context globals so the call runs entirely in the
+  // handler's own vm context and stays under the watchdog.
+  context[inputKey] = input ?? {};
+  context[ctxKey] = sandboxCtx;
   try {
-    const result = await def.compiled(input ?? {}, sandboxCtx);
+    // The synchronous phase (including a blocking `while(true)`) runs inside
+    // the vm watchdog; the async phase is bounded by the race below.
+    const raw = vm.runInContext(`__axInvoke(${inputKey}, ${ctxKey})`, def.context, {
+      timeout: timeoutMs,
+    });
+    const result = await Promise.race([
+      Promise.resolve(raw),
+      new Promise<never>((_resolve, reject) => {
+        const timer = setTimeout(
+          () => reject(new Error(`插件工具 ${toolName} 执行超时（${Math.round(timeoutMs / 1000)}s）`)),
+          timeoutMs,
+        );
+        if (typeof timer.unref === 'function') timer.unref();
+      }),
+    ]);
     return { output: result ?? null };
   } catch (err: unknown) {
     return { output: null, error: `插件工具 ${toolName} 执行失败: ${errorText(err)}` };
+  } finally {
+    if (prevInput === undefined) delete context[inputKey];
+    else context[inputKey] = prevInput;
+    if (prevCtx === undefined) delete context[ctxKey];
+    else context[ctxKey] = prevCtx;
   }
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { PtyRegistry, runPtyTool, type PtySessionLike, type PtyFactory } from '../pty-tool';
+import { PtyRegistry, runPtyTool, MAX_SCROLLBACK, type PtySessionLike, type PtyFactory } from '../pty-tool';
 
 class FakeSession implements PtySessionLike {
   written: string[] = [];
@@ -91,6 +91,25 @@ describe('pty-tool registry', () => {
     registry.create({ owner: 'a', command: 'python' });
     expect(registry.clearOwner('a')).toBe(2);
     expect(registry.list('a')).toHaveLength(0);
+  });
+
+  it('rejects a duplicate session id without killing the existing session', () => {
+    const { registry, last } = makeRegistry();
+    const { id } = registry.create({ owner: 'a', command: 'node' });
+    expect(() => registry.create({ owner: 'a', id, command: 'bash' })).toThrow(/已存在/);
+    expect(last().killed).toBe(false);
+    expect(registry.list('a')).toHaveLength(1);
+    expect(registry.list('a')[0].command).toBe('node');
+  });
+
+  it('caps scrollback so long-lived sessions cannot grow unbounded', () => {
+    const { registry, last } = makeRegistry();
+    const { id } = registry.create({ owner: 'a', command: 'node' });
+    const tail = '--tail--';
+    last().push('x'.repeat(MAX_SCROLLBACK + 1000) + tail);
+    const peek = registry.peek(id, 'a');
+    expect(peek?.buffer.length).toBe(MAX_SCROLLBACK);
+    expect(peek?.buffer.endsWith(tail)).toBe(true);
   });
 
   it('read times out and rejects missing sessions / invalid owners', async () => {

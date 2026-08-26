@@ -59,6 +59,10 @@ interface CronFields {
   dom: Set<number>;
   month: Set<number>;
   dow: Set<number>;
+  /** Whether the day-of-month field was an explicit restriction (not '*'). */
+  domRestricted: boolean;
+  /** Whether the day-of-week field was an explicit restriction (not '*'). */
+  dowRestricted: boolean;
 }
 
 function parseField(field: string, min: number, max: number): Set<number> {
@@ -73,7 +77,8 @@ function parseField(field: string, min: number, max: number): Set<number> {
   for (const part of parts) {
     if (part.includes('/')) {
       const [range, stepStr] = part.split('/');
-      const step = parseInt(stepStr, 10) || 1;
+      const step = Number(stepStr);
+      if (!Number.isInteger(step) || step < 1) throw new Error('步长必须为正整数');
       let rangeMin = min,
         rangeMax = max;
       if (range !== '*') {
@@ -82,15 +87,31 @@ function parseField(field: string, min: number, max: number): Set<number> {
           rangeMin = a;
           rangeMax = b;
         } else {
-          rangeMin = rangeMax = parseInt(range, 10);
+          rangeMin = rangeMax = Number(range);
         }
+      }
+      if (
+        !Number.isInteger(rangeMin) ||
+        !Number.isInteger(rangeMax) ||
+        rangeMin < min ||
+        rangeMax > max ||
+        rangeMin > rangeMax
+      ) {
+        throw new Error('cron 区间超出范围或顺序错误');
       }
       for (let i = rangeMin; i <= rangeMax; i += step) result.add(i);
     } else if (part.includes('-')) {
       const [a, b] = part.split('-').map(Number);
+      if (!Number.isInteger(a) || !Number.isInteger(b) || a < min || b > max || a > b) {
+        throw new Error('cron 区间超出范围或顺序错误');
+      }
       for (let i = a; i <= b; i++) result.add(i);
     } else {
-      result.add(parseInt(part, 10));
+      const value = Number(part);
+      if (!Number.isInteger(value) || value < min || value > max) {
+        throw new Error('cron 字段超出范围');
+      }
+      result.add(value);
     }
   }
 
@@ -108,6 +129,8 @@ function parseCron(cron: string): CronFields | null {
       dom: parseField(parts[2], 1, 31),
       month: parseField(parts[3], 1, 12),
       dow: parseField(parts[4], 0, 6),
+      domRestricted: parts[2] !== '*',
+      dowRestricted: parts[4] !== '*',
     };
   } catch {
     return null;
@@ -128,13 +151,14 @@ function nextFireTime(fields: CronFields, from: Date = new Date()): number {
     const month = cursor.getMonth() + 1;
     const dow = cursor.getDay();
 
-    if (
-      fields.minute.has(m) &&
-      fields.hour.has(h) &&
-      fields.dom.has(dom) &&
-      fields.month.has(month) &&
-      fields.dow.has(dow)
-    ) {
+    // Vixie-cron semantics: when BOTH day-of-month and day-of-week are
+    // restricted, a date matches when EITHER field matches; otherwise both
+    // must match.
+    const dayMatches =
+      fields.domRestricted && fields.dowRestricted
+        ? fields.dom.has(dom) || fields.dow.has(dow)
+        : fields.dom.has(dom) && fields.dow.has(dow);
+    if (fields.minute.has(m) && fields.hour.has(h) && fields.month.has(month) && dayMatches) {
       return cursor.getTime();
     }
   }

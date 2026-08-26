@@ -61,6 +61,25 @@ describe('cron 解析与持久化', () => {
     expect(createCronJob({ name: 'n', prompt: 'p', cron: '* * * *', recurring: true }).ok).toBe(false);
   });
 
+  it('拒绝越界字段、零步长与倒序区间', () => {
+    const bad = ['61 * * * *', '* 24 * * *', '* * 32 * *', '* * * 13 *', '* * * * 7', '*/0 * * * *', '5-2 * * * *'];
+    for (const cron of bad) {
+      expect(createCronJob({ name: 'n', prompt: 'p', cron, recurring: true }).ok).toBe(false);
+    }
+    expect(getCronJobCount()).toBe(0);
+  });
+
+  it('日与星期同时受限时按标准 cron 的 OR 语义计算', () => {
+    vi.useFakeTimers();
+    // 2026-08-24 是周一（且不是 1 日）。`0 0 1 * 1` 应按 OR 语义命中
+    // 下一个周一（8-31），而不是 AND 语义下的下一个“1 日且周一”（2027-02-01）。
+    vi.setSystemTime(new Date('2026-08-24T00:01:00+08:00'));
+    const r = createCronJob({ name: 'n', prompt: 'p', cron: '0 0 1 * 1', recurring: true });
+    expect(r.ok).toBe(true);
+    expect(r.data!.nextFireAt).toBe(new Date('2026-08-31T00:00:00+08:00').getTime());
+    vi.useRealTimers();
+  });
+
   it('支持标准 5 字段、步进、区间与列表', () => {
     for (const cron of ['* * * * *', '*/15 * * * *', '0-5 1-2 1,15 * *']) {
       const r = createCronJob({ name: 'n', prompt: 'p', cron, recurring: true });

@@ -52,6 +52,9 @@ export class JsonlSessionStore implements SessionStore {
   private readonly prefix: string;
   private readonly cacheDirFn: (() => string) | null;
   private cacheInstance: ProjectionCache | null = null;
+  /** Per-session append serialization: lastSeq + append is read-modify-write,
+   *  so concurrent flushes would otherwise assign duplicate seq values. */
+  private readonly appendTails = new Map<string, Promise<void>>();
 
   constructor(private readonly opts: SessionStoreOptions) {
     this.kind = opts.kind ?? 'chat';
@@ -129,9 +132,17 @@ export class JsonlSessionStore implements SessionStore {
     if (sessionId === '__ax-nav-trace__') return;
     const file = this.file(sessionId);
     await fs.mkdir(path.dirname(file), { recursive: true });
-    let seq = await this.lastSeq(sessionId);
-    const lines = events.map((e) => JSON.stringify({ ...e, seq: ++seq } as SessionEvent));
-    await fs.appendFile(file, lines.join('\n') + '\n', 'utf8');
+    const write = async (): Promise<void> => {
+      let seq = await this.lastSeq(sessionId);
+      const lines = events.map((e) => JSON.stringify({ ...e, seq: ++seq } as SessionEvent));
+      await fs.appendFile(file, lines.join('\n') + '\n', 'utf8');
+    };
+    const prev = this.appendTails.get(sessionId) ?? Promise.resolve();
+    const next = prev.then(write, write);
+    // The stored tail swallows errors so one failed append never blocks the
+    // next one, while `next` still propagates to this caller.
+    this.appendTails.set(sessionId, next.catch(() => {}));
+    await next;
   }
 
   async read(sessionId: string): Promise<SessionEvent[]> {

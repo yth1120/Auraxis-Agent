@@ -69,6 +69,9 @@ export interface ToolContext {
 }
 
 const observedFiles = new Map<string, Set<string>>();
+/** Per-scope cap so a long-lived task can't grow `observedFiles` without
+ *  bound; insertion order doubles as recency order (oldest evicted first). */
+const MAX_OBSERVED_PER_SCOPE = 10_000;
 
 export function observationScope(ctx: ToolContext): string {
   return ctx.sessionId || ctx.agentId || ctx.requestId;
@@ -82,6 +85,10 @@ export function markFileObserved(ctx: ToolContext, filePath: string): void {
     observedFiles.set(scope, set);
   }
   set.add(path.resolve(filePath));
+  if (set.size > MAX_OBSERVED_PER_SCOPE) {
+    const oldest = set.keys().next().value;
+    if (oldest !== undefined) set.delete(oldest);
+  }
   const driftScope = ctx.projectRoot || scope;
   void workspaceDrift.observe(driftScope, filePath).catch(() => {});
   if (observedFiles.size > 500) {

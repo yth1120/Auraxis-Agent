@@ -100,6 +100,9 @@ export function registerTerminalHandlers() {
           env: { ...safeProcessEnv({ TERM: 'xterm-256color' }) },
           stdio: ['pipe', 'pipe', 'pipe'],
         });
+        // Typing into an already-exited fallback shell raises EPIPE
+        // asynchronously; without a listener it would crash the main process.
+        child.stdin.on('error', () => {});
         const session: TerminalSession = { kind: 'pipe', child, win };
         sessions.set(id, session);
         child.stdout.on('data', (d: Buffer) => send(win, id, 'data', d.toString()));

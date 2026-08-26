@@ -155,6 +155,9 @@ export function queryLsp(input: LspQueryInput): Promise<LspQueryResult> {
       resolve({ ok: false, error: errorText(e) });
       return;
     }
+    // If the server dies mid-write, EPIPE arrives on stdin asynchronously;
+    // swallow it so the write can never crash the process.
+    child.stdin.on('error', () => {});
 
     let settled = false;
     const timer = setTimeout(() => {
@@ -233,6 +236,7 @@ export function queryLsp(input: LspQueryInput): Promise<LspQueryResult> {
     child.on('exit', () => {
       if (settled) return;
       settled = true;
+      cleanup();
       resolve({ ok: false, error: 'LSP 服务器提前退出' });
     });
 

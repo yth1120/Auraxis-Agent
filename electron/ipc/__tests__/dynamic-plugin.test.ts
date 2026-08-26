@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, afterEach, beforeAll, afterAll, vi } from 'vitest';
 import {
   mountDynamicPlugin,
   unmountDynamicPlugin,
@@ -55,6 +55,36 @@ describe('dynamic-plugin', () => {
     });
     const res = await executeDynamicTool('AsyncTool', { n: 21 }, { projectRoot: 'C:/x', requestId: 'r1' });
     expect(res?.output).toEqual({ doubled: 42 });
+  });
+
+  it('terminates a blocking handler under the vm watchdog', async () => {
+    mountDynamicPlugin({
+      id: 'test-spin',
+      name: 'Spin',
+      tools: [{ name: 'SpinTool', description: 'blocks forever', handler: '() => { while (true) {} }' }],
+    });
+    const started = Date.now();
+    const res = await executeDynamicTool('SpinTool', {}, { projectRoot: 'C:/x', requestId: 'r1' }, 100);
+    expect(res?.output).toBeNull();
+    expect(res?.error).toContain('执行失败');
+    expect(Date.now() - started).toBeLessThan(5000);
+  });
+
+  it('bounds a never-resolving async handler', async () => {
+    vi.useFakeTimers();
+    try {
+      mountDynamicPlugin({
+        id: 'test-hang',
+        name: 'Hang',
+        tools: [{ name: 'HangTool', description: 'hangs', handler: 'async () => new Promise(() => {})' }],
+      });
+      const pending = executeDynamicTool('HangTool', {}, { projectRoot: 'C:/x', requestId: 'r1' }, 500);
+      await vi.advanceTimersByTimeAsync(600);
+      const res = await pending;
+      expect(res?.error).toContain('超时');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('rejects duplicate tool names and invalid ids', async () => {

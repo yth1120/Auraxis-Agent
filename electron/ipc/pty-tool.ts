@@ -27,20 +27,38 @@ export type PtyFactory = (opts: {
   rows?: number;
 }) => PtySessionLike | null;
 
+/** Cap on retained scrollback so long-lived sessions can't grow memory
+ *  without bound. */
+export const MAX_SCROLLBACK = 1_000_000;
+
 function defaultShell(): string {
   if (process.platform === 'win32') return process.env.COMSPEC || 'cmd.exe';
   return process.env.SHELL || '/bin/bash';
 }
 
+type PtyModule = { spawn: typeof import('node-pty').spawn };
+/** undefined = not probed yet; null = unavailable; otherwise the module. */
+let PTY_MODULE: PtyModule | null | undefined;
+
+/** 测试注入：让 defaultPtyFactory 走 pipe 回退路径，避免依赖真实系统 shell。 */
+export function setPtyModuleForTests(ptyModule: unknown): void {
+  PTY_MODULE = ptyModule as PtyModule | null;
+}
+
+function getPtyModule(): PtyModule | null {
+  if (PTY_MODULE === undefined) {
+    try {
+      PTY_MODULE = require('node-pty') as PtyModule;
+    } catch {
+      PTY_MODULE = null;
+    }
+  }
+  return PTY_MODULE;
+}
+
 /** node-pty when available; pipe-based child process otherwise. */
 export const defaultPtyFactory: PtyFactory = (opts) => {
-  type PtyModule = { spawn: typeof import('node-pty').spawn };
-  let PTY: PtyModule | null = null;
-  try {
-    PTY = require('node-pty') as PtyModule;
-  } catch {
-    PTY = null;
-  }
+  const PTY = getPtyModule();
   if (PTY) {
     const pty: IPty = PTY.spawn(opts.command, [], {
       name: 'xterm-256color',
@@ -88,6 +106,13 @@ export const defaultPtyFactory: PtyFactory = (opts) => {
     windowsHide: true,
   });
   const emitter = new EventEmitter();
+  // A missing shell or cwd fails asynchronously (ENOENT); without a listener
+  // the 'error' event would escape as an uncaught exception and kill the
+  // entire main process.
+  child.on('error', () => emitter.emit('exit'));
+  // Writing into an already-exited shell surfaces EPIPE asynchronously on
+  // stdin; swallow it so a late write can never crash the process.
+  child.stdin?.on('error', () => {});
   child.stdout?.on('data', (d: Buffer) => emitter.emit('data', d.toString()));
   child.stderr?.on('data', (d: Buffer) => emitter.emit('data', d.toString()));
   child.on('exit', () => emitter.emit('exit'));
@@ -133,9 +158,12 @@ export class PtyRegistry {
 
   create(opts: { owner: string; id?: string; command?: string; cwd?: string }): { id: string; command: string } {
     const command = opts.command?.trim() || defaultShell();
+    const id = opts.id || `pty-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    if (this.sessions.has(id)) {
+      throw new Error(`PTY 会话 ${id} 已存在，请先关闭该会话或换一个新的 session_id`);
+    }
     const backend = this.factory({ command, cwd: opts.cwd });
     if (!backend) throw new Error('PTY 不可用（无法启动终端进程）');
-    const id = opts.id || `pty-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     const session: InternalSession = {
       backend,
       id,
@@ -148,10 +176,17 @@ export class PtyRegistry {
     };
     backend.onData((d) => {
       session.buffer += d;
+      if (session.buffer.length > MAX_SCROLLBACK) {
+        const dropped = session.buffer.length - MAX_SCROLLBACK;
+        session.buffer = session.buffer.slice(dropped);
+        session.lastRead = Math.max(0, session.lastRead - dropped);
+      }
     });
     backend.onExit(() => {
       session.exited = true;
-      this.sessions.delete(id);
+      // Guard by identity so a stale backend can never tear down a newer
+      // session that reused the same id.
+      if (this.sessions.get(id) === session) this.sessions.delete(id);
     });
     this.sessions.set(id, session);
     return { id, command };
