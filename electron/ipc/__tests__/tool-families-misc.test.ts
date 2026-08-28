@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import os from 'os';
+import { mkdtempSync, writeFileSync, rmSync } from 'fs';
+import path from 'path';
 
 vi.mock('electron', () => ({
   app: { getPath: () => os.tmpdir() },
@@ -422,7 +424,13 @@ describe('运行时插件挂载 / GitCommit / Ralph', () => {
   // 全工具扫描会触发 WebFetch/WebSearch；把 fetch 固定为本地 stub，避免
   // 测试真实联网（此前在并行负载下偶发 60s 超时）。
   let originalFetch: typeof globalThis.fetch;
+  let sweepRoot = '';
   beforeEach(() => {
+    // 扫描用例使用专用的小目录，避免 Grep/Glob 递归扫 os.tmpdir() 上的
+    // 整套测试临时数据（Linux runner 上会卡到超时）。
+    sweepRoot = mkdtempSync(path.join(os.tmpdir(), 'auraxis-sweep-'));
+    writeFileSync(path.join(sweepRoot, 'a.md'), 'hello', 'utf8');
+    writeFileSync(path.join(sweepRoot, 'b.ts'), 'export const b = 1;\n', 'utf8');
     originalFetch = globalThis.fetch;
     globalThis.fetch = vi.fn(async () => ({
       ok: true,
@@ -434,6 +442,7 @@ describe('运行时插件挂载 / GitCommit / Ralph', () => {
   });
   afterEach(() => {
     globalThis.fetch = originalFetch;
+    rmSync(sweepRoot, { recursive: true, force: true });
   });
 
   it('MountPlugin / UnmountPlugin', async () => {
@@ -515,7 +524,7 @@ describe('运行时插件挂载 / GitCommit / Ralph', () => {
     const results = [];
     for (const def of TOOL_DEFINITIONS) {
       try {
-        results.push(await executeToolCall(def.name, {}, ctx()));
+        results.push(await executeToolCall(def.name, {}, ctx({ projectRoot: sweepRoot })));
       } catch (error) {
         results.push({ error: String(error) });
       }
@@ -527,7 +536,7 @@ describe('运行时插件挂载 / GitCommit / Ralph', () => {
     const results = [];
     for (const def of TOOL_DEFINITIONS) {
       try {
-        results.push(await executeToolCall(def.name, { unexpected: true }, ctx()));
+        results.push(await executeToolCall(def.name, { unexpected: true }, ctx({ projectRoot: sweepRoot })));
       } catch (error) {
         results.push({ error: String(error) });
       }
@@ -549,7 +558,7 @@ describe('运行时插件挂载 / GitCommit / Ralph', () => {
         else input[key] = key === 'file_path' ? 'C:/proj/a.ts' : 'test';
       }
       try {
-        results.push(await executeToolCall(def.name, input, ctx()));
+        results.push(await executeToolCall(def.name, input, ctx({ projectRoot: sweepRoot })));
       } catch (error) {
         results.push({ error: String(error) });
       }
@@ -620,7 +629,7 @@ describe('运行时插件挂载 / GitCommit / Ralph', () => {
     for (const input of edgeInputs) {
       for (const def of TOOL_DEFINITIONS) {
         try {
-          await executeToolCall(def.name, input, ctx());
+          await executeToolCall(def.name, input, ctx({ projectRoot: sweepRoot }));
         } catch {
           /* edge values are expected to fail validation */
         }

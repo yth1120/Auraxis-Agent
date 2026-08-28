@@ -421,6 +421,9 @@ export async function runGrep(
 
   const results: { file: string; line: number; content: string }[] = [];
   const MAX_RESULTS = 50;
+  /** 跳过超大文件，避免在含大型/二进制文件的项目（乃至测试生成的临时目录）
+   *  里读入整份文件做正则扫描，导致 Grep 卡死或内存暴涨。 */
+  const MAX_GREP_FILE_BYTES = 10 * 1024 * 1024;
   let regex: RegExp;
 
   try {
@@ -448,6 +451,8 @@ export async function runGrep(
             if (!new RegExp(matchGlob, 'i').test(entry.name)) continue;
           }
           try {
+            const fileStat = await stat(fullPath);
+            if (fileStat.isFile() && fileStat.size > MAX_GREP_FILE_BYTES) continue;
             const content = await readFile(fullPath, 'utf-8');
             const lines = content.split('\n');
             for (let i = 0; i < lines.length && results.length < MAX_RESULTS; i++) {
@@ -469,6 +474,9 @@ export async function runGrep(
   try {
     const s = await stat(searchRoot);
     if (s.isFile()) {
+      if (s.size > MAX_GREP_FILE_BYTES) {
+        return { output: { pattern: params.pattern, match_count: 0, results: [], truncated: false } };
+      }
       const content = await readFile(searchRoot, 'utf-8');
       const lines = content.split('\n');
       for (let i = 0; i < lines.length && results.length < MAX_RESULTS; i++) {

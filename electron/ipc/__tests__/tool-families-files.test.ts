@@ -377,4 +377,11 @@ describe('file-tools direct edge branches', () => {
       match_count: 1,
     });
   });
+
+  it('Grep skips oversized files instead of reading them fully', async () => {
+    const big = path.join(root, 'huge.bin');
+    writeFileSync(big, Buffer.alloc(11 * 1024 * 1024, 0x41));
+    const r = await runGrep({ pattern: 'A', path: 'huge.bin' }, ctx({ autoApprove: true }));
+    expect(r.output).toMatchObject({ pattern: 'A', match_count: 0 });
+  });
 });
