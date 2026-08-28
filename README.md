@@ -1,5 +1,6 @@
 # Auraxis
 ![Auraxis 主界面](https://github.com/user-attachments/assets/cc06146b-51a2-4b2e-a6c4-41aca0a0fb5e)
+
 ![CI](https://github.com/yth1120/Auraxis-Agent/actions/workflows/build.yml/badge.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
