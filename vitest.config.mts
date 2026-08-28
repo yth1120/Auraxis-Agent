@@ -31,7 +31,9 @@ export default defineConfig({
         'electron/preload.ts',
       ],
     },
-    testTimeout: 10000,
+    testTimeout: 30000,
+    hookTimeout: 30000,
+    teardownTimeout: 30000,
   },
   resolve: {
     alias: {
