@@ -5,6 +5,12 @@
 
 Auraxis 是一个基于 Electron + React 19 + TypeScript 的桌面端 AI 智能体工作台，提供统一的 ReAct 步进引擎、多智能体调度、Code / Work 模式、MCP 连接器、文档处理、终端、插件扩展和持久化项目记忆。
 
+## 界面预览
+
+![Auraxis 主界面](https://github.com/user-attachments/assets/cc06146b-51a2-4b2e-a6c4-41aca0a0fb5e)
+
+![Auraxis 工作台](https://github.com/user-attachments/assets/88f118c2-fc15-4779-8be3-928cb9c04ae8)
+
 ## 功能亮点
 
 - 统一聊天、多 Agent 与 Code Mode 执行链路
