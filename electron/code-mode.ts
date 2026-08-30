@@ -7,7 +7,8 @@
  * profile, sandbox gate, approval, execution) with the same authority as the
  * calling turn. Concurrency-safe tools overlap up to `MAX_PARALLEL_SUB_CALLS`;
  * mutation tools serialize. Only what the program prints or returns goes
- * back to the model.
+ * back to the model. The worker is not an OS security boundary and this mode
+ * is only enabled with `AURAXIS_ALLOW_UNSAFE_CODE=1` in a trusted environment.
  */
 import { errorText } from './errors';
 import { Worker } from 'worker_threads';

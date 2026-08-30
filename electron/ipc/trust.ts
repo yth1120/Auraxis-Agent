@@ -1,7 +1,35 @@
 import { BrowserWindow, ipcMain } from 'electron';
 import type { IpcMainInvokeEvent } from 'electron';
+import { fileURLToPath } from 'url';
 
 const DEV_ORIGINS = new Set(['http://localhost:5173', 'http://127.0.0.1:5173', 'http://[::1]:5173']);
+const trustedRendererUrls = new Set<string>();
+
+function normalizeUrl(value: string): string {
+  try {
+    const url = new URL(value);
+    if (url.protocol === 'file:') {
+      const p = fileURLToPath(url);
+      return process.platform === 'win32' ? p.toLowerCase() : p;
+    }
+    return url.href.split('#')[0].split('?')[0];
+  } catch {
+    return value;
+  }
+}
+
+/** Register the exact main-window renderer URL (called by main.ts). */
+export function setTrustedRendererUrl(url: string): void {
+  trustedRendererUrls.add(normalizeUrl(url));
+}
+
+export function clearTrustedRendererUrls(): void {
+  trustedRendererUrls.clear();
+}
+
+export function isTrustedRendererUrl(value: string): boolean {
+  return isTrustedUrl(value);
+}
 
 function isTesting(): boolean {
   // Test seams are only available in unpackaged/development processes.
@@ -13,7 +41,7 @@ function isTrustedUrl(value: string): boolean {
     const url = new URL(value);
     if (DEV_ORIGINS.has(url.origin)) return true;
     if (url.protocol === 'file:') {
-      return url.pathname.endsWith('/dist/index.html') || url.pathname.endsWith('/index.html');
+      return trustedRendererUrls.has(normalizeUrl(value));
     }
     return false;
   } catch {
@@ -34,6 +62,7 @@ export function isTrustedIpcSender(event: unknown): boolean {
   if (!e?.sender) return false;
   const win = BrowserWindow.fromWebContents(e.sender as Electron.WebContents);
   if (!win || win.isDestroyed()) return false;
+  if (e.senderFrame && e.sender.mainFrame && e.senderFrame !== e.sender.mainFrame) return false;
   const frameUrl = e.senderFrame?.url || (e.sender as Electron.WebContents).getURL?.() || '';
   return isTrustedUrl(frameUrl);
 }

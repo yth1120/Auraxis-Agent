@@ -32,7 +32,7 @@ Auraxis v3.2.0 是一款基于 Electron 的桌面端智能体工作台，融合�
   聚焦模块；移除生产代码剩余 `any`；迁移 Zustand selector 与废弃 AntD props；
   加固 IPC / Agent / Store 类型；修复登录与 Windows userData；稳定测试、
   E2E 与三平台 CI，并本地锁定 `image-size`。
-- **质量门禁**：261 个测试文件 / 1,992 用例通过（另有 3 例环境性跳过），
+- **质量门禁**：268 个测试文件 / 2,053 用例通过（另有 3 例环境性跳过），
   SDK 构建、SDK 真实 runtime 冒烟、E2E、审计与三平台 Release CI 均通过。
 
 ### 技术栈
@@ -81,6 +81,7 @@ Electron Main Process (electron/)            Renderer Process (src/)
 ┌──────────────────────────────────┐    ┌──────────────────────────────┐
 │ main.ts — 窗口创建, CSP, 单实例锁  │    │ main.tsx → App.tsx            │
 │ preload.ts — contextBridge API   │◄──►│ React 19 + Ant Design 6       │
+│ preload-{platform,core,ai,rest}  │    │                              │
 │                                      │    │                              │
 │ ipc/index.ts — 注册 30+ 模块处理器 │IPC │ Zustand Stores (18个)         │
 │ ipc/step-engine.ts — 统一ReAct步进 │    │                              │
@@ -89,7 +90,7 @@ Electron Main Process (electron/)            Renderer Process (src/)
 │ ipc/agent-scheduler.ts — 调度器    │    │   工具/命令注册表              │
 │ ipc/agent-handlers.ts — Agent CRUD │   │                              │
 │ ipc/tool-handlers.ts — 71个工具执行│   │ src/components/ — UI 组件     │
- │ tool-defs.ts — 71 个工具定义     │    │    chat/, input/, layout/,    │
+ │ tool-defs/ — 71 个工具定义      │    │    chat/, input/, layout/,    │
 │ ipc/permission-*.ts — 权限系统    │    │    settings/, agent/,         │
 │ ipc/mcp-handlers.ts — MCP 协议    │    │    permissions/, preview/     │
 │ ipc/memory-*.ts — 溯源记忆        │    │                              │
@@ -118,8 +119,12 @@ Auraxis/
 ├── electron/                    # 主进程代码（Node.js 环境）
 │   ├── main.ts                  # 应用入口：窗口创建、CSP、单实例锁
 │   ├── preload.ts               # contextBridge 暴露 API 给渲染进程
+│   ├── preload-api.ts           # IPC 桥接组合
+│   ├── preload-{platform,core,ai,rest,shared}.ts # 按域拆分的 IPC 桥接模块
+│   ├── vite.preload.config.mts  # 沙箱安全 preload 打包配置
 │   ├── types.ts                 # 共享类型（ApprovalPolicy, IpcResponse, ModelDefinition 等）
-│   ├── tool-defs.ts             # 71 个 AI 工具的定义（名称、描述、入参 schema）
+│   ├── tool-defs.ts             # 内置工具定义聚合入口
+│   ├── tool-defs/               # 71 个 AI 工具的定义（名称、描述、入参 schema）
 │   ├── contracts/               # 跨进程类型单一事实源（core/tools/advanced/session-types）
 │   ├── advanced-defs.ts         # MCP/Agent/Permission 高级类型
 │   └── ipc/                     # IPC 处理器模块
@@ -128,9 +133,31 @@ Auraxis/
 │       ├── query-engine.ts      # 聊天模式的 ReAct 循环（含 3 次 API 重试）
 │       ├── step-engine.ts       # 统一 ReAct 步进（聊天与 Agent 共用，策略钩子注入）
 │       ├── agent-loop.ts        # Agent 驱动（规划/偏差检测/上下文压缩/停止策略）
+│       ├── agent-loop-planning.ts # 规划阶段辅助
+│       ├── agent-loop-utils.ts   # 调试/日志/工具摘要辅助
+│       ├── agent-loop-planner.ts # 规划器 / 偏差检测
+│       ├── agent-loop-messages.ts # 消息去重
+│       ├── agent-loop-context.ts # 上下文管理
+│       ├── agent-loop-prepare.ts # 上下文/提示准备
+│       ├── agent-loop-inject.ts  # 外部指令/工作区漂移注入
+│       ├── agent-loop-interceptors.ts # 规划/重规划工具合成缝
+│       ├── agent-loop-stop.ts   # 停止策略
+│       ├── context-manager-utils.ts # 纯上下文工具函数
+│       ├── context-manager-snapshot.ts # 原子组安全截断
+│       ├── context-manager-summary.ts # 摘要生成与注入
 │       ├── agent-handlers.ts    # Agent CRUD + 3 个内置 Agent 定义 + 子 Agent 父子关系
+│       ├── agent-defs.ts        # 内置 Agent 角色定义
+│       ├── agent-subagent-registry.ts # 子 Agent 注册表与观察器
 │       ├── agent-scheduler.ts   # 多 Agent 并发调度器（优先级队列、并发控制、暂停/恢复）
-│       ├── tool-handlers.ts     # 71 个工具的实际执行逻辑 + 权限守卫 + 结构化输出摘要
+│       ├── tool-handlers.ts     # 工具注册表 + 权限/沙箱管线 + 结构化输出摘要
+│       ├── tool-handlers/       # registry / pipeline / internal / bash / file-tools / network / terminal / integrations / agents / session / runtime / worktree / lsp / review / execution
+│       ├── agent-scheduler-class.ts # 多 Agent 调度器实现
+│       ├── agent-scheduler-support.ts # 调度器辅助函数
+│       ├── agent-scheduler-types.ts # 调度契约 + 计划映射
+│       ├── agent-scheduler-{runtime,snapshot,query,queue,lifecycle,runner,cleanup}.ts # 调度器域模块
+│       ├── memory-db-sqlite.ts      # SQLite 记忆后端
+│       ├── memory-db-json.ts        # JSON 文件回退后端
+│       ├── memory-db-{sqlite-schema,sqlite-rows,sqlite-memory,sqlite-evidence,sqlite-belief,sqlite-audit}.ts # SQLite 域模块
 │       ├── permission-handlers.ts # 权限检查、规则管理、对话框请求
 │       ├── mcp-handlers.ts      # MCP 协议客户端（JSON-RPC、工具发现、安全验证）
 │       ├── model-config.ts      # 模型解析（内置 + 环境变量 + 持久化）
@@ -154,6 +181,9 @@ Auraxis/
 │       ├── shared.ts            # 路径验证、安全扩展名、排除目录
 │       ├── text-filter.ts       # 模型产物剥离（thinking 标签、零宽字符等）
 │       ├── code-mode.ts         # Code Mode：TS 程序 + 工具绑定 + 并发子调用（worker）
+│       ├── step-engine-context.ts # 时间/ tmux 步进上下文
+│       ├── step-engine-tool-results.ts # 超长/视觉工具结果协议
+│       ├── step-engine-tools.ts # 批量工具上下文与生命周期回调
 │       ├── step-compressor.ts   # AGORA 步骤级压缩（免推理，整步保留/丢弃）
 │       ├── workspace-drift.ts   # SWE-Touch 共享工作区漂移感知
 │       ├── approval-fatigue.ts  # Oversight 审批疲劳守卫（倒 U 型监督）
@@ -166,7 +196,7 @@ Auraxis/
 │       ├── session-store.ts     # 聊天/Agent 统一 JSONL 事件日志
 │       ├── sandbox-runner.ts    # 原生沙箱调度（restricted/AppContainer/linux/macos）
 │       ├── acp-server.ts / sdk-server.ts / headless-run.ts  # ACP / JSON-RPC SDK / 无头执行
-│       └── __tests__/           # 主进程测试（全仓 261 个测试文件 / 1,992 用例）
+│       └── __tests__/           # 主进程测试（全仓 268 个测试文件 / 2,053 用例）
 │
 ├── src/                         # 渲染进程代码（浏览器环境）
 │   ├── main.tsx                 # React 入口
@@ -188,6 +218,20 @@ Auraxis/
 │   │   └── common/              # 通用组件
 │   ├── stores/                  # Zustand 状态管理（18 个 Store）
 │   │   ├── useChatStore.ts      # 聊天消息、流、重试、项目上下文、记忆注入
+│   │   ├── chatSendEvents.ts    # 查询路径事件桥接
+│   │   ├── agentStoreActions.ts # Agent 动作与 IPC 副作用
+│   │   ├── agentStoreBuffers.ts # Agent 流式日志帧缓冲
+│   │   ├── agentStoreEvents.ts  # Agent 事件订阅生命周期
+│   │   ├── sessionStoreHelpers.ts # 会话标题/日志/投影辅助
+│   │   ├── sessionStoreActions.ts # 会话持久化动作
+│   │   ├── settingsStoreActions.ts # 设置 IPC 持久化动作
+│   │   ├── chatActions.ts       # 非流式消息动作
+│   │   ├── chatContinueCode.ts  # 前缀续写动作
+│   │   ├── chatSendMessage.ts   # 完整 sendMessage 流式动作
+│   │   ├── chatStreamRuntime.ts # 共享流生命周期状态
+│   │   ├── chatRuntime.ts       # 用量累积 + 防抖聊天日志缓冲
+│   │   ├── chatStoreSideEffects.ts # 模式/计划联动 + 会话自动保存订阅
+│   │   └── chatPlanListener.ts  # plan:generated IPC 监听与清理
 │   │   ├── useAuthStore.ts      # 登录状态、账户信息、头像
 │   │   ├── useSettingsStore.ts   # API Key、默认模型、通知
 │   │   ├── useAppStore.ts       # 主题、侧边栏、右侧面板、导航历史
@@ -936,7 +980,7 @@ SQLite 投影缓存与 FTS 索引均带 `PRAGMA user_version = 1`，后续结构
 
 ```
 源代码
-  ├── electron/ ──→ tsc (tsconfig.electron.json) ──→ dist-electron/
+  ├── electron/ ──→ tsc6 (tsconfig.electron.json) ──→ dist-electron/
   └── src/ ──────→ Vite build ────────────────────→ dist/
 
 dist-electron/ + dist/ ──→ electron-builder ──→ release/
@@ -952,7 +996,7 @@ dist-electron/ + dist/ ──→ electron-builder ──→ release/
 
 ### 12.3 环境变量加载
 
-应用使用 `dotenv` 从项目根目录的 `.env` 文件加载环境变量。运行 `npm run electron:dev` 前需创建 `.env` 文件（参考 `.env.example`）。
+应用使用内置 `.env` 解析器从项目根目录加载环境变量（无第三方 `dotenv` 依赖）。运行 `npm run electron:dev` 前需创建 `.env` 文件（参考 `.env.example`）。
 
 ---
 
@@ -970,12 +1014,12 @@ dist-electron/ + dist/ ──→ electron-builder ──→ release/
 - **测试框架**：Vitest（`describe`, `it`, `expect`, `vi` 通过 globals 注入）
 - **主进程测试**：`electron/**/__tests__/`，node 环境，依赖 `electron` 的模块用 `vi.mock('electron', ...)` 隔离
 - **渲染进程测试**：`src/**/__tests__/`，jsdom 环境（@testing-library/react）
-- **测试总数**：261 个测试文件 / 1,992 个用例通过（另有 3 例环境性跳过）
+- **测试总数**：268 个测试文件 / 2,053 个用例通过（另有 3 例环境性跳过）
 - **覆盖率口径**：门槛统计范围包括 `electron/**`、`src/stores/**`、`src/core/**`；UI 组件（`src/components/`）与主进程入口（`main.ts` / `preload.ts` 等）不计入该门槛，另有组件级测试与 Playwright 端到端测试（`npm run test:e2e`）覆盖
-- **覆盖率阈值**：行/语句 ≥ 80%，分支 ≥ 80%，函数 ≥ 80%（最近一次全仓库分支门禁报告为 88.50% statements / 90.79% lines / 80.04% branches / 87.08% functions，四项均已达标；Electron 主入口由真实 E2E、SDK smoke 与 headless CLI 验证，Linux CI 默认执行覆盖率门禁）
+- **覆盖率阈值**：行/语句 ≥ 80%，分支 ≥ 80%，函数 ≥ 80%（最近一次全仓库分支门禁报告为 87.76% statements / 90.03% lines / 80.22% branches / 82.20% functions，四项均已达标；Electron 主入口由真实 E2E、SDK smoke 与 headless CLI 验证，Linux CI 默认执行覆盖率门禁）
 - **覆盖率报告**：`npm run test:coverage` 同时输出 `coverage/coverage-summary.json`（gitignore 的开发期产物）；设置面板「测试覆盖率」页经 `coverage:get` IPC 实时读取，纯浏览器 dev 由 Vite 中间件提供同一路径，生产构建将其拷入 `dist/coverage/`。报告缺失时面板提示运行命令，不显示伪造数字。
 - **端到端测试**：16 条 Playwright UI 链路通过（真实 Electron，含本地注册 → 登录 → 记住我持久化）
-- **实战验收（DeepSeek 真实 API）**：Chat 流式回答、Code 自动代批 Bash、Code「每次确认」权限卡（允许一次后写入文件）、Work 智能放行执行流、Work 计划审批面板均跑通；沙箱脚本直启 `dist-electron/main.js` 时增加 cwd 回退（`electron/sandbox-runner.ts`）。
+- **实战验收（DeepSeek 真实 API）**：Chat 流式回答、Code 自动代批 Bash、Code「每次确认」权限卡（允许一次后写入文件）、Work 智能放行执行流、Work 计划审批面板均跑通；另用 `deepseek-v4-flash` 完成无头端到端组合运行，覆盖 TodoWrite / Bash / Write / Read / Grep / Glob / WebSearch / WebFetch / ListSkills / ListAgents / SessionQuery / Goal / Task / Job 流程，创建并验证了一个 ESM + `node:test` 示例（13/13 用例通过），并确认内联 `RunWorkflow` 保持 fail-closed；沙箱脚本直启 `dist-electron/main.js` 时增加 cwd 回退（`electron/sandbox-runner.ts`）。
 - **压力测试（本地 mock LLM + 真实 Electron）**：200 会话冷启动约 1.4s、会话切换约 155ms、FTS 重建约 178ms；18 个 Agent（6 并发）与 30 个 Agent（8 并发）全部完成、无失败；极端负载（30 个任务 + 200 行侧栏同时渲染）下快速模式切换偶发 8–11s 卡顿并有一次超过 15s，负载结束后自动恢复；默认 3 并发下无此现象。
 - **环境**：已通过 winget 安装 Python 3.10.11；`npm run sdk:test:py` 7 个用例通过，`npm run sdk:smoke` 已验证真实无头 runtime。
 - **运行命令**：`npm test`（全量）、`npm run test:backend`（主进程）、`npm run test:frontend`（渲染进程）、`npm run test:coverage`（覆盖率报告）
@@ -1068,14 +1112,24 @@ npm run build            # 生产构建
 | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
 | [electron/main.ts](../electron/main.ts)                                                             | 应用入口                                             |
 | [electron/preload.ts](../electron/preload.ts)                                                       | IPC 桥接                                             |
+| [electron/preload-api.ts](../electron/preload-api.ts)                                               | IPC 桥接组合                                         |
+| [vite.preload.config.mts](../vite.preload.config.mts)                                               | 沙箱安全 preload 打包                                |
 | [electron/ipc/index.ts](../electron/ipc/index.ts)                                                   | IPC 注册总入口                                       |
 | [electron/tool-defs.ts](../electron/tool-defs.ts)                                                   | 工具定义                                             |
+| [electron/tool-defs/](../electron/tool-defs/)                                                       | 工具定义（按能力族拆分）                             |
 | [electron/ipc/step-engine.ts](../electron/ipc/step-engine.ts)                                       | 统一 ReAct 步进引擎                                  |
 | [electron/ipc/query-engine.ts](../electron/ipc/query-engine.ts)                                     | 聊天驱动                                             |
 | [electron/ipc/query-context.ts](../electron/ipc/query-context.ts)                                   | 规范上下文快照（缓存对齐重放 / 记忆去重 / 失效墓碑） |
 | [electron/ipc/agent-loop.ts](../electron/ipc/agent-loop.ts)                                         | Agent 驱动（规划/审批/偏差/停止策略）                |
 | [electron/ipc/agent-scheduler.ts](../electron/ipc/agent-scheduler.ts)                               | 多 Agent 调度                                        |
 | [electron/ipc/tool-handlers.ts](../electron/ipc/tool-handlers.ts)                                   | 工具执行                                             |
+| [electron/ipc/tool-handlers/runtime.ts](../electron/ipc/tool-handlers/runtime.ts)                   | Cron / 跟进 / 任务 / Job 工具                        |
+| [electron/ipc/tool-handlers/lsp.ts](../electron/ipc/tool-handlers/lsp.ts)                           | LSP 代码智能                                         |
+| [electron/ipc/tool-handlers/review.ts](../electron/ipc/tool-handlers/review.ts)                     | ReviewArtifact 质量门                                |
+| [electron/ipc/tool-handlers/execution.ts](../electron/ipc/tool-handlers/execution.ts)               | 插件 / 技能 / 工作流 / 代码 / PowerShell 工具        |
+| [electron/ipc/tool-handlers/worktree.ts](../electron/ipc/tool-handlers/worktree.ts)                 | Git 工作树沙箱会话工具                               |
+| [electron/ipc/agent-scheduler-class.ts](../electron/ipc/agent-scheduler-class.ts)                   | 多 Agent 调度器实现                                  |
+| [electron/ipc/agent-scheduler-types.ts](../electron/ipc/agent-scheduler-types.ts)                   | 调度契约 + 计划映射                                  |
 | [electron/ipc/permission-handlers.ts](../electron/ipc/permission-handlers.ts)                       | 权限控制                                             |
 | [electron/code-mode.ts](../electron/code-mode.ts)                                                   | Code Mode（TS 工具编排）                             |
 | [electron/step-compressor.ts](../electron/step-compressor.ts)                                       | AGORA 步骤级压缩                                     |

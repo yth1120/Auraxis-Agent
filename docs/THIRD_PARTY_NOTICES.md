@@ -4,27 +4,35 @@
 
 ## 运行时依赖
 
-| 依赖                                                     | 用途                    | 许可证       |
-| -------------------------------------------------------- | ----------------------- | ------------ |
-| Electron                                                 | 桌面运行时              | MIT          |
-| React / React DOM                                        | UI 渲染                 | MIT          |
-| Ant Design (antd)                                        | 组件库                  | MIT          |
-| Zustand                                                  | 状态管理                | MIT          |
-| lucide-react                                             | 图标                    | ISC          |
-| react-virtuoso                                           | 消息列表虚拟化          | MIT          |
-| react-markdown / remark-gfm / remark-math / rehype-katex | Markdown / 数学公式渲染 | MIT          |
-| mermaid                                                  | 图表渲染                | MIT          |
-| echarts                                                  | 热力图 / 图表           | Apache-2.0   |
-| highlight.js                                             | 代码高亮                | BSD-3-Clause |
-| @xterm/xterm / @xterm/addon-fit                          | 集成终端 UI             | MIT          |
-| node-pty                                                 | PTY 终端会话            | MIT          |
-| better-sqlite3（可选）                                   | 长期记忆 SQLite 存储    | MIT          |
-| ssh2                                                     | SSH 连接                | MIT          |
-| axios                                                    | HTTP / SSE 请求         | MIT          |
-| clsx / dagre / @types/dagre / @xyflow/react / allotment  | 样式与工作流可视化      | MIT          |
-| katex                                                    | 数学公式渲染            | MIT          |
-| iconv-lite                                               | 文本编码转换            | MIT          |
-| mime-types                                               | MIME 类型识别           | MIT          |
+| 依赖                                                     | 用途                    | 许可证                  |
+| -------------------------------------------------------- | ----------------------- | ----------------------- |
+| Electron                                                 | 桌面运行时              | MIT                     |
+| React / React DOM                                        | UI 渲染                 | MIT                     |
+| Ant Design (antd)                                        | 组件库                  | MIT                     |
+| Zustand                                                  | 状态管理                | MIT                     |
+| lucide-react                                             | 图标                    | ISC                     |
+| react-virtuoso                                           | 消息列表虚拟化          | MIT                     |
+| react-markdown / remark-gfm / remark-math / rehype-katex | Markdown / 数学公式渲染 | MIT                     |
+| mermaid                                                  | 图表渲染                | MIT                     |
+| echarts                                                  | 热力图 / 图表           | Apache-2.0              |
+| highlight.js                                             | 代码高亮                | BSD-3-Clause            |
+| @xterm/xterm / @xterm/addon-fit                          | 集成终端 UI             | MIT                     |
+| node-pty                                                 | PTY 终端会话            | MIT                     |
+| better-sqlite3（可选）                                   | 长期记忆 SQLite 存储    | MIT                     |
+| ssh2                                                     | SSH 连接                | MIT                     |
+| axios                                                    | HTTP / SSE 请求         | MIT                     |
+| mammoth                                                  | Word 文档读取           | BSD-2-Clause            |
+| docx                                                     | Word 文档生成           | MIT                     |
+| exceljs                                                  | Excel 读写              | MIT                     |
+| pptxgenjs                                                | PowerPoint 生成         | MIT                     |
+| pdf-parse                                                | PDF 文本提取            | Apache-2.0              |
+| pdfkit                                                   | PDF 生成                | MIT                     |
+| adm-zip                                                  | PowerPoint ZIP 解析     | MIT                     |
+| jszip                                                    | PptxGenJS 压缩组件      | MIT OR GPL-3.0-or-later |
+| clsx / dagre / @types/dagre / @xyflow/react / allotment  | 样式与工作流可视化      | MIT                     |
+| katex                                                    | 数学公式渲染            | MIT                     |
+| iconv-lite                                               | 文本编码转换            | MIT                     |
+| mime-types                                               | MIME 类型识别           | MIT                     |
 
 > **说明**：`better-sqlite3` 为可选原生依赖，依赖本机编译工具链；未安装时长期记忆自动回退为 JSON 文件存储，不影响其余功能。
 

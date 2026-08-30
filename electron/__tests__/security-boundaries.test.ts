@@ -22,11 +22,13 @@ describe('安全边界回归', () => {
     process.env.AURAXIS_SDK_TOKEN = 'sdk-token';
     process.env.PATH = '/usr/bin';
     process.env.HOME = '/home/test';
+    process.env.DSH_MCP_WORKSPACE_ROOTS = '/workspaces';
     const env = safeProcessEnv({ TERM: 'xterm-256color', DEEPSEEK_API_KEY: 'override' });
     expect(env.DEEPSEEK_API_KEY).toBeUndefined();
     expect(env.AURAXIS_SDK_TOKEN).toBeUndefined();
     expect(env.PATH).toBe('/usr/bin');
     expect(env.HOME).toBe('/home/test');
+    expect(env.DSH_MCP_WORKSPACE_ROOTS).toBe('/workspaces');
     expect(env.TERM).toBe('xterm-256color');
   });
 

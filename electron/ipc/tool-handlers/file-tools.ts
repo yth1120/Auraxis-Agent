@@ -14,12 +14,15 @@ import {
   resolveToolPath,
   workspaceRootsOf,
   isInsideAnyRoot,
+  isSensitiveToolPath,
   markFileObserved,
   isFileObserved,
   fileExists,
   type ToolContext,
   type ToolResult,
 } from './path-utils';
+
+const MAX_TEXT_TOOL_BYTES = 10 * 1024 * 1024;
 // ─── Read ──────────────────────────────────────────────
 export async function runRead(
   params: { file_path: string; offset?: number; limit?: number },
@@ -32,8 +35,15 @@ export async function runRead(
   if (boundary) {
     return { output: null, error: `${boundary}: ${params.file_path}` };
   }
+  if (isSensitiveToolPath(resolved)) {
+    return { output: null, error: `禁止模型读取敏感文件: ${resolved}` };
+  }
 
   try {
+    const fileStat = await stat(resolved);
+    if (fileStat.isFile() && fileStat.size > MAX_TEXT_TOOL_BYTES) {
+      return { output: null, error: `文件过大（${fileStat.size} 字节，上限 ${MAX_TEXT_TOOL_BYTES} 字节）` };
+    }
     const content = await readFile(resolved, 'utf-8');
     const lines = content.split('\n');
     const offset = params.offset ?? 1;
@@ -67,6 +77,9 @@ export async function runReadImage(params: { file_path: string }, ctx: ToolConte
   const boundary = outsideWorkspace(resolved, ctx, false);
   if (boundary) {
     return { output: null, error: `${boundary}: ${params.file_path}` };
+  }
+  if (isSensitiveToolPath(resolved)) {
+    return { output: null, error: `禁止模型读取敏感文件: ${resolved}` };
   }
 
   try {
@@ -111,6 +124,9 @@ export async function runWrite(
   const boundary = outsideWorkspace(resolved, ctx, true);
   if (boundary) {
     return { output: null, error: `${boundary}: ${params.file_path}` };
+  }
+  if (isSensitiveToolPath(resolved)) {
+    return { output: null, error: `禁止模型修改敏感文件: ${resolved}` };
   }
 
   if (!ctx.autoApprove && !isSafeExtension(resolved)) {
@@ -169,6 +185,9 @@ export async function runEdit(
   const boundary = outsideWorkspace(resolved, ctx, true);
   if (boundary) {
     return { output: null, error: `${boundary}: ${params.file_path}` };
+  }
+  if (isSensitiveToolPath(resolved)) {
+    return { output: null, error: `禁止模型修改敏感文件: ${resolved}` };
   }
   if (!ctx.autoApprove && !isSafeExtension(resolved)) {
     return { output: null, error: `不允许编辑的文件类型: ${path.extname(resolved)}` };
@@ -243,6 +262,9 @@ export async function runStrReplaceEditor(
   const boundary = outsideWorkspace(resolved, ctx, isWriteCmd);
   if (boundary) {
     return { output: null, error: `${boundary}: ${params.path}` };
+  }
+  if (isSensitiveToolPath(resolved)) {
+    return { output: null, error: `禁止模型访问敏感文件: ${resolved}` };
   }
   if (!ctx.autoApprove && !isSafeExtension(resolved)) {
     return { output: null, error: `不允许编辑的文件类型: ${path.extname(resolved)}` };
@@ -345,6 +367,9 @@ export async function runDelete(
   if (!isInsideAnyRoot(resolved, workspaceRootsOf(ctx))) {
     return { output: null, error: `路径越权: ${file_path}` };
   }
+  if (isSensitiveToolPath(resolved)) {
+    return { output: null, error: `禁止模型删除敏感文件: ${resolved}` };
+  }
   // 任一工作区根本身都不能作为删除目标（递归删除会清空整个根）。
   if (workspaceRootsOf(ctx).some((root) => resolved === root)) {
     return { output: null, error: '路径越权：不能删除项目目录本身或目录外的文件' };
@@ -414,6 +439,9 @@ export async function runGrep(
 ): Promise<ToolResult> {
   if (ctx.abortSignal?.aborted) return { output: null, error: '操作已取消' };
   const searchRoot = params.path ? resolvePath(params.path, ctx.projectRoot) : ctx.projectRoot;
+  if (isSensitiveToolPath(searchRoot)) {
+    return { output: { pattern: params.pattern, match_count: 0, results: [], truncated: false } };
+  }
 
   if (!ctx.autoApprove && !isInsideAnyRoot(searchRoot, workspaceRootsOf(ctx))) {
     return { output: null, error: `路径越权: ${params.path}` };
@@ -442,6 +470,7 @@ export async function runGrep(
         if (entry.name.startsWith('.') || EXCLUDED_DIRS.has(entry.name)) continue;
 
         const fullPath = path.join(dirPath, entry.name);
+        if (isSensitiveToolPath(fullPath)) continue;
 
         if (entry.isDirectory()) {
           await searchDir(fullPath, depth + 1);
@@ -477,6 +506,9 @@ export async function runGrep(
       if (s.size > MAX_GREP_FILE_BYTES) {
         return { output: { pattern: params.pattern, match_count: 0, results: [], truncated: false } };
       }
+      if (isSensitiveToolPath(searchRoot)) {
+        return { output: { pattern: params.pattern, match_count: 0, results: [], truncated: false } };
+      }
       const content = await readFile(searchRoot, 'utf-8');
       const lines = content.split('\n');
       for (let i = 0; i < lines.length && results.length < MAX_RESULTS; i++) {
@@ -501,6 +533,9 @@ export async function runGrep(
 export async function runGlob(params: { pattern: string; path?: string }, ctx: ToolContext): Promise<ToolResult> {
   if (ctx.abortSignal?.aborted) return { output: null, error: '操作已取消' };
   const searchRoot = params.path ? resolvePath(params.path, ctx.projectRoot) : ctx.projectRoot;
+  if (isSensitiveToolPath(searchRoot)) {
+    return { output: { pattern: params.pattern, match_count: 0, results: [], truncated: false } };
+  }
 
   if (!ctx.autoApprove && !isInsideAnyRoot(searchRoot, workspaceRootsOf(ctx))) {
     return { output: null, error: `路径越权: ${params.path}` };
@@ -533,6 +568,7 @@ export async function runGlob(params: { pattern: string; path?: string }, ctx: T
         if (entry.name.startsWith('.') || EXCLUDED_DIRS.has(entry.name)) continue;
 
         const fullPath = path.join(dirPath, entry.name);
+        if (isSensitiveToolPath(fullPath)) continue;
 
         if (entry.isDirectory()) {
           await walk(fullPath, depth + 1);

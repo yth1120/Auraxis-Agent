@@ -55,22 +55,24 @@ describe('agent prune — decision logic', () => {
 
 describe('agent prune — wiring is in place', () => {
   it('scheduler pruneStale drops terminal instances (AG-4) and is called on completion', () => {
-    const src = read('agent-scheduler-core.ts');
+    const src = read('agent-scheduler-class-impl.ts');
+    const cleanup = read('agent-scheduler-cleanup.ts');
     const pruneMatch = src.match(/pruneStale\([^)]*\)\s*:\s*number\s*\{[\s\S]*?\n {2}\}/);
     expect(pruneMatch).toBeTruthy();
-    expect(pruneMatch![0]).toContain('instances.delete(id)');
+    expect(pruneMatch![0]).toContain('pruneAgentInstances');
+    expect(cleanup).toContain('instances.delete(id)');
     // Triggered when an agent completes or errors.
     expect(src).toContain('this.pruneStale();');
     expect((src.match(/this\.pruneStale\(\)/g) || []).length).toBeGreaterThanOrEqual(2);
   });
 
   it('sub-agent map is pruned on each new runSubAgent (AG-3)', () => {
-    const src = read('agent-handlers.ts');
-    expect(src).toContain('function pruneSubAgents');
+    const src = read('agent-subagent-registry.ts');
+    expect(src).toContain('export function pruneSubAgents');
     expect(src).toContain('pruneSubAgents();');
     // Prune call sits before the new sub-agent is inserted.
     const pruneIdx = src.indexOf('pruneSubAgents();');
-    const setIdx = src.indexOf('agents.set(agentId, agent);');
+    const setIdx = src.indexOf('agents.set(agent.id, agent);');
     expect(pruneIdx).toBeGreaterThan(0);
     expect(pruneIdx).toBeLessThan(setIdx);
   });

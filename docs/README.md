@@ -34,7 +34,7 @@ The project follows **paper-driven development**: 7 arXiv papers' core technique
   Zustand selectors and deprecated AntD props migrated; IPC / agent / store
   typings hardened; login and Windows userData recovery; test / E2E / CI
   matrix stabilization and local `image-size` pinning.
-- **Quality gates**: 261 test files / 1,992 passing cases (+3 environment
+- **Quality gates**: 268 test files / 2,053 passing cases (+3 environment
   skips), SDK build, SDK live smoke, E2E, audit, and three-platform release CI.
 
 ### Tech Stack
@@ -83,6 +83,7 @@ Electron Main Process (electron/)            Renderer Process (src/)
 ┌──────────────────────────────────┐    ┌──────────────────────────────┐
 │ main.ts — window, CSP, lock      │    │ main.tsx → App.tsx            │
 │ preload.ts — contextBridge API   │◄──►│ React 19 + Ant Design 6       │
+│ preload-{platform,core,ai,rest}  │    │                              │
 │                                  │    │                              │
 │ ipc/index.ts — 30+ modules       │IPC │ Zustand Stores (18)           │
 │ ipc/step-engine.ts — ReAct step  │    │                              │
@@ -90,8 +91,8 @@ Electron Main Process (electron/)            Renderer Process (src/)
 │ ipc/agent-loop.ts — agent drive  │    │   tool/command registry       │
 │ ipc/agent-scheduler.ts — sched.  │    │                              │
 │ ipc/agent-handlers.ts — CRUD     │    │                              │
-│ ipc/tool-handlers.ts — 71 tools  │    │ src/components/ — UI         │
-│ tool-defs.ts — 71 tool defs      │    │  chat/, input/, layout/,      │
+│ ipc/tool-handlers/ — 71 tools    │    │ src/components/ — UI         │
+│ tool-defs/ — 71 tool defs        │    │  chat/, input/, layout/,      │
 │ ipc/permission-*.ts — perms      │    │  settings/, agent/,           │
 │ ipc/mcp-handlers.ts — MCP        │    │  permissions/, preview/       │
 │ ipc/memory-*.ts — memory         │    │                              │
@@ -120,8 +121,12 @@ Auraxis/
 ├── electron/                    # Main process code (Node.js)
 │   ├── main.ts                  # App entry: window, CSP, single-instance lock
 │   ├── preload.ts               # contextBridge API for the renderer
+│   ├── preload-api.ts           # IPC bridge composition
+│   ├── preload-{platform,core,ai,rest,shared}.ts # Domain IPC bridge modules
+│   ├── vite.preload.config.mts  # Sandbox-safe preload bundle config
 │   ├── types.ts                 # Shared types (ApprovalPolicy, IpcResponse, ModelDefinition…)
-│   ├── tool-defs.ts             # 71 AI tool definitions (name, description, input schema)
+│   ├── tool-defs.ts             # Aggregator for built-in tool definitions
+│   ├── tool-defs/               # 71 AI tool definitions (name, description, input schema)
 │   ├── contracts/               # Single source of truth for cross-process types
 │   ├── advanced-defs.ts         # MCP / Agent / Permission advanced types
 │   └── ipc/                     # IPC handler modules
@@ -130,9 +135,31 @@ Auraxis/
 │       ├── query-engine.ts      # Chat-mode ReAct loop (3 API retries)
 │       ├── step-engine.ts       # Unified ReAct stepping (shared by chat & agents)
 │       ├── agent-loop.ts        # Agent driver (planning / deviance / compaction / stop)
+│       ├── agent-loop-planning.ts # Planning phase helpers
+│       ├── agent-loop-utils.ts   # Debug/log/tool-summary helpers
+│       ├── agent-loop-planner.ts # Planner / Deviance
+│       ├── agent-loop-messages.ts # Message deduplication
+│       ├── agent-loop-context.ts # Context manager
+│       ├── agent-loop-prepare.ts # Context/prompt preparation
+│       ├── agent-loop-inject.ts  # External/workspace turn injections
+│       ├── agent-loop-interceptors.ts # Plan/replan tool seams
+│       ├── agent-loop-stop.ts   # Stop policy
+│       ├── context-manager-utils.ts # Pure context helpers
+│       ├── context-manager-snapshot.ts # Atomic-group truncation
+│       ├── context-manager-summary.ts # Summary generation/injection
 │       ├── agent-handlers.ts    # Agent CRUD + 3 built-in agent types + parent-child links
+│       ├── agent-defs.ts        # Built-in agent role definitions
+│       ├── agent-subagent-registry.ts # Sub-agent registry/observer bridge
 │       ├── agent-scheduler.ts   # Multi-agent concurrent scheduler (queue, limits, pause/resume)
-│       ├── tool-handlers.ts     # 71 tool executors + permission guards + structured summaries
+│       ├── tool-handlers.ts     # Tool registry, permission/sandbox pipeline, structured summaries
+│       ├── tool-handlers/       # registry / pipeline / internal / bash / file-tools / network / terminal / integrations / agents / session / runtime / worktree / lsp / review / execution
+│       ├── agent-scheduler-class.ts # Multi-agent scheduler implementation
+│       ├── agent-scheduler-support.ts # Scheduler helper functions
+│       ├── agent-scheduler-types.ts # Scheduler contracts + plan mapping
+│       ├── agent-scheduler-{runtime,snapshot,query,queue,lifecycle,runner,cleanup}.ts # Scheduler domain modules
+│       ├── memory-db-sqlite.ts      # SQLite memory backend
+│       ├── memory-db-json.ts        # JSON file fallback backend
+│       ├── memory-db-{sqlite-schema,sqlite-rows,sqlite-memory,sqlite-evidence,sqlite-belief,sqlite-audit}.ts # SQLite domain modules
 │       ├── permission-handlers.ts # Permission checks, rules, dialog requests
 │       ├── mcp-handlers.ts      # MCP protocol client (JSON-RPC, discovery, security)
 │       ├── model-config.ts      # Model resolution (built-in + env + persisted)
@@ -156,6 +183,9 @@ Auraxis/
 │       ├── shared.ts            # Path validation, safe extensions, excluded dirs
 │       ├── text-filter.ts       # Strips model artifacts (thinking tags, zero-width chars…)
 │       ├── code-mode.ts         # Code Mode: TS program + tool bindings + concurrent calls (worker)
+│       ├── step-engine-context.ts # Time/tmux step context
+│       ├── step-engine-tool-results.ts # Oversized/visual tool-result protocol
+│       ├── step-engine-tools.ts # Shared tool batch context/callbacks
 │       ├── step-compressor.ts   # AGORA step compression (inference-free, keep/drop whole steps)
 │       ├── workspace-drift.ts   # SWE-Touch shared-workspace drift detection
 │       ├── approval-fatigue.ts  # Oversight approval fatigue guard (inverted-U supervision)
@@ -168,7 +198,7 @@ Auraxis/
 │       ├── session-store.ts     # Unified JSONL event logs (chat & agent)
 │       ├── sandbox-runner.ts    # Native sandbox dispatch (restricted/AppContainer/linux/macos)
 │       ├── acp-server.ts / sdk-server.ts / headless-run.ts  # ACP / JSON-RPC SDK / headless
-│       └── __tests__/           # Main-process tests (261 files / 1,992 cases repo-wide)
+│       └── __tests__/           # Main-process tests (268 files / 2,053 cases repo-wide)
 │
 ├── src/                         # Renderer code (browser environment)
 │   ├── main.tsx                 # React entry
@@ -190,6 +220,20 @@ Auraxis/
 │   │   └── common/              # Shared components
 │   ├── stores/                  # Zustand stores (18)
 │   │   ├── useChatStore.ts      # Chat messages, stream, retry, project context, memory injection
+│   │   ├── chatSendEvents.ts    # Query path event bridge
+│   │   ├── agentStoreActions.ts # Agent actions/IPC side effects
+│   │   ├── agentStoreBuffers.ts # Agent streaming log frame buffers
+│   │   ├── agentStoreEvents.ts  # Agent event subscription lifecycle
+│   │   ├── sessionStoreHelpers.ts # Session titles/log/projection helpers
+│   │   ├── sessionStoreActions.ts # Session durable actions
+│   │   ├── settingsStoreActions.ts # Settings IPC-backed mutations
+│   │   ├── chatActions.ts       # Non-streaming message actions
+│   │   ├── chatContinueCode.ts  # Prefix continuation action
+│   │   ├── chatSendMessage.ts   # Full sendMessage stream action
+│   │   ├── chatStreamRuntime.ts # Shared stream lifecycle state
+│   │   ├── chatRuntime.ts       # Usage accumulation + debounced chat-log buffer
+│   │   ├── chatStoreSideEffects.ts # Mode/plan coupling + session auto-save subscriptions
+│   │   └── chatPlanListener.ts  # plan:generated IPC listener + dispose
 │   │   ├── useAuthStore.ts      # Login state, account info, avatar
 │   │   ├── useSettingsStore.ts  # API key, default model, notifications
 │   │   ├── useAppStore.ts       # Theme, sidebar, right panel, nav history
@@ -939,7 +983,7 @@ Models can use either OpenAI-compatible or Anthropic format. OpenAI format is th
 
 ```
 Source code
-  ├── electron/ ──→ tsc (tsconfig.electron.json) ──→ dist-electron/
+  ├── electron/ ──→ tsc6 (tsconfig.electron.json) ──→ dist-electron/
   └── src/ ──────→ Vite build ────────────────────→ dist/
 
 dist-electron/ + dist/ ──→ electron-builder ──→ release/
@@ -955,7 +999,7 @@ dist-electron/ + dist/ ──→ electron-builder ──→ release/
 
 ### 12.3 Environment Variable Loading
 
-The app uses `dotenv` to load environment variables from `.env` at the project root. Create a `.env` file (see `.env.example`) before running `npm run electron:dev`.
+The app uses a built-in `.env` parser to load environment variables from `.env` at the project root (no third-party `dotenv` dependency). Create a `.env` file (see `.env.example`) before running `npm run electron:dev`.
 
 ---
 
@@ -973,12 +1017,12 @@ The app uses `dotenv` to load environment variables from `.env` at the project r
 - **Framework**: Vitest (`describe`, `it`, `expect`, `vi` injected via globals)
 - **Main-process tests**: `electron/**/__tests__/`, node environment; modules depending on `electron` are isolated with `vi.mock('electron', ...)`
 - **Renderer tests**: `src/**/__tests__/`, jsdom environment (@testing-library/react)
-- **Total**: 261 test files / 1,992 cases passing (+3 environment-skips)
+- **Total**: 268 test files / 2,053 cases passing (+3 environment-skips)
 - **Coverage scope**: the branch gate counts `electron/**`, `src/stores/**`, `src/core/**`; UI components (`src/components/`) and main-process entry points (`main.ts` / `preload.ts` etc.) are excluded from the gate and covered by component tests + Playwright E2E (`npm run test:e2e`)
-- **Coverage thresholds**: lines/statements ≥ 80%, branches ≥ 80%, functions ≥ 80% (latest full branch gate: 88.50% statements / 90.79% lines / 80.04% branches / 87.08% functions; Electron main entry is verified by E2E and SDK smoke; Linux CI runs the coverage gate by default)
+- **Coverage thresholds**: lines/statements ≥ 80%, branches ≥ 80%, functions ≥ 80% (latest full branch gate: 87.76% statements / 90.03% lines / 80.22% branches / 82.20% functions; Electron main entry is verified by E2E and SDK smoke; Linux CI runs the coverage gate by default)
 - **Coverage report**: `npm run test:coverage` outputs `coverage/coverage-summary.json` (gitignored dev artifact); the Settings "Test coverage" page reads it live via the `coverage:get` IPC; pure browser dev is served by a Vite middleware, and production builds copy it into `dist/coverage/`. When the report is missing, the panel shows the command to run instead of fake numbers
 - **E2E**: 16 Playwright UI flows passing (real Electron, including register → login → remember-me persistence)
-- **Real-API acceptance (DeepSeek)**: chat streaming, Code auto-approve Bash, Code "confirm each time" permission card (write after one approval), Work smart-execution flow, and Work plan-approval panel all verified; sandbox scripts add cwd fallback when launching `dist-electron/main.js` directly (`electron/sandbox-runner.ts`)
+- **Real-API acceptance (DeepSeek)**: chat streaming, Code auto-approve Bash, Code "confirm each time" permission card (write after one approval), Work smart-execution flow, and Work plan-approval panel all verified; `deepseek-v4-flash` additionally drove a headless end-to-end combos run using TodoWrite / Bash / Write / Read / Grep / Glob / WebSearch / WebFetch / ListSkills / ListAgents / SessionQuery / Goal / Task / Job flows, created and verified an ESM + `node:test` sample (13/13 tests), and confirmed inline `RunWorkflow` remains fail-closed; sandbox scripts add cwd fallback when launching `dist-electron/main.js` directly (`electron/sandbox-runner.ts`)
 - **Stress testing (local mock LLM + real Electron)**: 200 sessions cold start ~1.4s, session switch ~155ms, FTS rebuild ~178ms; 18 agents (6 concurrent) and 30 agents (8 concurrent) all completed without failure; under extreme load (30 tasks + 200 sidebar rows) fast mode switches occasionally stalled 8–11s with one >15s, recovering automatically after load; no issue at the default 3-concurrency setting
 - **Environment**: Python 3.10.11 installed via winget; `npm run sdk:test:py` passes 7 cases and `npm run sdk:smoke` verifies the live headless runtime
 - **Commands**: `npm test` (all), `npm run test:backend` (main process), `npm run test:frontend` (renderer), `npm run test:coverage` (coverage report)
@@ -1072,17 +1116,36 @@ npm run build            # Production build
 | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
 | [electron/main.ts](../electron/main.ts)                                                             | App entry                                                                                   |
 | [electron/preload.ts](../electron/preload.ts)                                                       | IPC bridge                                                                                  |
+| [electron/preload-api.ts](../electron/preload-api.ts)                                               | IPC bridge composition                                                                      |
+| [vite.preload.config.mts](../vite.preload.config.mts)                                               | Sandbox-safe preload bundling                                                               |
 | [electron/ipc/index.ts](../electron/ipc/index.ts)                                                   | IPC registration entry                                                                      |
 | [electron/tool-defs.ts](../electron/tool-defs.ts)                                                   | Tool definitions                                                                            |
+| [electron/tool-defs/](../electron/tool-defs/)                                                       | Tool definitions (capability modules)                                                       |
 | [electron/ipc/step-engine.ts](../electron/ipc/step-engine.ts)                                       | Unified ReAct step engine                                                                   |
 | [electron/ipc/query-engine.ts](../electron/ipc/query-engine.ts)                                     | Chat driver                                                                                 |
 | [electron/ipc/query-context.ts](../electron/ipc/query-context.ts)                                   | Canonical context snapshots (cache-aligned replay / memory dedup / invalidation tombstones) |
 | [electron/ipc/agent-loop.ts](../electron/ipc/agent-loop.ts)                                         | Agent driver (plan/approval/deviance/stop)                                                  |
+| [electron/ipc/agent-loop-preparation.ts](../electron/ipc/agent-loop-prepare.ts)                     | Agent context/prompt preparation                                                            |
+| [electron/ipc/agent-loop-interceptors.ts](../electron/ipc/agent-loop-interceptors.ts)               | Plan/replan synthetic tool seams                                                            |
+| [electron/ipc/agent-subagent-registry.ts](../electron/ipc/agent-subagent-registry.ts)               | Sub-agent registry and observer bridge                                                      |
 | [electron/ipc/agent-scheduler.ts](../electron/ipc/agent-scheduler.ts)                               | Multi-agent scheduling                                                                      |
+| [electron/ipc/agent-scheduler-runner.ts](../electron/ipc/agent-scheduler-runner.ts)                 | Scheduler run lifecycle                                                                     |
+| [electron/ipc/agent-scheduler-queue.ts](../electron/ipc/agent-scheduler-queue.ts)                   | Scheduler queue helpers                                                                     |
 | [electron/ipc/tool-handlers.ts](../electron/ipc/tool-handlers.ts)                                   | Tool execution                                                                              |
+| [electron/ipc/tool-handlers/runtime.ts](../electron/ipc/tool-handlers/runtime.ts)                   | Cron / schedule / task / job tools                                                          |
+| [electron/ipc/tool-handlers/lsp.ts](../electron/ipc/tool-handlers/lsp.ts)                           | LSP code intelligence                                                                       |
+| [electron/ipc/tool-handlers/review.ts](../electron/ipc/tool-handlers/review.ts)                     | ReviewArtifact quality gate                                                                 |
+| [electron/ipc/tool-handlers/execution.ts](../electron/ipc/tool-handlers/execution.ts)               | Plugin / skill / workflow / code / PowerShell tools                                         |
+| [electron/ipc/tool-handlers/worktree.ts](../electron/ipc/tool-handlers/worktree.ts)                 | Git worktree sandbox session tools                                                          |
+| [electron/ipc/agent-scheduler-class.ts](../electron/ipc/agent-scheduler-class.ts)                   | Multi-agent scheduler implementation                                                        |
+| [electron/ipc/agent-scheduler-types.ts](../electron/ipc/agent-scheduler-types.ts)                   | Scheduler contracts + plan mapping                                                          |
 | [electron/ipc/permission-handlers.ts](../electron/ipc/permission-handlers.ts)                       | Permission control                                                                          |
 | [electron/code-mode.ts](../electron/code-mode.ts)                                                   | Code Mode (TS tool orchestration)                                                           |
 | [electron/step-compressor.ts](../electron/step-compressor.ts)                                       | AGORA step compression                                                                      |
+| [electron/ipc/step-engine-tools.ts](../electron/ipc/step-engine-tools.ts)                           | Shared step tool batch seam                                                                 |
+| [electron/ipc/step-engine-tool-results.ts](../electron/ipc/step-engine-tool-results.ts)             | Step tool-result formatting                                                                 |
+| [electron/ipc/context-manager-snapshot.ts](../electron/ipc/context-manager-snapshot.ts)             | Atomic-group safe truncation                                                                |
+| [electron/ipc/context-manager-summary.ts](../electron/ipc/context-manager-summary.ts)               | Context summary generation                                                                  |
 | [electron/workspace-drift.ts](../electron/workspace-drift.ts)                                       | SWE-Touch workspace drift                                                                   |
 | [electron/approval-fatigue.ts](../electron/approval-fatigue.ts)                                     | Oversight approval fatigue                                                                  |
 | [electron/tool-inertia.ts](../electron/tool-inertia.ts)                                             | AutoTool tool inertia                                                                       |
@@ -1094,6 +1157,9 @@ npm run build            # Production build
 | [electron/session-store.ts](../electron/session-store.ts)                                           | Unified event logs                                                                          |
 | [src/App.tsx](../src/App.tsx)                                                                       | React root component                                                                        |
 | [src/stores/useChatStore.ts](../src/stores/useChatStore.ts)                                         | Chat state                                                                                  |
+| [src/stores/agentStoreActions.ts](../src/stores/agentStoreActions.ts)                               | Agent store actions                                                                         |
+| [src/stores/sessionStoreActions.ts](../src/stores/sessionStoreActions.ts)                           | Session store actions                                                                       |
+| [src/stores/settingsStoreActions.ts](../src/stores/settingsStoreActions.ts)                         | Settings store mutations                                                                    |
 | [src/components/auth/AuthGate.tsx](../src/components/auth/AuthGate.tsx)                             | Login gate                                                                                  |
 | [src/components/work/WorkExecutionFlow.tsx](../src/components/work/WorkExecutionFlow.tsx)           | Work execution flow view                                                                    |
 | [src/components/input/ThinkingDepthSelector.tsx](../src/components/input/ThinkingDepthSelector.tsx) | Thinking-depth slider (magnetic streaming effect)                                           |

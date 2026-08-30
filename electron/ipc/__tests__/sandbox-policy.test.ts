@@ -13,7 +13,7 @@ describe('sandbox-policy — 每调用沙箱强制', () => {
     for (const tool of [...MUTATION_TOOLS]) {
       const r = enforceSandbox({ sandboxMode: 'read', toolName: tool, input: {} });
       expect(r.allowed).toBe(false);
-      expect(r.reason).toContain('只读沙箱');
+      expect(r.reason).toMatch(/只读沙箱|受控沙箱/);
     }
     const read = enforceSandbox({ sandboxMode: 'read', toolName: 'Read', input: { file_path: 'a.ts' } });
     expect(read.allowed).toBe(true);
@@ -38,5 +38,12 @@ describe('sandbox-policy — 每调用沙箱强制', () => {
     expect(
       enforceSandbox({ sandboxMode: 'workspace-write', toolName: 'Bash', input: { command: 'npm test' } }).allowed,
     ).toBe(true);
+  });
+
+  it('confined modes reject terminal/code execution surfaces that cannot be wrapped', () => {
+    for (const tool of ['Pty', 'TerminalOpen', 'TerminalSend', 'RunWorkflow', 'MountPlugin']) {
+      expect(enforceSandbox({ sandboxMode: 'workspace-write', toolName: tool, input: {} }).allowed).toBe(false);
+    }
+    expect(enforceSandbox({ sandboxMode: 'read', toolName: 'Pwsh', input: { command: 'ls' } }).allowed).toBe(false);
   });
 });

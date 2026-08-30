@@ -122,10 +122,15 @@ describe('permission profiles', () => {
     const denied = await evaluateToolProfileGate('Write', { file_path: 'src/a.ts' }, projectRoot);
     expect(denied.allowed).toBe(false);
     expect(denied.reason).toContain('只读');
+    expect((await evaluateToolProfileGate('StrReplaceEditor', { path: 'src/a.ts' }, projectRoot)).allowed).toBe(false);
+    expect((await evaluateToolProfileGate('ReadImage', { file_path: 'src/a.png' }, projectRoot)).allowed).toBe(true);
+    expect((await evaluateToolProfileGate('Bash', { command: 'cat a.ts' }, projectRoot)).allowed).toBe(false);
+    expect((await evaluateToolProfileGate('TerminalSend', { command: 'cat a.ts' }, projectRoot)).allowed).toBe(false);
 
     await writeSettings({ activePermissionProfile: 'standard' });
     const allowed = await evaluateToolProfileGate('Write', { file_path: 'src/a.ts' }, projectRoot);
     expect(allowed.allowed).toBe(true);
+    expect((await evaluateToolProfileGate('Bash', { command: 'cat a.ts' }, projectRoot)).allowed).toBe(true);
 
     await writeSettings({ activePermissionProfile: 'sandbox' });
     const web = await evaluateToolProfileGate('WebFetch', { url: 'https://api.example.com' }, projectRoot);

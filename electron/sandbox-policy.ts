@@ -15,18 +15,25 @@
 
 export type SandboxMode = 'read' | 'workspace-write' | 'full';
 
+import {
+  CODE_EXECUTION_TOOLS,
+  EXTERNAL_MUTATION_TOOLS,
+  FILE_WRITE_TOOLS,
+  RUNTIME_MUTATION_TOOLS,
+  UNSUPPORTED_CONFINED_TOOLS,
+  isUnsupportedConfinementTool,
+} from './tool-capability';
+
 export const MUTATION_TOOLS = new Set([
-  'Write',
-  'Edit',
-  'Delete',
-  'NotebookEdit',
-  'GitCommit',
-  'EnterWorktree',
-  'CronCreate',
-  'CronDelete',
-  'TaskStop',
-  'RunCode',
+  ...FILE_WRITE_TOOLS,
+  ...CODE_EXECUTION_TOOLS,
+  ...RUNTIME_MUTATION_TOOLS,
+  ...EXTERNAL_MUTATION_TOOLS,
+  'Pwsh',
 ]);
+
+/** Re-export for tests/back-compat; the source of truth is tool-capability. */
+export { UNSUPPORTED_CONFINED_TOOLS };
 
 const MUTATION_PATTERNS: { re: RegExp; reason: string }[] = [
   { re: /\b(rm|rmdir|mv|cp|mkdir|touch|truncate|dd|mkfs|mkswap)\b/i, reason: '检测到文件/磁盘变更命令' },
@@ -69,10 +76,17 @@ export function enforceSandbox(args: { sandboxMode: SandboxMode; toolName: strin
 } {
   if (args.sandboxMode === 'full') return { allowed: true };
 
+  if (isUnsupportedConfinementTool(args.toolName)) {
+    return {
+      allowed: false,
+      reason: `受控沙箱（${args.sandboxMode}）不支持 ${args.toolName}，已拒绝执行`,
+    };
+  }
+  if (args.toolName.startsWith('mcp__')) {
+    return { allowed: false, reason: '受控沙箱不允许调用 MCP 工具（无法验证其读写边界）' };
+  }
+
   if (args.sandboxMode === 'read') {
-    if (args.toolName.startsWith('mcp__')) {
-      return { allowed: false, reason: '只读沙箱不允许调用 MCP 工具（无法验证其读写边界）' };
-    }
     if (MUTATION_TOOLS.has(args.toolName)) {
       return { allowed: false, reason: `只读沙箱禁止调用 ${args.toolName}` };
     }
@@ -85,7 +99,8 @@ export function enforceSandbox(args: { sandboxMode: SandboxMode; toolName: strin
     return { allowed: true };
   }
 
-  // workspace-write: reads pass; writes are allowed (path confinement is the
-  // worktree redirect's job). No additional application-level restriction.
+  // workspace-write: reads and genuine project-write tools pass; path
+  // confinement is the worktree redirect's job. Execution surfaces that cannot
+  // be wrapped are already rejected above.
   return { allowed: true };
 }

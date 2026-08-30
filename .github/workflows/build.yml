@@ -23,6 +23,9 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
 
       - run: npm ci
 
@@ -35,12 +38,11 @@ jobs:
           sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
 
       - run: npm run electron:compile
-      - run: npx tsc --noEmit -p tsconfig.json
+      - run: npx tsc6 --noEmit -p tsconfig.json
       - run: npm run sdk:build
       - run: npx vite build
-      # Coverage currently remains below the configured thresholds; keep the
-      # full unit suite blocking while coverage is tracked separately in
-      # Settings → Coverage instead of blocking platform releases.
+      # Coverage currently passes the configured thresholds; keep the unit
+      # suite and the Linux coverage gate blocking platform releases.
       - run: npm run test
       - run: npm run sdk:test:py
       - name: SDK live smoke (Linux)

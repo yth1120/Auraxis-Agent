@@ -5,7 +5,10 @@
  * definitions. Each tool carries a handler as a JS function body string
  * (e.g. `async (input, ctx) => ({ echo: input.value })`). Handlers execute in
  * a Node `vm` context with an allowlisted global surface (no require/process/
- * fs) plus a `ctx` object mirroring the inline-workflow surface.
+ * fs) plus a `ctx` object mirroring the inline-workflow surface. This is a
+ * developer-tool sandbox, not an OS security boundary: Node `vm` contexts can
+ * be escaped, and this path is only enabled with `AURAXIS_ALLOW_UNSAFE_CODE=1`
+ * in an explicitly trusted environment.
  *
  * Tool definitions are merged into the main-process tool registry so the LLM
  * sees and can call them on the next request.
@@ -99,6 +102,9 @@ function buildSandboxCtx(caller: OrchestrationCaller & { log?: (line: string) =>
     sessionId: caller.requestId,
     requestId: caller.requestId,
     depth: caller.depth ?? 0,
+    sandboxMode: caller.sandboxMode,
+    workTier: caller.workTier,
+    mode: caller.mode,
     log: caller.log ?? (() => {}),
     agents: createOrchestrationApi(caller),
   };

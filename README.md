@@ -71,6 +71,7 @@ SDK 通过换行分隔的 JSON-RPC 2.0 协议驱动 Auraxis 无头 runtime，支
 ## 安全
 
 模型编写的任意代码执行默认关闭。工具执行必须经过权限配置、沙箱门、审批与路径边界校验；只有显式设置 `AURAXIS_ALLOW_UNSAFE_CODE=1` 的受信开发环境才会启用不安全代码执行。
+项目目录内的规则文件与 hooks 默认不授权，需分别显式设置 `AURAXIS_TRUST_PROJECT_RULES=1` 和 `AURAXIS_TRUST_PROJECT_HOOKS=1`。
 
 ## License
 

@@ -1,4 +1,7 @@
 import { errorText } from '../errors';
+import type { ApprovalPolicy } from '../contracts/core';
+import type { SandboxMode } from '../sandbox-policy';
+import type { WorkAutonomyTier } from '../types';
 /**
  * agent-orchestration.ts — shared model-facing orchestration API.
  *
@@ -15,6 +18,9 @@ export interface OrchestrationCaller {
   checkPermission?: (toolName: string, input: Record<string, unknown>, toolCallId?: string) => Promise<boolean>;
   autoApprove?: boolean;
   abortSignal?: AbortSignal;
+  sandboxMode?: SandboxMode;
+  workTier?: WorkAutonomyTier;
+  mode?: ApprovalPolicy;
   /** Which UI surface created this run — 'work' enforces docs-only writes. */
   surface?: 'chat' | 'work' | 'code';
 }
@@ -35,6 +41,9 @@ export async function orchestrateRunSubAgent(
       depth: (caller.depth ?? 0) + 1,
       checkPermission: caller.checkPermission,
       autoApprove: caller.autoApprove,
+      sandboxMode: caller.sandboxMode,
+      workTier: caller.workTier,
+      mode: caller.mode,
       parentSignal: caller.abortSignal,
       surface: caller.surface,
     });
@@ -60,6 +69,9 @@ export async function orchestrateStartBackgroundSubAgent(
       depth: (caller.depth ?? 0) + 1,
       checkPermission: caller.checkPermission,
       autoApprove: caller.autoApprove,
+      sandboxMode: caller.sandboxMode,
+      workTier: caller.workTier,
+      mode: caller.mode,
       parentSignal: caller.abortSignal,
       background: true,
       surface: caller.surface,

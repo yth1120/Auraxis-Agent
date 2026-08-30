@@ -238,6 +238,25 @@ describe('Pwsh — 本地 PowerShell 执行', () => {
       Object.defineProperty(process, 'platform', { value: original });
     }
   });
+
+  it('routes Pwsh through the native sandbox in workspace-write mode', async () => {
+    vi.mocked(runSandboxedCommand).mockImplementation(async ({ onStdout }: any) => {
+      onStdout('sandboxed');
+      return { exitCode: 0, error: undefined, timedOut: false, supported: true };
+    });
+    const r = await executeToolCall(
+      'Pwsh',
+      { command: 'Write-Output hi', workdir: '.', timeout: 1000 },
+      ctx({ sandboxMode: 'workspace-write', autoApprove: false }),
+    );
+    expect(r.output).toMatchObject({ stdout: 'sandboxed', exitCode: 0 });
+    expect(runSandboxedCommand).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: 'workspace-write',
+        argv: expect.arrayContaining([expect.stringContaining('powershell'), '-NoProfile', '-NonInteractive']),
+      }),
+    );
+  });
 });
 
 describe('Bash — 一次性执行', () => {

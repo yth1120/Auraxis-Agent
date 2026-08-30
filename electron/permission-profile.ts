@@ -11,6 +11,13 @@ import { secureHandle } from './ipc/trust';
 import path from 'path';
 import { readSettings, writeSettings } from './ipc/settings-store';
 import { normalizeApprovalPolicy } from './contracts/core';
+import {
+  FILE_READ_TOOLS,
+  FILE_WRITE_TOOLS,
+  NETWORK_TOOLS,
+  PROFILE_MUTATION_TOOLS,
+  isProfileMutationTool,
+} from './tool-capability';
 
 export type ToolPolicy = 'ask' | 'plan' | 'auto';
 export type FileAccess = 'read' | 'write' | 'deny';
@@ -221,19 +228,9 @@ export function evaluateNetworkProfile(profile: PermissionProfile, urlOrHost: st
   return { allowed: true };
 }
 
-const FILE_TOOL_READ = new Set(['Read', 'Grep', 'Glob', 'ReadDocument']);
-const FILE_TOOL_WRITE = new Set(['Write', 'Edit', 'Delete', 'NotebookEdit', 'WriteDocument']);
-const NETWORK_TOOLS = new Set([
-  'WebFetch',
-  'WebSearch',
-  'SlackListChannels',
-  'SlackPostMessage',
-  'DriveList',
-  'DriveRead',
-  'NotionSearch',
-  'NotionCreatePage',
-]);
-
+const FILE_TOOL_READ = FILE_READ_TOOLS;
+const FILE_TOOL_WRITE = FILE_WRITE_TOOLS;
+export { PROFILE_MUTATION_TOOLS };
 /** Extract a scoped path from a tool input (file_path or path). */
 function inputPath(_toolName: string, input: Record<string, unknown>): string | null {
   const raw =
@@ -243,6 +240,10 @@ function inputPath(_toolName: string, input: Record<string, unknown>): string | 
         ? input.path
         : null;
   return raw;
+}
+
+function profileHasWriteGrant(profile: PermissionProfile): boolean {
+  return profile.fileScopes.some((scope) => scope.access === 'write');
 }
 
 /**
@@ -276,9 +277,28 @@ export async function evaluateToolProfileGate(
   }
 
   if (NETWORK_TOOLS.has(toolName)) {
+    if ((toolName === 'SlackPostMessage' || toolName === 'NotionCreatePage') && !profileHasWriteGrant(profile)) {
+      return {
+        allowed: false,
+        reason: `权限 Profile 未授予写权限，拒绝 ${toolName}`,
+      };
+    }
     // WebSearch has no URL — only a catch-all rule can meaningfully match it.
     const target = toolName === 'WebSearch' ? '*' : String(input.url ?? '*');
     return evaluateNetworkProfile(profile, target);
+  }
+
+  // Any remaining tool with file/system side effects must be allowed by the
+  // profile. A read-only profile cannot be bypassed through terminal, code
+  // execution, dynamic plugin or agent delegation tools.
+  if (isProfileMutationTool(toolName)) {
+    if (!profileHasWriteGrant(profile)) {
+      return {
+        allowed: false,
+        reason: `权限 Profile 未授予写权限，拒绝 ${toolName}`,
+      };
+    }
+    return { allowed: true };
   }
 
   return { allowed: true };

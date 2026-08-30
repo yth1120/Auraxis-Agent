@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   isCodeFilePath,
+  isWorkForbiddenPath,
   workDocsOnlyVerdict,
   appendWorkDocsSystemRule,
   appendWorkRules,
@@ -59,6 +60,9 @@ describe('work-docs-policy — Work 模式文档边界', () => {
   it('Work 表面拒绝删除目录/未知类型路径', () => {
     expect(workDocsOnlyVerdict('work', 'Delete', { file_path: 'src' }).allowed).toBe(false);
     expect(workDocsOnlyVerdict('work', 'Delete', { file_path: 'some_dir' }).allowed).toBe(false);
+    expect(workDocsOnlyVerdict('work', 'Delete', { file_path: '.git' }).allowed).toBe(false);
+    expect(workDocsOnlyVerdict('work', 'Delete', { file_path: 'node_modules' }).allowed).toBe(false);
+    expect(workDocsOnlyVerdict('work', 'Delete', { file_path: 'docs/readme.md' }).allowed).toBe(true);
   });
 
   it('Work 表面用 WriteDocument 改写代码文件被拒、文档文件放行', () => {
@@ -68,15 +72,18 @@ describe('work-docs-policy — Work 模式文档边界', () => {
     expect(workDocsOnlyVerdict('work', 'WriteDocument', { file_path: 'data.xlsx' }).allowed).toBe(true);
   });
 
-  it('Work 表面拒绝通过 shell 改写代码文件', () => {
-    expect(workDocsOnlyVerdict('work', 'Bash', { command: 'echo x > src/app.ts' }).allowed).toBe(false);
-    expect(workDocsOnlyVerdict('work', 'Bash', { command: 'echo x >> src/app.ts' }).allowed).toBe(false);
-    expect(workDocsOnlyVerdict('work', 'Pwsh', { command: 'echo x > src/app.ts' }).allowed).toBe(false);
-    expect(workDocsOnlyVerdict('work', 'Bash', { command: 'sed -i s/a/b/ src/app.ts' }).allowed).toBe(false);
-    expect(workDocsOnlyVerdict('work', 'Bash', { command: 'cp notes.txt src/app.ts' }).allowed).toBe(false);
-    expect(workDocsOnlyVerdict('work', 'Bash', { command: 'echo x > docs/notes.md' }).allowed).toBe(true);
-    expect(workDocsOnlyVerdict('work', 'Bash', { command: 'echo hello' }).allowed).toBe(true);
+  it('Work 表面拒绝所有 shell/终端/代码执行入口，即使用户疑似只读命令', () => {
+    for (const tool of ['Bash', 'Pwsh', 'Pty', 'TerminalOpen', 'TerminalSend', 'RunCode', 'MountPlugin']) {
+      expect(workDocsOnlyVerdict('work', tool, { command: 'echo hello', action: 'create' }).allowed).toBe(false);
+    }
     expect(workDocsOnlyVerdict('code', 'Bash', { command: 'echo x > src/app.ts' }).allowed).toBe(true);
+  });
+
+  it('isWorkForbiddenPath 识别 .git、node_modules 等受保护路径', () => {
+    expect(isWorkForbiddenPath('.git')).toBe(true);
+    expect(isWorkForbiddenPath('src/../.git/config')).toBe(true);
+    expect(isWorkForbiddenPath('node_modules/pkg/index.js')).toBe(true);
+    expect(isWorkForbiddenPath('docs/readme.md')).toBe(false);
   });
 
   it('appendWorkDocsSystemRule 仅对 Work 追加且幂等', () => {

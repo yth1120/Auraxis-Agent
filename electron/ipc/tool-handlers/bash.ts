@@ -8,36 +8,7 @@ import { startBashTask, finishBashTask } from '../task-monitor';
 import { registerAbort, unregisterAbort } from './abort-registry';
 import { cacheTaskResult } from './task-cache';
 import { resolvePath, fixWindowsNullRedirect, type ToolContext, type ToolResult } from './path-utils';
-function getSafeEnv(): Record<string, string> {
-  const safe = [
-    'PATH',
-    'HOME',
-    'USERPROFILE',
-    'SYSTEMROOT',
-    'SYSTEMDRIVE',
-    'TEMP',
-    'TMP',
-    'TMPDIR',
-    'SHELL',
-    'LANG',
-    'LC_ALL',
-    'TERM',
-    'NODE_PATH',
-    'PYTHONPATH',
-    'GOPATH',
-    'JAVA_HOME',
-    'CARGO_HOME',
-    'DISPLAY',
-    'WAYLAND_DISPLAY',
-    'XDG_SESSION_TYPE',
-  ];
-  const env: Record<string, string> = {};
-  for (const key of safe) {
-    if (process.env[key]) env[key] = process.env[key];
-  }
-  env.HOME = process.env.HOME || process.env.USERPROFILE || '';
-  return env;
-}
+import { safeProcessEnv } from '../../safe-env';
 
 // ─── Resolve best shell on Windows ──────────────────────
 let _winShell: { bin: string; args: string[] } | null | undefined;
@@ -104,7 +75,7 @@ export function spawnBashChild(
   const child = spawn(shellBin, [...shellArgs, finalCmd], {
     cwd: workdir,
     timeout,
-    env: { ...getSafeEnv(), LANG: 'en_US.UTF-8', LC_ALL: 'en_US.UTF-8' },
+    env: safeProcessEnv({ LANG: 'en_US.UTF-8', LC_ALL: 'en_US.UTF-8' }),
     windowsHide: true,
     shell: false,
   });
@@ -275,7 +246,7 @@ function runBashBackground(command: string, workdir: string, ctx: ToolContext): 
   const startTime = Date.now();
   const child = spawn(shellBin, [...shellArgs, finalCmd], {
     cwd: workdir,
-    env: { ...getSafeEnv(), LANG: 'en_US.UTF-8', LC_ALL: 'en_US.UTF-8' },
+    env: safeProcessEnv({ LANG: 'en_US.UTF-8', LC_ALL: 'en_US.UTF-8' }),
     windowsHide: true,
     shell: false,
   });
@@ -452,12 +423,13 @@ export async function runBash(
  * Object via sandbox-windows.ps1. Streaming, task tracking, progress
  * throttling and abort semantics mirror the regular Bash path.
  */
-async function spawnBashSandboxed(
+export async function spawnBashSandboxed(
   command: string,
   workdir: string,
   timeout: number,
   ctx: ToolContext,
   resolve: (result: ToolResult) => void,
+  forcedShell?: { bin: string; args: string[] },
 ) {
   const { isSandboxSupported, runSandboxedCommand } = await import('../../sandbox-runner');
   if (!isSandboxSupported()) {
@@ -466,11 +438,15 @@ async function spawnBashSandboxed(
   }
 
   const isWin = process.platform === 'win32';
-  const resolved = isWin ? getWinShell() : null;
+  const resolved = forcedShell ? null : isWin ? getWinShell() : null;
   let shellBin: string;
   let shellArgs: string[];
   let finalCmd: string;
-  if (resolved) {
+  if (forcedShell) {
+    shellBin = forcedShell.bin;
+    shellArgs = forcedShell.args;
+    finalCmd = command;
+  } else if (resolved) {
     shellBin = resolved.bin;
     shellArgs = resolved.args;
     finalCmd = fixWindowsNullRedirect(command);

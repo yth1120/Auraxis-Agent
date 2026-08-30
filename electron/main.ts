@@ -1,9 +1,10 @@
 import { app, BrowserWindow, shell, session } from 'electron';
-import { secureHandle } from './ipc/trust';
+import { isTrustedRendererUrl, secureHandle, setTrustedRendererUrl } from './ipc/trust';
 import path from 'path';
 import os from 'os';
 import { existsSync, mkdtempSync } from 'fs';
 import { copyFile, cp } from 'fs/promises';
+import { pathToFileURL } from 'url';
 import { registerIpcHandlers, isWindows11, markAcrylicWindowReady } from './ipc';
 import { cleanupWindowStreams } from './ipc/ai-handlers';
 import { setMainWindowRef, clearMainWindowRef } from './ipc/window-ref';
@@ -177,6 +178,20 @@ function createWindow(useAcrylic = false) {
     return { action: 'deny' };
   });
 
+  const blockUntrustedNavigation = (event: Electron.Event, url: string) => {
+    if (!isTrustedRendererUrl(url)) {
+      event.preventDefault();
+      try {
+        const parsed = new URL(url);
+        if (parsed.protocol === 'https:' || parsed.protocol === 'http:') shell.openExternal(url);
+      } catch {
+        /* invalid URL, deny */
+      }
+    }
+  };
+  mainWindow.webContents.on('will-navigate', blockUntrustedNavigation);
+  mainWindow.webContents.on('will-redirect', blockUntrustedNavigation);
+
   // Harden every <webview> created by the renderer: only allow http(s),
   // strip any renderer-supplied preload, and pin secure flags so a compromised
   // renderer cannot escalate by setting nodeIntegration=true on a child frame.
@@ -224,6 +239,11 @@ process.on('unhandledRejection', (reason) => {
 
 process.env.AURAXIS_PACKAGED = app.isPackaged ? '1' : '';
 app.setName('Auraxis');
+
+// IPC trust + in-window navigation only accept the exact application renderer
+// URL. Do not trust arbitrary local `index.html` files.
+setTrustedRendererUrl(pathToFileURL(path.join(__dirname, '../dist/index.html')).href);
+
 app.whenReady().then(async () => {
   // 旧版本错误地在 Windows 上把 cache 路径写入后，userData 被解析到了
   // Local\auraxis\Cache\auraxis。这里一次性把持久化账户/设置/记忆数据

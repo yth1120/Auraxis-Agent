@@ -35,7 +35,7 @@
 
 - Upgraded the major stack and fixed compatibility: React 18 → 19,
   Ant Design 5 → 6, Zustand 4 → 5, Electron 43 → 44, Vite 7 → 8,
-  TypeScript 5 → 6 (+ TS7-compatible native compiler), Vitest 3 → 4,
+  TypeScript 5 → 6, Vitest 3 → 4,
   Node target 20 → 22, KaTeX, PDFKit, jsdom, testing-library, and related
   typings.
 - Migrated deprecated Ant Design props and Zustand shallow selectors; split
@@ -43,6 +43,12 @@
   scheduler, memory, workbench, composer, sidebar, inspector, settings, and
   timeline modules; removed remaining production `any` and hardened
   IPC / agent / store typings.
+- Expanded the maintainability pass: split the LLM adapter/provider protocol
+  layers, scheduler runtime/query/queue/lifecycle/cleanup, SQLite memory
+  domains, context truncation/summary, step-engine tool context, sub-agent
+  registry, renderer agent/session/settings stores, and preload IPC domains;
+  preload sources stay modular while `vite.preload.config.mts` bundles them
+  into one sandbox-safe `preload.js`.
 - Fixed the SDK TypeScript module-resolution build, guarded real sandbox /
   AppContainer integration tests on GitHub runners, stabilized Ant Design
   portal teardown, updated E2E selectors for Ant Design 6, made the release
@@ -55,10 +61,11 @@
 
 ### Quality
 
-- Full check passes: 261 test files / 1,992 passing cases (+3 environment skips).
+- Full check passes: 268 test files / 2,053 passing cases (+3 environment skips).
 - Production smoke, SDK live runtime smoke, Electron IPC, skill seeding, and MCP handshake tests pass.
-- Latest full branch coverage gate: 90.79% lines, 88.50% statements, 80.04% branches,
-  87.08% functions; the gate covers all unit-testable Electron + stores/core code,
+- DeepSeek V4 Flash live combo acceptance: headless agent exercised file/search/web/session/skill/goal/task flows and verified a generated zero-dependency ESM + `node:test` project (13/13 tests); inline workflows stayed fail-closed by default.
+- Latest full branch coverage gate: 90.03% lines, 87.76% statements, 80.22% branches,
+  82.20% functions; the gate covers all unit-testable Electron + stores/core code,
   while Electron main entry remains verified by real E2E and SDK smoke.
 - Docs and changelog updated for the 3.2.0 release.
 

@@ -1,7 +1,7 @@
 import path from 'path';
-import { stat } from 'fs/promises';
+import { realpath, stat } from 'fs/promises';
 import { workspaceDrift } from '../../workspace-drift';
-import { isPathInside, normalizeWinPath, SAFE_EXTENSIONS } from '../shared';
+import { isPathInside, isSensitiveFilePath, normalizeWinPath, SAFE_EXTENSIONS } from '../shared';
 import type { SandboxMode } from '../../sandbox-policy';
 import type { ApprovalPolicy } from '../../types';
 import type { WorkSurface } from '../../work-docs-policy';
@@ -172,7 +172,9 @@ export function isInsideAnyRoot(target: string, roots: string[]): boolean {
 }
 
 export function outsideWorkspace(resolved: string, ctx: ToolContext, write: boolean): string | null {
-  if (ctx.sandboxMode === 'full' || ctx.autoApprove) return null;
+  // Work 模式即使选择 full/autoApprove 也必须保持项目边界：这是文档协作
+  // 模式的硬约束，不能由“全自动档位”取消。
+  if ((ctx.sandboxMode === 'full' || ctx.autoApprove) && ctx.surface !== 'work') return null;
   if (!isInsideAnyRoot(resolved, workspaceRootsOf(ctx))) return '路径越权';
   if (write && !isInsideAnyRoot(resolved, writableRootsOf(ctx))) return '写入越权';
   return null;
@@ -180,4 +182,47 @@ export function outsideWorkspace(resolved: string, ctx: ToolContext, write: bool
 
 export function isSafeExtension(filePath: string): boolean {
   return SAFE_EXTENSIONS.has(path.extname(filePath).toLowerCase());
+}
+
+export function isSensitiveToolPath(filePath: string): boolean {
+  return isSensitiveFilePath(filePath);
+}
+
+/**
+ * Resolve a file path to its real filesystem location and verify it stays
+ * inside one of the allowed roots. Symlinks/junctions cannot escape the
+ * workspace. For a not-yet-existing write target, the parent directory is
+ * resolved instead.
+ */
+export async function realPathWithin(resolved: string, roots: string[]): Promise<string> {
+  const realRoots = await Promise.all(roots.map((root) => realpath(root)));
+  let real: string;
+  try {
+    real = await realpath(resolved);
+  } catch {
+    // Walk up to the nearest existing ancestor so new files/folders under a
+    // not-yet-created directory can still be validated physically.
+    let probe = resolved;
+    let existingAncestor = '';
+    while (true) {
+      try {
+        existingAncestor = await realpath(probe);
+        break;
+      } catch {
+        const parent = path.dirname(probe);
+        if (parent === probe) break;
+        probe = parent;
+      }
+    }
+    if (!existingAncestor) throw new Error(`路径无法解析: ${resolved}`);
+    real = path.join(existingAncestor, path.relative(probe, resolved));
+  }
+  if (!isInsideAnyRoot(real, realRoots)) {
+    throw new Error(`路径越权：真实路径超出工作区（${real}）`);
+  }
+  return real;
+}
+
+export async function assertRealPathBoundary(resolved: string, roots: string[]): Promise<void> {
+  await realPathWithin(resolved, roots);
 }

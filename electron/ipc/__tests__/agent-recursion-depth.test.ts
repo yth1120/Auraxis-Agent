@@ -32,7 +32,7 @@ describe('sub-agent recursion depth — counting logic', () => {
 
 describe('sub-agent recursion depth — wiring is in place', () => {
   it('runAgentTool no longer hard-codes depth: 1', () => {
-    const src = read('tool-handlers.ts');
+    const src = read('tool-handlers/internal.ts');
     expect(src).toContain('depth: (ctx.depth ?? 0) + 1');
     expect(src).not.toMatch(/depth:\s*1,/);
   });
@@ -45,7 +45,7 @@ describe('sub-agent recursion depth — wiring is in place', () => {
   });
 
   it('agentLoopRun threads depth into the tool execution context', () => {
-    const agentSrc = read('agent-loop-core.ts');
+    const agentSrc = read('agent-loop-types.ts');
     const runSrc = read('agent-loop.ts');
     expect(runSrc).toContain('depth: config.depth');
     const cfgMatch = agentSrc.match(/export interface AgentLoopConfig\s*\{[\s\S]*?\n\}/);
@@ -53,7 +53,8 @@ describe('sub-agent recursion depth — wiring is in place', () => {
 
     // The unified step engine forwards depth into the shared tool runner.
     const stepSrc = read('step-engine.ts');
-    expect(stepSrc).toContain('depth: cfg.depth');
+    const toolSrc = read('step-engine-tools.ts');
+    expect(toolSrc).toContain('depth: cfg.depth');
     const stepCfgMatch = stepSrc.match(/export interface StepEngineConfig\s*\{[\s\S]*?\n\}/);
     expect(stepCfgMatch![0]).toContain('depth?: number');
 

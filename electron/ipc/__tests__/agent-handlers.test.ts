@@ -301,6 +301,25 @@ describe('registerAgentHandlers', () => {
 });
 
 describe('agent-handlers — settings and lifecycle edge branches', () => {
+  it('inherits parent sandbox, work tier and approval mode', async () => {
+    const p = runSubAgent(
+      baseParams({
+        background: true,
+        sandboxMode: 'read',
+        workTier: 'full',
+        mode: 'auto',
+      }),
+    );
+    await vi.waitFor(() => expect(h.loops).toHaveLength(1));
+    expect(h.loops[0].opts).toMatchObject({
+      sandboxMode: 'read',
+      workTier: 'full',
+      mode: 'auto',
+    });
+    h.loops[0].resolve(settledResult({ allText: '' }));
+    await p;
+  });
+
   it('derives model/plan/sandbox settings and honors active parent signals', async () => {
     const { readSettings } = await import('../settings-store');
     vi.mocked(readSettings).mockResolvedValue({

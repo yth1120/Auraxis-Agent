@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { IpcMainInvokeEvent } from 'electron';
+import { pathToFileURL } from 'url';
 
 const electronMock = vi.hoisted(() => ({
   handle: vi.fn(),
@@ -11,9 +12,12 @@ vi.mock('electron', () => ({
   BrowserWindow: { fromWebContents: electronMock.fromWebContents },
 }));
 
-import { isTrustedIpcSender, secureHandle } from '../trust';
+import { clearTrustedRendererUrls, isTrustedIpcSender, secureHandle, setTrustedRendererUrl } from '../trust';
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  clearTrustedRendererUrls();
+});
 afterEach(() => vi.unstubAllEnvs());
 
 describe('trusted IPC wrapper', () => {
@@ -51,6 +55,27 @@ describe('trusted IPC wrapper', () => {
       isTrustedIpcSender({
         sender,
         senderFrame: { url: 'https://evil.example/' },
+      }),
+    ).toBe(false);
+  });
+
+  it('only trusts the exact registered application file URL', () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('VITEST', 'false');
+    const appUrl = pathToFileURL('C:/app/dist/index.html').href;
+    setTrustedRendererUrl(appUrl);
+    electronMock.fromWebContents.mockReturnValue({ isDestroyed: () => false });
+
+    expect(
+      isTrustedIpcSender({
+        sender: { getURL: () => appUrl },
+        senderFrame: { url: appUrl },
+      }),
+    ).toBe(true);
+    expect(
+      isTrustedIpcSender({
+        sender: { getURL: () => 'file:///C:/evil/index.html' },
+        senderFrame: { url: 'file:///C:/evil/index.html' },
       }),
     ).toBe(false);
   });

@@ -27,6 +27,16 @@ function rulesDir(): string {
   return path.join(app.getPath('userData'), 'rules');
 }
 
+/**
+ * Project-owned `.auraxis/rules/*.rules` can contain `decision = "allow"` and
+ * would otherwise let an untrusted repository grant itself permission to run
+ * commands. Keep them inert unless the operator explicitly trusts project
+ * rules (mirrors the project-hooks trust switch).
+ */
+function projectRulesTrusted(): boolean {
+  return process.env.AURAXIS_TRUST_PROJECT_RULES === '1';
+}
+
 function parseDecision(raw: string): RuleDecision {
   const v = raw.toLowerCase();
   if (v === 'allow' || v === 'deny' || v === 'prompt') return v;
@@ -88,7 +98,7 @@ async function loadRulesFromDir(dir: string): Promise<PrefixRule[]> {
 
 export async function loadRules(projectRoot?: string): Promise<PrefixRule[]> {
   const rules = await loadRulesFromDir(rulesDir());
-  if (projectRoot) {
+  if (projectRoot && projectRulesTrusted()) {
     rules.push(...(await loadRulesFromDir(path.join(projectRoot, '.auraxis', 'rules'))));
   }
   return rules;

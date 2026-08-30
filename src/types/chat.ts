@@ -2,12 +2,14 @@ import type { ToolCall } from './tools';
 import {
   BUILT_IN_MODELS as SHARED_MODELS,
   modelSupportsImageInput as sharedModelSupportsImageInput,
+  type ModelDefinition,
+  type ModelProvider,
 } from '../../electron/types';
 import type { ApiMessageContent } from '../../electron/types';
 import type { PermissionRequest, DeepSeekToolChoice, WorkAutonomyTier } from './advanced';
 
-// Re-export for convenience
-export type ModelProvider = 'deepseek';
+export type AIModel = ModelDefinition;
+export type { ModelProvider };
 
 /** DeepSeek API reasoning_effort 三档（官方 low/high/max）。 */
 export type ApiReasoningEffort = 'low' | 'high' | 'max';
@@ -15,17 +17,6 @@ export type ApiReasoningEffort = 'low' | 'high' | 'max';
 /** UI 三档 → API 三档：轻度→low、中度→high、深度→max。 */
 export function mapThinkingLevelToEffort(level: 'low' | 'medium' | 'high'): ApiReasoningEffort {
   return level === 'low' ? 'low' : level === 'high' ? 'max' : 'high';
-}
-
-export interface AIModel {
-  id: string;
-  name: string;
-  provider: ModelProvider;
-  maxTokens?: number;
-  contextWindow?: number;
-  supportsImages?: boolean;
-  experimental?: boolean;
-  apiBase?: string;
 }
 
 export const BUILT_IN_MODELS: AIModel[] = SHARED_MODELS.map((m) => ({

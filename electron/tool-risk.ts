@@ -10,33 +10,16 @@
  */
 export type ToolRisk = 'low' | 'medium' | 'high';
 
-const LOW_RISK_TOOLS = new Set(['Read', 'Grep', 'Glob', 'WebSearch', 'WebFetch', 'LSP', 'SessionQuery']);
-const HIGH_RISK_TOOLS = new Set([
-  'Delete',
-  'GitCommit',
-  'CronCreate',
-  'CronDelete',
-  'ScheduleCreate',
-  'ScheduleDelete',
-  'TaskStop',
-  'JobKill',
-  'EnterWorktree',
-  'RunCode',
-  'RunWorkflow',
-  'Agent',
-  'Ralph',
-  'MountPlugin',
-  'UnmountPlugin',
-  'WriteSkill',
-  'Pty',
-  'TerminalOpen',
-  'TerminalSend',
-  'TerminalSignal',
-  'TerminalClose',
-  'SendMessage',
-  'InterruptAgent',
-  'Replan',
-]);
+import { DANGEROUS_TOOLS, FILE_READ_TOOLS, SHELL_TOOLS } from './tool-capability';
+
+const LOW_RISK_TOOLS = new Set([...FILE_READ_TOOLS, 'WebSearch', 'WebFetch', 'LSP', 'SessionQuery']);
+const MEDIUM_FILE_TOOLS = new Set(['Write', 'Edit', 'NotebookEdit', 'StrReplaceEditor', 'WriteDocument']);
+const HIGH_RISK_TOOLS = new Set(
+  [...DANGEROUS_TOOLS].filter(
+    (tool) => !LOW_RISK_TOOLS.has(tool) && !SHELL_TOOLS.has(tool) && !MEDIUM_FILE_TOOLS.has(tool),
+  ),
+);
+HIGH_RISK_TOOLS.add('Replan');
 
 /** 把一次工具调用分级（纯函数，便于测试）。未知工具按 medium 处理。 */
 export function classifyToolRisk(toolName: string, input: Record<string, unknown>): ToolRisk {

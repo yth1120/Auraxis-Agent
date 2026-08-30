@@ -1,16 +1,12 @@
-import { errorText } from '../errors';
-import { readdir } from 'fs/promises';
 import { runHooksFor } from '../hooks';
-import { loadAgentInstructions } from '../agent-instructions';
-import { appendWorkRules } from '../work-docs-policy';
-import type { BatchToolResult } from '../tool-registry';
-import { workspaceDrift, driftSummary } from '../workspace-drift';
 import { devLog } from './shared';
-import { invokeLlm } from './llm-adapter';
 import { runStep, createStepState } from './step-engine';
 import type { StepEngineConfig } from './step-engine';
 import { makeTurnId } from './engine-events';
-import path from 'path';
+import { runPlanningPhase, setupInitialMessages } from './agent-loop-planning';
+import { prepareLoopContext } from './agent-loop-prepare';
+import { injectExternalMessages, injectWorkspaceDrift } from './agent-loop-inject';
+import { createPlanIntercept } from './agent-loop-interceptors';
 
 function safeStringify(v: unknown): string {
   try {
@@ -18,10 +14,6 @@ function safeStringify(v: unknown): string {
   } catch {
     return String(v).slice(0, 500);
   }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
 /** Read error response body when axios responseType='stream' — the body is a Readable, not parsed JSON. */
@@ -62,17 +54,12 @@ export async function readErrorBody(err: unknown): Promise<string> {
     return '';
   }
 }
-import type { ApprovalPolicy } from '../types';
-
 import {
   AssistantMessage,
-  Planner,
   createDevianceDetector,
   DEFAULT_CONTEXT_CONFIG,
   restrictPlanToApproved,
-  parsePlanFromLLMText,
   markInjected,
-  type AgentObserver,
   type TaskPlan,
   type AgentLoopConfig,
   type AgentLoopResult,
@@ -91,117 +78,6 @@ export * from './agent-loop-core';
 // Output ONLY a valid JSON object in this exact format (no markdown, no extra text):
 // ...
 // Rules: Each task must be specific and actionable... 3-8 tasks is ideal. Do NOT include any text outside the JSON object.`
-
-const PLANNING_SYSTEM_PROMPT = `你是任务规划器。你唯一的工作是分析用户的需求，生成结构化的 JSON 执行计划。
-
-仅输出以下格式的有效 JSON 对象（不要 markdown，不要额外文字）：
-
-{
-  "tasks": [
-    { "id": "1", "description": "读取配置文件了解当前设置", "dependencies": [] },
-    { "id": "2", "description": "修改 config.ts 中的端口号", "dependencies": ["1"] },
-    { "id": "3", "description": "重新读取文件验证修改结果", "dependencies": ["2"] }
-  ]
-}
-
-规则：
-- 每个任务必须具体、可执行（是 Read/Write/Edit/Bash/Grep/Glob 能完成的操作）
-- 依赖必须引用列表中已出现的有效任务 ID
-- 3-8 个任务最理想，不要对简单请求过度规划
-- JSON 之外不要输出任何文字`;
-
-// ─── AgentLoop Helpers ──────────────────────────────────
-
-async function runPlanningPhase(params: {
-  model: string;
-  apiKey: string;
-  apiBase: string;
-  adapter?: string;
-  systemPrompt: string;
-  signal?: AbortSignal;
-  observer: AgentObserver;
-}): Promise<TaskPlan | null> {
-  const { model, apiKey, apiBase, adapter, systemPrompt, signal, observer } = params;
-  const planningUserMsg = systemPrompt.includes('Your Task') ? systemPrompt : `Task: ${systemPrompt}`;
-  // Planning LLM output is raw JSON for parsePlanFromLLMText — never stream it
-  // to the UI as text. Surface a single quiet progress line instead.
-  observer.emit({
-    type: 'tool_progress',
-    toolCallId: 'planning',
-    toolName: 'Planning',
-    progress: '正在分析需求并生成执行计划…',
-    stepGroupId: 'planning',
-  });
-  const planningStartedAt = Date.now();
-  const planningTimer = setInterval(() => {
-    const waited = Math.floor((Date.now() - planningStartedAt) / 1000);
-    observer.emit({
-      type: 'tool_progress',
-      toolCallId: 'planning',
-      toolName: 'Planning',
-      progress: waited >= 6 ? `正在生成执行计划…（已等待 ${waited}s）` : '正在分析任务与项目上下文…',
-      stepGroupId: 'planning',
-    });
-  }, 3000);
-  try {
-    const planAssistant = await invokeLlm({
-      model,
-      apiKey,
-      apiBase,
-      adapter,
-      systemPrompt: PLANNING_SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: planningUserMsg }],
-      tools: [],
-      // 官方 JSON Output：保证计划输出是合法 JSON，避免 markdown 包裹导致的解析失败。
-      responseFormat: 'json_object',
-      signal: signal || new AbortController().signal,
-    });
-    if (planAssistant?.rawText) {
-      const parsed = parsePlanFromLLMText(planAssistant.rawText);
-      if (parsed && parsed.tasks.length > 0) {
-        observer.emit({
-          type: 'tool_progress',
-          toolCallId: 'planning',
-          toolName: 'Planning',
-          progress: `计划已生成，共 ${parsed.tasks.length} 个任务`,
-          stepGroupId: 'planning',
-        });
-        observer.emit({ type: 'plan_created', plan: parsed });
-        return parsed;
-      }
-    }
-  } catch {
-    /* fall through */
-  } finally {
-    clearInterval(planningTimer);
-  }
-  return null;
-}
-
-function setupInitialMessages(
-  systemPrompt: string,
-  activePlan: TaskPlan | null,
-  mode: ApprovalPolicy = 'ask',
-): LoopMessage[] {
-  const msgs: LoopMessage[] = [];
-  const workGuide =
-    '请根据 system prompt 中的任务描述开始工作。\n' +
-    '节奏由你自主决定：可以直接执行，也可以先探索理解再动手；多步骤任务如需跟踪进度可以使用 TodoWrite。\n' +
-    (mode === 'plan'
-      ? '当前为计划模式：先制定执行计划并等待用户批准，批准后再开始执行；未批准前不要调用修改类工具。'
-      : mode === 'auto'
-        ? '当前为全自动模式：可自主决定并执行所有工具，无需向用户请求确认。'
-        : '当前为交互模式：写文件、执行命令等风险操作需要先向用户确认。');
-  msgs.push({ role: 'system', content: systemPrompt });
-  msgs.push({ role: 'user', content: workGuide });
-  if (activePlan) {
-    msgs.push({
-      role: 'user',
-      content: `你的任务计划:\n${Planner.getSummary(activePlan)}\n\n请按批准的计划逐项推进；完成一项后继续下一项。`,
-    });
-  }
-  return msgs;
-}
 
 export function appendAssistantToHistory(messages: LoopMessage[], msg: AssistantMessage): void {
   const m: LoopMessage = {
@@ -224,110 +100,7 @@ export function appendAssistantToHistory(messages: LoopMessage[], msg: Assistant
 }
 
 // ─── Debug logger ────────────────────────────────────────
-const ts = () => new Date().toISOString().slice(11, 23);
-
-// Tool batching (concurrency, abort, zero-orphan results) is owned by
-// step-engine via tool-runner; Replan is intercepted through the step-engine
-// `interceptTool` seam (see agentLoopRun) instead of a bespoke loop branch.
-
-/** Plan/deviance side effects for a completed tool result.
- *  Canonical tool_start/tool_end/tool_error events are emitted by step-engine;
- *  this function only updates the plan, emits deviance warnings and surfaces
- *  Replan plan updates. */
-/** Build structured summary from tool output for frontend rendering */
-function buildToolSummary(
-  toolName: string,
-  output: unknown,
-  input: Record<string, unknown>,
-): Record<string, unknown> | undefined {
-  try {
-    switch (toolName) {
-      case 'Read': {
-        const text = typeof output === 'string' ? output : '';
-        return { filePath: input.file_path, lines: text.split('\n').length, size: text.length };
-      }
-      case 'Write':
-        return {
-          filePath: input.file_path,
-          bytesWritten: typeof input.content === 'string' ? input.content.length : 0,
-        };
-      case 'Edit':
-        return { filePath: input.file_path, replaced: true };
-      case 'Grep': {
-        const lines = typeof output === 'string' ? output.split('\n').filter(Boolean) : [];
-        return { matchCount: lines.length, filesSearched: 'current' };
-      }
-      case 'Glob':
-        return { matchCount: Array.isArray(output) ? output.length : 0 };
-      case 'Bash': {
-        const o = isRecord(output) ? output : {};
-        return {
-          exitCode: typeof o.exitCode === 'number' ? o.exitCode : undefined,
-          stdoutLen: typeof o.stdout === 'string' ? o.stdout.length : 0,
-          stderrLen: typeof o.stderr === 'string' ? o.stderr.length : 0,
-        };
-      }
-      case 'ReviewArtifact':
-        return {
-          checkType: input.check_type,
-          passed: true,
-          output: typeof output === 'string' ? output.slice(0, 300) : '',
-        };
-      case 'Delete':
-        return { filePath: input.file_path, deleted: true };
-      case 'GitCommit':
-        return { message: input.message, hash: isRecord(output) && typeof output.hash === 'string' ? output.hash : '' };
-      case 'Replan':
-        return {
-          replanned: true,
-          message: isRecord(output) && typeof output.message === 'string' ? output.message : undefined,
-        };
-      default:
-        return undefined;
-    }
-  } catch {
-    return undefined;
-  }
-}
-
-function emitToolObserverForResult(
-  r: BatchToolResult,
-  observer: AgentObserver,
-  activePlan: TaskPlan | null,
-  // dd is REQUIRED — callers must pass a per-loop DevianceDetector instance so
-  // failure tracking is isolated to a single query/agent run.
-  dd: ReturnType<typeof createDevianceDetector>,
-  toolName?: string,
-): void {
-  if (r.error) {
-    console.error(
-      `[AURAXIS] [${ts()}] [TOOL:FAIL] tool=${r.toolName} toolCallId=${r.toolUseId} error=${r.error.slice(0, 200)} duration=${r.durationMs}ms`,
-    );
-    if (activePlan && toolName !== 'Replan') {
-      const dv = dd.checkFailures(activePlan, r.toolName, r.input, r.error);
-      if (dv.shouldWarn) {
-        // UI transparency only — 模型从工具结果中看到错误
-        // its result and decides how to react; we do not lecture it.
-        observer.emit({ type: 'deviance_warning', message: dv.message });
-        if (dv.blockedTaskId) observer.emit({ type: 'plan_updated', plan: activePlan });
-      }
-    }
-  } else {
-    devLog(`[AURAXIS] [${ts()}] [TOOL:OK] tool=${r.toolName} toolCallId=${r.toolUseId} duration=${r.durationMs}ms`);
-    if (toolName === 'Replan' && activePlan) {
-      // The interceptor already merged the new plan — surface it to the UI.
-      observer.emit({ type: 'plan_updated', plan: activePlan });
-      return;
-    }
-    if (activePlan) {
-      const match = Planner.markCompleted(activePlan, r.toolName, r.input, true);
-      if (match.updated) observer.emit({ type: 'plan_updated', plan: activePlan });
-    }
-  }
-}
-
-// ─── AgentLoop ──────────────────────────────────────────
-
+import { ts, buildToolSummary, emitToolObserverForResult } from './agent-loop-utils';
 export async function agentLoopRun(config: AgentLoopConfig): Promise<AgentLoopResult> {
   const {
     model,
@@ -343,43 +116,8 @@ export async function agentLoopRun(config: AgentLoopConfig): Promise<AgentLoopRe
     onPlanGenerated,
   } = config;
   let { mode, approvedPlanSteps } = config;
-  let effectiveSystemPrompt = systemPrompt;
-  if (!config.resumeFrom) {
-    const instructions = await loadAgentInstructions(projectRoot);
-    if (instructions.trim()) {
-      effectiveSystemPrompt += `\n\n## 项目指令（AGENTS.md）\n${instructions.trim()}`;
-      observer.emit({
-        type: 'context_injected',
-        source: 'instructions',
-        producer: 'AGENTS.md',
-        detail: '项目指令已注入系统提示',
-      });
-    }
-  }
-  if (config.goal) {
-    effectiveSystemPrompt += `\n\n## 当前目标\n${config.goal.text}\n（最多执行 ${config.goal.maxRounds} 轮；达到轮次上限时总结当前进展并结束）`;
-  }
-  if (config.surface === 'work') {
-    try {
-      const { readSettings } = await import('./settings-store');
-      const settings = await readSettings();
-      const before = effectiveSystemPrompt;
-      effectiveSystemPrompt = appendWorkRules(effectiveSystemPrompt, config.surface, {
-        clarify: settings.clarifyBeforeWork !== false,
-      });
-      if (effectiveSystemPrompt !== before) {
-        observer.emit({
-          type: 'context_injected',
-          source: 'instructions',
-          producer: 'Work 规则',
-          detail: '已注入 Work 边界与澄清规则',
-        });
-      }
-    } catch {
-      // Settings unavailable — still keep docs-only rule from the caller.
-      effectiveSystemPrompt = appendWorkRules(effectiveSystemPrompt, config.surface, { clarify: true });
-    }
-  }
+  const prepared = await prepareLoopContext(config);
+  let effectiveSystemPrompt = prepared.effectiveSystemPrompt;
   void runHooksFor('SessionStart', { projectRoot, model }, projectRoot).catch(() => {});
   const baseContextConfig =
     config.contextConfig ||
@@ -424,23 +162,6 @@ export async function agentLoopRun(config: AgentLoopConfig): Promise<AgentLoopRe
     // Re-emit current plan so a freshly-attached UI can render it on resume.
     if (activePlan) observer.emit({ type: 'plan_updated', plan: activePlan });
   } else {
-    // ── New project detection ─────────────────────────────
-    // If the project directory has no package.json, inject guidance so the
-    // agent knows to initialize the project first before writing code.
-    let projectInitHint: string | undefined;
-    if (projectRoot) {
-      const { existsSync } = await import('fs');
-      const pkgPath = path.join(projectRoot, 'package.json');
-      if (!existsSync(pkgPath)) {
-        const dirContents = await readdir(projectRoot).catch(() => [] as string[]);
-        const isEmpty = dirContents.filter((n) => !n.startsWith('.')).length === 0;
-        if (isEmpty || !dirContents.some((n) => n.endsWith('.json') || n.endsWith('.ts') || n.endsWith('.js'))) {
-          projectInitHint =
-            '该项目目录尚未初始化（没有 package.json）。请根据实际需要决定是否先初始化项目（如 npm init -y）或安装依赖，再开始工作。';
-        }
-      }
-    }
-
     // 规划阶段为可选 (plan mode or explicit
     // forcePlanning). Ordinary ask/auto runs start executing directly — the
     // first thing the user sees is the model's own reasoning/tool choice.
@@ -479,8 +200,8 @@ export async function agentLoopRun(config: AgentLoopConfig): Promise<AgentLoopRe
 
     messages = setupInitialMessages(effectiveSystemPrompt, activePlan, mode);
     // Inject new-project guidance if detected
-    if (projectInitHint) {
-      messages.push({ role: 'user', content: projectInitHint });
+    if (prepared.projectInitHint) {
+      messages.push({ role: 'user', content: prepared.projectInitHint });
     }
   }
 
@@ -569,113 +290,21 @@ export async function agentLoopRun(config: AgentLoopConfig): Promise<AgentLoopRe
       }
     },
     onAssistantReady: () => undefined,
-    interceptTool: async (tc) => {
-      // 规划是模型可自主选择的工具.
-      // EnterPlanMode generates a plan, waits for approval, and binds the
-      // approved plan into the loop — permissions, the review gate and
-      // TodoWrite tracking all switch to plan mode. ExitPlanMode acknowledges.
-      if (tc.name === 'EnterPlanMode') {
-        if (activePlan && mode === 'plan') {
-          return { output: { entered: true, alreadyActive: true, plan: Planner.getSummary(activePlan) } };
-        }
-        const generated = await runPlanningPhase({
-          model: config.planModel || model,
-          apiKey,
-          apiBase,
-          adapter: config.adapter,
-          systemPrompt: effectiveSystemPrompt,
-          signal,
-          observer,
-        });
-        if (!generated || generated.tasks.length === 0) {
-          return { output: null, error: '规划失败：未能生成有效计划。请直接说明方案后继续执行。' };
-        }
-        const applyApproval = async (plan: TaskPlan): Promise<boolean> => {
-          if (onPlanGenerated) {
-            const approvedStepIds = await onPlanGenerated(plan);
-            if (!approvedStepIds || approvedStepIds.length === 0) return false;
-            activePlan = restrictPlanToApproved(plan, approvedStepIds);
-          } else {
-            // No approval UI (tests/headless) — auto-approve every step.
-            activePlan = plan;
-            activePlan.approvedSteps = plan.tasks.map((t) => t.id);
-          }
-          mode = 'plan';
-          engineConfig.mode = 'plan';
-          engineConfig.approvedPlanSteps = activePlan.approvedSteps;
-          engineConfig.plan = activePlan;
-          observer.emit({ type: 'plan_updated', plan: activePlan });
-          return true;
-        };
-        if (await applyApproval(generated)) {
-          const planMsg = {
-            role: 'user' as const,
-            content: `你的任务计划已获批准：\n${Planner.getSummary(activePlan!)}\n\n请按批准后的计划逐项执行，不要执行未包含在计划中的步骤。`,
-          };
-          markInjected(planMsg);
-          messages.push(planMsg);
-          return {
-            output: {
-              entered: true,
-              approved: true,
-              tasks: activePlan!.tasks.map((t) => ({ id: t.id, description: t.description })),
-            },
-          };
-        }
-        const deniedMsg = {
-          role: 'user' as const,
-          content: '用户未批准该计划。请继续以交互方式执行任务；修改类工具需要用户逐次确认。',
-        };
-        markInjected(deniedMsg);
-        messages.push(deniedMsg);
-        return { output: { entered: false, approved: false, message: '计划未获批准，继续交互执行。' } };
-      }
-      if (tc.name === 'ExitPlanMode') {
-        if (!activePlan || mode !== 'plan') {
-          return { output: null, error: '当前不在计划模式，无需退出' };
-        }
-        return { output: { exited: true, message: '已退出规划模式，继续实施。' } };
-      }
-      if (tc.name !== 'Replan') return null;
-      if (!activePlan) return { output: null, error: '没有活动计划可重规划' };
-      const input = tc.input;
-      const currentPlanStatus = typeof input.currentPlanStatus === 'string' ? input.currentPlanStatus : '未知';
-      const blockedTasks = Array.isArray(input.blockedTasks) ? input.blockedTasks : [];
-      const reason = typeof input.reason === 'string' ? input.reason : '原始计划无法继续';
-      const replanPrompt = `以下是任务执行中途的状态。部分任务已完成，部分受阻。请基于当前情况生成一个新的子计划，仅包含剩余待完成的任务。\n\n当前计划状态: ${currentPlanStatus}\n受阻任务: ${JSON.stringify(blockedTasks)}\n重新规划原因: ${reason}\n\n请输出 JSON 格式的新计划（仅包含还需要执行的任务）:\n{"tasks": [{"id": "1", "description": "...", "dependencies": []}]}`;
-      try {
-        const replanResult = await invokeLlm({
-          model,
-          apiKey,
-          apiBase,
-          adapter: config.adapter,
-          systemPrompt: PLANNING_SYSTEM_PROMPT,
-          messages: [{ role: 'user', content: replanPrompt }],
-          tools: [],
-          responseFormat: 'json_object',
-          signal: signal || new AbortController().signal,
-        });
-        if (!replanResult?.rawText) return { output: null, error: '重规划失败：LLM 返回空响应。' };
-        const parsed = parsePlanFromLLMText(replanResult.rawText);
-        if (!parsed || parsed.tasks.length === 0)
-          return { output: null, error: '重规划失败：LLM 未返回有效的 JSON 计划。' };
-        const merged = Planner.mergePlan(
-          activePlan,
-          parsed.tasks.map((t) => ({ description: t.description, dependencies: t.dependencies || [] })),
-        );
-        activePlan.tasks.length = 0;
-        activePlan.tasks.push(...merged.tasks);
-        return {
-          output: {
-            message: `重规划完成。新增 ${parsed.tasks.length} 个任务。当前共 ${activePlan.tasks.length} 个任务。`,
-            newTasks: parsed.tasks.map((t) => ({ id: t.id, description: t.description })),
-            planSummary: Planner.getSummary(activePlan),
-          },
-        };
-      } catch (replanErr: unknown) {
-        return { output: null, error: `重规划异常: ${errorText(replanErr)}` };
-      }
-    },
+    interceptTool: createPlanIntercept({
+      config,
+      effectiveSystemPrompt,
+      messages,
+      observer,
+      readActivePlan: () => activePlan,
+      writeActivePlan: (plan) => {
+        activePlan = plan;
+      },
+      readMode: () => mode,
+      writeMode: (value) => {
+        mode = value;
+      },
+      updateEngine: (update) => Object.assign(engineConfig, update),
+    }),
     onToolResult: (r, tc, toolCallId) => {
       emitToolObserverForResult(r, observer, activePlan, dd, tc.name);
       // Auto tier only: full access intentionally skips the gate, ask/plan
@@ -733,41 +362,9 @@ export async function agentLoopRun(config: AgentLoopConfig): Promise<AgentLoopRe
     // External follow-up messages (SendMessage / UI steer) are injected into
     // the conversation at the turn boundary — the LLM sees them as new user
     // instructions for the next step.
-    if (config.messageQueue) {
-      for (const text of config.messageQueue()) {
-        const trimmed = String(text ?? '').trim();
-        if (!trimmed) continue;
-        const m = { role: 'user' as const, content: `[外部指令]\n${trimmed}` };
-        markInjected(m);
-        messages.push(m);
-        observer.emit({
-          type: 'context_injected',
-          source: 'instructions',
-          producer: 'external',
-          detail: trimmed,
-        });
-        observer.emit({ type: 'system_message', level: 'info', content: `收到外部指令：${trimmed.slice(0, 120)}` });
-      }
-    }
+    injectExternalMessages(messages, observer, config.messageQueue);
     // SWE-Touch：检测用户/其它进程在任务执行期间对工作区的外部修改。
-    if (projectRoot) {
-      try {
-        const drifted = await workspaceDrift.takeDrift(projectRoot);
-        if (drifted.length > 0) {
-          const driftMsg = { role: 'user' as const, content: driftSummary(drifted) };
-          markInjected(driftMsg);
-          messages.push(driftMsg);
-          observer.emit({
-            type: 'context_injected',
-            source: 'workspace',
-            producer: 'drift-detector',
-            detail: `检测到 ${drifted.length} 个文件被外部修改：${drifted.map((d) => d.filePath).join('、')}`,
-          });
-        }
-      } catch {
-        /* 漂移检测不允许影响主循环 */
-      }
-    }
+    await injectWorkspaceDrift(messages, observer, projectRoot);
     observer.emit({ type: 'iteration_start', iteration: iter });
     observer.onStateChange({
       iteration: iter,

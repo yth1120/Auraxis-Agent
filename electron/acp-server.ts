@@ -13,6 +13,7 @@ import { errorText } from './errors';
 import { createInterface } from 'readline';
 import { promises as fs } from 'fs';
 import path from 'path';
+import { resolveInsideRoot } from './ipc/path-security';
 
 export interface AcpRunAgentParams {
   prompt: string;
@@ -155,7 +156,7 @@ export class AcpServer {
             this.send({ jsonrpc: '2.0', id: msg.id ?? null, error: { code: -32001, message: 'Session not found' } });
             return;
           }
-          const filePath = this.resolveFilePath(session, typeof p.filePath === 'string' ? p.filePath : '');
+          const filePath = await this.resolveFilePath(session, typeof p.filePath === 'string' ? p.filePath : '');
           const content = await fs.readFile(filePath, 'utf8');
           this.send({ jsonrpc: '2.0', id: msg.id ?? null, result: { content } });
           return;
@@ -171,7 +172,7 @@ export class AcpServer {
             this.send({ jsonrpc: '2.0', id: msg.id ?? null, error: { code: -32602, message: 'content is required' } });
             return;
           }
-          const filePath = this.resolveFilePath(session, typeof p.filePath === 'string' ? p.filePath : '');
+          const filePath = await this.resolveFilePath(session, typeof p.filePath === 'string' ? p.filePath : '');
           await fs.mkdir(path.dirname(filePath), { recursive: true });
           await fs.writeFile(filePath, p.content, 'utf8');
           this.send({ jsonrpc: '2.0', id: msg.id ?? null, result: {} });
@@ -210,21 +211,16 @@ export class AcpServer {
     }
   }
 
-  private resolveFilePath(session: AcpSession, raw: unknown): string {
+  private async resolveFilePath(session: AcpSession, raw: unknown): Promise<string> {
     if (typeof raw !== 'string' || !raw.trim()) {
       throw new Error('filePath is required');
     }
-    const resolved = path.resolve(raw);
     // Fail closed: a session created without a project root must not be able
     // to reach arbitrary absolute paths on disk.
     if (!session.projectRoot) {
       throw new Error('会话未设置项目目录（session/new 缺少 cwd），拒绝文件访问');
     }
-    const root = path.resolve(session.projectRoot);
-    if (resolved !== root && !resolved.startsWith(root + path.sep)) {
-      throw new Error('filePath 必须位于会话项目目录内');
-    }
-    return resolved;
+    return resolveInsideRoot(raw, path.resolve(session.projectRoot));
   }
 
   private async runPrompt(

@@ -6,6 +6,7 @@ import type { PermissionRule, PermissionRequest } from '../advanced-defs';
 import type { ApprovalPolicy } from '../types';
 import { readSettings, writeSettings } from './settings-store';
 import { approvalFatigue } from '../approval-fatigue';
+import { FILE_DIFF_TOOLS, SAFE_READONLY_TOOLS } from '../tool-capability';
 
 export interface PermissionContext {
   mode: ApprovalPolicy;
@@ -14,8 +15,6 @@ export interface PermissionContext {
   /** When set, the request belongs to a background agent task (routed per-task in the UI). */
   agentId?: string;
 }
-
-const FILE_DIFF_TOOLS = new Set(['Write', 'Edit', 'NotebookEdit']);
 
 const permissionRules: PermissionRule[] = [];
 const pendingRequests = new Map<
@@ -49,18 +48,6 @@ async function persistPermissionRules(): Promise<void> {
     /* persistence is best-effort */
   }
 }
-
-/** Safe read-only tools that don't modify files or execute code. */
-const SAFE_READONLY_TOOLS = new Set([
-  'Read',
-  'Grep',
-  'Glob',
-  'ReadDocument',
-  'SlackListChannels',
-  'DriveList',
-  'DriveRead',
-  'NotionSearch',
-]);
 
 /**
  * Mode-aware auto-approval guard.

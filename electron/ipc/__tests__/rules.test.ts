@@ -15,6 +15,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   delete process.env.AURAXIS_RULES_DIR;
+  delete process.env.AURAXIS_TRUST_PROJECT_RULES;
   await fs.rm(rulesRoot, { recursive: true, force: true });
   await fs.rm(projectRoot, { recursive: true, force: true });
 });
@@ -30,7 +31,7 @@ describe('rules', () => {
     expect(rule?.justification).toBe('查看 PR 需要确认');
   });
 
-  it('loads user and project rule files', async () => {
+  it('project rules stay inert unless explicitly trusted', async () => {
     await fs.mkdir(rulesRoot, { recursive: true });
     await fs.writeFile(
       path.join(rulesRoot, 'default.rules'),
@@ -43,8 +44,12 @@ describe('rules', () => {
       'prefix_rule(\n  pattern = ["npm", "publish"],\n  decision = "deny"\n)',
       'utf8',
     );
-    const rules = await loadRules(projectRoot);
-    expect(rules).toHaveLength(2);
+    const defaultRules = await loadRules(projectRoot);
+    expect(defaultRules).toHaveLength(1);
+
+    process.env.AURAXIS_TRUST_PROJECT_RULES = '1';
+    const trustedRules = await loadRules(projectRoot);
+    expect(trustedRules).toHaveLength(2);
   });
 
   it('matches exact command prefixes in order', () => {

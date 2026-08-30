@@ -9,6 +9,7 @@ import { readSettings } from './settings-store';
 import type { MCPServerConfig, MCPToolDef, MCPStatus } from '../advanced-defs';
 import { invalidateMcpToolCache } from '../tool-registry';
 import { assertString } from './shared';
+import { safeProcessEnv } from '../safe-env';
 
 interface MCPConnection {
   config: MCPServerConfig;
@@ -110,6 +111,8 @@ function handleMcpData(conn: MCPConnection, data: string) {
 
 // Only allow known safe MCP commands — no user-supplied arbitrary binaries
 const ALLOWED_MCP_COMMANDS = new Set(['npx', 'node', 'python', 'python3', 'uvx', 'deno']);
+const DANGEROUS_MCP_ARGS =
+  /^(?:-e|--eval|-c|--command|-i|--interactive|--require|-r|--rcfile|--load|--eval-file)(?:=.*)?$/i;
 
 function validateMcpConfig(config: MCPServerConfig): string | null {
   if (!config.command || typeof config.command !== 'string') {
@@ -126,41 +129,20 @@ function validateMcpConfig(config: MCPServerConfig): string | null {
   if (config.args && (!Array.isArray(config.args) || config.args.some((a) => typeof a !== 'string'))) {
     return 'MCP args 必须是字符串数组';
   }
+  if (Array.isArray(config.args) && config.args.some((a) => DANGEROUS_MCP_ARGS.test(a))) {
+    return 'MCP args 不允许使用代码执行/交互参数（如 -e/--eval/-c/--require）';
+  }
   if (config.env && typeof config.env !== 'object') {
     return 'MCP env 必须是键值对对象';
+  }
+  if (config.useAuraxisDeepSeekKey && !isDeepSeekHarnessMcp(config)) {
+    return '仅 DeepSeek Harness 预设允许注入 Auraxis DeepSeek Key';
   }
   return null;
 }
 
-function getSafeEnv(): Record<string, string | undefined> {
-  // Only pass through safe environment variables to child processes
-  const safeVars = [
-    'PATH',
-    'HOME',
-    'USER',
-    'USERNAME',
-    'TEMP',
-    'TMP',
-    'NODE_PATH',
-    'APPDATA',
-    'PATHEXT',
-    'COMSPEC',
-    'SYSTEMROOT',
-    'DSH_MCP_WORKSPACE_ROOTS',
-    'DSH_MCP_DATA_DIR',
-    'DSH_MCP_HARNESS_PACKAGE',
-    'DSH_PERMISSION_MODE',
-  ];
-  const env: Record<string, string | undefined> = {};
-  for (const key of safeVars) {
-    if (process.env[key]) env[key] = process.env[key];
-  }
-  return env;
-}
-
 function isDeepSeekHarnessMcp(config: MCPServerConfig): boolean {
-  if (config.useAuraxisDeepSeekKey) return true;
-  const label = `${config.name} ${config.args.join(' ')}`.toLowerCase();
+  const label = `${config.name} ${(config.args ?? []).join(' ')}`.toLowerCase();
   return label.includes('deepseek-harness') || label.includes('deepseek harness');
 }
 
@@ -205,7 +187,7 @@ async function connectServer(serverId: string): Promise<MCPStatus> {
 
   try {
     const childEnv: Record<string, string | undefined> = {
-      ...getSafeEnv(),
+      ...safeProcessEnv(),
       ...conn.config.env,
     };
 

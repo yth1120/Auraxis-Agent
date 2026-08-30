@@ -4,7 +4,9 @@
  * The script runs inside a **Node worker thread**（工作线程）so a runaway
  * script can never freeze the host event loop. Inside the
  * worker the script still runs in a `vm` context with an allowlisted global
- * surface (no require / process / fs) plus a `ctx` object:
+ * surface (no require / process / fs) plus a `ctx` object. `vm` is not an OS
+ * security boundary; this path is only enabled with
+ * `AURAXIS_ALLOW_UNSAFE_CODE=1` in an explicitly trusted environment:
  *   ctx.projectRoot      — current project root
  *   ctx.log(msg)         — append a line to the workflow transcript
  *   ctx.sleep(ms)        — async delay

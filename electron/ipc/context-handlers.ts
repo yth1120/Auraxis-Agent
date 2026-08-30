@@ -2,9 +2,10 @@ import { errorText } from '../errors';
 import { secureHandle } from './trust';
 import { readFile, readdir, stat } from 'fs/promises';
 import path from 'path';
-import { isPathInside, normalizeWinPath, SAFE_EXTENSIONS, EXCLUDED_DIRS } from './shared';
+import { SAFE_EXTENSIONS, EXCLUDED_DIRS } from './shared';
 import { assertTrustedIpcSender } from './trust';
 import { resolveTrustedProjectRoot } from './project-access';
+import { resolveInsideRoot } from './path-security';
 import { compactHistory, estimateTokens } from './context-manager';
 import { readSettings } from './settings-store';
 import { resolveModelApiBase, resolveModelApiKey } from './model-config';
@@ -167,12 +168,13 @@ export function registerContextHandlers() {
   secureHandle('context:readFile', async (event, filePath: string, projectRoot?: string) => {
     assertTrustedIpcSender(event);
     try {
-      const resolved = path.resolve(normalizeWinPath(filePath));
       const root = await resolveTrustedProjectRoot(projectRoot);
-      if (!isPathInside(resolved, root)) {
-        return { ok: false, error: '路径越权：无法访问项目外的文件' };
+      const normalized = await resolveInsideRoot(filePath, root);
+      const stats = await stat(normalized);
+      if (stats.isFile() && stats.size > 10 * 1024 * 1024) {
+        return { ok: false, error: '文件过大，无法读取（上限 10MB）' };
       }
-      const content = await readFile(resolved, 'utf-8');
+      const content = await readFile(normalized, 'utf-8');
       return { ok: true, data: content };
     } catch (error: unknown) {
       return { ok: false, error: errorText(error) };

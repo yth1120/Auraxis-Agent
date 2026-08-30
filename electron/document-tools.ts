@@ -37,6 +37,7 @@ import PDFDocument from 'pdfkit';
 export const DOC_EXTENSIONS = new Set(['.docx', '.xlsx', '.pptx', '.pdf']);
 
 export type DocumentFormat = 'docx' | 'xlsx' | 'pptx' | 'pdf';
+const MAX_DOCUMENT_BYTES = 50 * 1024 * 1024;
 
 export interface DocumentSheet {
   name: string;
@@ -118,6 +119,9 @@ export async function readDocument(filePath: string): Promise<DocumentReadResult
     throw new Error(`不支持的文件类型: ${extOf(resolved) || '(无扩展名)'}（仅支持 .docx/.xlsx/.pptx/.pdf）`);
   }
   const bytes = (await fs.stat(resolved)).size;
+  if (bytes > MAX_DOCUMENT_BYTES) {
+    throw new Error(`文档过大（${bytes} 字节，上限 ${MAX_DOCUMENT_BYTES} 字节）`);
+  }
   const buffer = await fs.readFile(resolved);
   const fileName = path.basename(resolved);
 

@@ -142,6 +142,9 @@ describe('mcp — setServers / connect / disconnect', () => {
       [{ command: 'curl' }, '不支持的 MCP 命令'],
       [{ command: 'npx', args: 'bad' }, 'args 必须是字符串数组'],
       [{ command: 'npx', env: 'bad' }, 'env 必须是键值对对象'],
+      [{ command: 'node', args: ['--eval', '1'] }, '代码执行/交互参数'],
+      [{ command: 'python', args: ['-c', '1'] }, '代码执行/交互参数'],
+      [{ name: 'Generic MCP', useAuraxisDeepSeekKey: true }, '仅 DeepSeek Harness'],
     ];
     for (const [over, msg] of cases) {
       const id = `s-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
@@ -159,7 +162,9 @@ describe('mcp — setServers / connect / disconnect', () => {
     const child = fakeChild();
     h.spawn.mockReturnValue(child);
     h.resolveCredential.mockResolvedValue({ value: 'sk-auraxis-test' });
-    await set({}, [cfg({ useAuraxisDeepSeekKey: true })]);
+    await set({}, [
+      cfg({ name: 'DeepSeek Harness MCP', args: ['-y', 'deepseek-harness-mcp'], useAuraxisDeepSeekKey: true }),
+    ]);
 
     respond(child, { jsonrpc: '2.0', id: 1, result: {} });
     respond(child, { jsonrpc: '2.0', id: 2, result: { tools: [] } });

@@ -125,7 +125,7 @@ describe('acp-server', () => {
         method: 'session/read_file',
         params: { sessionId, filePath: path.join(os.tmpdir(), 'outside.txt') },
       });
-      expect(String((sent.at(-1)?.error as any)?.message)).toContain('项目目录');
+      expect(String((sent.at(-1)?.error as any)?.message)).toContain('工作区');
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

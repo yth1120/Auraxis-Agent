@@ -7,9 +7,10 @@ import os from 'os';
 import crypto from 'crypto';
 import type { ApplyCodePayload } from '../types';
 import { EMPTY_PROJECT_GLOBAL_STATE, normalizeProjectGlobalState, type ProjectGlobalState } from '../contracts/project';
-import { isPathInside, isAllowedExtension, EXCLUDED_DIRS, assertString, assertObject } from './shared';
+import { isAllowedExtension, EXCLUDED_DIRS, assertString, assertObject } from './shared';
 import { assertTrustedIpcSender } from './trust';
 import { authorizeProjectRoot, resolveTrustedProjectRoot } from './project-access';
+import { resolveInsideRoot } from './path-security';
 
 function parseGitignore(content: string): string[] {
   return content
@@ -188,11 +189,7 @@ export function registerProjectHandlers() {
       assertString(code, 'code', true);
       assertString(projectRoot, 'projectRoot');
       const root = await resolveTrustedProjectRoot(projectRoot);
-      const fullPath = path.resolve(root, filePath);
-
-      if (!isPathInside(fullPath, root)) {
-        return { ok: false, filePath, action: 'created', error: '路径越权：文件不在项目目录内' };
-      }
+      const fullPath = await resolveInsideRoot(filePath, root);
 
       if (!isAllowedExtension(fullPath)) {
         return { ok: false, filePath, action: 'created', error: `不允许写入该文件类型: ${path.extname(fullPath)}` };

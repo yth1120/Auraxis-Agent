@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtempSync, writeFileSync, readFileSync, mkdirSync, rmSync, existsSync } from 'fs';
+import { mkdtempSync, writeFileSync, readFileSync, mkdirSync, rmSync, existsSync, symlinkSync } from 'fs';
 import os from 'os';
 import path from 'path';
 
@@ -116,9 +116,12 @@ describe('Read / ReadImage', () => {
   });
 
   it('非 full 沙箱且未授权时拒绝越权路径', async () => {
-    await expect(
-      executeToolCall('Read', { file_path: '../outside.ts' }, ctx({ sandboxMode: 'read', autoApprove: false })),
-    ).rejects.toThrow('路径越界');
+    const r = await executeToolCall(
+      'Read',
+      { file_path: '../outside.ts' },
+      ctx({ sandboxMode: 'read', autoApprove: false }),
+    );
+    expect(r.error).toContain('路径越界');
   });
 
   it('ReadImage 返回图片数据，超大/非文件/不支持类型拒绝', async () => {
@@ -383,5 +386,35 @@ describe('file-tools direct edge branches', () => {
     writeFileSync(big, Buffer.alloc(11 * 1024 * 1024, 0x41));
     const r = await runGrep({ pattern: 'A', path: 'huge.bin' }, ctx({ autoApprove: true }));
     expect(r.output).toMatchObject({ pattern: 'A', match_count: 0 });
+  });
+});
+
+describe('security boundaries — sensitive files and symlinks', () => {
+  it('模型工具拒绝读写敏感文件', async () => {
+    writeFileSync(path.join(root, '.env'), 'DEEPSEEK_API_KEY=sk-secret', 'utf-8');
+    const read = await executeToolCall('Read', { file_path: '.env' }, ctx());
+    expect(read.error).toContain('敏感');
+    const write = await executeToolCall('Write', { file_path: '.env', content: 'x' }, ctx());
+    expect(write.error).toContain('敏感');
+  });
+
+  it('confined sandbox 拒绝通过符号链接逃逸工作区', async () => {
+    const outside = mkdtempSync(path.join(tmpRoot, 'outside-'));
+    writeFileSync(path.join(outside, 'secret.txt'), 'secret', 'utf-8');
+    const link = path.join(root, 'escape');
+    try {
+      symlinkSync(outside, link, process.platform === 'win32' ? 'junction' : 'dir');
+    } catch {
+      rmSync(outside, { recursive: true, force: true });
+      return;
+    }
+    const r = await executeToolCall(
+      'Read',
+      { file_path: path.join('escape', 'secret.txt') },
+      ctx({ sandboxMode: 'workspace-write', autoApprove: false }),
+    );
+    expect(r.error).toContain('路径越权');
+    rmSync(link, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
   });
 });

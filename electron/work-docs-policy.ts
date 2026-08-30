@@ -8,20 +8,31 @@
  * 硬门禁是最终防线，不依赖模型自觉。
  */
 
+import { FILE_WRITE_TOOLS, WORK_FORBIDDEN_TOOLS, isWorkForbiddenTool } from './tool-capability';
+
 export type WorkSurface = 'chat' | 'work' | 'code';
 
-/** Work 模式下会改写文件系统的工具，逐一走文档门禁。 */
-export const WORK_MUTATION_TOOLS = new Set([
-  'Write',
-  'Edit',
-  'NotebookEdit',
-  'StrReplaceEditor',
-  'Delete',
-  'WriteDocument',
-]);
+/** Work 模式会改写文件系统的工具，统一来自能力矩阵。 */
+export const WORK_MUTATION_TOOLS = FILE_WRITE_TOOLS;
+export { WORK_FORBIDDEN_TOOLS };
 
-/** Work 模式下也要拦截的 shell 改写路径。 */
-const WORK_SHELL_MUTATION_TOOLS = new Set(['Bash', 'Pwsh']);
+/** Work 模式下禁止触碰的仓库/运行目录（含隐藏元数据目录）。 */
+const WORK_FORBIDDEN_DIR_SEGMENTS = new Set([
+  '.git',
+  '.github',
+  '.vscode',
+  '.idea',
+  '.auraxis',
+  'node_modules',
+  'dist',
+  'dist-electron',
+  'build',
+  'release',
+  'coverage',
+  'test-results',
+  'playwright-report',
+  'spill',
+]);
 
 /** 源代码 / 脚本 / Web 前端等“代码文件”扩展名。 */
 const CODE_EXTENSIONS = new Set([
@@ -101,24 +112,12 @@ export function isCodeFilePath(filePath: string): boolean {
   return CODE_BASENAMES.has(base);
 }
 
-/** 从 shell 命令里粗检出“改写代码文件”的目标路径。 */
-function shellCommandTargetsCode(command: string): string | null {
-  const cmd = String(command || '').trim();
-  if (!cmd) return null;
-
-  // echo/printf/tee ... > src/app.ts / >> docs/notes.md
-  const redirect = cmd.match(/>>?\s*["']?([^\s"']+)/i);
-  if (redirect?.[1] && isCodeFilePath(redirect[1])) return redirect[1];
-
-  // sed -i ... src/app.ts
-  const sed = cmd.match(/sed\s+-i\b[^;&|]*\s+["']?([^\s"']+?)\s*$/i);
-  if (sed?.[1] && isCodeFilePath(sed[1])) return sed[1];
-
-  // cp / mv <src> <dst>，目标为代码文件
-  const copy = cmd.match(/(?:^|[;&|]\s*)(?:cp|mv)\s+["']?[^\s"']+["']?\s+["']?([^\s"']+)/i);
-  if (copy?.[1] && isCodeFilePath(copy[1])) return copy[1];
-
-  return null;
+/** 是否命中 Work 模式禁止的目录/隐藏元数据路径。 */
+export function isWorkForbiddenPath(filePath: string): boolean {
+  const normalized = String(filePath || '').replace(/\\/g, '/');
+  if (!normalized || normalized === '.') return false;
+  const segments = normalized.split('/').filter(Boolean);
+  return segments.some((segment) => WORK_FORBIDDEN_DIR_SEGMENTS.has(segment.toLowerCase()));
 }
 
 export interface WorkDocsVerdict {
@@ -142,6 +141,15 @@ export function workDocsOnlyVerdict(
     return { allowed: false, reason: 'Work 模式不允许调用 MCP 工具（无法验证其文件操作边界）' };
   }
 
+  // 所有 shell/终端/代码执行及运行时扩展入口一律拒绝。Work 模式的硬边界
+  // 不能依赖对命令内容的正则猜测；宁可少一个能力，也不能放行代码改写。
+  if (isWorkForbiddenTool(toolName)) {
+    return {
+      allowed: false,
+      reason: `Work 模式不允许调用 ${toolName}（可能绕过文档边界或执行任意代码）`,
+    };
+  }
+
   if (WORK_MUTATION_TOOLS.has(toolName)) {
     const candidates: string[] = [];
     if (typeof input.file_path === 'string' && input.file_path.trim()) {
@@ -154,6 +162,12 @@ export function workDocsOnlyVerdict(
 
     for (const raw of candidates) {
       const filePath = String(raw);
+      if (isWorkForbiddenPath(filePath)) {
+        return {
+          allowed: false,
+          reason: `Work 模式不允许修改受保护路径: ${filePath}`,
+        };
+      }
       if (isCodeFilePath(filePath)) {
         const name = filePath.split(/[\\/]/).pop() || filePath;
         return {
@@ -161,8 +175,8 @@ export function workDocsOnlyVerdict(
           reason: `Work 模式仅允许修改文档/非代码文件，已阻止修改代码文件: ${name}`,
         };
       }
-      // Delete 目录（无扩展名）在 Work 模式下无法确认是否含代码，直接拒绝。
-      if (toolName === 'Delete' && !filePath.includes('.')) {
+      // Delete 目录或未知类型路径在 Work 模式下无法确认是否含代码，直接拒绝。
+      if (toolName === 'Delete' && (!filePath.includes('.') || filePath.endsWith('/') || filePath.endsWith('\\'))) {
         return {
           allowed: false,
           reason: `Work 模式不允许删除目录或未知类型路径: ${filePath}`,
@@ -170,16 +184,6 @@ export function workDocsOnlyVerdict(
       }
     }
     return { allowed: true };
-  }
-
-  if (WORK_SHELL_MUTATION_TOOLS.has(toolName) && typeof input.command === 'string') {
-    const target = shellCommandTargetsCode(input.command);
-    if (target) {
-      return {
-        allowed: false,
-        reason: `Work 模式不允许通过 shell 改写代码文件: ${target}`,
-      };
-    }
   }
 
   return { allowed: true };
@@ -191,7 +195,9 @@ export const WORK_DOCS_ONLY_SYSTEM_RULE = `
 你处于 Work 模式，职责是文档与文件协作：可以创建、修改、删除文档、文本、
 配置等非代码文件（如 .md/.txt/.docx/.pdf/.json/.yaml 等）。
 禁止修改任何源代码文件（如 .ts/.tsx/.js/.py/.java/.c/.cpp/.go/.rs/.html/.css/.sh 等），
-也不得通过 Bash 等命令改写代码文件。代码文件只能读取，不能写入。`;
+也不得通过 Bash、Pwsh、终端、代码执行或动态插件改写代码文件。
+Work 模式禁止运行任意 Shell、代码执行、终端会话和动态插件；
+代码文件只能读取，不能写入。`;
 
 /** Work 模式默认开工前澄清规则（AskUser 提问，自主研发）。 */
 export const WORK_CLARIFY_RULE = `

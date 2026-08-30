@@ -3,7 +3,7 @@
  * production renderer (dist/), verifies the preload bridge is injected and
  * a few read-only IPC surfaces answer, then exits cleanly.
  *
- * Usage: npx tsc -p tsconfig.electron.json && npx vite build && node scripts/smoke-electron.cjs
+ * Usage: npx tsc6 -p tsconfig.electron.json && npx vite build && node scripts/smoke-electron.cjs
  */
 const path = require('path');
 const os = require('os');

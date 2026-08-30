@@ -39,16 +39,19 @@ npm run check            # lint + 主进程编译 + 渲染层类型检查 + 全�
 - **统一循环**：LLM 步进只允许走 `step-engine.ts`（聊天与 Agent 共用），停止策略/压缩/重试/质量门做成策略钩子，禁止在 query-engine / agent-loop 里另写一套循环。
 - **工具执行管线**：所有工具经 `tool-runner.ts` → `executeToolCall`，权限 profile → 沙箱门 → 审批 → 执行顺序不可绕过；新增后端或子调用必须回穿这条管线。
 - **会话事实源**：聊天与 Agent 共用 append-only 事件流（词表 `electron/contracts/session-types.ts`，存储 `electron/session-store.ts` / chat-log / session-log），禁止再开私有持久化格式。
+- **模块边界**：`electron/tool-handlers.ts` 只保留兼容导出与任务中止接线，注册表、安全管线及内部工具分别放在 `electron/ipc/tool-handlers/{registry,pipeline,internal,bash,file-tools,network,terminal,integrations,agents,session,runtime,worktree,lsp,review,execution}`；`electron/tool-defs.ts` 是聚合入口，定义放在 `electron/tool-defs/`。调度器实现、权限、支持、状态/队列/查询/快照/生命周期/运行器与类型分别放在 `agent-scheduler-class-impl.ts` / `agent-scheduler-permission.ts` / `agent-scheduler-support.ts` / `agent-scheduler-{types,queue,query,snapshot,lifecycle,runner,cleanup}.ts`；loop 纯类型放在 `agent-loop-types.ts`，Planner/Deviance、消息去重、Context、StopPolicy、上下文准备、注入与规划拦截分别放在 `agent-loop-{planner,messages,context,stop,prepare,inject,interceptors}.ts`，规划编排与工具日志放在 `agent-loop-planning.ts` / `agent-loop-utils.ts`，内置 Agent 定义放在 `agent-defs.ts`，子 Agent 注册表与观察器放在 `agent-subagent-registry.ts`；LLM 类型、适配器与协议实现分别放在 `llm-types.ts` / `llm-adapter.ts` / `llm-provider-{format,anthropic,openai}.ts`；memory SQLite/JSON 后端与 schema/行映射/实体模块分别放在 `memory-db-{sqlite,json,sqlite-schema,sqlite-rows,sqlite-memory,sqlite-evidence,sqlite-belief,sqlite-audit}.ts`，`memory-db-backends.ts` 只做兼容导出；上下文纯工具、截断、摘要与管线分别放在 `context-manager-{utils,snapshot,summary,compact}.ts`；step-engine 的上下文、工具结果与批量工具上下文放在 `step-engine-{context,tool-results,tools}.ts`；preload 按平台/核心/AI/其余域拆到 `preload-{platform,core,ai,rest,shared,api}.ts`。渲染层聊天 Store 的流运行时、非流式消息动作、前缀续写、完整流动作、跨 Store 副作用与计划监听分别放在 `src/stores/{chatStreamRuntime,chatActions,chatContinueCode,chatSendMessage,chatRuntime,chatStoreSideEffects,chatPlanListener}.ts`；Agent 动作/事件/缓冲放在 `src/stores/{agentStoreActions,agentStoreEvents,agentStoreBuffers}.ts`；会话与设置的 helper/actions 放 `src/stores/{sessionStoreHelpers,sessionStoreActions,settingsStoreActions}.ts`。
 - **能力 seam**：已有 `SessionStore`、`ShellExecutor`、`LlmAdapter` 三个可替换接口；换实现走 seam，不直接改消费方。
 - **Work 模式边界**：Work 模式只允许创建/修改/删除文档与非代码文件（门禁见 `electron/work-docs-policy.ts`），任何对代码文件的 Write/Edit/NotebookEdit/StrReplaceEditor/Delete 都会被硬拒绝；Code 模式不受影响。
 
 ## 模型工具开发约定
 
-- 新增工具必须**同时**改三处：`electron/tool-defs.ts` 的 `TOOL_DEFINITIONS`（schema + `isConcurrencySafe`）、`electron/ipc/tool-handlers.ts` 的 `toolRegistry`（处理器）、必要时 `electron/permission-profile.ts` 的门禁。漏注册会出现「模型看得到工具但调用失败」。
+- 新增工具必须**同时**改三处：`electron/tool-defs/` 的 `TOOL_DEFINITIONS`（schema + `isConcurrencySafe`）、`electron/ipc/tool-handlers.ts` 的 `toolRegistry`（处理器）、必要时 `electron/permission-profile.ts` 的门禁。漏注册会出现「模型看得到工具但调用失败」。
+- 工具风险/Work/沙箱/Profile 门禁统一读写 `electron/tool-capability.ts`，禁止在多个模块重复维护同名字符串集合。
+- 项目路径与敏感文件统一经 `electron/ipc/path-security.ts` 校验；子进程环境统一使用 `electron/safe-env.ts`。
 - `Replan` 是**例外**：不进 registry，由 loop 驱动的 `interceptTool` 合成缝处理（`agent-loop.ts` 的 `tc.name !== 'Replan'` 分支）。
 - **read-before-write**：存在文件的 Write/Edit 必须先 Read（或携带其 `version`）；Read/Write/Edit 成功都会登记会话级观测。`autoApprove` 无头流程按惯例豁免。
 - Code Mode（`RunCode` 的 `language=typescript`）：程序体在 worker 线程执行，`await tools.Name(args)` 子调用必须回穿 `executeToolCall` 全管线，并发安全工具最多 8 路重叠、变异工具串行；实现见 `electron/code-mode.ts`。
-- 文件类工具必须过 `resolveToolPath` / `isPathInside` 的路径边界与 `isSafeExtension` 检查，除非 `autoApprove`。
+- 文件类工具必须过 `resolveSafeTarget` / `realPathWithin` 的物理路径边界与 `isSafeExtension` 检查，除非 `autoApprove`。
 
 ## UI 视觉规范（严格遵守）
 
@@ -81,12 +84,14 @@ npm run check            # lint + 主进程编译 + 渲染层类型检查 + 全�
 
 - 模型编写的任意代码执行（`RunCode`、动态插件 handler、内联工作流）**默认禁用**；只有显式设置 `AURAXIS_ALLOW_UNSAFE_CODE=1` 的受信开发环境才允许，且仍不视为 OS 沙箱。
 - 原生沙箱启动失败必须拒绝执行（fail-closed）；终端、Lint、LSP、Code Runtime 等子进程只继承 `safeProcessEnv()` 白名单环境。
+- 项目目录内 `.auraxis/rules/*.rules` **默认不授权**：需要显式设置 `AURAXIS_TRUST_PROJECT_RULES=1`；项目 hooks 同样默认禁用。
+- Work 模式禁止 `Bash`、`Pwsh`、`Pty`、`Terminal*`、`RunCode`、`RunWorkflow`、动态插件及 MCP；`.env*`、`.npmrc`、`.git-credentials`、私钥等敏感路径禁止模型工具读写。
 - 所有主进程 IPC 注册必须经 `secureHandle` 或 `assertTrustedIpcSender` 校验来源；文件/项目/上下文写入路径必须经 `resolveTrustedProjectRoot` 校验。
 
 ## 测试与验证
 
-- 新增/改动必须过：`npx tsc --noEmit`（渲染层）、`npm run electron:compile`（主进程）、`npx vitest run`（全量）、`npx vite build`（构建）。
-- 单元覆盖率门槛：lines/statements ≥ 80%、branches ≥ 80%、functions ≥ 80%（`vitest.config.mts`）；最近一次全仓库分支门禁报告为 88.50% statements / 90.79% lines / 80.04% branches / 87.08% functions，四项均已达标。
+- 新增/改动必须过：`npx tsc6 --noEmit`（渲染层）、`npm run electron:compile`（主进程）、`npx vitest run`（全量）、`npx vite build`（构建）。
+- 单元覆盖率门槛：lines/statements ≥ 80%、branches ≥ 80%、functions ≥ 80%（`vitest.config.mts`）；最近一次全仓库分支门禁报告为 87.76% statements / 90.03% lines / 80.22% branches / 82.20% functions，四项均已达标。
 - 全仓库分支门禁统计范围：`electron/**`、`src/stores/**`、`src/core/**`；`main.ts` / `preload.ts` 依赖真实 Electron 窗口生命周期，由真实 Electron E2E、SDK smoke 与 headless CLI 验证并明确排除。CI 全量单元测试是三项平台阻断项，Linux 默认执行单元 coverage gate（见 `.github/workflows/build.yml`）。
 - 覆盖率报告：`npm run test:coverage` 同时输出 `coverage/coverage-summary.json`（gitignore，开发期产物），设置面板「测试覆盖率」页经 `coverage:get` IPC 实时读取该文件；README / AGENTS / docs 中的用例数与覆盖率数字以最近一次全量覆盖率为准，更新后必须同步。
 - 覆盖率统计范围：全仓库可单测部分（不含 `src/components/` 与主进程入口）；UI 由组件级测试覆盖，桌面端到端链路由 `npm run test:smoke` 覆盖。

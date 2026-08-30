@@ -48,7 +48,6 @@ export const SAFE_EXTENSIONS = new Set([
   '.xml',
   '.svg',
   '.txt',
-  '.env',
   '.gitignore',
   '.dockerignore',
   '.docx',
@@ -67,6 +66,30 @@ export function isDocumentExtension(filePath: string): boolean {
 export function isAllowedExtension(filePath: string): boolean {
   const ext = path.extname(filePath).toLowerCase();
   return SAFE_EXTENSIONS.has(ext);
+}
+
+/** 敏感/凭据类路径：模型工具、文件 IPC 与代码应用均不得读取或改写。 */
+const SENSITIVE_FILE_NAMES = new Set([
+  '.npmrc',
+  '.yarnrc',
+  '.yarnrc.yml',
+  '.pypirc',
+  '.netrc',
+  '.git-credentials',
+  'credentials.json',
+  'secrets.json',
+  'id_rsa',
+  'id_ecdsa',
+  'id_ed25519',
+]);
+
+export function isSensitiveFilePath(filePath: string): boolean {
+  const normalized = String(filePath || '').replace(/\\/g, '/');
+  const base = normalized.split('/').pop() || '';
+  const lower = base.toLowerCase();
+  if (lower.startsWith('.env')) return true;
+  if (SENSITIVE_FILE_NAMES.has(lower)) return true;
+  return /\.(pem|key|p12|pfx)$/i.test(lower);
 }
 
 // ─── Directory exclusions ──────────────────────────────

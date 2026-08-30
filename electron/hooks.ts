@@ -11,6 +11,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { app } from 'electron';
 import { getShellExecutor } from './ipc/shell-executor';
+import { safeProcessEnv } from './safe-env';
 
 export type HookEvent = 'SessionStart' | 'UserPromptSubmit' | 'PreToolUse' | 'PostToolUse' | 'Stop' | 'SessionEnd';
 
@@ -77,18 +78,9 @@ export async function getHooks(projectRoot?: string): Promise<Partial<Record<Hoo
   return merged;
 }
 
-const HOOK_SECRET_RE = /(KEY|TOKEN|SECRET|PASSWORD|PASSWD|AUTH|CREDENTIAL)/i;
-
 /** Hook 进程继承的环境：剥离 API Key / Token 等敏感变量，只留通用环境。 */
 function hookEnv(payload: Record<string, unknown>): Record<string, string> {
-  const env: Record<string, string> = {};
-  for (const [k, v] of Object.entries(process.env)) {
-    if (typeof v !== 'string') continue;
-    if (HOOK_SECRET_RE.test(k)) continue;
-    env[k] = v;
-  }
-  env.HOOK_PAYLOAD = JSON.stringify(payload);
-  return env;
+  return safeProcessEnv({ HOOK_PAYLOAD: JSON.stringify(payload) });
 }
 
 export function runHook(config: HookConfig, payload: Record<string, unknown>, cwd?: string): Promise<HookRunResult> {

@@ -11,7 +11,6 @@ import type { ApprovalPolicy } from '../types';
 import type { WorkAutonomyTier } from '../types';
 import type { ToolDef } from '../tool-defs';
 import type { SandboxMode } from '../sandbox-policy';
-import { writeSpill } from '../spill';
 import type { AssistantMessage, LoopMessage, TaskPlan } from './agent-loop';
 import type { DeepSeekToolChoice } from '../contracts/advanced';
 import { errorRecord, errorText } from '../errors';
@@ -22,14 +21,22 @@ import {
   appendAssistantToHistory,
   readErrorBody,
 } from './agent-loop';
-import { invokeLlm, buildToolResultContent, buildToolResultText, isDeepSeekVisionModel } from './llm-adapter';
-import { getShellExecutor } from './shell-executor';
-import { runToolBatch, isDeniedError } from './tool-runner';
+import { invokeLlm } from './llm-adapter';
+import { runToolBatch } from './tool-runner';
 import type { RunnerToolCall, RunnerToolResult } from './tool-runner';
 import { getAllTools } from '../tool-registry';
 import { shouldCompactByTokens, compactHistory, estimateTokens } from './context-manager';
 import type { EngineEvent } from './engine-events';
 import type { StopDecision } from './agent-loop';
+import { buildTimeContextMessage, buildTmuxContextMessage, resolveTmuxLocation } from './step-engine-context';
+import { appendToolResults } from './step-engine-tool-results';
+import { buildStepToolBatch } from './step-engine-tools';
+export {
+  buildTimeContextMessage,
+  buildTmuxContextMessage,
+  resetTmuxLocationCache,
+  resolveTmuxLocation,
+} from './step-engine-context';
 
 // ─── State ──────────────────────────────────────────────
 
@@ -54,52 +61,6 @@ export function createStepState(messages: LoopMessage[]): StepState {
     emptyResponseCount: 0,
     allText: '',
     startedAt: Date.now(),
-  };
-}
-
-export function buildTimeContextMessage(startedAt: number, now: number): { role: 'system'; content: string } {
-  const elapsed = Math.max(0, Math.floor((now - startedAt) / 1000));
-  const h = Math.floor(elapsed / 3600);
-  const m = Math.floor((elapsed % 3600) / 60);
-  const s = elapsed % 60;
-  const elapsedText = h > 0 ? `${h}h${m}m` : m > 0 ? `${m}m${s}s` : `${s}s`;
-  return {
-    role: 'system',
-    content: `[时间上下文] 当前时间：${new Date(now).toLocaleString('zh-CN', { hour12: false })}；本轮会话已运行 ${elapsedText}。`,
-  };
-}
-
-// ─── tmux context (tmux 上下文) ────────────
-
-let cachedTmuxLocation: string | null | undefined;
-
-/** Resolve the current tmux session:window.pane once per process. */
-export async function resolveTmuxLocation(): Promise<string | null> {
-  if (!process.env.TMUX) return null;
-  if (cachedTmuxLocation !== undefined) return cachedTmuxLocation;
-  try {
-    const result = await getShellExecutor().run({
-      command: 'tmux',
-      args: ['display-message', '-p', '#S:#W.#P'],
-      shell: false,
-      timeoutMs: 2000,
-    });
-    cachedTmuxLocation = (result.stdout || '').trim() || null;
-  } catch {
-    cachedTmuxLocation = null;
-  }
-  return cachedTmuxLocation;
-}
-
-/** Test seam — clears the memoized tmux location. */
-export function resetTmuxLocationCache(): void {
-  cachedTmuxLocation = undefined;
-}
-
-export function buildTmuxContextMessage(location: string, now = Date.now()): { role: 'system'; content: string } {
-  return {
-    role: 'system',
-    content: `[tmux 上下文] 当前位于 tmux ${location}（${new Date(now).toLocaleString('zh-CN', { hour12: false })}）`,
   };
 }
 
@@ -218,56 +179,6 @@ export type StepOutcome =
 export interface StepMetrics {
   firstTokenMs?: number;
   outputTokens?: number;
-}
-
-// ─── Tool result append (preserves API protocol) ─────────
-
-const SPILL_ABOVE_CHARS = 30_000;
-const SPILL_PREVIEW_CHARS = 1_200;
-
-async function appendToolResults(
-  messages: LoopMessage[],
-  results: { toolUseId: string; toolName: string; input: Record<string, unknown>; output: unknown; error?: string }[],
-  sessionId?: string,
-  model = '',
-): Promise<void> {
-  const imageUserParts: Array<Record<string, unknown>> = [];
-  for (const tr of results) {
-    const raw = tr.error ? `Error: ${tr.error}` : JSON.stringify(tr.output);
-    let content = raw;
-    if (!tr.error && !isImageResult(tr.output) && raw.length > SPILL_ABOVE_CHARS) {
-      try {
-        const ref = await writeSpill(raw, { sessionId, toolName: tr.toolName, toolCallId: tr.toolUseId });
-        content = JSON.stringify({
-          spill_path: ref.path,
-          spill_bytes: ref.bytes,
-          preview: raw.slice(0, SPILL_PREVIEW_CHARS),
-          note: '输出过大已落盘，可用 ReadSpill 读取完整内容',
-        });
-      } catch {
-        // Spill is best-effort — keep the raw output if the store fails.
-      }
-    }
-    const imageResult = !tr.error && isImageResult(tr.output);
-    const toolContent = imageResult ? buildToolResultText(tr.output) : content;
-    messages.push({
-      role: 'tool' as const,
-      tool_call_id: tr.toolUseId,
-      content: toolContent,
-    });
-    if (imageResult && isDeepSeekVisionModel(model)) {
-      const imageParts = buildToolResultContent(tr.output);
-      if (Array.isArray(imageParts)) imageUserParts.push(...imageParts);
-    }
-  }
-  if (imageUserParts.length > 0) {
-    messages.push({ role: 'user' as const, content: imageUserParts });
-  }
-}
-
-function isImageResult(output: unknown): boolean {
-  const obj = (output && typeof output === 'object' ? output : null) as Record<string, unknown> | null;
-  return !!obj && typeof obj.image === 'string' && obj.image.startsWith('data:image/');
 }
 
 // ─── Step driver ────────────────────────────────────────
@@ -530,95 +441,8 @@ export async function runStep(cfg: StepEngineConfig, state: StepState, stepGroup
   state.consecutiveTextOnly = 0;
   state.emptyResponseCount = 0;
   toolsThisIteration = assistantMsg.toolCalls.length;
-  const sandboxMode: SandboxMode =
-    cfg.sandboxMode ??
-    (process.env.AURAXIS_SANDBOX_MODE === 'read' || process.env.AURAXIS_SANDBOX_MODE === 'workspace-write'
-      ? process.env.AURAXIS_SANDBOX_MODE
-      : 'full');
-
-  const collectedResults = await runToolBatch(
-    assistantMsg.toolCalls,
-    {
-      projectRoot: cfg.projectRoot,
-      requestId: cfg.requestId,
-      // 权限路由 / 工作区会话 / 冲突检测都以稳定任务 ID 为 key；
-      // requestId 是每次运行的随机 ID，不能当 agentId 用。
-      agentId: cfg.sessionId ?? cfg.requestId,
-      sessionId: cfg.sessionId ?? cfg.requestId,
-      checkPermission: cfg.checkPermission,
-      autoApprove: cfg.autoApprove,
-      abortSignal: signal,
-      mode: cfg.mode,
-      approvedPlanSteps: cfg.approvedPlanSteps,
-      workTier: cfg.workTier,
-      workspaceRoots: cfg.workspaceRoots,
-      writableRoots: cfg.writableRoots,
-      depth: cfg.depth,
-      sandboxMode,
-      surface: cfg.surface,
-      stepGroupId,
-      executeTool: cfg.executeTool,
-      interceptTool: cfg.interceptTool,
-      riskGate:
-        cfg.riskGate ??
-        (process.env.AURAXIS_MEMORY_RISK_GATE === '1'
-          ? async (toolName: string) => {
-              const { createMemoryRiskGate, recordRiskAudit, roleForAgent } = await import('./memory-graph');
-              const role = roleForAgent(cfg.agentName || '');
-              const verdict = createMemoryRiskGate(cfg.projectRoot, role)(toolName);
-              if (!verdict.allowed) recordRiskAudit(cfg.projectRoot, toolName, verdict);
-              return Promise.resolve({ allowed: verdict.allowed, reason: verdict.reason });
-            }
-          : undefined),
-    },
-    {
-      makeToolCallId: cfg.makeToolCallId ?? ((tc) => `tc-${Date.now()}-${tc.name}`),
-      preCheckPermission: cfg.preCheckPermission,
-      onBeforeDispatch: cfg.onBeforeToolDispatch,
-      onToolStart: (tc, toolCallId) => {
-        state.toolCallCount++;
-        // Canonical tool lifecycle events — emitted by the engine, not by callers.
-        emit({ type: 'tool_start', toolCallId, toolName: tc.name, input: tc.input, stepGroupId: tc.stepGroupId ?? '' });
-        cfg.onToolStart?.(tc, toolCallId);
-      },
-      onToolProgress: (tc, toolCallId, chunk) => {
-        emit({
-          type: 'tool_progress',
-          toolCallId,
-          toolName: tc.name,
-          input: tc.input,
-          progress: chunk,
-          stepGroupId: tc.stepGroupId ?? '',
-        });
-        cfg.onToolProgress?.(tc, toolCallId, chunk);
-      },
-      onToolResult: (r, tc, toolCallId) => {
-        const isAbort = r.error === '用户手动中止' || isDeniedError(r.error);
-        if (r.error) {
-          emit({
-            type: isAbort ? 'tool_aborted' : 'tool_error',
-            toolCallId,
-            toolName: tc.name,
-            input: tc.input,
-            error: r.error,
-            stepGroupId: tc.stepGroupId ?? '',
-          });
-        } else {
-          emit({
-            type: 'tool_end',
-            toolCallId,
-            toolName: tc.name,
-            input: tc.input,
-            output: r.output,
-            durationMs: r.durationMs,
-            stepGroupId: tc.stepGroupId ?? '',
-            summary: cfg.onToolSummary?.(r, tc),
-          });
-        }
-        cfg.onToolResult?.(r, tc, toolCallId);
-      },
-    },
-  );
+  const toolBatch = buildStepToolBatch(cfg, state, stepGroupId, emit);
+  const collectedResults = await runToolBatch(assistantMsg.toolCalls, toolBatch.context, toolBatch.callbacks);
 
   await appendToolResults(
     messages,

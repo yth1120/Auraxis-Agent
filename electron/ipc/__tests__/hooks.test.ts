@@ -78,11 +78,11 @@ describe('hooks', () => {
   it('strips secret-like variables from hook environment', async () => {
     process.env.DEEPSEEK_API_KEY = 'sk-secret';
     process.env.AURAXIS_SDK_TOKEN = 'sdk-token';
-    process.env.MY_SAFE_VAR = 'visible';
+    process.env.HOME = 'visible';
     const probe = path.join(root, 'env-probe.cjs');
     await fs.writeFile(
       probe,
-      `console.log(JSON.stringify({ ds: process.env.DEEPSEEK_API_KEY || '', tok: process.env.AURAXIS_SDK_TOKEN || '', safe: process.env.MY_SAFE_VAR || '' }));\n`,
+      `console.log(JSON.stringify({ ds: process.env.DEEPSEEK_API_KEY || '', tok: process.env.AURAXIS_SDK_TOKEN || '', safe: process.env.HOME || '' }));\n`,
       'utf8',
     );
     try {
@@ -95,7 +95,7 @@ describe('hooks', () => {
     } finally {
       delete process.env.DEEPSEEK_API_KEY;
       delete process.env.AURAXIS_SDK_TOKEN;
-      delete process.env.MY_SAFE_VAR;
+      delete process.env.HOME;
     }
   });
 

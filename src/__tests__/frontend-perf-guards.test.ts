@@ -40,7 +40,11 @@ describe('frontend perf guards', () => {
 
   it('chat store persistence and event-log flushing are debounced', () => {
     const store = src('stores/useChatStore.ts');
+    const runtime = src('stores/chatRuntime.ts');
     expect(store).toContain('createDebouncedStorage');
-    expect(store).toContain('chatLogTimer');
+    expect(store).toContain("from './chatRuntime'");
+    expect(runtime).toContain('createChatLogBuffer');
+    expect(runtime).toContain('void flush(), 1000');
+    expect(runtime).toContain('void flush(), 2000');
   });
 });
