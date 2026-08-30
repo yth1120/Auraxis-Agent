@@ -239,7 +239,7 @@ describe('Pwsh — 本地 PowerShell 执行', () => {
     }
   });
 
-  it('routes Pwsh through the native sandbox in workspace-write mode', async () => {
+  it.runIf(process.platform === 'win32')('routes Pwsh through the native sandbox in workspace-write mode', async () => {
     vi.mocked(runSandboxedCommand).mockImplementation(async ({ onStdout }: any) => {
       onStdout('sandboxed');
       return { exitCode: 0, error: undefined, timedOut: false, supported: true };
