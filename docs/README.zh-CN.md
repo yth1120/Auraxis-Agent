@@ -1022,7 +1022,7 @@ dist-electron/ + dist/ ──→ electron-builder ──→ release/
 - **渲染进程测试**：`src/**/__tests__/`，jsdom 环境（@testing-library/react）
 - **测试总数**：268 个测试文件 / 2,053 个用例通过（另有 3 例环境性跳过）
 - **覆盖率口径**：门槛统计范围包括 `electron/**`、`src/stores/**`、`src/core/**`；UI 组件（`src/components/`）与主进程入口（`main.ts` / `preload.ts` 等）不计入该门槛，另有组件级测试与 Playwright 端到端测试（`npm run test:e2e`）覆盖
-- **覆盖率阈值**：行/语句 ≥ 80%，分支 ≥ 80%，函数 ≥ 80%（最近一次全仓库分支门禁报告为 87.76% statements / 90.03% lines / 80.22% branches / 82.20% functions，四项均已达标；Electron 主入口由真实 E2E、SDK smoke 与 headless CLI 验证，Linux CI 默认执行覆盖率门禁）
+- **覆盖率阈值**：行/语句 ≥ 80%，分支 ≥ 80%，函数 ≥ 80%（最近一次全仓库分支门禁报告为 87.73% statements / 90.00% lines / 80.13% branches / 82.20% functions，四项均已达标；Electron 主入口由真实 E2E、SDK smoke 与 headless CLI 验证，Linux CI 默认执行覆盖率门禁）
 - **覆盖率报告**：`npm run test:coverage` 同时输出 `coverage/coverage-summary.json`（gitignore 的开发期产物）；设置面板「测试覆盖率」页经 `coverage:get` IPC 实时读取，纯浏览器 dev 由 Vite 中间件提供同一路径，生产构建将其拷入 `dist/coverage/`。报告缺失时面板提示运行命令，不显示伪造数字。
 - **端到端测试**：16 条 Playwright UI 链路通过（真实 Electron，含本地注册 → 登录 → 记住我持久化）
 - **实战验收（DeepSeek 真实 API）**：Chat 流式回答、Code 自动代批 Bash、Code「每次确认」权限卡（允许一次后写入文件）、Work 智能放行执行流、Work 计划审批面板均跑通；另用 `deepseek-v4-flash` 完成无头端到端组合运行，覆盖 TodoWrite / Bash / Write / Read / Grep / Glob / WebSearch / WebFetch / ListSkills / ListAgents / SessionQuery / Goal / Task / Job 流程，创建并验证了一个 ESM + `node:test` 示例（13/13 用例通过），并确认内联 `RunWorkflow` 保持 fail-closed；沙箱脚本直启 `dist-electron/main.js` 时增加 cwd 回退（`electron/sandbox-runner.ts`）。

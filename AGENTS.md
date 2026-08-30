@@ -91,7 +91,7 @@ npm run check            # lint + 主进程编译 + 渲染层类型检查 + 全�
 ## 测试与验证
 
 - 新增/改动必须过：`npx tsc6 --noEmit`（渲染层）、`npm run electron:compile`（主进程）、`npx vitest run`（全量）、`npx vite build`（构建）。
-- 单元覆盖率门槛：lines/statements ≥ 80%、branches ≥ 80%、functions ≥ 80%（`vitest.config.mts`）；最近一次全仓库分支门禁报告为 87.76% statements / 90.03% lines / 80.22% branches / 82.20% functions，四项均已达标。
+- 单元覆盖率门槛：lines/statements ≥ 80%、branches ≥ 80%、functions ≥ 80%（`vitest.config.mts`）；最近一次全仓库分支门禁报告为 87.73% statements / 90.00% lines / 80.13% branches / 82.20% functions，四项均已达标。
 - 全仓库分支门禁统计范围：`electron/**`、`src/stores/**`、`src/core/**`；`main.ts` / `preload.ts` 依赖真实 Electron 窗口生命周期，由真实 Electron E2E、SDK smoke 与 headless CLI 验证并明确排除。CI 全量单元测试是三项平台阻断项，Linux 默认执行单元 coverage gate（见 `.github/workflows/build.yml`）。
 - 覆盖率报告：`npm run test:coverage` 同时输出 `coverage/coverage-summary.json`（gitignore，开发期产物），设置面板「测试覆盖率」页经 `coverage:get` IPC 实时读取该文件；README / AGENTS / docs 中的用例数与覆盖率数字以最近一次全量覆盖率为准，更新后必须同步。
 - 覆盖率统计范围：全仓库可单测部分（不含 `src/components/` 与主进程入口）；UI 由组件级测试覆盖，桌面端到端链路由 `npm run test:smoke` 覆盖。

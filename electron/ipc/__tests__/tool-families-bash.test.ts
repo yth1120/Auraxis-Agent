@@ -239,7 +239,10 @@ describe('Pwsh — 本地 PowerShell 执行', () => {
     }
   });
 
-  it.runIf(process.platform === 'win32')('routes Pwsh through the native sandbox in workspace-write mode', async () => {
+  it('routes Pwsh through the native sandbox in workspace-write mode', async () => {
+    // 跨平台统一验证：让 pwsh 探测成功，确保进入原生沙箱分支，
+    // 而不是在 Linux/macOS 上因“未找到 PowerShell”提前返回。
+    childMocks.execSync.mockImplementation(() => '');
     vi.mocked(runSandboxedCommand).mockImplementation(async ({ onStdout }: any) => {
       onStdout('sandboxed');
       return { exitCode: 0, error: undefined, timedOut: false, supported: true };
@@ -253,7 +256,7 @@ describe('Pwsh — 本地 PowerShell 执行', () => {
     expect(runSandboxedCommand).toHaveBeenCalledWith(
       expect.objectContaining({
         mode: 'workspace-write',
-        argv: expect.arrayContaining([expect.stringContaining('powershell'), '-NoProfile', '-NonInteractive']),
+        argv: expect.arrayContaining([expect.stringMatching(/pwsh|powershell/), '-NoProfile', '-NonInteractive']),
       }),
     );
   });

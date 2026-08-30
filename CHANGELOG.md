@@ -19,7 +19,7 @@
 ### Validation
 
 - 268 test files / 2,053 passing cases (+3 environment skips).
-- Coverage: 87.76% statements / 90.03% lines / 80.22% branches / 82.20% functions.
+- Coverage: 87.73% statements / 90.00% lines / 80.13% branches / 82.20% functions.
 - E2E 16/16, Electron smoke, TS SDK (7/7), Python SDK (7/7), live SDK smoke and dependency audit pass.
 - DeepSeek V4 Flash live combo acceptance exercised file/search/web/session/skill/goal/task flows and verified a generated zero-dependency ESM + `node:test` project (13/13 tests); inline workflows stayed fail-closed by default.
 

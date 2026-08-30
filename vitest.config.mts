@@ -15,7 +15,7 @@ export default defineConfig({
       // 全仓库单测分支门禁：统计 electron/、src/stores/、src/core/。
       // main.ts / preload.ts 依赖真实 Electron 窗口生命周期，由 E2E、
       // SDK smoke 与 headless CLI 覆盖，故从单元门禁中排除。
-      // 当前实际：statements 87.76% / lines 90.03% / branches 80.22% /
+      // 当前实际：statements 87.73% / lines 90.00% / branches 80.13% /
       // functions 82.20%。
       thresholds: { lines: 80, branches: 80, functions: 80, statements: 80 },
       include: ['electron/**/*.ts', 'src/stores/**/*.ts', 'src/core/**/*.ts'],
