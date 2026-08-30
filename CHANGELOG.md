@@ -23,6 +23,12 @@
 - E2E 16/16, Electron smoke, TS SDK (7/7), Python SDK (7/7), live SDK smoke and dependency audit pass.
 - DeepSeek V4 Flash live combo acceptance exercised file/search/web/session/skill/goal/task flows and verified a generated zero-dependency ESM + `node:test` project (13/13 tests); inline workflows stayed fail-closed by default.
 
+### Release Artifacts
+
+- Windows: [Auraxis.Setup.3.3.0.exe](https://github.com/yth1120/Auraxis-Agent/releases/download/v3.3.0/Auraxis.Setup.3.3.0.exe)
+- Windows blockmap: [Auraxis.Setup.3.3.0.exe.blockmap](https://github.com/yth1120/Auraxis-Agent/releases/download/v3.3.0/Auraxis.Setup.3.3.0.exe.blockmap)
+- Windows update metadata: [latest.yml](https://github.com/yth1120/Auraxis-Agent/releases/download/v3.3.0/latest.yml)
+
 ## v3.2.0 (2026-08-25)
 
 > Feature release: official Feishu/Lark OpenAPI MCP, DeepSeek Harness MCP
