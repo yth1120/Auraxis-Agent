@@ -6,7 +6,7 @@ Related docs: [TS SDK](../packages/auraxis-sdk/README.md) · [Python SDK](../pyt
 
 ## 1. Project Overview
 
-Auraxis v3.2.0 is an Electron-based desktop agentic workbench that combines a unified ReAct step engine, multi-agent scheduling, Code Mode tool orchestration, plugin extensibility, and persistent project memory. Execution semantics follow the common convention (`end_turn` ends the turn — no scripts or forced gates), and ReviewArtifact is an optional verification tool. The backend LLM defaults to the DeepSeek API (OpenAI / Anthropic compatible formats). Web search defaults to DeepSeek's native search (falling back to DuckDuckGo, with Exa and Perplexity also supported). Official DeepSeek capabilities are integrated: reasoning effort low/high/max, strict tools (Beta), plan-generation JSON mode, conversation prefix continuation ("continue writing" from a code block), FIM completion (Beta) API, streaming usage with context-cache hit display, user_id isolation, configurable max output tokens (up to 384K), and local offline tokenizer counting.
+Auraxis v3.3.0 is an Electron-based desktop agentic workbench that combines a unified ReAct step engine, multi-agent scheduling, Code Mode tool orchestration, plugin extensibility, and persistent project memory. Execution semantics follow the common convention (`end_turn` ends the turn — no scripts or forced gates), and ReviewArtifact is an optional verification tool. The backend LLM defaults to the DeepSeek API (OpenAI / Anthropic compatible formats). Web search defaults to DeepSeek's native search (falling back to DuckDuckGo, with Exa and Perplexity also supported). Official DeepSeek capabilities are integrated: reasoning effort low/high/max, strict tools (Beta), plan-generation JSON mode, conversation prefix continuation ("continue writing" from a code block), FIM completion (Beta) API, streaming usage with context-cache hit display, user_id isolation, configurable max output tokens (up to 384K), and local offline tokenizer counting.
 
 The project follows **paper-driven development**: 7 arXiv papers' core techniques — Eywa (provenance-grounded long-term memory), MAP-Graph (multi-agent shared-memory authorization), AGORA (step-level context compression), SWE-Touch (workspace drift detection), Oversight Has a Capacity (approval fatigue guard), AutoTool (tool usage inertia), Verifier-as-Gatekeeper (skill pollution gating); plus 4 caching-oriented techniques — RadixAttention (canonical history replay / shared-prefix maximization), Prompt Cache (stable block organization), Cache-Aware Prompt Compression (dynamic content tailing), and Byte-Exact Deduplication (byte-exact dedup of memory blocks). Paper links, technical mappings, and landing modules are detailed in [Section 5](#5-research-papers--technical-implementation). Product-side additions include local account login, Chat / Work / Code modes, thinking and web-search toggles, Agent execution flow views, session event timelines, and context-cache alignment.
 
@@ -14,8 +14,16 @@ The project follows **paper-driven development**: 7 arXiv papers' core technique
 - **Renderer**: React 19 + Vite 8 (`src/`) — UI rendering, state management, user interaction
 - **IPC**: bidirectional communication via Electron IPC (`contextBridge` + `ipcMain/ipcRenderer`)
 
-### 1.1 v3.2.0 Release Highlights
+### 1.1 v3.3.0 Release Highlights
 
+- **Deep module decomposition**: LLM adapters/providers, scheduler, SQLite
+  memory, agent loop, context management, step engine, renderer stores and
+  preload IPC were split into focused runtime modules with preserved public
+  compatibility facades; preload is bundled into one sandbox-safe file.
+- **Live API acceptance**: `deepseek-v4-flash` drove headless end-to-end
+  file/search/web/session/skill/goal/task flows and verified a generated
+  zero-dependency ESM + `node:test` project (13/13 tests); inline workflows
+  stayed fail-closed by default.
 - **Models**: built-in DeepSeek V4 Flash, V4 Pro, and the new experimental
   V4 Flash Vision Exp. Vision routes JPEG / PNG / GIF / WebP image content and
   `ReadImage` output through image blocks; non-vision DeepSeek models degrade to text.

@@ -6,7 +6,7 @@
 
 ## 一、项目概述
 
-Auraxis v3.2.0 是一款基于 Electron 的桌面端智能体工作台，融合了统一 ReAct 步进引擎、多智能体调度、Code Mode 工具编排、插件扩展和持久化项目记忆。执行语义遵循通用约定（`end_turn` 即回合结束，无剧本/强制门），ReviewArtifact 作为可选验证工具。后端 LLM 默认为 DeepSeek API（兼容 OpenAI / Anthropic 格式），联网搜索默认使用 DeepSeek 官方原生搜索（失败自动降级 DuckDuckGo，另支持 Exa / Perplexity provider）。DeepSeek 官方能力已接入：思考强度 low/high/max 三档、strict tools（Beta）、计划生成 JSON 模式、对话前缀续写（代码块“继续写”）、FIM 补全（Beta）API、流式 usage 与上下文缓存命中展示、user_id 隔离、可配置单次最大输出 tokens（上限 384K）、官方离线 tokenizer 本地计数。
+Auraxis v3.3.0 是一款基于 Electron 的桌面端智能体工作台，融合了统一 ReAct 步进引擎、多智能体调度、Code Mode 工具编排、插件扩展和持久化项目记忆。执行语义遵循通用约定（`end_turn` 即回合结束，无剧本/强制门），ReviewArtifact 作为可选验证工具。后端 LLM 默认为 DeepSeek API（兼容 OpenAI / Anthropic 格式），联网搜索默认使用 DeepSeek 官方原生搜索（失败自动降级 DuckDuckGo，另支持 Exa / Perplexity provider）。DeepSeek 官方能力已接入：思考强度 low/high/max 三档、strict tools（Beta）、计划生成 JSON 模式、对话前缀续写（代码块“继续写”）、FIM 补全（Beta）API、流式 usage 与上下文缓存命中展示、user_id 隔离、可配置单次最大输出 tokens（上限 384K）、官方离线 tokenizer 本地计数。
 
 项目采用**论文驱动开发**：已落地 7 篇 arXiv 论文的核心技术——Eywa（溯源长期记忆）、MAP-Graph（多 Agent 共享记忆授权）、AGORA（步骤级上下文压缩）、SWE-Touch（工作区漂移感知）、Oversight Has a Capacity（审批疲劳守卫）、AutoTool（工具使用惯性）、Verifier-as-Gatekeeper（技能库污染门禁）；另落地 4 项缓存方向论文/系统技术——RadixAttention（规范历史重放 / 公共前缀最大化）、Prompt Cache（稳定块组织）、Cache-Aware Prompt Compression（动态内容尾部化）、Byte-Exact Deduplication（记忆块字节级去重）。论文地址、技术映射与落地模块详见「[第五章 研究论文与技术落地](#五研究论文与技术落地)」。产品侧新增本地账户登录、Chat / Work / Code 三模式、思考与联网搜索开关、Agent 执行流程视图、会话事件时间轴、上下文缓存对齐等能力。
 
@@ -14,8 +14,14 @@ Auraxis v3.2.0 是一款基于 Electron 的桌面端智能体工作台，融合�
 - **渲染进程**：React 19 + Vite 8（`src/`），负责 UI 渲染、状态管理、用户交互
 - **进程通信**：通过 Electron IPC（`contextBridge` + `ipcMain/ipcRenderer`）进行双向通信
 
-### 1.1 v3.2.0 发布亮点
+### 1.1 v3.3.0 发布亮点
 
+- **深度模块拆分**：LLM 适配器/协议、调度器、SQLite 记忆、Agent 循环、
+  上下文管理、步进引擎、渲染层 Store 与 preload IPC 均拆成聚焦模块，并保留
+  兼容 facade；preload 打包为单一沙箱安全文件。
+- **真实 API 验收**：`deepseek-v4-flash` 完成无头端到端
+  文件/搜索/网络/会话/技能/目标/任务流程验证，并验证生成的零依赖
+  ESM + `node:test` 项目（13/13 用例通过）；内联工作流保持 fail-closed。
 - **模型**：内置 DeepSeek V4 Flash、V4 Pro 与新增的实验版 V4 Flash Vision Exp；
   视觉模型接收 JPEG / PNG / GIF / WebP 图片与 `ReadImage` 结果，非视觉 DeepSeek
   模型自动降级为文本。

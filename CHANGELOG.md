@@ -1,5 +1,28 @@
 # Auraxis Changelog
 
+## v3.3.0 (2026-08-30)
+
+> Maintenance release: deep module decomposition, sandbox-safe preload bundling,
+> documentation parity checks, and real-API acceptance hardening.
+
+### Refactor & Maintainability
+
+- Split the LLM adapter from protocol providers and added a pure `llm-types` layer.
+- Split scheduler state, queue, queries, snapshots, lifecycle, cleanup and runner concerns.
+- Split SQLite memory into schema, row mapping and memory/evidence/belief/audit domains.
+- Split agent loop preparation/injection/interceptors and moved sub-agent registry/observer out of handlers.
+- Split context truncation/summary and step-engine context/tool-result/tool-batch modules.
+- Split renderer Agent/Session/Settings stores into helpers and action factories.
+- Split preload IPC into domain modules and bundled them into one sandbox-safe `preload.js`.
+- Added `vite.preload.config.mts`, preserved public compatibility exports, and updated structural tests.
+
+### Validation
+
+- 268 test files / 2,053 passing cases (+3 environment skips).
+- Coverage: 87.76% statements / 90.03% lines / 80.22% branches / 82.20% functions.
+- E2E 16/16, Electron smoke, TS SDK (7/7), Python SDK (7/7), live SDK smoke and dependency audit pass.
+- DeepSeek V4 Flash live combo acceptance exercised file/search/web/session/skill/goal/task flows and verified a generated zero-dependency ESM + `node:test` project (13/13 tests); inline workflows stayed fail-closed by default.
+
 ## v3.2.0 (2026-08-25)
 
 > Feature release: official Feishu/Lark OpenAPI MCP, DeepSeek Harness MCP
