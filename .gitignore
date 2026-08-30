@@ -48,6 +48,7 @@ shots/
 *.tmp
 *.temp
 spill/
+.tmp-build/
 **/temp/
 **/tmp/
 
