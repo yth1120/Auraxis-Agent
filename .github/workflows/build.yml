@@ -56,7 +56,14 @@ jobs:
         run: npm run test:coverage
       - run: npm audit --audit-level=high
       - run: npm run format:check
-      - run: npm run check:docs
+      - name: Check docs (Linux)
+        if: runner.os == 'Linux'
+        run: npm run check:docs
+        env:
+          AURAXIS_COVERAGE_REQUIRED: '1'
+      - name: Check docs (macOS / Windows)
+        if: runner.os != 'Linux'
+        run: npm run check:docs
       - run: npm run lint
 
       - name: Run E2E (Linux)

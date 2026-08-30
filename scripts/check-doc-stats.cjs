@@ -19,6 +19,7 @@ const pyproject = fs.readFileSync(path.join(root, 'python/auraxis_sdk/pyproject.
 
 const coveragePath = path.join(root, 'coverage/coverage-summary.json');
 const coverage = fs.existsSync(coveragePath) ? JSON.parse(fs.readFileSync(coveragePath, 'utf8')) : null;
+const coverageRequired = process.env.AURAXIS_COVERAGE_REQUIRED === '1';
 
 const age = `v${appPackage.version}`;
 const failures = [];
@@ -82,10 +83,10 @@ if (coverage) {
       failures.push(`README/AGENTS/docs 未记录当前 ${name} 覆盖率 ${formatted}%`);
     }
   }
-} else if (process.env.CI) {
-  failures.push('CI 缺失 coverage/coverage-summary.json，无法校验文档覆盖率');
+} else if (coverageRequired) {
+  failures.push('缺失 coverage/coverage-summary.json，无法校验文档覆盖率');
 } else {
-  console.warn('本地缺少 coverage/coverage-summary.json，跳过覆盖率文档校验；运行 npm run test:coverage 后重试。');
+  console.warn('缺少 coverage/coverage-summary.json，跳过覆盖率文档校验；Linux 覆盖率门禁运行后重试。');
 }
 
 if (appPackage.version !== sdkPackage.version) {
