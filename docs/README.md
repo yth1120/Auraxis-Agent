@@ -42,8 +42,8 @@ The project follows **paper-driven development**: 7 arXiv papers' core technique
   Zustand selectors and deprecated AntD props migrated; IPC / agent / store
   typings hardened; login and Windows userData recovery; test / E2E / CI
   matrix stabilization and local `image-size` pinning.
-- **Quality gates**: 268 test files / 2,053 passing cases (+3 environment
-  skips), SDK build, SDK live smoke, E2E, audit, and three-platform release CI.
+- **Quality gates**: 268 test files / 2,077 passing cases (platform-dependent
+  skips excluded), SDK build, SDK live smoke, E2E, audit, and three-platform release CI.
 
 ### Tech Stack
 
@@ -206,7 +206,7 @@ Auraxis/
 │       ├── session-store.ts     # Unified JSONL event logs (chat & agent)
 │       ├── sandbox-runner.ts    # Native sandbox dispatch (restricted/AppContainer/linux/macos)
 │       ├── acp-server.ts / sdk-server.ts / headless-run.ts  # ACP / JSON-RPC SDK / headless
-│       └── __tests__/           # Main-process tests (268 files / 2,053 cases repo-wide)
+│       └── __tests__/           # Main-process tests (268 files / 2,077 cases repo-wide)
 │
 ├── src/                         # Renderer code (browser environment)
 │   ├── main.tsx                 # React entry
@@ -1025,9 +1025,9 @@ The app uses a built-in `.env` parser to load environment variables from `.env` 
 - **Framework**: Vitest (`describe`, `it`, `expect`, `vi` injected via globals)
 - **Main-process tests**: `electron/**/__tests__/`, node environment; modules depending on `electron` are isolated with `vi.mock('electron', ...)`
 - **Renderer tests**: `src/**/__tests__/`, jsdom environment (@testing-library/react)
-- **Total**: 268 test files / 2,053 cases passing (+3 environment-skips)
-- **Coverage scope**: the branch gate counts `electron/**`, `src/stores/**`, `src/core/**`; UI components (`src/components/`) and main-process entry points (`main.ts` / `preload.ts` etc.) are excluded from the gate and covered by component tests + Playwright E2E (`npm run test:e2e`)
-- **Coverage thresholds**: lines/statements ≥ 80%, branches ≥ 80%, functions ≥ 80% (latest full branch gate: 87.73% statements / 90.00% lines / 80.13% branches / 82.20% functions; Electron main entry is verified by E2E and SDK smoke; Linux CI runs the coverage gate by default)
+- **Total**: 268 test files / 2,077 cases passing (platform-dependent skips excluded)
+- **Coverage scope**: the branch gate counts `electron/**`, `src/stores/**`, `src/core/**`; UI components (`src/components/`) and main-process entry points (`main.ts` / `preload*.ts` etc.) are excluded from the gate and covered by component tests + Playwright E2E (`npm run test:e2e`)
+- **Coverage thresholds**: lines/statements ≥ 80%, branches ≥ 80%, functions ≥ 80% (latest full branch gate: 89.44% statements / 91.85% lines / 80.87% branches / 88.09% functions; Electron main entry and the preload bridge are verified by E2E and SDK smoke; Linux CI runs the coverage gate by default; `check-doc-stats` tolerates ≤0.6pp platform drift)
 - **Coverage report**: `npm run test:coverage` outputs `coverage/coverage-summary.json` (gitignored dev artifact); the Settings "Test coverage" page reads it live via the `coverage:get` IPC; pure browser dev is served by a Vite middleware, and production builds copy it into `dist/coverage/`. When the report is missing, the panel shows the command to run instead of fake numbers
 - **E2E**: 16 Playwright UI flows passing (real Electron, including register → login → remember-me persistence)
 - **Real-API acceptance (DeepSeek)**: chat streaming, Code auto-approve Bash, Code "confirm each time" permission card (write after one approval), Work smart-execution flow, and Work plan-approval panel all verified; `deepseek-v4-flash` additionally drove a headless end-to-end combos run using TodoWrite / Bash / Write / Read / Grep / Glob / WebSearch / WebFetch / ListSkills / ListAgents / SessionQuery / Goal / Task / Job flows, created and verified an ESM + `node:test` sample (13/13 tests), and confirmed inline `RunWorkflow` remains fail-closed; sandbox scripts add cwd fallback when launching `dist-electron/main.js` directly (`electron/sandbox-runner.ts`)

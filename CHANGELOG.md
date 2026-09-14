@@ -16,10 +16,22 @@
 - Split preload IPC into domain modules and bundled them into one sandbox-safe `preload.js`.
 - Added `vite.preload.config.mts`, preserved public compatibility exports, and updated structural tests.
 
+### Fixes
+
+- Synced `package-lock.json` with the vendored `image-size` stub (2.1.0) so a clean `npm ci`
+  no longer resolves the vulnerable upstream version; `npm ls image-size` is clean.
+- Refreshed security floors: `adm-zip` 0.6.1 (symlink extraction advisory) and transitive
+  `js-yaml` 4.3.2 (merge-key CPU advisory); `npm audit --audit-level=high` reports 0 vulnerabilities.
+- Extended the unit coverage gate to treat the split `preload*.ts` bridge modules like the
+  previous monolithic `preload.ts` (verified by E2E / SDK smoke), and added branch tests for
+  tool risk tiers, follow-up scheduling and the lint runner.
+- `check-doc-stats` now tolerates ≤0.6pp platform coverage drift instead of failing on
+  Windows-vs-Linux v8 differences, while still rejecting genuinely stale numbers.
+
 ### Validation
 
-- 268 test files / 2,053 passing cases (+3 environment skips).
-- Coverage: 87.73% statements / 90.00% lines / 80.13% branches / 82.20% functions.
+- 268 test files / 2,077 passing cases (platform-dependent skips excluded).
+- Coverage: 89.44% statements / 91.85% lines / 80.87% branches / 88.09% functions.
 - E2E 16/16, Electron smoke, TS SDK (7/7), Python SDK (7/7), live SDK smoke and dependency audit pass.
 - DeepSeek V4 Flash live combo acceptance exercised file/search/web/session/skill/goal/task flows and verified a generated zero-dependency ESM + `node:test` project (13/13 tests); inline workflows stayed fail-closed by default.
 
