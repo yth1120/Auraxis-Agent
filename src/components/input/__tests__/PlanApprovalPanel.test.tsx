@@ -1,11 +1,22 @@
 // @vitest-environment jsdom
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, fireEvent, waitFor, cleanup } from '@testing-library/react';
-import { message } from 'antd';
+import { render, fireEvent, waitFor } from '@testing-library/react';
 import PlanApprovalPanel from '../PlanApprovalPanel';
 import { useInspectorStore } from '@/stores/useInspectorStore';
 import type { PlanData } from '@/types/chat';
+
+// 面板只通过 antd 静态 message 反馈结果。真实静态方法会创建 portal React root
+// 与 motion 定时器，在 jsdom 卸载后仍可能触发 React 调度任务；这里用显式 mock
+// 断言提示调用，同时避免把异步 UI 队列留到 teardown 之后。
+const messageMock = vi.hoisted(() => ({
+  success: vi.fn(),
+  error: vi.fn(),
+  info: vi.fn(),
+  destroy: vi.fn(),
+}));
+
+vi.mock('antd', () => ({ message: messageMock }));
 
 const plan: PlanData = {
   planId: 'p1',
@@ -20,6 +31,7 @@ const plan: PlanData = {
 
 describe('PlanApprovalPanel — 审批接管输入区', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     useInspectorStore.setState({ plans: [plan] });
     (window as any).electronAPI = {
       plan: {
@@ -29,12 +41,10 @@ describe('PlanApprovalPanel — 审批接管输入区', () => {
     };
   });
 
-  afterEach(async () => {
-    // AntD message 的静态 portal/定时任务若在 jsdom 销毁后才触发，会留下
-    // 未处理的 `window is not defined`，导致 vitest 以非零码退出。
-    cleanup();
-    message.destroy();
-    await new Promise((resolve) => setTimeout(resolve, 150));
+  afterEach(() => {
+    // 自定义 afterEach 保留仅为删除测试注入的 electronAPI；DOM 清理由
+    // src/test/setup.ts 的统一 teardown 负责。
+    delete (window as any).electronAPI;
   });
 
   it('renders amber takeover with steps, tool tags and saved path', () => {
@@ -58,6 +68,8 @@ describe('PlanApprovalPanel — 审批接管输入区', () => {
     await waitFor(() => {
       expect(useInspectorStore.getState().plans).toHaveLength(0);
     });
+    expect(messageMock.success).toHaveBeenCalledTimes(1);
+    expect(messageMock.error).not.toHaveBeenCalled();
   });
 
   it('approves only checked steps after unchecking one', async () => {
@@ -81,5 +93,7 @@ describe('PlanApprovalPanel — 审批接管输入区', () => {
     await waitFor(() => {
       expect(useInspectorStore.getState().plans).toHaveLength(0);
     });
+    expect(messageMock.info).toHaveBeenCalledTimes(1);
+    expect(messageMock.error).not.toHaveBeenCalled();
   });
 });
