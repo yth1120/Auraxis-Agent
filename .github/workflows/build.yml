@@ -8,8 +8,18 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# 默认只读：只有 release job 在需要上传资产时提升为 contents: write。
+permissions:
+  contents: read
+
+concurrency:
+  # 同一 ref 的连续推送只保留最新一次构建；标签触发的发布不参与取消。
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
 jobs:
   build:
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -17,13 +27,13 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: npm
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.10'
 
@@ -91,7 +101,7 @@ jobs:
         run: npx electron-builder --win --publish never
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: Auraxis-${{ runner.os }}-${{ runner.arch }}
           path: |
@@ -106,12 +116,13 @@ jobs:
     needs: build
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           pattern: Auraxis-*
           path: release
@@ -123,7 +134,7 @@ jobs:
           awk -v h="$HEADER" 'BEGIN{found=0} index($0,h){found=1} found && $0 ~ /^## / && index($0,h)==0{exit} found{print}' CHANGELOG.md > release-notes.md
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           name: Auraxis ${{ github.ref_name }}
           files: release/*

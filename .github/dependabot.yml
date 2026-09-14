@@ -1,0 +1,35 @@
+version: 2
+
+# 依赖公告属于发布阻断项（CI 跑 npm audit --audit-level=high），靠自动 PR
+# 提前发现，避免临近发布时才发现必须升级。
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      dev-minor-patch:
+        dependency-type: development
+        update-types: [minor, patch]
+      prod-minor-patch:
+        dependency-type: production
+        update-types: [minor, patch]
+    ignore:
+      # 大版本升级需要单独迁移与回归验证，不走自动 PR。
+      - dependency-name: electron
+        update-types: [version-update:semver-major]
+      - dependency-name: mermaid
+        update-types: [version-update:semver-major]
+      - dependency-name: '@vitest/coverage-v8'
+        update-types: [version-update:semver-major]
+      - dependency-name: react
+        update-types: [version-update:semver-major]
+      - dependency-name: react-dom
+        update-types: [version-update:semver-major]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
