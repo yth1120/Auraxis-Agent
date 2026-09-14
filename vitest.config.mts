@@ -13,10 +13,11 @@ export default defineConfig({
       // 「测试覆盖率」页读取同一份文件展示真实数据。
       reporter: ['text', 'json-summary'],
       // 全仓库单测分支门禁：统计 electron/、src/stores/、src/core/。
-      // main.ts / preload.ts 依赖真实 Electron 窗口生命周期，由 E2E、
-      // SDK smoke 与 headless CLI 覆盖，故从单元门禁中排除。
-      // 当前实际：statements 87.73% / lines 90.00% / branches 80.13% /
-      // functions 82.20%。
+      // main.ts 与 preload*.ts 依赖真实 Electron 窗口生命周期，由 E2E、
+      // SDK smoke 与 headless CLI 覆盖，故从单元门禁中排除（preload 拆分出的
+      // 领域模块是等价的 contextBridge 装配层，适用同一条口径）。
+      // 当前实际：statements 89.44% / lines 91.85% / branches 80.87% /
+      // functions 88.09%。
       thresholds: { lines: 80, branches: 80, functions: 80, statements: 80 },
       include: ['electron/**/*.ts', 'src/stores/**/*.ts', 'src/core/**/*.ts'],
       exclude: [
@@ -26,7 +27,7 @@ export default defineConfig({
         '**/*.test.*',
         '**/node_modules/**',
         'electron/main.ts',
-        'electron/preload.ts',
+        'electron/preload*.ts',
       ],
     },
     testTimeout: 30000,
