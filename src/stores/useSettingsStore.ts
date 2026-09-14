@@ -13,14 +13,11 @@ import {
   type PermissionPreset,
 } from '../types/advanced';
 import { createSettingsStoreActions } from './settingsStoreActions';
+import { isRecord } from '../../electron/utils/guards';
 
 export type CostCurrency = 'RMB' | 'USD';
 /** Hard sandbox boundary for Agent tasks (mirrors electron SandboxMode). */
 export type SandboxMode = 'read' | 'workspace-write' | 'full';
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
-}
 
 export interface AccountInfo {
   balance: string;

@@ -3,10 +3,8 @@ import { estimateTokensForMessages } from '../utils/token-counter';
 import { invokeLlm } from './llm-adapter';
 import type { ContextConfig, LLMSummaryConfig, LoopMessage, TaskPlan } from './agent-loop-types';
 import { Planner } from './agent-loop-planner';
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
-}
+import { isRecord } from '../utils/guards';
+import { devLog } from './shared';
 
 // ─── ContextManager ──────────────────────────────────────
 // Sliding window + summary compression. When the conversation exceeds the
@@ -231,25 +229,33 @@ function buildSummary(messagesToCompress: LoopMessage[], plan: TaskPlan | null):
             try {
               const args: unknown = typeof argumentsValue === 'string' ? JSON.parse(argumentsValue) : argumentsValue;
               if (isRecord(args) && typeof args.file_path === 'string') filesRead.add(args.file_path);
-            } catch {}
+            } catch {
+              devLog('[AURAXIS] [Context] 忽略无法解析的工具参数', fn.name);
+            }
           }
           if (fn.name === 'Edit' && argumentsValue) {
             try {
               const args: unknown = typeof argumentsValue === 'string' ? JSON.parse(argumentsValue) : argumentsValue;
               if (isRecord(args) && typeof args.file_path === 'string') filesEdited.add(args.file_path);
-            } catch {}
+            } catch {
+              devLog('[AURAXIS] [Context] 忽略无法解析的工具参数', fn.name);
+            }
           }
           if (fn.name === 'Write' && argumentsValue) {
             try {
               const args: unknown = typeof argumentsValue === 'string' ? JSON.parse(argumentsValue) : argumentsValue;
               if (isRecord(args) && typeof args.file_path === 'string') filesWritten.add(args.file_path);
-            } catch {}
+            } catch {
+              devLog('[AURAXIS] [Context] 忽略无法解析的工具参数', fn.name);
+            }
           }
           if (fn.name === 'Bash' && argumentsValue) {
             try {
               const args: unknown = typeof argumentsValue === 'string' ? JSON.parse(argumentsValue) : argumentsValue;
               if (isRecord(args) && typeof args.command === 'string') commandsRun.push(args.command);
-            } catch {}
+            } catch {
+              devLog('[AURAXIS] [Context] 忽略无法解析的工具参数', fn.name);
+            }
           }
         }
       }

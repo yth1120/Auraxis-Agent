@@ -14,6 +14,7 @@ import { createInterface } from 'readline';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { resolveInsideRoot } from './ipc/path-security';
+import { isRecord } from './utils/guards';
 
 export interface AcpRunAgentParams {
   prompt: string;
@@ -36,10 +37,6 @@ export interface AcpRpcMessage {
   params?: Record<string, unknown>;
   result?: unknown;
   error?: { code: number; message: string };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
 interface AcpSession {

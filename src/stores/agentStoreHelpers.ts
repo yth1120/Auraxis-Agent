@@ -1,5 +1,6 @@
 import type { AgentInfo, AgentLogEntry, AgentPriority, AgentStatus } from '../types/agent';
 import type { AgentRuntimeEvent } from '../types/tools';
+import { isRecord } from '../../electron/utils/guards';
 
 export function agentIpc() {
   return window.electronAPI?.agent;
@@ -32,9 +33,7 @@ export interface BackendAgentSnapshot {
   log?: AgentLogEntry[];
 }
 
-export function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
-}
+export { isRecord };
 
 function isAgentStatus(value: unknown): value is AgentStatus {
   return (

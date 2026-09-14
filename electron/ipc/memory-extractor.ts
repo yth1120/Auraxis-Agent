@@ -5,6 +5,7 @@
 
 import { llmClientInvoke } from './agent-loop';
 import type { EvidenceRecord, MemoryRecord } from './memory-db';
+import { isRecord } from '../utils/guards';
 
 // ─── Types ─────────────────────────────────────────────
 
@@ -33,10 +34,6 @@ export interface ExtractorConfig {
   model: string;
   apiKey: string;
   apiBase: string;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
 // ─── Helpers ───────────────────────────────────────────

@@ -13,10 +13,7 @@ import net from 'net';
 import crypto from 'crypto';
 import type { FtsHit } from './fts';
 import { errorRecord, errorText } from './errors';
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
-}
+import { isRecord } from './utils/guards';
 
 export interface SdkDeps {
   runAgent: (params: {

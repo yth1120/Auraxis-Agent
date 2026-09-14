@@ -21,11 +21,8 @@ import {
   unsubscribeStream,
 } from './chatStreamRuntime';
 import { disposePlanListener } from './chatPlanListener';
+import { isRecord } from '../../electron/utils/guards';
 export { initPlanListener } from './chatPlanListener';
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
-}
 
 let usage: UsageAccumulator | null = null;
 

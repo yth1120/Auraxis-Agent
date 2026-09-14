@@ -2,10 +2,9 @@
 import type { LoopMessage } from './agent-loop';
 import type { AtomicGroup } from './context-manager-types';
 import { estimateTokens } from './agent-loop';
+import { isRecord } from '../utils/guards';
 
-export function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
-}
+export { isRecord };
 
 export function toolCallFn(toolCall: Record<string, unknown>): Record<string, unknown> {
   return isRecord(toolCall.function) ? toolCall.function : toolCall;

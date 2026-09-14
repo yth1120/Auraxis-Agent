@@ -11,6 +11,7 @@
  */
 
 import type { LoopMessage } from './ipc/agent-loop-core';
+import { isRecord } from './utils/guards';
 
 export interface StepCompressorPlanTask {
   status?: string;
@@ -37,10 +38,6 @@ interface ToolCallInfo {
 }
 
 const DEFAULT_KEEP_RECENT_STEPS = 6;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
-}
 
 function isPlainString(m: LoopMessage): m is LoopMessage & { content: string } {
   return typeof m.content === 'string';

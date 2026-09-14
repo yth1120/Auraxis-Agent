@@ -13,6 +13,7 @@ import { captureSessionTelemetry } from './ipc/session-telemetry';
 import { scheduleSessionFtsRefresh } from './fts';
 import { captureEvidenceFromEvents } from './ipc/memory-evidence';
 import type { ProjectedSession, SessionEvent } from './contracts/session-types';
+import { isRecord } from './utils/guards';
 
 const agentStore = new JsonlSessionStore({
   root: () => process.env.AURAXIS_SESSION_LOG_DIR || path.join(app.getPath('userData'), 'session-logs'),
@@ -26,10 +27,6 @@ const agentStore = new JsonlSessionStore({
     }
   },
 });
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
-}
 
 function tsOf(e: Record<string, unknown>): number {
   const v = typeof e.ts === 'number' ? e.ts : typeof e.timestamp === 'number' ? e.timestamp : Date.now();

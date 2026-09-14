@@ -1,10 +1,7 @@
 import { devLog } from './shared';
 import { Planner, createDevianceDetector, type AgentObserver, type TaskPlan } from './agent-loop-core';
 import type { BatchToolResult } from '../tool-registry';
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
-}
+import { isRecord } from '../utils/guards';
 
 export const ts = () => new Date().toISOString().slice(11, 23);
 

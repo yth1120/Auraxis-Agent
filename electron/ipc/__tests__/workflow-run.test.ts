@@ -75,7 +75,11 @@ describe('workflow-engine — workflow run execution', () => {
         result: `result-${step.id}`,
       } as unknown as AgentInstance);
     }
-    await new Promise((resolve) => setTimeout(resolve, 400));
+    // 轮询等待持久化落地，避免固定 sleep 在慢机器上变成 flake。
+    await vi.waitFor(async () => {
+      const pending = await getWorkflowRun(runId);
+      expect(pending?.status).toBe('completed');
+    });
     const run = await getWorkflowRun(runId);
     expect(run?.status).toBe('completed');
     expect(run?.steps.a.status).toBe('completed');

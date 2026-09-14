@@ -1,4 +1,5 @@
 import type { PlanTask, TaskPlan, TaskStatus } from './agent-loop-types';
+import { isRecord } from '../utils/guards';
 
 // ─── Planner ──────────────────────────────────────────────
 // Structured task planning: creates plans from LLM output, tracks progress,
@@ -49,10 +50,6 @@ export function parsePlanFromLLMText(text: string): TaskPlan | null {
   } catch {
     return null;
   }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
 /** Extract meaningful keywords from a task description for fuzzy matching */

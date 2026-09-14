@@ -5,6 +5,7 @@ import { CalendarComponent, TooltipComponent, VisualMapComponent } from 'echarts
 import { CanvasRenderer } from 'echarts/renderers';
 import type { EChartsType } from 'echarts/core';
 import { t, useI18nStore, useT, type I18nKey } from '../../i18n';
+import { isRecord } from '../../../electron/utils/guards';
 
 // Register only the pieces the calendar heatmap needs — importing `echarts`
 // wholesale pulls ~1 MB of unused charts into the settings chunk.
@@ -17,10 +18,6 @@ interface HeatmapDay {
 
 interface StatsData {
   heatmapDays?: HeatmapDay[];
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
 function cssVar(name: string, fallback: string): string {

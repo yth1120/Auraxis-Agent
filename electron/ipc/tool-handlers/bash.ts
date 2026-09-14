@@ -26,7 +26,9 @@ function getWinShell(): { bin: string; args: string[] } | null {
       statSync(p);
       _winShell = { bin: p, args: ['-c'] };
       return _winShell!;
-    } catch {}
+    } catch {
+      devLog(`[AURAXIS] [Bash] Git Bash 路径不可用，尝试下一个候选: ${p}`);
+    }
   }
   // Try bash in PATH
   if (!_failedShells.has('bash.exe')) {
@@ -34,7 +36,9 @@ function getWinShell(): { bin: string; args: string[] } | null {
       execSync('where bash.exe 2>nul', { stdio: 'pipe', timeout: 3000, windowsHide: true });
       _winShell = { bin: 'bash.exe', args: ['-c'] };
       return _winShell;
-    } catch {}
+    } catch {
+      devLog('[AURAXIS] [Bash] PATH 中未找到 bash.exe，回退 cmd.exe');
+    }
   }
 
   // cmd.exe fallback: supports dir/type/findstr
@@ -43,7 +47,9 @@ function getWinShell(): { bin: string; args: string[] } | null {
       execSync('where cmd.exe 2>nul', { stdio: 'pipe', timeout: 3000, windowsHide: true });
       _winShell = { bin: 'cmd.exe', args: ['/c'] };
       return _winShell;
-    } catch {}
+    } catch {
+      devLog('[AURAXIS] [Bash] PATH 中未找到 cmd.exe，回退 PowerShell');
+    }
   }
 
   // Last resort: PowerShell

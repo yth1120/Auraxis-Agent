@@ -8,12 +8,9 @@
 import axios from 'axios';
 import { errorRecord, errorText } from './errors';
 import { readSettings, writeSettings } from './ipc/settings-store';
+import { isRecord } from './utils/guards';
 
 export type ConnectorKind = 'slack' | 'drive' | 'notion' | 'lark';
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
-}
 
 export const CONNECTOR_KINDS: ConnectorKind[] = ['slack', 'drive', 'notion', 'lark'];
 

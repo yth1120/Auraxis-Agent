@@ -2,14 +2,13 @@
 import type { BrowserWindow } from 'electron';
 import type { AgentInstance } from './agent-scheduler-types';
 import { taskPlanToFrontendPlan } from './agent-scheduler-types';
+import { isRecord } from '../utils/guards';
 
 export function genId(): string {
   return `agent-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
-export function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
-}
+export { isRecord };
 
 export function broadcast(win: BrowserWindow | null, agentId: string, event: unknown) {
   if (win && !win.isDestroyed() && isRecord(event)) {

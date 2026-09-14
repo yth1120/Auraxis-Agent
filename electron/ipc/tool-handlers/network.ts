@@ -7,13 +7,12 @@
 import dns from 'dns';
 import { errorText } from '../../errors';
 import type { ToolContext, ToolResult } from './path-utils';
+import { isRecord } from '../../utils/guards';
 
 const BLOCKED_HOSTS = new Set(['localhost', '127.0.0.1', '0.0.0.0', '::1', '[::1]', '169.254.169.254']);
 const BLOCKED_SUFFIXES = ['.local', '.internal', '.localhost'];
 
-export function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
-}
+export { isRecord };
 
 function isPrivateIpv4(ip: string): boolean {
   const parts = ip.split('.').map(Number);

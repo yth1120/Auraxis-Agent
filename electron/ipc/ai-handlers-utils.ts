@@ -3,10 +3,9 @@ import type { BrowserWindow } from 'electron';
 import { executeToolCall } from './tool-handlers';
 import { resolveCredential } from '../credentials';
 import { readSettings } from './settings-store';
+import { isRecord } from '../utils/guards';
 
-export function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
-}
+export { isRecord };
 
 export async function performWebSearch(query: string): Promise<string | null> {
   try {

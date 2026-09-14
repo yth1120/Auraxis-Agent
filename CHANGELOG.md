@@ -1,5 +1,34 @@
 # Auraxis Changelog
 
+## Unreleased
+
+### Maintainability
+
+- Removed unused dependencies (`@xyflow/react`, `dagre`, `@types/dagre`,
+  `electron-builder-squirrel-windows`) together with the stale `vendor-flow`
+  chunk rule and third-party notice row.
+- Declared `use-sync-external-store` explicitly: three components import
+  `zustand/traditional`, and the shim used to arrive only as a hoisted
+  transitive package, so a clean install could resolve zustand's optional peer
+  to nothing.
+- Consolidated the `isRecord` type guard that was pasted into 20 modules into
+  `electron/utils/guards.ts`.
+- Replaced the silent `catch {}` probes in the Bash shell resolver and the
+  agent-loop context scan with `devLog` traces so fallbacks are diagnosable.
+- Removed fixed-duration sleeps from `workflow-run` and `RollbackToMessage`
+  tests (polling / shared teardown instead) to cut flake surface.
+- Coverage after the cleanup: 89.41% statements / 91.81% lines / 80.84%
+  branches / 88.09% functions (268 test files / 2,077 passing cases).
+
+### Build & CI
+
+- Packaging no longer ships `dist-electron/**/*.map`, keeping source maps for
+  local debugging only.
+- CI: least-privilege `permissions`, per-ref `concurrency` (tag releases are
+  never cancelled), job `timeout-minutes`, and actions pinned to commit SHAs.
+- Added `.github/dependabot.yml` (weekly npm + monthly Actions updates, major
+  bumps of Electron/Mermaid/React/Vitest coverage excluded from auto PRs).
+
 ## v3.3.0 (2026-09-14)
 
 > Maintenance release: deep module decomposition, sandbox-safe preload bundling,

@@ -13,6 +13,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'child_process';
 import { safeProcessEnv } from './safe-env';
 import path from 'path';
 import { pathToFileURL } from 'url';
+import { isRecord } from './utils/guards';
 
 export interface LspPosition {
   line: number;
@@ -57,10 +58,6 @@ interface LspRpcMessage {
   error?: unknown;
   method?: string;
   params?: unknown;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
 function parseServerCommand(envValue: string | undefined): string[] | null {

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Progress } from 'antd';
 import { ShieldCheck as FileProtectOutlined, ChartBar } from '@/components/common/icons';
 import { useT } from '../../i18n';
+import { isRecord } from '../../../electron/utils/guards';
 
 interface MetricCoverage {
   total: number;
@@ -20,10 +21,6 @@ interface CoverageData {
   branches?: MetricCoverage;
   functions?: MetricCoverage;
   modules: Record<string, ModuleCoverage>;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
 function getColor(pct: number): string {

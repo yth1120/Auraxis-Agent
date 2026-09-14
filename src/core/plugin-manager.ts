@@ -13,12 +13,9 @@ import { usePluginStore } from '../stores/usePluginStore';
 import { registerTools, unregisterTools } from './tool-registry';
 import { registerCommands, unregisterCommands } from './command-registry';
 import { loadPlugin, scanForRisks, validatePlugin, getCapabilitySummary } from './plugin-loader';
+import { isRecord } from '../../electron/utils/guards';
 
 const extraHooks: NonNullable<Plugin['hooks']>[] = [];
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
-}
 
 // ─── Plugin Manager ────────────────────────────────────
 
