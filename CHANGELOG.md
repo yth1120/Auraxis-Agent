@@ -1,6 +1,6 @@
 # Auraxis Changelog
 
-## v3.3.0 (2026-08-30)
+## v3.3.0 (2026-09-14)
 
 > Maintenance release: deep module decomposition, sandbox-safe preload bundling,
 > documentation parity checks, and real-API acceptance hardening.
@@ -40,6 +40,11 @@
 - Windows: [Auraxis.Setup.3.3.0.exe](https://github.com/yth1120/Auraxis-Agent/releases/download/v3.3.0/Auraxis.Setup.3.3.0.exe)
 - Windows blockmap: [Auraxis.Setup.3.3.0.exe.blockmap](https://github.com/yth1120/Auraxis-Agent/releases/download/v3.3.0/Auraxis.Setup.3.3.0.exe.blockmap)
 - Windows update metadata: [latest.yml](https://github.com/yth1120/Auraxis-Agent/releases/download/v3.3.0/latest.yml)
+- macOS (Apple Silicon): [Auraxis-3.3.0-arm64.dmg](https://github.com/yth1120/Auraxis-Agent/releases/download/v3.3.0/Auraxis-3.3.0-arm64.dmg)
+- macOS (Intel): [Auraxis-3.3.0.dmg](https://github.com/yth1120/Auraxis-Agent/releases/download/v3.3.0/Auraxis-3.3.0.dmg)
+- macOS update metadata: [latest-mac.yml](https://github.com/yth1120/Auraxis-Agent/releases/download/v3.3.0/latest-mac.yml)
+- Linux: [Auraxis-3.3.0.AppImage](https://github.com/yth1120/Auraxis-Agent/releases/download/v3.3.0/Auraxis-3.3.0.AppImage)
+- Linux update metadata: [latest-linux.yml](https://github.com/yth1120/Auraxis-Agent/releases/download/v3.3.0/latest-linux.yml)
 
 ## v3.2.0 (2026-08-25)
 
