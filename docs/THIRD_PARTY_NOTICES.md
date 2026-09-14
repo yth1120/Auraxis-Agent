@@ -9,7 +9,7 @@
 | Electron                                                 | 桌面运行时              | MIT                     |
 | React / React DOM                                        | UI 渲染                 | MIT                     |
 | Ant Design (antd)                                        | 组件库                  | MIT                     |
-| Zustand                                                  | 状态管理                | MIT                     |
+| Zustand / use-sync-external-store                        | 状态管理                | MIT                     |
 | lucide-react                                             | 图标                    | ISC                     |
 | react-virtuoso                                           | 消息列表虚拟化          | MIT                     |
 | react-markdown / remark-gfm / remark-math / rehype-katex | Markdown / 数学公式渲染 | MIT                     |
@@ -29,7 +29,7 @@
 | pdfkit                                                   | PDF 生成                | MIT                     |
 | adm-zip                                                  | PowerPoint ZIP 解析     | MIT                     |
 | jszip                                                    | PptxGenJS 压缩组件      | MIT OR GPL-3.0-or-later |
-| clsx / dagre / @types/dagre / @xyflow/react / allotment  | 样式与工作流可视化      | MIT                     |
+| clsx / allotment                                         | 样式与面板布局          | MIT                     |
 | katex                                                    | 数学公式渲染            | MIT                     |
 | iconv-lite                                               | 文本编码转换            | MIT                     |
 | mime-types                                               | MIME 类型识别           | MIT                     |

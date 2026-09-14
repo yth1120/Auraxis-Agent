@@ -6,6 +6,10 @@ directories:
 files:
   - dist/**/*
   - dist-electron/**/*
+  # 源码映射只服务本地调试：不打包进安装包，避免体积膨胀与源码外泄。
+  - '!dist-electron/**/*.map'
+  # 依赖自带的 source map 同样只在调试时有用（占原 asar 数百 MB 量级）。
+  - '!node_modules/**/*.map'
   - package.json
 asar: true
 # node-pty 1.x 使用 N-API 并随包附带各平台预编译产物，无需 node-gyp 重编译；

@@ -92,9 +92,6 @@ export default defineConfig({
           if (id.includes('node_modules/react-virtuoso')) {
             return 'vendor-virtuoso';
           }
-          if (id.includes('node_modules/@xyflow')) {
-            return 'vendor-flow';
-          }
           if (id.includes('node_modules/allotment')) {
             return 'vendor-layout';
           }
