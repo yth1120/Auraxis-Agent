@@ -32,8 +32,9 @@ afterEach(async () => {
     cleanup();
   });
 
-  // 5 × 100ms 覆盖 rc-motion 的离场动画窗口，确保 teardown 前不再有排队任务。
-  for (let drain = 0; drain < 5; drain += 1) {
+  // 抽两轮宏任务，覆盖 rc-motion 常规离场调度；更长的等待无法消除
+  // React 调度器与 jsdom 销毁之间的固有竞态（CI 覆盖率步骤单独容忍该噪声）。
+  for (let drain = 0; drain < 2; drain += 1) {
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 100));
     });

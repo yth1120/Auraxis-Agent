@@ -5,8 +5,19 @@ import { render, fireEvent, act } from '@testing-library/react';
 import UndoToast from '../UndoToast';
 import { useUndoStore } from '@/stores/useUndoStore';
 
+// 组件只通过 antd 静态 message 反馈撤销结果；真实静态方法会创建独立的 portal
+// React root（带 motion 定时器），在 jsdom 销毁后仍可能触发调度任务。
+const messageMock = vi.hoisted(() => ({
+  success: vi.fn(),
+  error: vi.fn(),
+  info: vi.fn(),
+}));
+
+vi.mock('antd', () => ({ message: messageMock }));
+
 describe('UndoToast — 撤销按钮浮层', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     useUndoStore.setState({ undos: [] });
   });
 
@@ -30,5 +41,6 @@ describe('UndoToast — 撤销按钮浮层', () => {
     await act(async () => {});
     expect(revert).toHaveBeenCalledTimes(1);
     expect(useUndoStore.getState().undos).toHaveLength(0);
+    expect(messageMock.success).toHaveBeenCalledTimes(1);
   });
 });

@@ -53,7 +53,11 @@ jobs:
         run: npm run sdk:smoke
       - name: Coverage gate (Linux)
         if: runner.os == 'Linux'
-        run: npm run test:coverage
+        # React 调度器 + jsdom 环境销毁在覆盖率插桩下存在竞态：迟到的
+        # `window is not defined` 任务会让 vitest 以非零码退出（与被测代码无关）。
+        # 单元步骤（npm run test）保持严格，覆盖率步骤显式容忍这类
+        # teardown 噪声，只把测试失败与阈值当作门禁。
+        run: npm run test:coverage -- --dangerouslyIgnoreUnhandledErrors
       - run: npm audit --audit-level=high
       - run: npm run format:check
       - name: Check docs (Linux)
