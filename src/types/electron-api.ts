@@ -25,6 +25,9 @@ import type {
   AuthStatus,
 } from '../../electron/contracts/auth';
 import type { ProjectGlobalState } from '../../electron/contracts/project';
+import type { UpdateState } from '../../electron/contracts/update';
+
+export type UpdateStatePayload = UpdateState;
 
 // Re-export for convenience
 export type {
@@ -825,6 +828,14 @@ export interface ElectronAPI {
       data?: { balance: string; toppedUp: string; currency: string };
       error?: string;
     }>;
+  };
+
+  update: {
+    getState: () => Promise<{ ok: boolean; data?: UpdateStatePayload; error?: string }>;
+    check: () => Promise<{ ok: boolean; data?: UpdateStatePayload; error?: string }>;
+    download: () => Promise<{ ok: boolean; data?: UpdateStatePayload; error?: string }>;
+    install: () => Promise<{ ok: boolean; data?: UpdateStatePayload; error?: string }>;
+    onState: (callback: (state: UpdateStatePayload) => void) => () => void;
   };
 
   coverage: {

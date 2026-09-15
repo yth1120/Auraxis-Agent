@@ -94,11 +94,27 @@ jobs:
 
       - name: Build (macOS)
         if: runner.os == 'macOS'
-        run: npx electron-builder --mac --publish never
+        run: |
+          # 配置了 Apple 凭据才启用公证；否则产出未签名但可运行的 dmg。
+          if [ -n "$APPLE_ID" ] && [ -n "$APPLE_APP_SPECIFIC_PASSWORD" ] && [ -n "$APPLE_TEAM_ID" ]; then
+            npx electron-builder --mac --publish never --config.mac.notarize=true
+          else
+            echo "未配置 Apple 公证凭据，跳过 notarize"
+            npx electron-builder --mac --publish never
+          fi
+        env:
+          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
       - name: Build (Windows)
         if: runner.os == 'Windows'
         run: npx electron-builder --win --publish never
+        env:
+          CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
 
       - name: Upload artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

@@ -6,6 +6,7 @@ import { existsSync, mkdtempSync } from 'fs';
 import { copyFile, cp } from 'fs/promises';
 import { pathToFileURL } from 'url';
 import { registerIpcHandlers, isWindows11, markAcrylicWindowReady } from './ipc';
+import { initUpdater } from './updater';
 import { cleanupWindowStreams } from './ipc/ai-handlers';
 import { setMainWindowRef, clearMainWindowRef } from './ipc/window-ref';
 import { sessionQuerySearch } from './fts';
@@ -296,6 +297,8 @@ app.whenReady().then(async () => {
   }
   await seedAuthorizedProjectRoots();
   registerIpcHandlers();
+  // 打包版本启动后延迟检查更新；开发态只会把状态标记为 unsupported。
+  initUpdater();
 
   // Restore persisted undo history for the saved project (fresh app start
   // would otherwise lose it — undo backups exist on disk but entries are

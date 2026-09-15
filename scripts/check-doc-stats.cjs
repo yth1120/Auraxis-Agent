@@ -49,19 +49,19 @@ function collectCoverageClaims(metric) {
 const currentTestCountMentioned = docs.some((file) => {
   if (!fs.existsSync(file)) return false;
   const text = fs.readFileSync(file, 'utf8');
-  return text.includes('268 个测试文件') || text.includes('268 test files');
+  return text.includes('271 个测试文件') || text.includes('271 test files');
 });
 if (!currentTestCountMentioned) {
-  failures.push('文档未记录当前全量测试文件数 268');
+  failures.push('文档未记录当前全量测试文件数 271');
 }
 
 const currentCaseCountMentioned = docs.some((file) => {
   if (!fs.existsSync(file)) return false;
   const text = fs.readFileSync(file, 'utf8');
-  return text.includes('2,077') || text.includes('2077');
+  return text.includes('2,094') || text.includes('2094');
 });
 if (!currentCaseCountMentioned) {
-  failures.push('文档未记录当前全量通过用例数 2077');
+  failures.push('文档未记录当前全量通过用例数 2094');
 }
 
 for (const file of docs) {

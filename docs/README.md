@@ -42,7 +42,7 @@ The project follows **paper-driven development**: 7 arXiv papers' core technique
   Zustand selectors and deprecated AntD props migrated; IPC / agent / store
   typings hardened; login and Windows userData recovery; test / E2E / CI
   matrix stabilization and local `image-size` pinning.
-- **Quality gates**: 268 test files / 2,077 passing cases (platform-dependent
+- **Quality gates**: 271 test files / 2,094 passing cases (platform-dependent
   skips excluded), SDK build, SDK live smoke, E2E, audit, and three-platform release CI.
 
 ### Tech Stack
@@ -206,7 +206,7 @@ Auraxis/
 │       ├── session-store.ts     # Unified JSONL event logs (chat & agent)
 │       ├── sandbox-runner.ts    # Native sandbox dispatch (restricted/AppContainer/linux/macos)
 │       ├── acp-server.ts / sdk-server.ts / headless-run.ts  # ACP / JSON-RPC SDK / headless
-│       └── __tests__/           # Main-process tests (268 files / 2,077 cases repo-wide)
+│       └── __tests__/           # Main-process tests (271 files / 2,094 cases repo-wide)
 │
 ├── src/                         # Renderer code (browser environment)
 │   ├── main.tsx                 # React entry
@@ -1005,7 +1005,13 @@ dist-electron/ + dist/ ──→ electron-builder ──→ release/
 - **macOS**: DMG (x64 + arm64)
 - **Linux**: AppImage
 
-### 12.3 Environment Variable Loading
+### 12.3 Auto-update & Signing
+
+- **Update channel**: packaged builds read the GitHub release metadata (`latest*.yml`) through `electron-updater`; electron-builder writes `app-update.yml` into the app resources. Settings → About offers check / download / restart-and-install, and the app also checks once 15 seconds after startup with `autoDownload = false` so it never pulls hundreds of MB in the background.
+- **Signing & notarization**: CI reads `MAC_CSC_LINK` / `MAC_CSC_KEY_PASSWORD` (Developer ID), `APPLE_ID` / `APPLE_APP_SPECIFIC_PASSWORD` / `APPLE_TEAM_ID` (notarization) and `WIN_CSC_LINK` / `WIN_CSC_KEY_PASSWORD` (Windows code signing). When a secret is missing the build skips that step and still produces runnable unsigned artifacts.
+- **Local verification**: `npx electron-builder --win --dir` only packs a directory (no installer, no `app-update.yml`); verify the update chain with a real target build on the matching platform.
+
+### 12.4 Environment Variable Loading
 
 The app uses a built-in `.env` parser to load environment variables from `.env` at the project root (no third-party `dotenv` dependency). Create a `.env` file (see `.env.example`) before running `npm run electron:dev`.
 
@@ -1025,9 +1031,9 @@ The app uses a built-in `.env` parser to load environment variables from `.env` 
 - **Framework**: Vitest (`describe`, `it`, `expect`, `vi` injected via globals)
 - **Main-process tests**: `electron/**/__tests__/`, node environment; modules depending on `electron` are isolated with `vi.mock('electron', ...)`
 - **Renderer tests**: `src/**/__tests__/`, jsdom environment (@testing-library/react)
-- **Total**: 268 test files / 2,077 cases passing (platform-dependent skips excluded)
+- **Total**: 271 test files / 2,094 cases passing (platform-dependent skips excluded)
 - **Coverage scope**: the branch gate counts `electron/**`, `src/stores/**`, `src/core/**`; UI components (`src/components/`) and main-process entry points (`main.ts` / `preload*.ts` etc.) are excluded from the gate and covered by component tests + Playwright E2E (`npm run test:e2e`)
-- **Coverage thresholds**: lines/statements ≥ 80%, branches ≥ 80%, functions ≥ 80% (latest full branch gate: 89.41% statements / 91.81% lines / 80.84% branches / 88.09% functions; Electron main entry and the preload bridge are verified by E2E and SDK smoke; Linux CI runs the coverage gate by default; `check-doc-stats` tolerates ≤0.6pp platform drift)
+- **Coverage thresholds**: lines/statements ≥ 80%, branches ≥ 80%, functions ≥ 80% (latest full branch gate: 89.43% statements / 91.83% lines / 80.84% branches / 88.11% functions; Electron main entry and the preload bridge are verified by E2E and SDK smoke; Linux CI runs the coverage gate by default; `check-doc-stats` tolerates ≤0.6pp platform drift)
 - **Coverage report**: `npm run test:coverage` outputs `coverage/coverage-summary.json` (gitignored dev artifact); the Settings "Test coverage" page reads it live via the `coverage:get` IPC; pure browser dev is served by a Vite middleware, and production builds copy it into `dist/coverage/`. When the report is missing, the panel shows the command to run instead of fake numbers
 - **E2E**: 16 Playwright UI flows passing (real Electron, including register → login → remember-me persistence)
 - **Real-API acceptance (DeepSeek)**: chat streaming, Code auto-approve Bash, Code "confirm each time" permission card (write after one approval), Work smart-execution flow, and Work plan-approval panel all verified; `deepseek-v4-flash` additionally drove a headless end-to-end combos run using TodoWrite / Bash / Write / Read / Grep / Glob / WebSearch / WebFetch / ListSkills / ListAgents / SessionQuery / Goal / Task / Job flows, created and verified an ESM + `node:test` sample (13/13 tests), and confirmed inline `RunWorkflow` remains fail-closed; sandbox scripts add cwd fallback when launching `dist-electron/main.js` directly (`electron/sandbox-runner.ts`)

@@ -38,7 +38,7 @@ Auraxis v3.3.0 是一款基于 Electron 的桌面端智能体工作台，融合�
   聚焦模块；移除生产代码剩余 `any`；迁移 Zustand selector 与废弃 AntD props；
   加固 IPC / Agent / Store 类型；修复登录与 Windows userData；稳定测试、
   E2E 与三平台 CI，并本地锁定 `image-size`。
-- **质量门禁**：268 个测试文件 / 2,077 用例通过（平台/CI 相关跳过不在其中），
+- **质量门禁**：271 个测试文件 / 2,094 用例通过（平台/CI 相关跳过不在其中），
   SDK 构建、SDK 真实 runtime 冒烟、E2E、审计与三平台 Release CI 均通过。
 
 ### 技术栈
@@ -202,7 +202,7 @@ Auraxis/
 │       ├── session-store.ts     # 聊天/Agent 统一 JSONL 事件日志
 │       ├── sandbox-runner.ts    # 原生沙箱调度（restricted/AppContainer/linux/macos）
 │       ├── acp-server.ts / sdk-server.ts / headless-run.ts  # ACP / JSON-RPC SDK / 无头执行
-│       └── __tests__/           # 主进程测试（全仓 268 个测试文件 / 2,077 用例）
+│       └── __tests__/           # 主进程测试（全仓 271 个测试文件 / 2,094 用例）
 │
 ├── src/                         # 渲染进程代码（浏览器环境）
 │   ├── main.tsx                 # React 入口
@@ -1000,7 +1000,13 @@ dist-electron/ + dist/ ──→ electron-builder ──→ release/
 - **macOS**：DMG（x64 + arm64）
 - **Linux**：AppImage
 
-### 12.3 环境变量加载
+### 12.3 自动更新与签名
+
+- **更新通道**：打包版本通过 `electron-updater` 读取 Release 里的 `latest*.yml` 元数据（`app-update.yml` 由 electron-builder 写入应用 resources）。设置 → 关于页可手动检查 / 下载 / 重启安装；启动 15 秒后还会自动检查一次，`autoDownload = false`，不会在后台偷跑几百 MB 流量。
+- **签名与公证**：CI 读取 `MAC_CSC_LINK` / `MAC_CSC_KEY_PASSWORD`（Developer ID 证书）、`APPLE_ID` / `APPLE_APP_SPECIFIC_PASSWORD` / `APPLE_TEAM_ID`（公证）、`WIN_CSC_LINK` / `WIN_CSC_KEY_PASSWORD`（Windows 代码签名）；缺少某个 secret 时自动跳过该步骤，仍然产出可运行的未签名产物。
+- **本地验证**：`npx electron-builder --win --dir` 只打包目录（不生成安装包，也不生成 `app-update.yml`）；要验证更新链路需在对应平台执行真实目标构建。
+
+### 12.4 环境变量加载
 
 应用使用内置 `.env` 解析器从项目根目录加载环境变量（无第三方 `dotenv` 依赖）。运行 `npm run electron:dev` 前需创建 `.env` 文件（参考 `.env.example`）。
 
@@ -1020,9 +1026,9 @@ dist-electron/ + dist/ ──→ electron-builder ──→ release/
 - **测试框架**：Vitest（`describe`, `it`, `expect`, `vi` 通过 globals 注入）
 - **主进程测试**：`electron/**/__tests__/`，node 环境，依赖 `electron` 的模块用 `vi.mock('electron', ...)` 隔离
 - **渲染进程测试**：`src/**/__tests__/`，jsdom 环境（@testing-library/react）
-- **测试总数**：268 个测试文件 / 2,077 个用例通过（平台/CI 相关跳过不在其中）
+- **测试总数**：271 个测试文件 / 2,094 个用例通过（平台/CI 相关跳过不在其中）
 - **覆盖率口径**：门槛统计范围包括 `electron/**`、`src/stores/**`、`src/core/**`；UI 组件（`src/components/`）与主进程入口（`main.ts` / `preload*.ts` 等）不计入该门槛，另有组件级测试与 Playwright 端到端测试（`npm run test:e2e`）覆盖
-- **覆盖率阈值**：行/语句 ≥ 80%，分支 ≥ 80%，函数 ≥ 80%（最近一次全仓库分支门禁报告为 89.41% statements / 91.81% lines / 80.84% branches / 88.09% functions，四项均已达标；Electron 主入口与 preload 桥由真实 E2E、SDK smoke 与 headless CLI 验证，Linux CI 默认执行覆盖率门禁，`check-doc-stats` 允许 ≤0.6pp 的平台差异）
+- **覆盖率阈值**：行/语句 ≥ 80%，分支 ≥ 80%，函数 ≥ 80%（最近一次全仓库分支门禁报告为 89.43% statements / 91.83% lines / 80.84% branches / 88.11% functions，四项均已达标；Electron 主入口与 preload 桥由真实 E2E、SDK smoke 与 headless CLI 验证，Linux CI 默认执行覆盖率门禁，`check-doc-stats` 允许 ≤0.6pp 的平台差异）
 - **覆盖率报告**：`npm run test:coverage` 同时输出 `coverage/coverage-summary.json`（gitignore 的开发期产物）；设置面板「测试覆盖率」页经 `coverage:get` IPC 实时读取，纯浏览器 dev 由 Vite 中间件提供同一路径，生产构建将其拷入 `dist/coverage/`。报告缺失时面板提示运行命令，不显示伪造数字。
 - **端到端测试**：16 条 Playwright UI 链路通过（真实 Electron，含本地注册 → 登录 → 记住我持久化）
 - **实战验收（DeepSeek 真实 API）**：Chat 流式回答、Code 自动代批 Bash、Code「每次确认」权限卡（允许一次后写入文件）、Work 智能放行执行流、Work 计划审批面板均跑通；另用 `deepseek-v4-flash` 完成无头端到端组合运行，覆盖 TodoWrite / Bash / Write / Read / Grep / Glob / WebSearch / WebFetch / ListSkills / ListAgents / SessionQuery / Goal / Task / Job 流程，创建并验证了一个 ESM + `node:test` 示例（13/13 用例通过），并确认内联 `RunWorkflow` 保持 fail-closed；沙箱脚本直启 `dist-electron/main.js` 时增加 cwd 回退（`electron/sandbox-runner.ts`）。

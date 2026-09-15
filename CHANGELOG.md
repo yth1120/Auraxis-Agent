@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Features
+
+- Desktop auto-update: `electron-updater` reads the GitHub release metadata, the main
+  process owns the update state machine (`electron/updater.ts` + `update:*` IPC), and
+  Settings → About exposes check / download / restart-and-install. Startup runs one check
+  15 seconds after launch with `autoDownload = false`, so a slow network never triggers a
+  background download of hundreds of MB.
+- Release engineering: explicit GitHub `publish` config (so `app-update.yml` and
+  `latest*.yml` are produced for all three platforms), macOS hardened runtime with
+  entitlements, and CI wiring for Apple notarization plus macOS/Windows code-signing
+  secrets. Every credential is optional — builds without them stay runnable and unsigned.
+
 ### Maintainability
 
 - Removed unused dependencies (`@xyflow/react`, `dagre`, `@types/dagre`,
@@ -17,8 +29,8 @@
   agent-loop context scan with `devLog` traces so fallbacks are diagnosable.
 - Removed fixed-duration sleeps from `workflow-run` and `RollbackToMessage`
   tests (polling / shared teardown instead) to cut flake surface.
-- Coverage after the cleanup: 89.41% statements / 91.81% lines / 80.84%
-  branches / 88.09% functions (268 test files / 2,077 passing cases).
+- Coverage after the cleanup: 89.43% statements / 91.83% lines / 80.84%
+  branches / 88.11% functions (271 test files / 2,094 passing cases).
 
 ### Build & CI
 

@@ -52,9 +52,23 @@ mac:
         - x64
         - arm64
   icon: build/icon.png
+  # 公证前置条件：hardened runtime + 显式 entitlements。公证本身由 CI 按
+  # APPLE_* secrets 是否存在决定（见 .github/workflows/build.yml），
+  # 未配置凭据时仍产出可运行的未签名 dmg。
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
 linux:
   target:
     - AppImage
   icon: build/icon.png
 extraMetadata:
   main: dist-electron/main.js
+
+# electron-updater 的更新源：与仓库 Release 资产一致；CI 用 --publish never，
+# 这里只负责生成 app-update.yml 与 latest*.yml。
+publish:
+  provider: github
+  owner: yth1120
+  repo: Auraxis-Agent

@@ -1,6 +1,7 @@
 /** preload-rest.ts — terminal/session/workflow/system renderer bridge. */
 import type { TerminalTask } from './ipc/task-monitor';
 import { invoke, subscribe } from './preload-shared';
+import type { UpdateState } from './contracts/update';
 
 export function createRestApi() {
   return {
@@ -165,6 +166,15 @@ export function createRestApi() {
       getGitBranches: (projectRoot: string) => invoke('system:getGitBranches', projectRoot),
       getVersion: () => invoke('system:getVersion'),
       getAccountInfo: (apiKey: string) => invoke('system:getAccountInfo', apiKey),
+    },
+
+    update: {
+      getState: () => invoke('update:getState'),
+      check: () => invoke('update:check'),
+      download: () => invoke('update:download'),
+      install: () => invoke('update:install'),
+      onState: (callback: (state: UpdateState) => void) =>
+        subscribe('update:state', callback as (...args: unknown[]) => void),
     },
 
     coverage: {

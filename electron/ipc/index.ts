@@ -14,6 +14,7 @@ import { loadPermissionRules } from './permission-handlers';
 import { registerMcpHandlers } from './mcp-handlers';
 import { registerAgentHandlers } from './agent-handlers';
 import { registerSystemHandlers } from './system-handlers';
+import { registerUpdateHandlers } from './update-handlers';
 import { registerMemoryIpc } from './memory-ipc';
 import { registerSchedulerIpc } from './agent-scheduler';
 import { registerConflictIpc } from './conflict-detector';
@@ -329,6 +330,7 @@ export function registerIpcHandlers() {
   registerMcpHandlers();
   registerAgentHandlers();
   registerSystemHandlers();
+  registerUpdateHandlers();
   registerMemoryIpc();
   registerSchedulerIpc();
   registerConflictIpc();
