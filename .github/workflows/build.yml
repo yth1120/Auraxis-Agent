@@ -79,6 +79,7 @@ jobs:
         if: runner.os != 'Linux'
         run: npm run check:docs
       - run: npm run lint
+      - run: npm run lint:budget
 
       # 只在 secrets 真的有值时才注入签名变量：GitHub 会把未配置的 secret
       # 展开成空字符串，而 electron-builder 看到「已定义但为空」的 CSC_LINK

@@ -2,6 +2,7 @@ import { useChatStore } from '../../stores/useChatStore';
 import type { AgentInfo } from '../../types/agent';
 import type { RawTodo } from '../../stores/useInspectorStore';
 import { t, type I18nKey } from '../../i18n';
+import { basename } from '../../utils/paths';
 
 /** Shared status metadata for the inspector header and task list. */
 export const AGENT_STATUS_META: Record<string, { labelKey: I18nKey; cls: string }> = {
@@ -28,9 +29,7 @@ export interface ToolInvocation {
   input: Record<string, unknown>;
 }
 
-export function basename(p: string): string {
-  return p.split(/[/\\]/).pop() || p;
-}
+export { basename };
 
 export function fmtRelative(ts: number, now: number): string {
   const diff = Math.max(0, now - ts);

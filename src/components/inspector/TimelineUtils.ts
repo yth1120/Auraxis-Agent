@@ -1,5 +1,6 @@
 import type { AgentLogEntry } from '@/types/agent';
 import { t } from '../../i18n';
+import { basename } from '../../utils/paths';
 
 export interface Turn {
   iteration: number;
@@ -11,9 +12,7 @@ export const ROW_H = 38;
 export const TURN_H = 44;
 export const OVERSCAN = 12;
 
-export function basename(p: unknown): string {
-  return typeof p === 'string' ? p.split(/[/\\]/).pop() || p : '';
-}
+export { basename };
 
 export function toolSummary(e: AgentLogEntry): string {
   const input = e.input ?? {};

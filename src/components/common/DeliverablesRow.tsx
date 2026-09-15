@@ -3,13 +3,11 @@ import { ArrowSquareOut, Eye, FileCode, FolderOpen } from '@/components/common/i
 import { useAppStore } from '@/stores/useAppStore';
 import { message } from 'antd';
 import { useT } from '../../i18n';
+import { basename } from '../../utils/paths';
 
 const MAX_CHIPS = 8;
 const PREVIEW_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.pdf']);
 
-function basename(p: string): string {
-  return p.split(/[/\\]/).pop() || p;
-}
 
 /**
  * Turn-tail deliverables （产物清单）: files created or

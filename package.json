@@ -43,10 +43,11 @@
     "test:frontend": "vitest run src",
     "test:all": "vitest run",
     "lint": "eslint .",
+    "lint:budget": "node scripts/check-lint-budget.cjs",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "check": "npm run lint && npm run electron:compile && npx tsc6 --noEmit -p tsconfig.json && npm run test && npm run check:docs",
+    "check": "npm run lint && npm run lint:budget && npm run electron:compile && npx tsc6 --noEmit -p tsconfig.json && npm run test && npm run check:docs",
     "check:docs": "node scripts/check-doc-parity.cjs && node scripts/check-doc-stats.cjs",
     "postinstall": "node node_modules/electron/install.js"
   },

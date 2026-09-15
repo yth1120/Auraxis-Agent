@@ -3,14 +3,12 @@ import clsx from 'clsx';
 import { Check, Copy } from '@/components/common/icons';
 import DiffView from '../permissions/DiffView';
 import { useT } from '../../i18n';
+import { basename } from '../../utils/paths';
 
 const MAX_LINES = 16;
 const HEAD_LINES = 8;
 const TAIL_LINES = 4;
 
-function basename(p: string): string {
-  return p.split(/[/\\]/).pop() || p;
-}
 
 function copyText(text: string, setCopied: (v: boolean) => void) {
   void navigator.clipboard?.writeText(text).then(

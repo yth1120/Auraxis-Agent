@@ -21,7 +21,7 @@ export function normalizeSessionTitle(raw: string | null | undefined): string | 
   let t = raw
     .trim()
     .replace(/^["'“”‘’「『]+|["'“”‘’」』]+$/g, '')
-    .replace(/^[*_#>\-]+\s*/, '')
+    .replace(/^[*_#>-]+\s*/, '')
     .replace(/^[*_`]+|[*_`]+$/g, '')
     .replace(/<(thinking|think)>[\s\S]*?<\/(thinking|think)>/gi, '')
     .replace(/<[^>]*>/g, '')

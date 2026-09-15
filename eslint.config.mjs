@@ -47,16 +47,16 @@ export default tseslint.config(
   },
   prettier,
   {
-    // Baseline exceptions for currently inherited code; keep hooks and unused-var warnings visible.
+    // 这些规则对当前代码库噪音过大或属于有意为之；每一项都应视为待还债务，
+    // 新增代码不要依赖它们（见 AGENTS.md「代码卫生」）。
     rules: {
       'no-undef': 'off',
       '@typescript-eslint/no-require-imports': 'off',
-      'no-useless-escape': 'off',
-      'no-empty': 'off',
-      'prefer-const': 'off',
-      'no-misleading-character-class': 'off',
-      '@typescript-eslint/no-unnecessary-type-constraint': 'off',
-      'preserve-caught-error': 'off',
+      // 复杂度/规模的"预算"：先以 warning 形式暴露，避免债务继续静默增长。
+      complexity: ['warn', 30],
+      'max-depth': ['warn', 5],
+      'max-lines-per-function': ['warn', 220],
+      'max-lines': ['warn', 800],
     },
   },
   {

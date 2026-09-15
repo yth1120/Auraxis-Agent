@@ -115,9 +115,10 @@ export async function agentLoopRun(config: AgentLoopConfig): Promise<AgentLoopRe
     observer,
     onPlanGenerated,
   } = config;
-  let { mode, approvedPlanSteps } = config;
+  let { mode } = config;
+  const { approvedPlanSteps } = config;
   const prepared = await prepareLoopContext(config);
-  let effectiveSystemPrompt = prepared.effectiveSystemPrompt;
+  const effectiveSystemPrompt = prepared.effectiveSystemPrompt;
   void runHooksFor('SessionStart', { projectRoot, model }, projectRoot).catch(() => {});
   const baseContextConfig =
     config.contextConfig ||

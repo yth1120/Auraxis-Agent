@@ -1,6 +1,7 @@
 import type { AgentLogEntry } from '../../types/agent';
 import type { PermissionRequest } from '../../types/advanced';
 import { t } from '../../i18n';
+import { basename } from '../../utils/paths';
 
 export const NO_PERMS: PermissionRequest[] = [];
 
@@ -34,10 +35,7 @@ export function runDurationLabel(ms: number): string {
     : t('duration.seconds', { seconds });
 }
 
-export function basename(p: unknown): string {
-  if (typeof p !== 'string' || !p) return '';
-  return p.split(/[/\\]/).pop() || p;
-}
+export { basename };
 
 export function summarizeInput(toolName: string | undefined, input: Record<string, unknown> | undefined): string {
   if (!input) return '';
@@ -112,7 +110,7 @@ export function cleanText(input: string | undefined): string {
     .replace(/<\/?FINAL_ANSWER>/gi, '')
     .replace(/^\s*<\/[A-Za-z_]+>\s*$/gm, '')
     .replace(
-      /[ \t]*[✅⚠️][ \t]*(模型已完成回答[^\n]*|LLM 发送了 <FINAL_ANSWER> 信号[^\n]*|已达到业务迭代上限[^\n]*|已达到目标轮次上限[^\n]*|达到安全硬上限[^\n]*|Agent 连续[^\n]*)/g,
+      /[ \t]*(?:✅|⚠️?)[ \t]*(模型已完成回答[^\n]*|LLM 发送了 <FINAL_ANSWER> 信号[^\n]*|已达到业务迭代上限[^\n]*|已达到目标轮次上限[^\n]*|达到安全硬上限[^\n]*|Agent 连续[^\n]*)/g,
       '',
     )
     .trim();

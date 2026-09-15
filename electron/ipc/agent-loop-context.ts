@@ -99,7 +99,7 @@ export function matchesPlanTask(filePath: string, plan: TaskPlan): boolean {
   for (const task of plan.tasks) {
     if (task.status === 'completed') continue;
     const taskDesc = task.description.toLowerCase();
-    const fileParts = fileName.split(/[\/\\]/);
+    const fileParts = fileName.split(/[/\\]/);
     for (const part of fileParts) {
       if (part.length > 3 && taskDesc.includes(part)) return true;
     }
@@ -177,118 +177,286 @@ async function llmSummarize(
   return null;
 }
 
+interface SummaryAccumulator {
+  filesRead: Set<string>;
+  filesEdited: Set<string>;
+  filesWritten: Set<string>;
+  commandsRun: string[];
+  findings: string[];
+}
+
+function createAccumulator(): SummaryAccumulator {
+  return {
+    filesRead: new Set<string>(),
+    filesEdited: new Set<string>(),
+    filesWritten: new Set<string>(),
+    commandsRun: [],
+    findings: [],
+  };
+}
+
+/** 工具参数可能是对象，也可能是 JSON 字符串；解析失败只留调试日志。 */
+function parseToolArguments(raw: unknown, toolName: unknown): Record<string, unknown> | null {
+  try {
+    const parsed: unknown = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    return isRecord(parsed) ? parsed : null;
+  } catch {
+    devLog('[AURAXIS] [Context] 忽略无法解析的工具参数', toolName);
+    return null;
+  }
+}
+
+/** 把一次工具输入归类到累加器（只关心会产生上下文的四类工具）。 */
+function collectToolInput(acc: SummaryAccumulator, toolName: unknown, input: unknown): void {
+  if (!isRecord(input)) return;
+  if (toolName === 'Read' && typeof input.file_path === 'string') acc.filesRead.add(input.file_path);
+  if (toolName === 'Edit' && typeof input.file_path === 'string') acc.filesEdited.add(input.file_path);
+  if (toolName === 'Write' && typeof input.file_path === 'string') acc.filesWritten.add(input.file_path);
+  if (toolName === 'Bash' && typeof input.command === 'string') acc.commandsRun.push(input.command);
+}
+
+function collectAssistantContent(content: unknown, acc: SummaryAccumulator): void {
+  if (Array.isArray(content)) {
+    for (const block of content) {
+      if (!isRecord(block)) continue;
+      if (block.type === 'text' && typeof block.text === 'string' && block.text) {
+        // 100 字以上的文本才可能有实质信息，截断后留作“关键发现”。
+        const text = block.text.trim();
+        if (text.length > 100) acc.findings.push(text.slice(0, 300));
+      }
+      if (block.type === 'tool_use') collectToolInput(acc, block.name, block.input);
+    }
+    return;
+  }
+  if (typeof content === 'string' && content.length > 100) acc.findings.push(content.slice(0, 300));
+}
+
+/** OpenAI 风格的 tool_calls：参数可能是 JSON 字符串。 */
+function collectOpenAiToolCalls(toolCalls: unknown, acc: SummaryAccumulator): void {
+  if (!Array.isArray(toolCalls)) return;
+  for (const call of toolCalls) {
+    const rawFn = isRecord(call) && isRecord(call.function) ? call.function : call;
+    const fn = isRecord(rawFn) ? rawFn : {};
+    if (!fn.arguments) continue;
+    collectToolInput(acc, fn.name, parseToolArguments(fn.arguments, fn.name));
+  }
+}
+
+function describeTouchedFiles(acc: SummaryAccumulator): string[] {
+  const parts: string[] = [];
+  if (acc.filesRead.size > 0) parts.push(`阅读了文件: ${[...acc.filesRead].join(', ')}`);
+  if (acc.filesEdited.size > 0) parts.push(`编辑了文件: ${[...acc.filesEdited].join(', ')}`);
+  if (acc.filesWritten.size > 0) parts.push(`创建了文件: ${[...acc.filesWritten].join(', ')}`);
+  if (acc.commandsRun.length > 0) {
+    parts.push(`执行了命令: ${[...new Set(acc.commandsRun)].slice(0, 5).join('; ')}`);
+  }
+  return parts;
+}
+
+function describePlanProgress(plan: TaskPlan | null): string[] {
+  if (!plan) return [];
+  const byStatus = (statuses: TaskPlan['tasks'][number]['status'][]): string[] =>
+    plan.tasks.filter((t) => statuses.includes(t.status)).map((t) => t.description);
+  const groups: [string, string[]][] = [
+    ['已完成任务', byStatus(['completed'])],
+    ['已阻塞任务', byStatus(['blocked'])],
+    ['待完成任务', byStatus(['pending', 'in_progress'])],
+  ];
+  return groups.filter(([, tasks]) => tasks.length > 0).map(([label, tasks]) => `${label}: ${tasks.join('; ')}`);
+}
+
+function describeFindings(findings: string[]): string[] {
+  if (findings.length === 0) return [];
+  return [
+    `关键发现: ${findings
+      .slice(0, 2)
+      .map((f) => f.slice(0, 200))
+      .join(' | ')}`,
+  ];
+}
+
 /** Build a compressed summary from old messages (rule-based fallback) */
 function buildSummary(messagesToCompress: LoopMessage[], plan: TaskPlan | null): string {
-  const parts: string[] = [];
-  const filesRead: Set<string> = new Set();
-  const filesEdited: Set<string> = new Set();
-  const filesWritten: Set<string> = new Set();
-  const commandsRun: string[] = [];
-  const findings: string[] = [];
-
+  const acc = createAccumulator();
   for (const msg of messagesToCompress) {
-    const content = msg.content;
-    if (msg.role === 'assistant') {
-      // Extract text content from assistant message
-      if (Array.isArray(content)) {
-        for (const block of content) {
-          if (!isRecord(block)) continue;
-          if (block.type === 'text' && typeof block.text === 'string' && block.text) {
-            // Collect significant findings (text 100+ chars likely has substance)
-            const text = block.text.trim();
-            if (text.length > 100) {
-              findings.push(text.slice(0, 300));
-            }
-          }
-          if (block.type === 'tool_use') {
-            const tc = block;
-            if (tc.name === 'Read' && isRecord(tc.input) && typeof tc.input.file_path === 'string') {
-              filesRead.add(tc.input.file_path);
-            }
-            if (tc.name === 'Edit' && isRecord(tc.input) && typeof tc.input.file_path === 'string') {
-              filesEdited.add(tc.input.file_path);
-            }
-            if (tc.name === 'Write' && isRecord(tc.input) && typeof tc.input.file_path === 'string') {
-              filesWritten.add(tc.input.file_path);
-            }
-            if (tc.name === 'Bash' && isRecord(tc.input) && typeof tc.input.command === 'string') {
-              commandsRun.push(tc.input.command);
-            }
-          }
-        }
-      } else if (typeof content === 'string' && content.length > 100) {
-        findings.push(content.slice(0, 300));
-      }
-      // Check OpenAI tool_calls format
-      if (msg.tool_calls) {
-        for (const tc of msg.tool_calls) {
-          const rawFn = isRecord(tc.function) ? tc.function : tc;
-          const fn = isRecord(rawFn) ? rawFn : {};
-          const argumentsValue = fn.arguments;
-          if (fn.name === 'Read' && argumentsValue) {
-            try {
-              const args: unknown = typeof argumentsValue === 'string' ? JSON.parse(argumentsValue) : argumentsValue;
-              if (isRecord(args) && typeof args.file_path === 'string') filesRead.add(args.file_path);
-            } catch {
-              devLog('[AURAXIS] [Context] 忽略无法解析的工具参数', fn.name);
-            }
-          }
-          if (fn.name === 'Edit' && argumentsValue) {
-            try {
-              const args: unknown = typeof argumentsValue === 'string' ? JSON.parse(argumentsValue) : argumentsValue;
-              if (isRecord(args) && typeof args.file_path === 'string') filesEdited.add(args.file_path);
-            } catch {
-              devLog('[AURAXIS] [Context] 忽略无法解析的工具参数', fn.name);
-            }
-          }
-          if (fn.name === 'Write' && argumentsValue) {
-            try {
-              const args: unknown = typeof argumentsValue === 'string' ? JSON.parse(argumentsValue) : argumentsValue;
-              if (isRecord(args) && typeof args.file_path === 'string') filesWritten.add(args.file_path);
-            } catch {
-              devLog('[AURAXIS] [Context] 忽略无法解析的工具参数', fn.name);
-            }
-          }
-          if (fn.name === 'Bash' && argumentsValue) {
-            try {
-              const args: unknown = typeof argumentsValue === 'string' ? JSON.parse(argumentsValue) : argumentsValue;
-              if (isRecord(args) && typeof args.command === 'string') commandsRun.push(args.command);
-            } catch {
-              devLog('[AURAXIS] [Context] 忽略无法解析的工具参数', fn.name);
-            }
-          }
+    if (msg.role !== 'assistant') continue;
+    collectAssistantContent(msg.content, acc);
+    collectOpenAiToolCalls(msg.tool_calls, acc);
+  }
+  const parts = [...describeTouchedFiles(acc), ...describePlanProgress(plan), ...describeFindings(acc.findings)];
+  return `[历史上下文摘要] 在之前的交互中，${parts.join('。')}。以下是最近的对话继续。`;
+}
+
+// ─── Compression zone analysis ──────────────────────────
+// 从 compressHistory 拆出的纯函数：每一段只做一件事，便于单测与维护。
+
+interface CompressZone {
+  boundaryIdx: number;
+  compressZone: LoopMessage[];
+  criticalPool: LoopMessage[];
+}
+
+/** 系统消息与注入型前导消息（计划/提醒）不参与压缩。 */
+function splitLeadingContext(messages: LoopMessage[]): {
+  systemMsgs: LoopMessage[];
+  preambleMsgs: LoopMessage[];
+  idx: number;
+} {
+  const systemMsgs: LoopMessage[] = [];
+  let idx = 0;
+  while (idx < messages.length && messages[idx].role === 'system') {
+    systemMsgs.push(messages[idx]);
+    idx++;
+  }
+
+  const preambleMsgs: LoopMessage[] = [];
+  while (idx < messages.length && typeof messages[idx].content === 'string') {
+    const c = messages[idx].content as string;
+    if (c.includes('你的任务计划') || c.includes('请根据 system prompt')) {
+      preambleMsgs.push(messages[idx]);
+      idx++;
+      continue;
+    }
+    break;
+  }
+  return { systemMsgs, preambleMsgs, idx };
+}
+
+function isCriticalCandidate(msg: LoopMessage, plan: TaskPlan | null): boolean {
+  return (msg.role === 'user' || msg.role === 'tool') && isCriticalResult(msg, plan);
+}
+
+/** 关键结果连同其 assistant 与同组 tool 结果一起从压缩区捞出。 */
+function rescueCriticalItem(messages: LoopMessage[], idx: number, at: number, criticalPool: LoopMessage[]): void {
+  criticalPool.push(messages[at]);
+  for (let j = at - 1; j >= idx; j--) {
+    if (messages[j].role === 'assistant' && !criticalPool.includes(messages[j])) {
+      criticalPool.push(messages[j]);
+      // Rescue ALL tool results belonging to this assistant
+      for (let k = j + 1; k <= at; k++) {
+        if (messages[k].role === 'tool' && !criticalPool.includes(messages[k])) {
+          criticalPool.push(messages[k]);
         }
       }
+      break;
     }
   }
+}
 
-  if (filesRead.size > 0) parts.push(`阅读了文件: ${[...filesRead].join(', ')}`);
-  if (filesEdited.size > 0) parts.push(`编辑了文件: ${[...filesEdited].join(', ')}`);
-  if (filesWritten.size > 0) parts.push(`创建了文件: ${[...filesWritten].join(', ')}`);
-  if (commandsRun.length > 0) {
-    const uniqueCmds = [...new Set(commandsRun)].slice(0, 5);
-    parts.push(`执行了命令: ${uniqueCmds.join('; ')}`);
+/**
+ * Token 边界对齐到最近的 assistant：避免把 assistant/tool_result 配对切开。
+ * 同时把被“挪出”压缩区的消息从两个池子里剔除。
+ */
+function alignBoundaryToAssistant(
+  messages: LoopMessage[],
+  idx: number,
+  boundaryIdx: number,
+  compressZone: LoopMessage[],
+  criticalPool: LoopMessage[],
+): number {
+  if (boundaryIdx <= idx || messages[boundaryIdx]?.role === 'assistant') return boundaryIdx;
+  let aligned = boundaryIdx;
+  for (let j = boundaryIdx - 1; j >= idx; j--) {
+    if (messages[j].role === 'assistant') {
+      aligned = j;
+      break;
+    }
+  }
+  if (aligned === boundaryIdx) return boundaryIdx;
+
+  const displaced = new Set(messages.slice(aligned, boundaryIdx));
+  for (let k = compressZone.length - 1; k >= 0; k--) {
+    if (displaced.has(compressZone[k])) compressZone.splice(k, 1);
+  }
+  for (let k = criticalPool.length - 1; k >= 0; k--) {
+    if (displaced.has(criticalPool[k])) criticalPool.splice(k, 1);
+  }
+  return aligned;
+}
+
+/** token 预算内累积 → 压缩区边界（沿用原有累积与打捞语义）。 */
+function findCompressZoneByTokens(
+  messages: LoopMessage[],
+  idx: number,
+  config: ContextConfig,
+  plan: TaskPlan | null,
+): CompressZone {
+  const totalTokens = estimateTokens(messages.slice(idx));
+  const compressTokenBudget = Math.floor(totalTokens * config.compressRatio);
+  const compressZone: LoopMessage[] = [];
+  const criticalPool: LoopMessage[] = [];
+  let boundaryIdx = idx;
+  let cumulativeTokens = 0;
+  let found = false;
+
+  for (let i = idx; i < messages.length; i++) {
+    cumulativeTokens += estimateTokens([messages[i]]);
+    if (!found && cumulativeTokens > compressTokenBudget) {
+      boundaryIdx = i;
+      found = true;
+    }
+    if (found) continue;
+
+    if (isCriticalCandidate(messages[i], plan)) rescueCriticalItem(messages, idx, i, criticalPool);
+    else compressZone.push(messages[i]);
   }
 
-  // Plan task status
-  if (plan) {
-    const completed = plan.tasks.filter((t) => t.status === 'completed').map((t) => t.description);
-    const blocked = plan.tasks.filter((t) => t.status === 'blocked').map((t) => t.description);
-    const pending = plan.tasks
-      .filter((t) => t.status === 'pending' || t.status === 'in_progress')
-      .map((t) => t.description);
-    if (completed.length > 0) parts.push(`已完成任务: ${completed.join('; ')}`);
-    if (blocked.length > 0) parts.push(`已阻塞任务: ${blocked.join('; ')}`);
-    if (pending.length > 0) parts.push(`待完成任务: ${pending.join('; ')}`);
+  if (found) {
+    boundaryIdx = alignBoundaryToAssistant(messages, idx, boundaryIdx, compressZone, criticalPool);
   }
+  return { boundaryIdx, compressZone, criticalPool };
+}
 
-  // Key findings (up to 2, truncated)
-  if (findings.length > 0) {
-    const key = findings.slice(0, 2).map((f) => f.slice(0, 200));
-    parts.push(`关键发现: ${key.join(' | ')}`);
+/** 轮次比例决定压缩区（沿用原有逐条判定语义）。 */
+function findCompressZoneByRounds(
+  messages: LoopMessage[],
+  idx: number,
+  config: ContextConfig,
+  plan: TaskPlan | null,
+): CompressZone {
+  const totalAssistantRounds = countRounds(messages.slice(idx));
+  const compressCount = Math.floor(totalAssistantRounds * config.compressRatio);
+  const compressZone: LoopMessage[] = [];
+  const criticalPool: LoopMessage[] = [];
+  let boundaryIdx = idx;
+  let seenAssistants = 0;
+  let inCompressZone = true;
+
+  for (let i = idx; i < messages.length; i++) {
+    const msg = messages[i];
+    if (msg.role === 'assistant') {
+      seenAssistants++;
+      if (seenAssistants > compressCount) {
+        inCompressZone = false;
+        boundaryIdx = i;
+      }
+    }
+    if (!inCompressZone) continue;
+
+    if (isCriticalCandidate(msg, plan)) rescueCriticalItem(messages, idx, i, criticalPool);
+    else compressZone.push(msg);
   }
+  return { boundaryIdx, compressZone, criticalPool };
+}
 
-  return `[历史上下文摘要] 在之前的交互中，${parts.join('。')}。以下是最近的对话继续。`;
+/** LLM 摘要优先，失败/未配置时回退规则摘要。 */
+async function buildSummaryMessage(
+  compressZone: LoopMessage[],
+  plan: TaskPlan | null,
+  config: ContextConfig,
+  llmConfig?: LLMSummaryConfig,
+): Promise<LoopMessage> {
+  let summary: string | null = null;
+  let isLLMGenerated = false;
+  if (config.useLLMSummary !== false && llmConfig) {
+    summary = await llmSummarize(compressZone, plan, llmConfig);
+    if (summary) isLLMGenerated = true;
+  }
+  if (!summary) summary = buildSummary(compressZone, plan);
+
+  const summaryMsg: LoopMessage = { role: 'user', content: summary };
+  if (isLLMGenerated) summaryMsg[LLM_SUMMARY_MARKER] = true;
+  return summaryMsg;
 }
 
 export const ContextManager = {
@@ -331,158 +499,28 @@ export const ContextManager = {
       });
     }
 
-    // Identify system messages (always at very beginning)
-    const systemMsgs: LoopMessage[] = [];
-    let idx = 0;
-    while (idx < messages.length && messages[idx].role === 'system') {
-      systemMsgs.push(messages[idx]);
-      idx++;
-    }
-
-    // Injected system-style user messages (plan info, deviance warnings, nudges)
-    const preambleMsgs: LoopMessage[] = [];
-    while (idx < messages.length && typeof messages[idx].content === 'string') {
-      const c = messages[idx].content as string;
-      if (c.includes('你的任务计划') || c.includes('请根据 system prompt')) {
-        preambleMsgs.push(messages[idx]);
-        idx++;
-        continue;
-      }
-      break;
-    }
-
-    // Find boundary: token-based accumulation or round-based counting
-    const compressZone: LoopMessage[] = [];
-    const criticalPool: LoopMessage[] = [];
-    let boundaryIdx = idx;
-
-    if (useTokenBased) {
-      const remainingMsgs = messages.slice(idx);
-      const totalTokens = estimateTokens(remainingMsgs);
-      const compressTokenBudget = Math.floor(totalTokens * config.compressRatio);
-      let cumulativeTokens = 0;
-      let found = false;
-
-      for (let i = idx; i < messages.length; i++) {
-        const msg = messages[i];
-        const msgTokens = estimateTokens([msg]);
-        cumulativeTokens += msgTokens;
-
-        if (!found && cumulativeTokens > compressTokenBudget) {
-          boundaryIdx = i;
-          found = true;
-        }
-
-        if (!found) {
-          if ((msg.role === 'user' || msg.role === 'tool') && isCriticalResult(msg, plan)) {
-            criticalPool.push(msg);
-            for (let j = i - 1; j >= idx; j--) {
-              if (messages[j].role === 'assistant' && !criticalPool.includes(messages[j])) {
-                criticalPool.push(messages[j]);
-                // Rescue ALL tool results belonging to this assistant
-                for (let k = j + 1; k <= i; k++) {
-                  if (messages[k].role === 'tool' && !criticalPool.includes(messages[k])) {
-                    criticalPool.push(messages[k]);
-                  }
-                }
-                break;
-              }
-            }
-          } else {
-            compressZone.push(msg);
-          }
-        }
-      }
-
-      // Align token-based boundary to nearest previous assistant so that
-      // no assistant/tool_result pairing is broken by the split point.
-      if (found && boundaryIdx > idx && messages[boundaryIdx]?.role !== 'assistant') {
-        let aligned = boundaryIdx;
-        for (let j = boundaryIdx - 1; j >= idx; j--) {
-          if (messages[j].role === 'assistant') {
-            aligned = j;
-            break;
-          }
-        }
-        if (aligned !== boundaryIdx) {
-          const displaced = new Set(messages.slice(aligned, boundaryIdx));
-          for (let k = compressZone.length - 1; k >= 0; k--) {
-            if (displaced.has(compressZone[k])) compressZone.splice(k, 1);
-          }
-          for (let k = criticalPool.length - 1; k >= 0; k--) {
-            if (displaced.has(criticalPool[k])) criticalPool.splice(k, 1);
-          }
-          boundaryIdx = aligned;
-        }
-      }
-    } else {
-      // Round-based boundary finding
-      const totalAssistantRounds = countRounds(messages.slice(idx));
-      const compressCount = Math.floor(totalAssistantRounds * config.compressRatio);
-      let seenAssistants = 0;
-      let inCompressZone = true;
-
-      for (let i = idx; i < messages.length; i++) {
-        const msg = messages[i];
-
-        if (msg.role === 'assistant') {
-          seenAssistants++;
-          if (seenAssistants > compressCount) {
-            inCompressZone = false;
-            boundaryIdx = i;
-          }
-        }
-
-        if (inCompressZone) {
-          if ((msg.role === 'user' || msg.role === 'tool') && isCriticalResult(msg, plan)) {
-            criticalPool.push(msg);
-            for (let j = i - 1; j >= idx; j--) {
-              if (messages[j].role === 'assistant' && !criticalPool.includes(messages[j])) {
-                criticalPool.push(messages[j]);
-                // Rescue ALL tool results belonging to this assistant
-                for (let k = j + 1; k <= i; k++) {
-                  if (messages[k].role === 'tool' && !criticalPool.includes(messages[k])) {
-                    criticalPool.push(messages[k]);
-                  }
-                }
-                break;
-              }
-            }
-          } else {
-            compressZone.push(msg);
-          }
-        }
-      }
-    }
+    const { systemMsgs, preambleMsgs, idx } = splitLeadingContext(messages);
+    const zone = useTokenBased
+      ? findCompressZoneByTokens(messages, idx, config, plan)
+      : findCompressZoneByRounds(messages, idx, config, plan);
 
     // Build the compressed messages array
     const result: LoopMessage[] = [...systemMsgs, ...preambleMsgs];
 
     // Add summary of compressed zone (LLM-driven with rule-based fallback)
-    if (compressZone.length > 0) {
-      let summary: string | null = null;
-      let isLLMGenerated = false;
-      if (config.useLLMSummary !== false && llmConfig) {
-        summary = await llmSummarize(compressZone, plan, llmConfig);
-        if (summary) isLLMGenerated = true;
-      }
-      if (!summary) {
-        summary = buildSummary(compressZone, plan);
-      }
-      const summaryMsg: LoopMessage = { role: 'user', content: summary };
-      if (isLLMGenerated) summaryMsg[LLM_SUMMARY_MARKER] = true;
-      result.push(summaryMsg);
+    if (zone.compressZone.length > 0) {
+      result.push(await buildSummaryMessage(zone.compressZone, plan, config, llmConfig));
     }
 
     // Add critical items rescued from compress zone
-    for (const item of criticalPool.reverse()) {
+    for (const item of zone.criticalPool.reverse()) {
       if (!result.includes(item)) {
         result.push(item);
       }
     }
 
     // Add everything after the compress zone (recent rounds)
-    for (let i = boundaryIdx; i < messages.length; i++) {
+    for (let i = zone.boundaryIdx; i < messages.length; i++) {
       result.push(messages[i]);
     }
 

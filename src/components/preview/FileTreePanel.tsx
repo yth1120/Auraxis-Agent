@@ -10,6 +10,7 @@ import { useFileTreeStore } from '@/stores/useFileTreeStore';
 import { useAppStore } from '@/stores/useAppStore';
 import { useT } from '../../i18n';
 import type { DirectoryEntry } from '../../types/electron-api';
+import { basename } from '../../utils/paths';
 
 interface FileTreePanelProps {
   tabId?: string;
@@ -20,9 +21,6 @@ interface FileTreePanelProps {
   variant?: 'tabs' | 'embedded';
 }
 
-function basename(p: string): string {
-  return p.split(/[/\\]/).pop() || p;
-}
 
 export default function FileTreePanel({ tabId: _tabId, variant = 'tabs' }: FileTreePanelProps) {
   const tPanel = useT();

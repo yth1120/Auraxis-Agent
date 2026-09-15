@@ -6,10 +6,8 @@ import clsx from 'clsx';
 import { useT } from '../../i18n';
 import type { PlanData } from '@/types/chat';
 import { useInspectorStore } from '@/stores/useInspectorStore';
+import { basename } from '../../utils/paths';
 
-function basename(p: string): string {
-  return p.split(/[/\\]/).pop() || p;
-}
 
 /**
  * Plan approval takeover （计划审批）: while a plan is pending,

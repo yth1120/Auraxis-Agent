@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { useT } from '../../i18n';
 import { useAppStore } from '@/stores/useAppStore';
+import { basename } from '../../utils/paths';
 
 export interface ContextGroup {
   key: string;
@@ -28,7 +29,6 @@ export default function ContextManifest({ groups, fileTokens, maxFileTokens }: C
   if (nonEmpty.length === 0) return null;
 
   const fmtTokens = (n: number) => (n >= 1000 ? `~${(n / 1000).toFixed(1)}k` : `~${n}`);
-  const basename = (p: string) => p.split(/[/\\]/).pop() || p;
 
   return (
     <section className="px-4 py-3 mb-3 rounded-xl bg-[var(--color-bg-secondary)]" aria-label={t('ctx.title')}>

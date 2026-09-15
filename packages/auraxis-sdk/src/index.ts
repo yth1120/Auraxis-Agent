@@ -291,7 +291,8 @@ export async function createAuraxis(options: AuraxisRuntimeOptions = {}): Promis
     await client.request('ping', {}, Math.min(2000, options.requestTimeoutMs ?? 2000));
   } catch (err) {
     await client.close().catch(() => {});
-    throw new Error(`无法连接 Auraxis runtime: ${(err as Error).message}`);
+    // Node 18+ 支持 Error cause，但 SDK 编译目标是 ES2020，这里用赋值代替构造参数。
+    throw Object.assign(new Error(`无法连接 Auraxis runtime: ${(err as Error).message}`), { cause: err });
   }
   return client;
 }

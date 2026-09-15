@@ -12,8 +12,8 @@ export interface AgentEventRuntimeDeps {
 }
 
 export function createAgentEventRuntime(deps: AgentEventRuntimeDeps) {
-  let eventSubs = new Map<string, () => void>();
-  let cleanupTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  const eventSubs = new Map<string, () => void>();
+  const cleanupTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
   function ensureEventSub(id: string) {
     const pendingCleanup = cleanupTimers.get(id);

@@ -56,7 +56,7 @@ export function parsePlanFromLLMText(text: string): TaskPlan | null {
 function extractKeywords(description: string): string[] {
   const keywords: string[] = [];
   // File path patterns
-  const pathMatches = description.match(/[\w.\/-]+\.(ts|tsx|js|jsx|json|css|yml|yaml|md|py|go|rs|java)/gi);
+  const pathMatches = description.match(/[\w./-]+\.(ts|tsx|js|jsx|json|css|yml|yaml|md|py|go|rs|java)/gi);
   if (pathMatches) keywords.push(...pathMatches);
   // Action words → tool mappings
   const actionMap: Record<string, string> = {
