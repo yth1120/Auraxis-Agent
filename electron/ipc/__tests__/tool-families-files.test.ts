@@ -50,6 +50,7 @@ vi.mock('../settings-store', () => ({
 import { executeToolCall } from '../tool-handlers';
 import {
   runRead,
+  runReadImage,
   runWrite,
   runEdit,
   runStrReplaceEditor,
@@ -416,5 +417,112 @@ describe('security boundaries — sensitive files and symlinks', () => {
     expect(r.error).toContain('路径越权');
     rmSync(link, { recursive: true, force: true });
     rmSync(outside, { recursive: true, force: true });
+  });
+});
+
+describe('file-tools — guard branches', () => {
+  const aborted = () => {
+    const ctrl = new AbortController();
+    ctrl.abort();
+    return ctrl.signal;
+  };
+  const restricted = { sandboxMode: 'workspace-write' as const, autoApprove: false };
+  // Work 模式即使用 full/autoApprove 也保持项目边界，是唯一能走到
+  // `outsideWorkspace` 返回值的路径（confined 沙箱会在解析阶段就抛错）。
+  const work = { surface: 'work' as const };
+  const outsideFile = () => path.join(tmpRoot, 'outside-target.ts');
+
+  beforeEach(() => {
+    writeFileSync(path.join(root, '.env'), 'DEEPSEEK_API_KEY=sk-secret', 'utf-8');
+  });
+
+  it('Read / ReadImage 的越界、敏感、超大与中止守卫', async () => {
+    expect((await runRead({ file_path: outsideFile() }, ctx(work))).error).toContain('路径越权');
+    expect((await runRead({ file_path: '.env' }, ctx())).error).toContain('敏感');
+    writeFileSync(path.join(root, 'huge.txt'), Buffer.alloc(10 * 1024 * 1024 + 1, 0x61));
+    expect((await runRead({ file_path: 'huge.txt' }, ctx())).error).toContain('文件过大');
+    expect((await runRead({ file_path: 'a.ts' }, ctx({ abortSignal: aborted() }))).error).toBe('操作已取消');
+
+    expect((await runReadImage({ file_path: 'img.png' }, ctx({ abortSignal: aborted() }))).error).toBe('操作已取消');
+    expect((await runReadImage({ file_path: outsideFile() }, ctx(work))).error).toContain('路径越权');
+    expect((await runReadImage({ file_path: '.env' }, ctx())).error).toContain('敏感');
+  });
+
+  it('Write / Edit 的越界、敏感与扩展名守卫', async () => {
+    expect((await runWrite({ file_path: 'a.ts', content: 'x' }, ctx({ abortSignal: aborted() }))).error).toBe(
+      '操作已取消',
+    );
+    expect((await runWrite({ file_path: '.env', content: 'x' }, ctx())).error).toContain('敏感');
+
+    expect((await runEdit({ file_path: outsideFile(), old_string: 'a', new_string: 'b' }, ctx(work))).error).toContain(
+      '路径越权',
+    );
+    expect((await runEdit({ file_path: '.env', old_string: 'a', new_string: 'b' }, ctx())).error).toContain('敏感');
+    const ext = await runEdit({ file_path: 'evil.exe', old_string: 'a', new_string: 'b' }, ctx(restricted));
+    expect(ext.error).toContain('不允许编辑的文件类型');
+  });
+
+  it('StrReplaceEditor 的命令守卫与失败分支', async () => {
+    expect((await runStrReplaceEditor({ path: 'a.ts', command: 'view' }, ctx({ abortSignal: aborted() }))).error).toBe(
+      '操作已取消',
+    );
+    expect((await runStrReplaceEditor({ path: outsideFile(), command: 'view' }, ctx(work))).error).toContain(
+      '路径越权',
+    );
+    expect((await runStrReplaceEditor({ path: '.env', command: 'view' }, ctx())).error).toContain('敏感');
+    expect((await runStrReplaceEditor({ path: 'evil.exe', command: 'view' }, ctx(restricted))).error).toContain(
+      '不允许编辑的文件类型',
+    );
+
+    expect((await runStrReplaceEditor({ path: 'a.ts', command: 'create' }, ctx())).error).toContain(
+      'create 需要 file_text',
+    );
+    expect(
+      // 父路径是文件（a.ts），mkdir/write 必然失败，命中 create 的 catch 分支。
+      (await runStrReplaceEditor({ path: path.join('a.ts', 'child.ts'), command: 'create', file_text: 'x' }, ctx()))
+        .error,
+    ).toContain('create 失败');
+    expect((await runStrReplaceEditor({ path: 'a.ts', command: 'insert' }, ctx())).error).toContain(
+      'insert 需要 new_str',
+    );
+    expect(
+      (await runStrReplaceEditor({ path: 'missing.ts', command: 'str_replace', old_str: 'a', new_str: 'b' }, ctx()))
+        .error,
+    ).toContain('str_replace 失败');
+    expect((await runStrReplaceEditor({ path: 'missing.ts', command: 'insert', new_str: 'b' }, ctx())).error).toContain(
+      'insert 失败',
+    );
+  });
+
+  it('Delete 的中止与敏感文件守卫', async () => {
+    expect((await runDelete({ file_path: 'a.ts' }, ctx({ abortSignal: aborted() }))).error).toBe('操作已取消');
+    expect((await runDelete({ file_path: '.env' }, ctx())).error).toContain('禁止模型删除敏感文件');
+  });
+
+  it('Grep 跳过隐藏目录、排除目录、敏感文件与超大文件并返回空结果', async () => {
+    expect((await runGrep({ pattern: 'needle' }, ctx({ abortSignal: aborted() }))).error).toBe('操作已取消');
+
+    mkdirSync(path.join(root, '.hidden'), { recursive: true });
+    writeFileSync(path.join(root, '.hidden', 'h.ts'), 'needle\n', 'utf-8');
+    mkdirSync(path.join(root, 'node_modules'), { recursive: true });
+    writeFileSync(path.join(root, 'node_modules', 'n.ts'), 'needle\n', 'utf-8');
+    writeFileSync(path.join(root, '.env'), 'needle\n', 'utf-8');
+    writeFileSync(path.join(root, 'big-grep.ts'), Buffer.alloc(10 * 1024 * 1024 + 1, 0x62));
+
+    const noMatch = await runGrep({ pattern: 'needle-not-present-anywhere' }, ctx());
+    expect(noMatch.error).toBeUndefined();
+    expect(noMatch.output).toMatchObject({ match_count: 0, results: [] });
+
+    const skipped = await runGrep({ pattern: 'needle' }, ctx());
+    expect(skipped.output).toMatchObject({ match_count: 0, results: [] });
+  });
+
+  it('Glob 的非法模式、空结果与敏感文件跳过', async () => {
+    expect((await runGlob({ pattern: '[' }, ctx())).error).toContain('无效的 glob 模式');
+    expect((await runGlob({ pattern: '**/*.ts' }, ctx({ abortSignal: aborted() }))).error).toBe('操作已取消');
+    writeFileSync(path.join(root, '.env.local'), 'x', 'utf-8');
+    const r = await runGlob({ pattern: '**/*.nope' }, ctx());
+    expect(r.error).toBeUndefined();
+    expect(r.output).toMatchObject({ match_count: 0, results: [] });
   });
 });

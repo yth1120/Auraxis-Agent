@@ -58,7 +58,7 @@ if (!currentTestCountMentioned) {
 const currentCaseCountMentioned = docs.some((file) => {
   if (!fs.existsSync(file)) return false;
   const text = fs.readFileSync(file, 'utf8');
-  return text.includes('2,094') || text.includes('2094');
+  return text.includes('2,100') || text.includes('2100');
 });
 if (!currentCaseCountMentioned) {
   failures.push('文档未记录当前全量通过用例数 2094');
