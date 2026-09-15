@@ -80,6 +80,42 @@ jobs:
         run: npm run check:docs
       - run: npm run lint
 
+      # 只在 secrets 真的有值时才注入签名变量：GitHub 会把未配置的 secret
+      # 展开成空字符串，而 electron-builder 看到「已定义但为空」的 CSC_LINK
+      # 会把它当作证书路径解析并直接报错（`... not a file`）。
+      - name: Resolve signing credentials
+        if: runner.os == 'macOS' || runner.os == 'Windows'
+        shell: bash
+        env:
+          IN_MAC_CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          IN_MAC_CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          IN_WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          IN_WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+          IN_APPLE_ID: ${{ secrets.APPLE_ID }}
+          IN_APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          IN_APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          emit() {
+            if [ -n "$2" ]; then
+              echo "$1=$2" >> "$GITHUB_ENV"
+            fi
+          }
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            if [ -n "$IN_MAC_CSC_LINK" ]; then
+              emit CSC_LINK "$IN_MAC_CSC_LINK"
+              emit CSC_KEY_PASSWORD "$IN_MAC_CSC_KEY_PASSWORD"
+            else
+              # 没有证书时不要再去钥匙串里探测签名身份，保持未签名构建稳定。
+              emit CSC_IDENTITY_AUTO_DISCOVERY false
+            fi
+            emit APPLE_ID "$IN_APPLE_ID"
+            emit APPLE_APP_SPECIFIC_PASSWORD "$IN_APPLE_APP_SPECIFIC_PASSWORD"
+            emit APPLE_TEAM_ID "$IN_APPLE_TEAM_ID"
+          else
+            emit CSC_LINK "$IN_WIN_CSC_LINK"
+            emit CSC_KEY_PASSWORD "$IN_WIN_CSC_KEY_PASSWORD"
+          fi
+
       - name: Run E2E (Linux)
         if: runner.os == 'Linux'
         run: xvfb-run -a npm run test:e2e
@@ -102,19 +138,10 @@ jobs:
             echo "未配置 Apple 公证凭据，跳过 notarize"
             npx electron-builder --mac --publish never
           fi
-        env:
-          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
       - name: Build (Windows)
         if: runner.os == 'Windows'
         run: npx electron-builder --win --publish never
-        env:
-          CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
 
       - name: Upload artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
