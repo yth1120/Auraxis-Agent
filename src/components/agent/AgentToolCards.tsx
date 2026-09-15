@@ -9,7 +9,6 @@ const MAX_LINES = 16;
 const HEAD_LINES = 8;
 const TAIL_LINES = 4;
 
-
 function copyText(text: string, setCopied: (v: boolean) => void) {
   void navigator.clipboard?.writeText(text).then(
     () => {

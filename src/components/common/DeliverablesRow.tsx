@@ -8,7 +8,6 @@ import { basename } from '../../utils/paths';
 const MAX_CHIPS = 8;
 const PREVIEW_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.pdf']);
 
-
 /**
  * Turn-tail deliverables （产物清单）: files created or
  * modified by the agent, rendered as clickable chips that open with the OS.

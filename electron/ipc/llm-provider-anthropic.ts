@@ -4,32 +4,17 @@ import { createStreamFilter } from './text-filter';
 import { getDeepSeekUserId } from '../auth-store';
 import { readSettings, resolveMaxOutputTokens } from './settings-store';
 import type { LlmInvokeParams } from './llm-types';
-import type { AssistantMessage, ToolCall } from './agent-loop-types';
+import type { AssistantMessage } from './agent-loop-types';
 import { buildAnthropicFormatTools, normalizeProviderContent, sanitizeToolCallPairing } from './llm-provider-format';
+import { AnthropicStreamAccumulator } from './llm-streams';
 
-export async function invokeDeepSeekAnthropic(params: LlmInvokeParams): Promise<AssistantMessage | null> {
-  const {
-    model,
-    apiKey,
-    apiBase,
-    systemPrompt,
-    messages,
-    tools,
-    isDeepThink,
-    signal,
-    onTextChunk,
-    onThinkingChunk,
-    onUsage,
-  } = params;
-  // Stateful per-invoke filter — catches XML tool-call rehearsal spanning chunks.
-  const streamFilter = createStreamFilter();
+/** 组装 Anthropic Messages 请求体（system 提升为顶层字段、工具映射、思考档位、user_id）。 */
+async function buildAnthropicRequestBody(params: LlmInvokeParams): Promise<Record<string, unknown>> {
+  const { model, systemPrompt, messages, tools, isDeepThink } = params;
   const anthropicTools = buildAnthropicFormatTools(tools);
-  const userId = await getDeepSeekUserId();
-  const maxTokens = resolveMaxOutputTokens(await readSettings().catch(() => null));
 
-  // Anthropic Messages API: system must be a top-level field; messages array
-  // must only contain user/assistant roles. Strip any system-role message from
-  // the array and merge its content into the top-level system field.
+  // Anthropic Messages API: system 必须是顶层字段；数组里只能有 user/assistant，
+  // 因此要把 system-role 消息从数组里摘出来合并进顶层 system。
   const hasSystemMsg = messages.length > 0 && messages[0].role === 'system';
   const systemContent = hasSystemMsg ? String(messages[0].content) : systemPrompt;
   const effectiveMessages = sanitizeToolCallPairing(hasSystemMsg ? messages.slice(1) : messages).map((m) =>
@@ -38,7 +23,7 @@ export async function invokeDeepSeekAnthropic(params: LlmInvokeParams): Promise<
 
   const body: Record<string, unknown> = {
     model,
-    max_tokens: maxTokens,
+    max_tokens: resolveMaxOutputTokens(await readSettings().catch(() => null)),
     messages: effectiveMessages,
     stream: true,
     system: systemContent,
@@ -55,18 +40,18 @@ export async function invokeDeepSeekAnthropic(params: LlmInvokeParams): Promise<
       body.tool_choice = { type: 'tool', name: tc.function.name };
     }
   }
-
-  if (params.temperature !== undefined) {
-    body.temperature = params.temperature;
-  }
-
+  if (params.temperature !== undefined) body.temperature = params.temperature;
   if (isDeepThink && model.startsWith('deepseek-')) {
     body.output_config = { effort: params.reasoningEffort || 'high' };
   }
+  const userId = await getDeepSeekUserId();
+  if (userId) body.metadata = { user_id: userId };
+  return body;
+}
 
-  if (userId) {
-    body.metadata = { user_id: userId };
-  }
+export async function invokeDeepSeekAnthropic(params: LlmInvokeParams): Promise<AssistantMessage | null> {
+  const { apiKey, apiBase, signal } = params;
+  const body = await buildAnthropicRequestBody(params);
 
   const response = await axios.post(apiBase, body, {
     headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
@@ -75,120 +60,14 @@ export async function invokeDeepSeekAnthropic(params: LlmInvokeParams): Promise<
     timeout: 180000,
   });
 
-  let buffer = '';
-  let currentTool: { id: string; name: string; input: string } | null = null;
-  let currentText = '';
-  let inThinkingBlock = false;
-  let thinkingText = '';
-  const contentTimeline: AssistantMessage['contentTimeline'] = [];
-  const toolCalls: ToolCall[] = [];
-  let rawText = '';
-  let completionStopReason: string | null = null;
-
-  const decoder = new TextDecoder('utf-8', { fatal: false });
+  // SSE 解析与内容时间线拼装在 llm-streams.ts（与 OpenAI 通道共用收尾逻辑）。
+  const stream = new AnthropicStreamAccumulator(
+    { onTextChunk: params.onTextChunk, onThinkingChunk: params.onThinkingChunk, onUsage: params.onUsage },
+    createStreamFilter(),
+  );
   for await (const chunk of response.data) {
     if (signal.aborted) return null;
-    buffer += decoder.decode(chunk, { stream: true });
-    const lines = buffer.split('\n');
-    buffer = lines.pop() || '';
-    for (const line of lines) {
-      if (!line.startsWith('data: ')) continue;
-      const data = line.slice(6).trim();
-      if (data === '[DONE]') continue;
-      try {
-        const p = JSON.parse(data);
-        switch (p.type) {
-          case 'content_block_start':
-            if (p.content_block?.type === 'tool_use') {
-              currentTool = { id: p.content_block.id, name: p.content_block.name, input: '' };
-            }
-            if (p.content_block?.type === 'thinking') {
-              inThinkingBlock = true;
-              onThinkingChunk?.('', true);
-            }
-            break;
-          case 'content_block_delta':
-            if (p.delta?.thinking && inThinkingBlock) {
-              thinkingText += p.delta.thinking;
-              onThinkingChunk?.(p.delta.thinking, false);
-            }
-            if (p.delta?.signature && inThinkingBlock) {
-              thinkingText += p.delta.signature;
-              onThinkingChunk?.(p.delta.signature, false);
-            }
-            if (p.delta?.text) {
-              const cleaned = streamFilter(p.delta.text);
-              if (cleaned) {
-                currentText += cleaned;
-                rawText += cleaned;
-                onTextChunk?.(cleaned);
-              }
-            }
-            if (p.delta?.partial_json && currentTool) {
-              currentTool.input += p.delta.partial_json;
-            }
-            break;
-          case 'content_block_stop':
-            if (currentText) {
-              contentTimeline.push({ type: 'text', text: currentText });
-              currentText = '';
-            }
-            if (inThinkingBlock) {
-              inThinkingBlock = false;
-            }
-            if (currentTool) {
-              let toolInput: Record<string, unknown> = {};
-              try {
-                toolInput = JSON.parse(currentTool.input);
-              } catch {
-                toolInput = { raw: currentTool.input };
-              }
-              toolCalls.push({ id: currentTool.id, name: currentTool.name, input: toolInput });
-              contentTimeline.push({ type: 'tool_use', id: currentTool.id, name: currentTool.name, input: toolInput });
-              currentTool = null;
-            }
-            break;
-          case 'message_delta':
-            if (p.delta?.stop_reason) {
-              completionStopReason = p.delta.stop_reason as string;
-            }
-            if (p.usage && onUsage) {
-              const inputTokens = p.usage.input_tokens || 0;
-              const cacheHitTokens = p.usage.cache_read_input_tokens || 0;
-              onUsage({
-                inputTokens,
-                outputTokens: p.usage.output_tokens || 0,
-                cacheHitTokens,
-                cacheMissTokens: Math.max(0, inputTokens - cacheHitTokens),
-              });
-            }
-            break;
-        }
-      } catch {
-        /* skip malformed SSE */
-      }
-    }
+    stream.pushChunk(chunk);
   }
-
-  if (currentText) {
-    contentTimeline.push({ type: 'text', text: currentText });
-  }
-
-  const finalMarkerRe = /<FINAL_ANSWER>/gi;
-  let isFinal = false;
-  if (toolCalls.length === 0 && finalMarkerRe.test(rawText)) {
-    isFinal = true;
-  }
-  finalMarkerRe.lastIndex = 0;
-  if (finalMarkerRe.test(rawText)) {
-    finalMarkerRe.lastIndex = 0;
-    rawText = rawText.replace(finalMarkerRe, '').trim();
-    for (const b of contentTimeline) {
-      if (b.type === 'text') {
-        b.text = b.text.replace(finalMarkerRe, '').trim();
-      }
-    }
-  }
-
-  return { contentTimeline, toolCalls, rawText, thinkingText, isFinal, completionStopReason };
+  return stream.finish();
 }

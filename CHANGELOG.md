@@ -34,6 +34,7 @@
 
 ### Maintainability
 
+- Consolidated nine copies of the `basename` helper into `src/utils/paths.ts`.
 - Removed unused dependencies (`@xyflow/react`, `dagre`, `@types/dagre`,
   `electron-builder-squirrel-windows`) together with the stale `vendor-flow`
   chunk rule and third-party notice row.
@@ -47,8 +48,38 @@
   agent-loop context scan with `devLog` traces so fallbacks are diagnosable.
 - Removed fixed-duration sleeps from `workflow-run` and `RollbackToMessage`
   tests (polling / shared teardown instead) to cut flake surface.
-- Coverage after the cleanup: 89.61% statements / 91.95% lines / 81.05%
-  branches / 88.09% functions (272 test files / 2,103 passing cases).
+- Coverage after the cleanup: 89.68% statements / 92.05% lines / 80.94%
+  branches / 88.27% functions (273 test files / 2,117 passing cases).
+
+### Fixed
+
+- `backupBeforeModify` required a non-existent module (`require('./undo-manager')`
+  from the `tool-handlers/` directory), and the swallowed exception turned every
+  pre-modification backup into a silent no-op — undo/rollback never recorded
+  Write/Edit/Delete snapshots even though the file reported 100% coverage. It now
+  uses a static import, and a regression test fails against the old code.
+- Removed dead code found by a knip pass: unused `src/styles/reset.css` plus the
+  `@electron/notarize` and `@types/adm-zip` devDependencies (electron-builder ships
+  its own notarize implementation and adm-zip ships its own types).
+
+### Code hygiene
+
+- Removed the eslint "baseline exceptions for inherited code" block: `no-empty`,
+  `prefer-const`, `no-useless-escape`, `no-misleading-character-class` and
+  `preserve-caught-error` are enforced again, and the nine violations they exposed
+  are fixed.
+- Added complexity / max-depth / max-lines budgets as warnings plus
+  `npm run lint:budget` (wired into CI and `npm run check`), so code-health debt can
+  only shrink; the ceiling is now 103 warnings and must be lowered after each cleanup.
+- Split the complexity-62 functions in `agent-loop-context.ts` (`buildSummary`,
+  `compressHistory`) into pure helpers for summary accumulation/parsing/rendering and
+  compression-zone analysis.
+- Split the two remaining LLM god-functions: `invokeDeepSeekOpenAI` (232 lines,
+  complexity 71, nesting 8) and `invokeDeepSeekAnthropic` (complexity 62) now only
+  assemble the request body, while both SSE state machines live in
+  `electron/ipc/llm-streams.ts` and share the `<FINAL_ANSWER>` finalisation. Fourteen
+  focused stream tests cover text/tool interleaving, thinking blocks, usage metadata
+  and stop-reason mapping.
 
 ### Build & CI
 

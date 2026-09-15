@@ -21,7 +21,6 @@ interface FileTreePanelProps {
   variant?: 'tabs' | 'embedded';
 }
 
-
 export default function FileTreePanel({ tabId: _tabId, variant = 'tabs' }: FileTreePanelProps) {
   const tPanel = useT();
   const isTabs = variant === 'tabs';

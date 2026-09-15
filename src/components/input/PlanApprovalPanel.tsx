@@ -8,7 +8,6 @@ import type { PlanData } from '@/types/chat';
 import { useInspectorStore } from '@/stores/useInspectorStore';
 import { basename } from '../../utils/paths';
 
-
 /**
  * Plan approval takeover （计划审批）: while a plan is pending,
  * the composer is replaced by this amber panel. Approve selected steps or
