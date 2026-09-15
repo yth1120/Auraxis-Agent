@@ -88,13 +88,11 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
-    "@electron/notarize": "^3.1.1",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.61.1",
     "@tailwindcss/vite": "^4.3.1",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.2",
-    "@types/adm-zip": "^0.5.8",
     "@types/cross-spawn": "^6.0.6",
     "@types/mime-types": "^3.0.1",
     "@types/node": "^26.3.0",

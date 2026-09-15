@@ -38,7 +38,7 @@ Auraxis v3.3.0 是一款基于 Electron 的桌面端智能体工作台，融合�
   聚焦模块；移除生产代码剩余 `any`；迁移 Zustand selector 与废弃 AntD props；
   加固 IPC / Agent / Store 类型；修复登录与 Windows userData；稳定测试、
   E2E 与三平台 CI，并本地锁定 `image-size`。
-- **质量门禁**：271 个测试文件 / 2,100 用例通过（平台/CI 相关跳过不在其中），
+- **质量门禁**：272 个测试文件 / 2,103 用例通过（平台/CI 相关跳过不在其中），
   SDK 构建、SDK 真实 runtime 冒烟、E2E、审计与三平台 Release CI 均通过。
 
 ### 技术栈
@@ -202,7 +202,7 @@ Auraxis/
 │       ├── session-store.ts     # 聊天/Agent 统一 JSONL 事件日志
 │       ├── sandbox-runner.ts    # 原生沙箱调度（restricted/AppContainer/linux/macos）
 │       ├── acp-server.ts / sdk-server.ts / headless-run.ts  # ACP / JSON-RPC SDK / 无头执行
-│       └── __tests__/           # 主进程测试（全仓 271 个测试文件 / 2,100 用例）
+│       └── __tests__/           # 主进程测试（全仓 272 个测试文件 / 2,103 用例）
 │
 ├── src/                         # 渲染进程代码（浏览器环境）
 │   ├── main.tsx                 # React 入口
@@ -1026,7 +1026,7 @@ dist-electron/ + dist/ ──→ electron-builder ──→ release/
 - **测试框架**：Vitest（`describe`, `it`, `expect`, `vi` 通过 globals 注入）
 - **主进程测试**：`electron/**/__tests__/`，node 环境，依赖 `electron` 的模块用 `vi.mock('electron', ...)` 隔离
 - **渲染进程测试**：`src/**/__tests__/`，jsdom 环境（@testing-library/react）
-- **测试总数**：271 个测试文件 / 2,100 个用例通过（平台/CI 相关跳过不在其中）
+- **测试总数**：272 个测试文件 / 2,103 个用例通过（平台/CI 相关跳过不在其中）
 - **覆盖率口径**：门槛统计范围包括 `electron/**`、`src/stores/**`、`src/core/**`；UI 组件（`src/components/`）与主进程入口（`main.ts` / `preload*.ts` 等）不计入该门槛，另有组件级测试与 Playwright 端到端测试（`npm run test:e2e`）覆盖
 - **覆盖率阈值**：行/语句 ≥ 80%，分支 ≥ 80%，函数 ≥ 80%（最近一次全仓库分支门禁报告为 89.61% statements / 91.95% lines / 81.05% branches / 88.09% functions，四项均已达标；Electron 主入口与 preload 桥由真实 E2E、SDK smoke 与 headless CLI 验证，Linux CI 默认执行覆盖率门禁，`check-doc-stats` 允许 ≤0.6pp 的平台差异）
 - **覆盖率报告**：`npm run test:coverage` 同时输出 `coverage/coverage-summary.json`（gitignore 的开发期产物）；设置面板「测试覆盖率」页经 `coverage:get` IPC 实时读取，纯浏览器 dev 由 Vite 中间件提供同一路径，生产构建将其拷入 `dist/coverage/`。报告缺失时面板提示运行命令，不显示伪造数字。
