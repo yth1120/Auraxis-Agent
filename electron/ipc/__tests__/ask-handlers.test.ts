@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const sendMock = vi.fn();
 vi.mock('electron', () => ({
@@ -16,6 +16,11 @@ vi.mock('electron', () => ({
 import { askUser, resolveAsk } from '../ask-handlers';
 
 describe('ask-handlers', () => {
+  // 每个用例独立计数：不再依赖 mock 调用在用例之间累积。
+  beforeEach(() => {
+    sendMock.mockClear();
+  });
+
   it('resolves a pending ask with the user answer', async () => {
     const BrowserWindow = (await import('electron')).BrowserWindow as any;
     const win = new BrowserWindow();
@@ -39,7 +44,7 @@ describe('ask-handlers', () => {
     const win = new BrowserWindow();
     const promise = askUser('快问', undefined, win, 20);
     await expect(promise).resolves.toContain('未在');
-    expect(sendMock).toHaveBeenCalledTimes(2);
+    expect(sendMock).toHaveBeenCalledTimes(1);
   });
 
   it('respond fails for an unknown ask id', () => {

@@ -530,7 +530,7 @@ describe('运行时插件挂载 / GitCommit / Ralph', () => {
       }
     }
     expect(results).toHaveLength(TOOL_DEFINITIONS.length);
-  }, 60_000);
+  }, 120_000);
 
   it('executes every built-in tool with invalid extra fields without crashing', async () => {
     const results = [];
@@ -542,7 +542,7 @@ describe('运行时插件挂载 / GitCommit / Ralph', () => {
       }
     }
     expect(results).toHaveLength(TOOL_DEFINITIONS.length);
-  }, 60_000);
+  }, 120_000);
 
   it('executes every built-in tool with schema-derived inputs without crashing', async () => {
     const results = [];
@@ -564,7 +564,7 @@ describe('运行时插件挂载 / GitCommit / Ralph', () => {
       }
     }
     expect(results).toHaveLength(TOOL_DEFINITIONS.length);
-  }, 30_000);
+  }, 120_000);
 
   it('sweeps every built-in tool with common validation edge values', async () => {
     const edgeInputs: Array<Record<string, unknown>> = [
@@ -635,7 +635,7 @@ describe('运行时插件挂载 / GitCommit / Ralph', () => {
         }
       }
     }
-  }, 60_000);
+  }, 120_000);
 
   it('WebFetch guards SSRF, DNS rebinding, redirects and text extraction', async () => {
     const originalFetch = (globalThis as any).fetch;

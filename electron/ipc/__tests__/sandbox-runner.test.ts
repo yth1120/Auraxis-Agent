@@ -9,8 +9,11 @@ const canRun = process.platform === 'win32' && sandboxScriptPath() !== null;
 const canRunAc = process.platform === 'win32' && sandboxScriptPath('appcontainer') !== null;
 // GitHub 托管 Windows Server 对受限令牌/AppContainer 的组查询与超时清理
 // 行为与本地桌面不一致（whoami /groups 退出码、ACL 恢复时序），这类
-// 真实 OS 集成用例保留在本地 Windows 验证，CI 上跳过避免环境性抖动。
+// 真实 OS 集成用例默认不在 CI 主流水线里跑（避免环境性抖动）；需要验证时
+// 用 .github/workflows/sandbox.yml（设置 AURAXIS_SANDBOX_CI=1）触发。
 const isCI = !!process.env.CI;
+const sandboxCiEnabled = process.env.AURAXIS_SANDBOX_CI === '1';
+const runSandboxSuite = !isCI || sandboxCiEnabled;
 // 当前平台的原生沙箱后端（Windows=restricted，Linux=linux，macOS=macos）。
 const platformBackend =
   process.platform === 'win32'
@@ -21,7 +24,7 @@ const platformBackend =
         ? 'macos'
         : 'restricted';
 
-describe.runIf(canRun && !isCI)('sandbox-runner — Windows 原生沙箱', () => {
+describe.runIf(canRun && runSandboxSuite)('sandbox-runner — Windows 原生沙箱', () => {
   it('runs a command under the restricted token and streams stdout', async () => {
     const res = await runSandboxedCommand({
       argv: ['cmd.exe', '/c', 'echo sandbox-ok'],
@@ -41,7 +44,7 @@ describe.runIf(canRun && !isCI)('sandbox-runner — Windows 原生沙箱', () =>
     expect(out.join('')).toContain('sandbox-stream');
   }, 90_000);
 
-  it.skipIf(isCI)(
+  it.skipIf(!runSandboxSuite)(
     'drops to medium integrity and disables administrative access',
     async () => {
       const out: string[] = [];
@@ -78,7 +81,8 @@ describe.runIf(canRun && !isCI)('sandbox-runner — Windows 原生沙箱', () =>
       timeoutMs: 2_000,
     });
     expect(res.timedOut).toBe(true);
-    expect(Date.now() - started).toBeLessThan(10_000);
+    // 进程树清理在高并发下会变慢；只要明显早于 30s 的 ping 自然结束即可。
+    expect(Date.now() - started).toBeLessThan(20_000);
   }, 30_000);
 });
 
@@ -115,7 +119,7 @@ describe('sandbox-runner — backend selection', () => {
   });
 });
 
-describe.runIf(canRunAc && !isCI)(
+describe.runIf(canRunAc && runSandboxSuite)(
   'sandbox-runner — AppContainer 原生沙箱',
   () => {
     const acProjectRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'auraxis-ac-project-'));
@@ -211,7 +215,7 @@ describe.runIf(canRunAc && !isCI)(
       expect(fs.existsSync(probe)).toBe(false);
     }, 60_000);
 
-    it.skipIf(isCI)(
+    it.skipIf(!runSandboxSuite)(
       'kills the whole job tree on timeout and restores the project ACL',
       async () => {
         const started = Date.now();

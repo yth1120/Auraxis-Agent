@@ -33,6 +33,10 @@ export default defineConfig({
     testTimeout: 30000,
     hookTimeout: 30000,
     teardownTimeout: 30000,
+    // 显式限制并发：沙箱/PTY 这类重进程用例在默认并发下会被饿死，
+    // 出现“2 秒超时却 10 秒还没杀完进程树”的假失败。
+    minWorkers: 1,
+    maxWorkers: 4,
   },
   resolve: {
     alias: {

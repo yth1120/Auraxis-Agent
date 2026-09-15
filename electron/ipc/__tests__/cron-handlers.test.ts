@@ -25,6 +25,7 @@ vi.mock('../agent-scheduler', () => ({
 import {
   createCronJob,
   deleteCronJob,
+  flushCronWrites,
   listCronJobs,
   getCronJob,
   getCronJobCount,
@@ -157,6 +158,8 @@ describe('cron 解析与持久化', () => {
         },
       ],
     };
+    // 先等挂起的持久化落地，否则上一次清理的写入可能覆盖这份夹具。
+    await flushCronWrites();
     writeFileSync(path.join(h.userData, 'cron-store.json'), JSON.stringify(store), 'utf-8');
 
     await initCronJobs();

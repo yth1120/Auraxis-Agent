@@ -1,0 +1,41 @@
+name: Sandbox integration
+
+# Windows 原生沙箱（受限令牌 / AppContainer）用例默认不在主流水线里跑：GitHub
+# 托管 runner 的 whoami /groups 退出码与 ACL 恢复时序和本地桌面不一致。这个
+# 工作流让这套真实 OS 集成用例保持可执行——手动触发即可，也可指向自托管的
+# 交互式 Windows runner（runs-on 输入）。
+on:
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: 'Runner label（自托管交互式 Windows 机器才能覆盖 AppContainer）'
+        required: false
+        default: windows-latest
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sandbox-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  sandbox:
+    runs-on: ${{ github.event.inputs.runner || 'windows-latest' }}
+    timeout-minutes: 30
+    env:
+      AURAXIS_SANDBOX_CI: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run electron:compile
+
+      - name: Windows native sandbox suite
+        run: npx vitest run electron/ipc/__tests__/sandbox-runner.test.ts

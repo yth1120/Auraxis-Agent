@@ -14,6 +14,17 @@
   entitlements, and CI wiring for Apple notarization plus macOS/Windows code-signing
   secrets. Every credential is optional — builds without them stay runnable and unsigned.
 
+### Toolchain
+
+- Upgraded to Vitest 5 / `@vitest/coverage-v8` 5 and mermaid 12. Vitest 5 no longer
+  keeps mock calls between test cases by default and runs heavier process tests closer
+  together, which surfaced two latent test issues (a cross-case mock assertion and a
+  starved sandbox timeout) and one real defect: `cron-store.json` writes were neither
+  serialized nor atomic, so concurrent saves could corrupt the file and lose every
+  scheduled job on restart.
+- mermaid 12 pulls `chevrotain` → `lodash-es`, so an npm override pins `lodash-es` to
+  `^4.18.1` and keeps `npm audit --audit-level=high` at zero findings.
+
 ### Maintainability
 
 - Removed unused dependencies (`@xyflow/react`, `dagre`, `@types/dagre`,

@@ -12,7 +12,7 @@
 
 import { app } from 'electron';
 import { secureHandle } from './trust';
-import { readFile, writeFile, mkdir } from 'fs/promises';
+import { readFile, writeFile, mkdir, rename } from 'fs/promises';
 import { join, dirname } from 'path';
 import { devLog } from './shared';
 import { existsSync } from 'fs';
@@ -168,18 +168,35 @@ function nextFireTime(fields: CronFields, from: Date = new Date()): number {
 
 // ─── Persistence ────────────────────────────────────────
 
-async function saveJobs(): Promise<void> {
-  try {
-    const store: CronStore = {
-      version: 1,
-      jobs: Array.from(jobs.values()),
-    };
-    const p = getStorePath();
-    await mkdir(dirname(p), { recursive: true });
-    await writeFile(p, JSON.stringify(store, null, 2), 'utf-8');
-  } catch (err) {
-    console.error('[Cron] Failed to persist jobs:', (err as Error).message);
-  }
+/**
+ * 写入串行化 + 原子替换：并发保存（创建/删除/触发几乎同时发生）曾把
+ * cron-store.json 写成两个文档拼接的损坏 JSON，重启后整个定时任务列表丢失。
+ */
+let saveTail: Promise<void> = Promise.resolve();
+
+function saveJobs(): Promise<void> {
+  const store: CronStore = {
+    version: 1,
+    jobs: Array.from(jobs.values()),
+  };
+  const snapshot = JSON.stringify(store, null, 2);
+  saveTail = saveTail
+    .then(async () => {
+      const p = getStorePath();
+      await mkdir(dirname(p), { recursive: true });
+      const tmp = `${p}.tmp`;
+      await writeFile(tmp, snapshot, 'utf-8');
+      await rename(tmp, p);
+    })
+    .catch((err: unknown) => {
+      console.error('[Cron] Failed to persist jobs:', (err as Error).message);
+    });
+  return saveTail;
+}
+
+/** 等待挂起的持久化写完（测试与退出前清理用）。 */
+export function flushCronWrites(): Promise<void> {
+  return saveTail;
 }
 
 async function loadJobs(): Promise<void> {
