@@ -14,6 +14,11 @@ const canRunAc = process.platform === 'win32' && sandboxScriptPath('appcontainer
 const isCI = !!process.env.CI;
 const sandboxCiEnabled = process.env.AURAXIS_SANDBOX_CI === '1';
 const runSandboxSuite = !isCI || sandboxCiEnabled;
+// 托管 runner 的受限令牌启动明显更慢（服务会话 + 冷启动），超时按环境放宽；
+// 本地交互式桌面沿用原来的 30s。
+const sandboxCommandTimeout = sandboxCiEnabled ? 120_000 : 30_000;
+// 单条用例的上限同样按环境放宽（托管 runner 冷启动 + 受限令牌上下文切换很慢）。
+const sandboxTestTimeout = sandboxCiEnabled ? 300_000 : 90_000;
 // 当前平台的原生沙箱后端（Windows=restricted，Linux=linux，macOS=macos）。
 const platformBackend =
   process.platform === 'win32'
@@ -25,24 +30,28 @@ const platformBackend =
         : 'restricted';
 
 describe.runIf(canRun && runSandboxSuite)('sandbox-runner — Windows 原生沙箱', () => {
-  it('runs a command under the restricted token and streams stdout', async () => {
-    const res = await runSandboxedCommand({
-      argv: ['cmd.exe', '/c', 'echo sandbox-ok'],
-      cwd: os.tmpdir(),
-      timeoutMs: 30_000,
-    });
-    expect(res.supported).toBe(true);
-    expect(res.exitCode).toBe(0);
-    expect(res.error).toBeUndefined();
-    const out: string[] = [];
-    await runSandboxedCommand({
-      argv: ['cmd.exe', '/c', 'echo sandbox-stream'],
-      cwd: os.tmpdir(),
-      timeoutMs: 30_000,
-      onStdout: (c) => out.push(c),
-    });
-    expect(out.join('')).toContain('sandbox-stream');
-  }, 90_000);
+  it(
+    'runs a command under the restricted token and streams stdout',
+    async () => {
+      const res = await runSandboxedCommand({
+        argv: ['cmd.exe', '/c', 'echo sandbox-ok'],
+        cwd: os.tmpdir(),
+        timeoutMs: sandboxCommandTimeout,
+      });
+      expect(res.supported).toBe(true);
+      expect(res.exitCode).toBe(0);
+      expect(res.error).toBeUndefined();
+      const out: string[] = [];
+      await runSandboxedCommand({
+        argv: ['cmd.exe', '/c', 'echo sandbox-stream'],
+        cwd: os.tmpdir(),
+        timeoutMs: sandboxCommandTimeout,
+        onStdout: (c) => out.push(c),
+      });
+      expect(out.join('')).toContain('sandbox-stream');
+    },
+    sandboxTestTimeout,
+  );
 
   it.skipIf(!runSandboxSuite)(
     'drops to medium integrity and disables administrative access',
@@ -51,7 +60,7 @@ describe.runIf(canRun && runSandboxSuite)('sandbox-runner — Windows 原生沙�
       const res = await runSandboxedCommand({
         argv: ['cmd.exe', '/c', 'whoami /groups'],
         cwd: os.tmpdir(),
-        timeoutMs: 30_000,
+        timeoutMs: sandboxCommandTimeout,
         onStdout: (c) => out.push(c),
       });
       // GitHub 托管的 Windows Server 在受限令牌下无法枚举组：`whoami /groups`
@@ -73,26 +82,34 @@ describe.runIf(canRun && runSandboxSuite)('sandbox-runner — Windows 原生沙�
     60_000,
   );
 
-  it('admin-only commands fail under the restricted token', async () => {
-    const res = await runSandboxedCommand({
-      argv: ['cmd.exe', '/c', 'net session'],
-      cwd: os.tmpdir(),
-      timeoutMs: 30_000,
-    });
-    expect(res.exitCode).not.toBe(0);
-  }, 60_000);
+  it(
+    'admin-only commands fail under the restricted token',
+    async () => {
+      const res = await runSandboxedCommand({
+        argv: ['cmd.exe', '/c', 'net session'],
+        cwd: os.tmpdir(),
+        timeoutMs: sandboxCommandTimeout,
+      });
+      expect(res.exitCode).not.toBe(0);
+    },
+    sandboxTestTimeout,
+  );
 
-  it('kills the whole job tree on timeout', async () => {
-    const started = Date.now();
-    const res = await runSandboxedCommand({
-      argv: ['cmd.exe', '/c', 'ping -n 30 127.0.0.1'],
-      cwd: os.tmpdir(),
-      timeoutMs: 2_000,
-    });
-    expect(res.timedOut).toBe(true);
-    // 进程树清理在高并发下会变慢；只要明显早于 30s 的 ping 自然结束即可。
-    expect(Date.now() - started).toBeLessThan(20_000);
-  }, 30_000);
+  it(
+    'kills the whole job tree on timeout',
+    async () => {
+      const started = Date.now();
+      const res = await runSandboxedCommand({
+        argv: ['cmd.exe', '/c', 'ping -n 30 127.0.0.1'],
+        cwd: os.tmpdir(),
+        timeoutMs: 2_000,
+      });
+      expect(res.timedOut).toBe(true);
+      // 进程树清理在高并发下会变慢；只要明显早于 30s 的 ping 自然结束即可。
+      expect(Date.now() - started).toBeLessThan(20_000);
+    },
+    sandboxTestTimeout,
+  );
 });
 
 describe.skipIf(isSandboxSupported(platformBackend))('sandbox-runner — 平台不支持', () => {
@@ -181,48 +198,64 @@ describe.runIf(canRunAc && runSandboxSuite)(
       }
     });
 
-    it('runs a command in the AppContainer and streams stdout', async () => {
-      const out: string[] = [];
-      const { res, stderr } = await runAc(['cmd.exe', '/c', 'echo ac-ok'], { onStdout: (c) => out.push(c) });
-      expect(res, stderr).not.toBeNull();
-      expect(res!.supported).toBe(true);
-      expect(res!.exitCode, stderr).toBe(0);
-      expect(res!.error).toBeUndefined();
-      expect(out.join('')).toContain('ac-ok');
-    }, 60_000);
+    it(
+      'runs a command in the AppContainer and streams stdout',
+      async () => {
+        const out: string[] = [];
+        const { res, stderr } = await runAc(['cmd.exe', '/c', 'echo ac-ok'], { onStdout: (c) => out.push(c) });
+        expect(res, stderr).not.toBeNull();
+        expect(res!.supported).toBe(true);
+        expect(res!.exitCode, stderr).toBe(0);
+        expect(res!.error).toBeUndefined();
+        expect(out.join('')).toContain('ac-ok');
+      },
+      sandboxTestTimeout,
+    );
 
-    it('runs at Low integrity with an AppContainer-scoped token', async () => {
-      const { res, stdout, stderr } = await runAc(['cmd.exe', '/c', 'whoami /groups']);
-      expect(res, stderr).not.toBeNull();
-      expect(res!.exitCode, stderr).toBe(0);
-      const groups = stdout;
-      expect(groups).toContain('S-1-16-4096'); // Low integrity
-      expect(groups).not.toContain('S-1-16-12288'); // not High
-    }, 60_000);
+    it(
+      'runs at Low integrity with an AppContainer-scoped token',
+      async () => {
+        const { res, stdout, stderr } = await runAc(['cmd.exe', '/c', 'whoami /groups']);
+        expect(res, stderr).not.toBeNull();
+        expect(res!.exitCode, stderr).toBe(0);
+        const groups = stdout;
+        expect(groups).toContain('S-1-16-4096'); // Low integrity
+        expect(groups).not.toContain('S-1-16-12288'); // not High
+      },
+      sandboxTestTimeout,
+    );
 
-    it('allows writes only inside the granted scratch TEMP', async () => {
-      const { res, stderr } = await runAc([
-        'cmd.exe',
-        '/c',
-        'echo scratch-ok>%TEMP%\\probe.txt && type %TEMP%\\probe.txt',
-      ]);
-      expect(res, stderr).not.toBeNull();
-      expect(res!.exitCode, stderr).toBe(0);
-      expect(res!.error).toBeUndefined();
-    }, 60_000);
+    it(
+      'allows writes only inside the granted scratch TEMP',
+      async () => {
+        const { res, stderr } = await runAc([
+          'cmd.exe',
+          '/c',
+          'echo scratch-ok>%TEMP%\\probe.txt && type %TEMP%\\probe.txt',
+        ]);
+        expect(res, stderr).not.toBeNull();
+        expect(res!.exitCode, stderr).toBe(0);
+        expect(res!.error).toBeUndefined();
+      },
+      sandboxTestTimeout,
+    );
 
-    it('denies writes to normal user-writable paths outside the grant', async () => {
-      const probe = path.join(os.tmpdir(), `auraxis-ac-deny-${process.pid}-${Date.now()}.txt`);
-      const res = await runSandboxedCommand({
-        backend: 'appcontainer',
-        argv: ['cmd.exe', '/c', `echo denied>${probe}`],
-        cwd: acProjectRoot,
-        projectRoot: acProjectRoot,
-        timeoutMs: 30_000,
-      });
-      expect(res.exitCode).not.toBe(0);
-      expect(fs.existsSync(probe)).toBe(false);
-    }, 60_000);
+    it(
+      'denies writes to normal user-writable paths outside the grant',
+      async () => {
+        const probe = path.join(os.tmpdir(), `auraxis-ac-deny-${process.pid}-${Date.now()}.txt`);
+        const res = await runSandboxedCommand({
+          backend: 'appcontainer',
+          argv: ['cmd.exe', '/c', `echo denied>${probe}`],
+          cwd: acProjectRoot,
+          projectRoot: acProjectRoot,
+          timeoutMs: sandboxCommandTimeout,
+        });
+        expect(res.exitCode).not.toBe(0);
+        expect(fs.existsSync(probe)).toBe(false);
+      },
+      sandboxTestTimeout,
+    );
 
     it.skipIf(!runSandboxSuite)(
       'kills the whole job tree on timeout and restores the project ACL',
