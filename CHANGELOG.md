@@ -16,6 +16,10 @@
 
 ### Toolchain
 
+- Windows native sandbox coverage is no longer silently skipped: `.github/workflows/sandbox.yml`
+  runs the restricted-token suite on demand (11 assertions pass on hosted runners; the
+  integrity-level check steps aside when the host cannot enumerate groups in a service
+  session, and command timeouts scale for cold hosted runners).
 - Upgraded to Vitest 5 / `@vitest/coverage-v8` 5 and mermaid 12. Vitest 5 no longer
   keeps mock calls between test cases by default and runs heavier process tests closer
   together, which surfaced two latent test issues (a cross-case mock assertion and a
@@ -24,6 +28,9 @@
   scheduled job on restart.
 - mermaid 12 pulls `chevrotain` → `lodash-es`, so an npm override pins `lodash-es` to
   `^4.18.1` and keeps `npm audit --audit-level=high` at zero findings.
+- Added guard-branch tests for `file-tools` (read/write/edit/str_replace/delete/grep/glob
+  permission, abort, oversized, sensitive-path and failure paths): the file went from
+  87.5% to 95.9% statements and 81.1% to 90.9% branches.
 
 ### Maintainability
 
