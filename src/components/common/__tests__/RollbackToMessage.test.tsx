@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, fireEvent, waitFor } from '@testing-library/react';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { render, fireEvent, waitFor, cleanup, act } from '@testing-library/react';
+import { Modal, message } from 'antd';
 import RollbackToMessage from '../RollbackToMessage';
 import { useAppStore } from '@/stores/useAppStore';
 
@@ -15,8 +16,20 @@ describe('RollbackToMessage — 按消息回退', () => {
     useAppStore.setState({ fileTreeVersion: 0 });
   });
 
-  // 卸载、portal 销毁与延迟任务抽干统一交给 src/test/setup.ts 的 teardown，
-  // 这里不再重复 cleanup / destroy / 固定 sleep。
+  afterEach(async () => {
+    // Modal.confirm 会创建独立的 portal React root，离场动画定时器可能晚于
+    // jsdom 销毁触发（macOS CI 上复现过）。这里在 act 内显式销毁并抽两轮宏任务。
+    await act(async () => {
+      cleanup();
+      Modal.destroyAll();
+      message.destroy();
+    });
+    for (let drain = 0; drain < 2; drain += 1) {
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      });
+    }
+  });
 
   it('confirms before reverting the later sessions', async () => {
     const { getByRole, findByRole } = render(

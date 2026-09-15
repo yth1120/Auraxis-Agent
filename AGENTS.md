@@ -98,3 +98,4 @@ npm run check            # lint + 主进程编译 + 渲染层类型检查 + 全�
 - 自动更新：主进程状态机在 `electron/updater.ts`，跨进程契约在 `electron/contracts/update.ts`；新增/调整 `update:*` 通道时必须同步 `electron/preload-rest.ts`、`src/types/electron-api.ts` 与设置页「关于」。发布侧依赖 `.github/workflows/build.yml` 的签名 secrets（缺失时自动跳过签名/公证，仍产出可运行产物）。
 - 端到端：`npm run test:e2e`（Playwright 启动真实 Electron，覆盖启动/模式切换/发消息/快捷卡片/设置主题/本地注册登录等 16 条链路）；改动渲染层或主进程启动链路后必须重跑。SDK 链路必须通过 `npm run sdk:smoke` 启动真实无头 runtime 并验证 `ping`。
 - 主进程模块依赖 `electron` 的测试需 `vi.mock('electron', ...)`；纯逻辑优先抽成可测函数。
+- jsdom teardown 噪声：CI 对 `window is not defined` 这类 React 调度器残留任务显式容忍（`--dangerouslyIgnoreUnhandledErrors`，见 `.github/workflows/build.yml`），本地 `npm test` 不传该参数；一旦出现，优先排查 antd 静态 portal（`message` / `Modal.confirm`）在 `act` 外的延迟任务。
