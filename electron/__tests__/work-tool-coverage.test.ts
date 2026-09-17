@@ -40,7 +40,15 @@ const WORK_DENIED = [
 ];
 
 /** Work 下仅允许改文档：同一工具对 .md 放行、对 .ts 拒绝。 */
-const WORK_DOCS_ONLY_WRITE = ['Write', 'Edit', 'StrReplaceEditor', 'NotebookEdit', 'Delete', 'GitCommit', 'WriteDocument'];
+const WORK_DOCS_ONLY_WRITE = [
+  'Write',
+  'Edit',
+  'StrReplaceEditor',
+  'NotebookEdit',
+  'Delete',
+  'GitCommit',
+  'WriteDocument',
+];
 
 /** Work 下放行：只读检索、计划/目标/记忆、远程只读或非代码写入的集成工具。 */
 const WORK_ALLOWED = [
@@ -91,7 +99,9 @@ const CODE_PATH = { file_path: 'src/app.ts' };
 describe('Work 模式工具分类', () => {
   it('每个已注册工具都被显式归类（新增工具必须在这里表态）', () => {
     const classified = new Set([...WORK_DENIED, ...WORK_DOCS_ONLY_WRITE, ...WORK_ALLOWED]);
-    const unclassified = TOOL_DEFINITIONS.map((t: { name: string }) => t.name).filter((n: string) => !classified.has(n));
+    const unclassified = TOOL_DEFINITIONS.map((t: { name: string }) => t.name).filter(
+      (n: string) => !classified.has(n),
+    );
     expect(unclassified, `以下工具未归类到 Work 允许/拒绝清单：${unclassified.join(', ')}`).toEqual([]);
   });
 

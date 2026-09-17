@@ -170,10 +170,7 @@ function applyHarnessPreload(childEnv: Record<string, string | undefined>, confi
   childEnv.NODE_OPTIONS = `${options}--require="${preloadPath}"`;
 }
 
-function spawnMcpChild(
-  conn: MCPConnection,
-  childEnv: Record<string, string | undefined>,
-): ReturnType<typeof spawn> {
+function spawnMcpChild(conn: MCPConnection, childEnv: Record<string, string | undefined>): ReturnType<typeof spawn> {
   const child = spawn(conn.config.command, conn.config.args, {
     env: childEnv,
     stdio: ['pipe', 'pipe', 'pipe'],

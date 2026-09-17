@@ -64,7 +64,12 @@ function GrepDetail({ entry }: { entry: AgentLogEntry }) {
     });
   }
   return (
-    <AgentSearchCard kind="matches" files={[...byFile.values()]} total={results.length} truncated={o.truncated === true} />
+    <AgentSearchCard
+      kind="matches"
+      files={[...byFile.values()]}
+      total={results.length}
+      truncated={o.truncated === true}
+    />
   );
 }
 

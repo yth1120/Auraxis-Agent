@@ -481,7 +481,21 @@ export function createSendMessageAction(deps: ChatSendMessageDeps) {
 
     const projectPath = get().currentProjectPath || useSettingsStore.getState().projectPath;
     const appMode = useAppStore.getState().sidebarMode;
-    const baseCtx = { set, get, getApiKey, chatLog, usage, logSessionId, assistantId, selectedModel, isDeepThink, reasoningEffort, isWebSearch, projectPath, appMode };
+    const baseCtx = {
+      set,
+      get,
+      getApiKey,
+      chatLog,
+      usage,
+      logSessionId,
+      assistantId,
+      selectedModel,
+      isDeepThink,
+      reasoningEffort,
+      isWebSearch,
+      projectPath,
+      appMode,
+    };
     startStreamWatchdogs({ ...baseCtx, apiMessages: [], memoryContext: undefined });
 
     const chatHistory = buildChatHistory(newMessages, assistantId, selectedModel);

@@ -1,4 +1,3 @@
-
 function safeStringify(v: unknown): string {
   try {
     return JSON.stringify(v);

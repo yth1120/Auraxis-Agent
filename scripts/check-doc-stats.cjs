@@ -128,7 +128,7 @@ if (appPackage.version !== sdkPackage.version) {
   failures.push(`SDK 版本 ${sdkPackage.version} 与主项目 ${appPackage.version} 不一致`);
 }
 
-  if (!new RegExp(`version = "${appPackage.version.replace(/\./g, '\\.')}"`).test(pyproject)) {
+if (!new RegExp(`version = "${appPackage.version.replace(/\./g, '\\.')}"`).test(pyproject)) {
   failures.push('Python SDK pyproject.toml 版本与主项目不一致');
 }
 

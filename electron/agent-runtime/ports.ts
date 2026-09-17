@@ -67,11 +67,7 @@ export interface RuntimePorts {
   observeToolSequence(scope: string, toolNames: string[]): void;
 
   // ── Hook ─────────────────────────────────────────────
-  runHooks(
-    event: string,
-    payload: Record<string, unknown>,
-    projectRoot?: string,
-  ): Promise<HookRunResult | null>;
+  runHooks(event: string, payload: Record<string, unknown>, projectRoot?: string): Promise<HookRunResult | null>;
 
   // ── 上下文装配 ────────────────────────────────────────
   takeWorkspaceDrift(projectRoot: string): Promise<DriftEntry[]>;
@@ -89,10 +85,7 @@ export interface RuntimePorts {
 
   // ── 其它宿主服务 ──────────────────────────────────────
   /** 大输出落盘（spill），best-effort。 */
-  writeSpill(
-    content: string,
-    meta: { sessionId?: string; toolName?: string; toolCallId?: string },
-  ): Promise<SpillRef>;
+  writeSpill(content: string, meta: { sessionId?: string; toolName?: string; toolCallId?: string }): Promise<SpillRef>;
   getShellExecutor(): ShellExecutorPort;
   /** MAP-Graph 记忆风险门控（含拒绝审计）。 */
   memoryRiskVerdict(projectRoot: string, agentName: string, toolName: string): MemoryRiskVerdict;

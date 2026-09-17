@@ -202,62 +202,61 @@ function ToolCallExpanded({
 }: ToolCallExpandedProps) {
   const t = useT();
   return (
-        <div className="flex flex-col">
-          {toolCall.toolName === 'Bash' && (toolCall.output || toolCall.error || toolCall.streamOutput) ? (
-            <TerminalBlock
-              className="ax-tool-card-surface"
-              command={bashCommand}
-              cwd={bashCwd}
-              output={toolCall.error ? toolCall.error : (bashTerm?.content ?? '')}
-              running={isRunning}
-              failed={!!toolCall.error}
-              exitCode={toolCall.error ? (bashTerm?.exitCode ?? 1) : bashTerm?.exitCode}
-            />
-          ) : diffCard !== null ? (
-            diffCard
-          ) : showGeneric ? (
-            <div className="ax-tool-card-surface">
-              <div className="rounded-xl border border-border-default bg-code-bg overflow-hidden">
-                {hasInput && (
-                  <div className="grid grid-cols-[max-content_1fr] gap-x-3.5 px-3 py-2 max-h-[150px] overflow-y-auto">
-                    <span className="sticky top-0 text-2xs font-semibold text-text-faint">IN</span>
-                    <pre className="m-0 text-2xs leading-relaxed text-text-secondary whitespace-pre-wrap break-all font-mono">
-                      {JSON.stringify(toolCall.input, null, 2).slice(0, 1200)}
-                    </pre>
-                  </div>
-                )}
-                {hasInput && hasOutput && <div className="h-px bg-border-dim" />}
-                {hasOutput && (
-                  <div className="grid grid-cols-[max-content_1fr] gap-x-3.5 px-3 py-2 max-h-[200px] overflow-y-auto">
-                    <span className="sticky top-0 text-2xs font-semibold text-text-faint">
-                      {toolCall.error ? 'ERR' : 'OUT'}
-                    </span>
-                    <div className="min-w-0 flex flex-col gap-2">
-                      {Boolean((toolCall.output as Record<string, unknown> | null | undefined)?.image) && (
-                        <img
-                          src={String((toolCall.output as Record<string, unknown>).image ?? '')}
-                          alt={t('toolCard.readImageResult')}
-                          className="max-w-full max-h-[320px] rounded-md border border-[var(--color-border-dim)] object-contain bg-[var(--color-bg-inset)]"
-                        />
-                      )}
-                      <pre
-                        className={clsx(
-                          'm-0 text-2xs leading-relaxed whitespace-pre-wrap break-all font-mono',
-                          toolCall.error ? 'text-danger' : 'text-text-secondary',
-                        )}
-                      >
-                        {cleanOutput(toolCall.error || formatOutput(toolCall.toolName, toolCall.output)).cleanedText}
-                      </pre>
-                    </div>
-                  </div>
-                )}
+    <div className="flex flex-col">
+      {toolCall.toolName === 'Bash' && (toolCall.output || toolCall.error || toolCall.streamOutput) ? (
+        <TerminalBlock
+          className="ax-tool-card-surface"
+          command={bashCommand}
+          cwd={bashCwd}
+          output={toolCall.error ? toolCall.error : (bashTerm?.content ?? '')}
+          running={isRunning}
+          failed={!!toolCall.error}
+          exitCode={toolCall.error ? (bashTerm?.exitCode ?? 1) : bashTerm?.exitCode}
+        />
+      ) : diffCard !== null ? (
+        diffCard
+      ) : showGeneric ? (
+        <div className="ax-tool-card-surface">
+          <div className="rounded-xl border border-border-default bg-code-bg overflow-hidden">
+            {hasInput && (
+              <div className="grid grid-cols-[max-content_1fr] gap-x-3.5 px-3 py-2 max-h-[150px] overflow-y-auto">
+                <span className="sticky top-0 text-2xs font-semibold text-text-faint">IN</span>
+                <pre className="m-0 text-2xs leading-relaxed text-text-secondary whitespace-pre-wrap break-all font-mono">
+                  {JSON.stringify(toolCall.input, null, 2).slice(0, 1200)}
+                </pre>
               </div>
-            </div>
-          ) : null}
+            )}
+            {hasInput && hasOutput && <div className="h-px bg-border-dim" />}
+            {hasOutput && (
+              <div className="grid grid-cols-[max-content_1fr] gap-x-3.5 px-3 py-2 max-h-[200px] overflow-y-auto">
+                <span className="sticky top-0 text-2xs font-semibold text-text-faint">
+                  {toolCall.error ? 'ERR' : 'OUT'}
+                </span>
+                <div className="min-w-0 flex flex-col gap-2">
+                  {Boolean((toolCall.output as Record<string, unknown> | null | undefined)?.image) && (
+                    <img
+                      src={String((toolCall.output as Record<string, unknown>).image ?? '')}
+                      alt={t('toolCard.readImageResult')}
+                      className="max-w-full max-h-[320px] rounded-md border border-[var(--color-border-dim)] object-contain bg-[var(--color-bg-inset)]"
+                    />
+                  )}
+                  <pre
+                    className={clsx(
+                      'm-0 text-2xs leading-relaxed whitespace-pre-wrap break-all font-mono',
+                      toolCall.error ? 'text-danger' : 'text-text-secondary',
+                    )}
+                  >
+                    {cleanOutput(toolCall.error || formatOutput(toolCall.toolName, toolCall.output)).cleanedText}
+                  </pre>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
+      ) : null}
+    </div>
   );
 }
-
 
 const ToolCallCard = memo(function ToolCallCard({ toolCall }: ToolCallCardProps) {
   useT();

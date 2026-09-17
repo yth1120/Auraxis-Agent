@@ -4,7 +4,12 @@
  * 负责：规划/审批/恢复的种子状态、turn 事件外壳、迭代上限、ReviewArtifact
  * 质量门与终止收尾。单个 ReAct 迭代本身由 step-engine 负责。
  */
-import { createDevianceDetector, DEFAULT_CONTEXT_CONFIG, restrictPlanToApproved, markInjected } from './agent-loop-core';
+import {
+  createDevianceDetector,
+  DEFAULT_CONTEXT_CONFIG,
+  restrictPlanToApproved,
+  markInjected,
+} from './agent-loop-core';
 import { runPlanningPhase, setupInitialMessages } from './agent-loop-planning';
 import { prepareLoopContext, type PreparedLoopContext } from './agent-loop-prepare';
 import { injectExternalMessages, injectWorkspaceDrift } from './agent-loop-inject';
@@ -377,7 +382,9 @@ export async function agentLoopRun(config: AgentLoopConfig): Promise<AgentLoopRe
   const { observer, model, projectRoot, systemPrompt } = config;
   const prepared = await prepareLoopContext(config);
   const effectiveSystemPrompt = prepared.effectiveSystemPrompt;
-  void runtimePorts().runHooks('SessionStart', { projectRoot, model }, projectRoot).catch(() => {});
+  void runtimePorts()
+    .runHooks('SessionStart', { projectRoot, model }, projectRoot)
+    .catch(() => {});
   const contextConfig = resolveContextConfig(config, model);
   const deviance = createDevianceDetector();
   deviance.reset();

@@ -512,10 +512,7 @@ async function grepSearchDir(
   }
 }
 
-export async function runGrep(
-  params: GrepParams,
-  ctx: ToolContext,
-): Promise<ToolResult> {
+export async function runGrep(params: GrepParams, ctx: ToolContext): Promise<ToolResult> {
   if (ctx.abortSignal?.aborted) return { output: null, error: '操作已取消' };
   const searchRoot = params.path ? resolvePath(params.path, ctx.projectRoot) : ctx.projectRoot;
   if (isSensitiveToolPath(searchRoot)) {

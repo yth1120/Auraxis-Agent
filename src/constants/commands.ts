@@ -286,46 +286,35 @@ export function executeCommand(name: string, args: string, ctx: CommandContext):
     case 'model':
       return cmdModel(trimmedArgs, ctx);
 
-
     case 'agent':
       return cmdAgent(trimmedArgs, ctx);
-
 
     case 'goal':
       return cmdGoal(trimmedArgs, ctx);
 
-
     case 'skill':
       return cmdSkill(trimmedArgs, ctx);
-
 
     case 'plan':
       return cmdPlan(trimmedArgs, ctx);
 
-
     case 'tool':
       return cmdTool(trimmedArgs, ctx);
-
 
     case 'review':
       return cmdReview(trimmedArgs, ctx);
 
-
     case 'workflow':
       return cmdWorkflow(trimmedArgs, ctx);
-
 
     case 'memories':
       return cmdMemories(trimmedArgs, ctx);
 
-
     case 'feedback':
       return cmdFeedback(trimmedArgs, ctx);
 
-
     case 'theme':
       return cmdTheme(trimmedArgs, ctx);
-
 
     case 'help':
       ctx.setInputValue('');

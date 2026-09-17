@@ -388,9 +388,7 @@ function rebuildChatLogs(): Promise<number> {
     chatLogRoot(),
     (file) => file.endsWith('.jsonl'),
     (id, parts, ts) =>
-      parts.length > 0
-        ? { type: 'chat', id, title: `会话 ${id}`, text: parts.join('\n').slice(-50_000), ts }
-        : null,
+      parts.length > 0 ? { type: 'chat', id, title: `会话 ${id}`, text: parts.join('\n').slice(-50_000), ts } : null,
   );
 }
 
@@ -399,9 +397,7 @@ function rebuildAgentLogs(): Promise<number> {
     sessionLogRoot(),
     (file) => file.startsWith('agent-') && file.endsWith('.jsonl'),
     (id, parts, ts) =>
-      parts.length > 0
-        ? { type: 'agent', id, title: `Agent ${id}`, text: parts.join('\n').slice(-50_000), ts }
-        : null,
+      parts.length > 0 ? { type: 'agent', id, title: `Agent ${id}`, text: parts.join('\n').slice(-50_000), ts } : null,
   );
 }
 

@@ -10,7 +10,12 @@ import { isPermissionPreset, PERMISSION_PRESETS } from '../contracts/permission'
 import { waitForPlanApproval } from './plan-handlers';
 import { appendAgentLog } from '../session-log';
 import { broadcast, notifyFrontend } from './agent-scheduler-support';
-import type { AgentLoopConfig, AgentLoopEvent, AgentObserver, AgentStateSnapshot } from '../agent-runtime/agent-loop-types';
+import type {
+  AgentLoopConfig,
+  AgentLoopEvent,
+  AgentObserver,
+  AgentStateSnapshot,
+} from '../agent-runtime/agent-loop-types';
 import type { AgentInstance } from './agent-scheduler-types';
 import type { ApprovalPolicy } from '../types';
 import type { SandboxMode } from '../sandbox-policy';

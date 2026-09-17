@@ -38,7 +38,10 @@ function fetchWithSse(lines: string[]): void {
       controller.close();
     },
   });
-  vi.stubGlobal('fetch', vi.fn(async () => new Response(body, { status: 200 })));
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => new Response(body, { status: 200 })),
+  );
 }
 
 beforeEach(() => {

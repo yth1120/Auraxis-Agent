@@ -24,13 +24,17 @@ beforeEach(async () => {
 
 describe('auth-store', () => {
   it('setup → locked → login → unlocked', async () => {
-    expect((await store.setupAccount({ name: ' T ', email: 'T@Example.com ', password: 'secret1', rememberMe: false })).ok).toBe(true);
+    expect(
+      (await store.setupAccount({ name: ' T ', email: 'T@Example.com ', password: 'secret1', rememberMe: false })).ok,
+    ).toBe(true);
 
     const locked = await store.getAuthStatus();
     expect(locked.phase).toBe('locked');
     expect(locked.email).toBe('t@example.com'); // 邮箱规范化后再比较
 
-    expect((await store.loginAccount({ email: 't@example.com', password: 'secret1', rememberMe: false })).ok).toBe(true);
+    expect((await store.loginAccount({ email: 't@example.com', password: 'secret1', rememberMe: false })).ok).toBe(
+      true,
+    );
     const unlocked = await store.getAuthStatus();
     expect(unlocked.phase).toBe('unlocked');
     expect(unlocked.name).toBe('T');

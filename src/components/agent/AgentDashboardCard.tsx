@@ -181,11 +181,7 @@ function CardActions({
 }
 
 /** 展开后的 todo 明细列表。 */
-function TodoList({
-  todos,
-}: {
-  todos: Array<{ status?: string; content?: string }>;
-}) {
+function TodoList({ todos }: { todos: Array<{ status?: string; content?: string }> }) {
   return (
     <div className="mt-1 pt-2 border-t border-[var(--color-border-dim)] flex flex-col gap-1">
       {todos.map((todo, index) => (
@@ -396,12 +392,7 @@ export default function AgentCard({ agent }: { agent: AgentInfo }) {
             }}
             t={t}
           />
-          <CardActions
-            status={status}
-            id={id}
-            t={t}
-            onToggleExpand={() => setExpanded(!expanded)}
-          />
+          <CardActions status={status} id={id} t={t} onToggleExpand={() => setExpanded(!expanded)} />
         </Space>
       }
     >

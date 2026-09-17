@@ -55,8 +55,7 @@ function toolEntries(e: ReplayEvent, d: Record<string, unknown>): AgentLogEntry[
           output: d.output,
           durationMs: num(d.durationMs),
           summary: (d.summary && typeof d.summary === 'object' ? d.summary : undefined) as
-            | Record<string, unknown>
-            | undefined,
+            Record<string, unknown> | undefined,
         },
       ];
     case 'error':
@@ -79,7 +78,8 @@ function systemEntries(e: ReplayEvent, d: Record<string, unknown>): AgentLogEntr
   switch (d.event) {
     case 'turn':
       if (d.action === 'start') return [{ type: 'turn_start', timestamp: e.ts, turnId: str(d.turnId) }];
-      if (d.action === 'end') return [{ type: 'turn_end', timestamp: e.ts, turnId: str(d.turnId), reason: str(d.reason) }];
+      if (d.action === 'end')
+        return [{ type: 'turn_end', timestamp: e.ts, turnId: str(d.turnId), reason: str(d.reason) }];
       return [];
     case 'iteration':
       if (d.action === 'start') return [{ type: 'iteration_start', timestamp: e.ts, iteration: num(d.iteration) }];

@@ -37,48 +37,48 @@ function ReviewFileList({
   onSelect: (index: number) => void;
 }) {
   return (
-<ul className="list-none m-0 py-1 max-h-[34%] overflow-y-auto border-b border-[var(--color-border-dim)] shrink-0">
-  {files.map((f, i) => {
-    const slash = f.diff.path.lastIndexOf('/');
-    const name = slash >= 0 ? f.diff.path.slice(slash + 1) : f.diff.path;
-    const dir = slash >= 0 ? f.diff.path.slice(0, slash) : '';
-    return (
-      <li key={f.diff.path}>
-        <button
-          type="button"
-          className={clsx(
-            'flex items-center gap-2 w-full py-[3px] px-3 border-none bg-transparent text-xs text-left cursor-pointer overflow-hidden transition-colors duration-fast ease-out',
-            'hover:bg-[var(--color-hover)]',
-            i === selected && 'bg-[var(--color-bg-inset)]',
-          )}
-          onClick={() => onSelect(i)}
-          title={f.diff.path}
-        >
-          <span className="flex-1 min-w-0 flex flex-col">
-            <span className="flex items-baseline gap-[6px] min-w-0">
-              <span className="font-mono whitespace-nowrap shrink-0 text-text-primary">{name}</span>
-              {dir && (
-                <span className="font-mono text-2xs text-muted whitespace-nowrap overflow-hidden text-ellipsis">
-                  {dir}
-                </span>
+    <ul className="list-none m-0 py-1 max-h-[34%] overflow-y-auto border-b border-[var(--color-border-dim)] shrink-0">
+      {files.map((f, i) => {
+        const slash = f.diff.path.lastIndexOf('/');
+        const name = slash >= 0 ? f.diff.path.slice(slash + 1) : f.diff.path;
+        const dir = slash >= 0 ? f.diff.path.slice(0, slash) : '';
+        return (
+          <li key={f.diff.path}>
+            <button
+              type="button"
+              className={clsx(
+                'flex items-center gap-2 w-full py-[3px] px-3 border-none bg-transparent text-xs text-left cursor-pointer overflow-hidden transition-colors duration-fast ease-out',
+                'hover:bg-[var(--color-hover)]',
+                i === selected && 'bg-[var(--color-bg-inset)]',
               )}
-            </span>
-            <span className="inline-block h-[3px] w-24 rounded-full bg-[var(--color-bg-inset)] overflow-hidden">
-              <span
-                className="block h-full rounded-full bg-primary"
-                style={{ width: `${Math.max(4, Math.round((f.churn / maxChurn) * 100))}%` }}
-              />
-            </span>
-          </span>
-          <span className="shrink-0 flex items-center gap-1.5 text-2xs tabular-nums">
-            <span className="text-[var(--color-success)]">+{f.added}</span>
-            <span className="text-danger">-{f.removed}</span>
-          </span>
-        </button>
-      </li>
-    );
-  })}
-</ul>
+              onClick={() => onSelect(i)}
+              title={f.diff.path}
+            >
+              <span className="flex-1 min-w-0 flex flex-col">
+                <span className="flex items-baseline gap-[6px] min-w-0">
+                  <span className="font-mono whitespace-nowrap shrink-0 text-text-primary">{name}</span>
+                  {dir && (
+                    <span className="font-mono text-2xs text-muted whitespace-nowrap overflow-hidden text-ellipsis">
+                      {dir}
+                    </span>
+                  )}
+                </span>
+                <span className="inline-block h-[3px] w-24 rounded-full bg-[var(--color-bg-inset)] overflow-hidden">
+                  <span
+                    className="block h-full rounded-full bg-primary"
+                    style={{ width: `${Math.max(4, Math.round((f.churn / maxChurn) * 100))}%` }}
+                  />
+                </span>
+              </span>
+              <span className="shrink-0 flex items-center gap-1.5 text-2xs tabular-nums">
+                <span className="text-[var(--color-success)]">+{f.added}</span>
+                <span className="text-danger">-{f.removed}</span>
+              </span>
+            </button>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 

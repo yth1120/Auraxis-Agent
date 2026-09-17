@@ -98,7 +98,9 @@ async function createTaskAgent(params: {
   planNext: boolean;
   permissionPreset: LaunchAgentTaskOptions['permissionPreset'];
   effectiveWorkTier: WorkAutonomyTier;
-  toolChoice: Parameters<typeof useChatStore.getState> extends never ? never : ReturnType<typeof useChatStore.getState>['pendingToolChoice'];
+  toolChoice: Parameters<typeof useChatStore.getState> extends never
+    ? never
+    : ReturnType<typeof useChatStore.getState>['pendingToolChoice'];
 }): Promise<string | null> {
   const { isWorkMode, planNext, permissionPreset, effectiveWorkTier } = params;
   const config = isWorkMode

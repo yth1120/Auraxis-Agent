@@ -26,9 +26,18 @@ for (const target of targets) {
   }
   const text = fs.readFileSync(full, 'utf8');
   // 沙箱 preload 里出现对兄弟模块的 require = 未经过 vite 打包。
-  for (const sibling of ['preload-api', 'preload-core', 'preload-rest', 'preload-platform', 'preload-shared', 'preload-ai']) {
+  for (const sibling of [
+    'preload-api',
+    'preload-core',
+    'preload-rest',
+    'preload-platform',
+    'preload-shared',
+    'preload-ai',
+  ]) {
     if (new RegExp(`require\\((['"])\\./${sibling}\\1\\)`).test(text)) {
-      problems.push(`${target.file} 仍在 require('./${sibling}')：preload 未被 vite 打包（tsc 可能报错导致打包被跳过）`);
+      problems.push(
+        `${target.file} 仍在 require('./${sibling}')：preload 未被 vite 打包（tsc 可能报错导致打包被跳过）`,
+      );
     }
   }
   if (!/contextBridge/.test(text)) {

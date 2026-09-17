@@ -18,8 +18,6 @@ import type { WorkAutonomyTier } from '../types';
 import type { SandboxMode } from '../sandbox-policy';
 import { runtimePorts } from './ports';
 
-
-
 export interface RunnerToolCall {
   /** Position in the original tool_calls array (used for order reassembly). */
   index: number;

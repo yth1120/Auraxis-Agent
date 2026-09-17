@@ -89,9 +89,7 @@ function metricsOf(tracker: StepTracker): StepMetrics {
 /** Pause/stop aborts surface as CanceledError/ERR_CANCELED from axios, not AbortError. */
 function isAbortError(apiError: ReturnType<typeof errorRecord>, signal?: AbortSignal): boolean {
   if (signal?.aborted) return true;
-  return (
-    apiError.name === 'AbortError' || apiError.name === 'CanceledError' || apiError.code === 'ERR_CANCELED'
-  );
+  return apiError.name === 'AbortError' || apiError.name === 'CanceledError' || apiError.code === 'ERR_CANCELED';
 }
 
 function parseApiDetail(errorBody: string): string {

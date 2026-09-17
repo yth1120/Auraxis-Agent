@@ -85,9 +85,7 @@ function pickSandboxMode(candidate: unknown, fallback: SandboxMode): SandboxMode
 }
 
 /** 解析 settings / agent 定义 / 模型配置；出错时返回可读错误。 */
-async function resolveSubAgentConfig(
-  params: SubAgentParams,
-): Promise<{ error: string } | { config: SubAgentConfig }> {
+async function resolveSubAgentConfig(params: SubAgentParams): Promise<{ error: string } | { config: SubAgentConfig }> {
   const depth = params.depth ?? 0;
   if (depth > 3) {
     return { error: '子 Agent 递归深度超过最大限制(3层)，请直接在父级 continuation 中完成任务' };

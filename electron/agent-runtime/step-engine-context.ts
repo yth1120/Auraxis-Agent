@@ -20,12 +20,14 @@ export async function resolveTmuxLocation(): Promise<string | null> {
   if (!process.env.TMUX) return null;
   if (cachedTmuxLocation !== undefined) return cachedTmuxLocation;
   try {
-    const result = await runtimePorts().getShellExecutor().run({
-      command: 'tmux',
-      args: ['display-message', '-p', '#S:#W.#P'],
-      shell: false,
-      timeoutMs: 2000,
-    });
+    const result = await runtimePorts()
+      .getShellExecutor()
+      .run({
+        command: 'tmux',
+        args: ['display-message', '-p', '#S:#W.#P'],
+        shell: false,
+        timeoutMs: 2000,
+      });
     cachedTmuxLocation = (result.stdout || '').trim() || null;
   } catch {
     cachedTmuxLocation = null;

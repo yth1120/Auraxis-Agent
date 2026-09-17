@@ -17,14 +17,22 @@ type SetState = StoreApi<SessionStore>['setState'];
 type GetState = StoreApi<SessionStore>['getState'];
 type SessionStoreActions = Omit<SessionStore, 'sessions' | 'currentSessionId' | 'pendingMode'>;
 
-type SessionCrudKeys = 'saveSession' | 'loadSession' | 'deleteSession' | 'getCurrentSession' | 'setCurrentSessionId' | 'touchCurrentSession' | 'renameSession' | 'togglePin' | 'toggleArchive' | 'moveSessionToProject' | 'newSession';
+type SessionCrudKeys =
+  | 'saveSession'
+  | 'loadSession'
+  | 'deleteSession'
+  | 'getCurrentSession'
+  | 'setCurrentSessionId'
+  | 'touchCurrentSession'
+  | 'renameSession'
+  | 'togglePin'
+  | 'toggleArchive'
+  | 'moveSessionToProject'
+  | 'newSession';
 type SessionLifecycleKeys = 'forkSession' | 'exportSession' | 'syncFromLogs';
 
 /** 会话 CRUD 与元数据维护。 */
-function createSessionCrudActions(
-  set: SetState,
-  get: GetState,
-): Pick<SessionStoreActions, SessionCrudKeys> {
+function createSessionCrudActions(set: SetState, get: GetState): Pick<SessionStoreActions, SessionCrudKeys> {
   return {
     saveSession: (messages, model, projectRoot, mode, targetId) => {
       const state = get();
@@ -144,10 +152,7 @@ function createSessionCrudActions(
 }
 
 /** 分支、导出与日志同步。 */
-function createSessionLifecycleActions(
-  set: SetState,
-  get: GetState,
-): Pick<SessionStoreActions, SessionLifecycleKeys> {
+function createSessionLifecycleActions(set: SetState, get: GetState): Pick<SessionStoreActions, SessionLifecycleKeys> {
   return {
     forkSession: (sessionId, messageId) => {
       const state = get();

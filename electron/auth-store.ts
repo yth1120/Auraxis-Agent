@@ -101,10 +101,7 @@ function authPath(): string {
 }
 
 /** 账户文件状态：missing = 从未创建；corrupt = 存在但无法解析（旧版本/被截断）。 */
-type AccountState =
-  | { status: 'ok'; account: StoredAccount }
-  | { status: 'missing' }
-  | { status: 'corrupt' };
+type AccountState = { status: 'ok'; account: StoredAccount } | { status: 'missing' } | { status: 'corrupt' };
 
 async function readAccountState(): Promise<AccountState> {
   let raw: string;
@@ -209,13 +206,13 @@ export async function setupAccount(params: AuthSetupParams): Promise<{ ok: boole
   return { ok: true };
 }
 
-export function loginAccount(
-  params: AuthLoginParams,
-): Promise<{ ok: boolean; error?: string; code?: AuthErrorCode }> {
+export function loginAccount(params: AuthLoginParams): Promise<{ ok: boolean; error?: string; code?: AuthErrorCode }> {
   return withThrottleLock(() => loginAccountInner(params));
 }
 
-async function loginAccountInner(params: AuthLoginParams): Promise<{ ok: boolean; error?: string; code?: AuthErrorCode }> {
+async function loginAccountInner(
+  params: AuthLoginParams,
+): Promise<{ ok: boolean; error?: string; code?: AuthErrorCode }> {
   const now = Date.now();
   const attempts = await readThrottle();
   if (now - attempts.windowStart > 60_000) {

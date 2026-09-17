@@ -19,7 +19,12 @@ vi.mock('electron', () => ({
     isEncryptionAvailable: () => true,
   },
 }));
-import { runToolBatch, isDeniedError, type ToolRunCallbacks, type ToolRunContext } from '../../agent-runtime/tool-runner';
+import {
+  runToolBatch,
+  isDeniedError,
+  type ToolRunCallbacks,
+  type ToolRunContext,
+} from '../../agent-runtime/tool-runner';
 
 import { installAgentRuntimePorts } from '../runtime-ports';
 

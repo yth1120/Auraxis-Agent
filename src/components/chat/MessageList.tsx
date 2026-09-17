@@ -75,18 +75,18 @@ function ScrollToBottomButton({
   label: string;
 }) {
   return (
-<button
-  className="ax-back-to-bottom"
-  style={{
-    left: 'calc(50% + var(--content-max-width, 880px) / 2 - 56px)',
-    bottom: `${Math.max(0, bottomInset) + 20}px`,
-  }}
-  onClick={onClick}
-  aria-label={label}
-  title={label}
->
-  <DownOutlined />
-</button>
+    <button
+      className="ax-back-to-bottom"
+      style={{
+        left: 'calc(50% + var(--content-max-width, 880px) / 2 - 56px)',
+        bottom: `${Math.max(0, bottomInset) + 20}px`,
+      }}
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+    >
+      <DownOutlined />
+    </button>
   );
 }
 

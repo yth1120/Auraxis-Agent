@@ -123,13 +123,7 @@ const handleChatStream = async (event: IpcMainInvokeEvent, payload: ChatStreamPa
   const settings = (await readSettings().catch(() => null)) as Record<string, unknown> | null;
   const maxOutputTokens = resolveMaxOutputTokens(settings);
   if (!resolvedKey) {
-    sendToRenderer(
-      win,
-      requestId,
-      'error',
-      undefined,
-      '未配置 DeepSeek API Key。请在设置中添加或在环境变量中设置。',
-    );
+    sendToRenderer(win, requestId, 'error', undefined, '未配置 DeepSeek API Key。请在设置中添加或在环境变量中设置。');
     return;
   }
 
@@ -181,13 +175,13 @@ const handleChatStream = async (event: IpcMainInvokeEvent, payload: ChatStreamPa
   }
 };
 
-  secureHandle('ai:abortStream', async (_event, requestId: string) => {
-    const controller = activeStreams.get(requestId);
-    if (controller) {
-      controller.abort();
-      activeStreams.delete(requestId);
-    }
-  });
+secureHandle('ai:abortStream', async (_event, requestId: string) => {
+  const controller = activeStreams.get(requestId);
+  if (controller) {
+    controller.abort();
+    activeStreams.delete(requestId);
+  }
+});
 
 const handleFim = async (_event: IpcMainInvokeEvent, params: FimPayload): Promise<unknown> => {
   const { model, apiKey, prompt, suffix, maxTokens } = params ?? {};
@@ -246,9 +240,7 @@ async function resolveQuerySetup(
       ? PERMISSION_PRESETS[settings.permissionPreset]
       : undefined;
   const settingsSandbox =
-    settings?.sandboxMode === 'read' ||
-    settings?.sandboxMode === 'workspace-write' ||
-    settings?.sandboxMode === 'full'
+    settings?.sandboxMode === 'read' || settings?.sandboxMode === 'workspace-write' || settings?.sandboxMode === 'full'
       ? settings.sandboxMode
       : undefined;
   return {
@@ -344,9 +336,7 @@ const handleSendQuery = async (event: IpcMainInvokeEvent, payload: QueryPayload)
         mode: approval,
         maxIterations,
         fallbackModel:
-          typeof settings?.fallbackModel === 'string' && settings.fallbackModel
-            ? settings.fallbackModel
-            : undefined,
+          typeof settings?.fallbackModel === 'string' && settings.fallbackModel ? settings.fallbackModel : undefined,
         sandboxMode,
         approvedPlanSteps,
         surface,
@@ -380,99 +370,99 @@ const handleSendQuery = async (event: IpcMainInvokeEvent, payload: QueryPayload)
   }
 };
 
-  secureHandle('ai:clearQueryContext', async (_event, sessionId: string) => {
-    try {
-      await clearLlmContext(sessionId);
-      return { ok: true };
-    } catch (error: unknown) {
-      return { ok: false, error: errorText(error) };
-    }
-  });
-
-  secureHandle('ai:abortQuery', async (_event, requestId: string) => {
-    const controller = activeQueries.get(requestId);
-    if (controller) {
-      controller.abort();
-      activeQueries.delete(requestId);
-    }
-  });
-
-  secureHandle('ai:abortTool', async (_event, _requestId: string, toolCallId: string) => {
-    const ok = abortTool(toolCallId);
-    if (!ok) {
-      console.warn('[ai:abortTool] no running tool found for', toolCallId);
-    }
-    return { ok };
-  });
-
-  secureHandle('ai:retryTool', async (_event, requestId: string, toolName: string) => {
-    const queue = nudgeQueues.get(requestId);
-    if (!queue) {
-      console.warn('[ai:retryTool] no active query found for', requestId);
-      return { ok: false, error: '无活跃查询' };
-    }
-    const nudge = `工具 ${toolName} 之前执行失败，请重试该工具调用。如果该方法反复失败，请换一种完全不同的方式。`;
-    queue.push(nudge);
+secureHandle('ai:clearQueryContext', async (_event, sessionId: string) => {
+  try {
+    await clearLlmContext(sessionId);
     return { ok: true };
-  });
+  } catch (error: unknown) {
+    return { ok: false, error: errorText(error) };
+  }
+});
+
+secureHandle('ai:abortQuery', async (_event, requestId: string) => {
+  const controller = activeQueries.get(requestId);
+  if (controller) {
+    controller.abort();
+    activeQueries.delete(requestId);
+  }
+});
+
+secureHandle('ai:abortTool', async (_event, _requestId: string, toolCallId: string) => {
+  const ok = abortTool(toolCallId);
+  if (!ok) {
+    console.warn('[ai:abortTool] no running tool found for', toolCallId);
+  }
+  return { ok };
+});
+
+secureHandle('ai:retryTool', async (_event, requestId: string, toolName: string) => {
+  const queue = nudgeQueues.get(requestId);
+  if (!queue) {
+    console.warn('[ai:retryTool] no active query found for', requestId);
+    return { ok: false, error: '无活跃查询' };
+  }
+  const nudge = `工具 ${toolName} 之前执行失败，请重试该工具调用。如果该方法反复失败，请换一种完全不同的方式。`;
+  queue.push(nudge);
+  return { ok: true };
+});
 
 const handleTestConnection = async (_event: IpcMainInvokeEvent, payload: { apiKey: string }): Promise<unknown> => {
-const { apiKey } = payload;
-const resolvedKey = typeof apiKey === 'string' && apiKey.trim() ? apiKey : await getApiKey(undefined);
-if (!resolvedKey) return { ok: false, error: '未配置 API Key，无法测试连接' };
-try {
-  // DEEPSEEK_BASE_URL in .env.example points at the chat completions
-  // endpoint (`.../v1/chat/completions`). Strip the chat path so we can
-  // append `/models` for the GET probe, otherwise we'd hit
-  // `.../chat/completions/models` → 404.
-  const response = await axios.get(getDeepSeekModelsUrl(), {
-    headers: { Authorization: `Bearer ${resolvedKey}` },
-    timeout: 15000,
-  });
-  if (response.status === 200) {
-    const responseData = isRecord(response.data) ? response.data : {};
-    const models = Array.isArray(responseData.data)
-      ? responseData.data
-          .filter(isRecord)
-          .map((m) => String(m.id ?? ''))
-          .filter(Boolean)
-      : [];
-    const modelIds = models.slice(0, 10);
-    return { ok: true, data: { message: 'DeepSeek API 连接成功', models: modelIds } };
-  }
-  return { ok: false, error: `HTTP ${response.status}: ${response.statusText}` };
-} catch (err: unknown) {
-  const apiError = errorRecord(err);
-  const status =
-    typeof apiError.response === 'object' && apiError.response
-      ? (apiError.response as { status?: number }).status
-      : undefined;
-  if (status === 401 || status === 403) {
-    return { ok: false, error: 'API Key 无效或未授权，请检查密钥是否正确' };
-  }
-  if (status === 429) {
-    return { ok: false, error: '请求过于频繁，请稍后重试' };
-  }
-  if (status === 402) {
-    return { ok: false, error: '账户余额不足，请前往 DeepSeek 平台充值后重试' };
-  }
-  if (status === 503) {
-    return { ok: false, error: '服务繁忙，请稍后重试' };
-  }
-  if (apiError.code === 'ECONNREFUSED' || apiError.code === 'ENOTFOUND') {
-    return { ok: false, error: '无法连接到 API 服务器，请检查网络或 API 地址' };
-  }
-  const errorBody = await readErrorBody(err);
-  let detail = '';
+  const { apiKey } = payload;
+  const resolvedKey = typeof apiKey === 'string' && apiKey.trim() ? apiKey : await getApiKey(undefined);
+  if (!resolvedKey) return { ok: false, error: '未配置 API Key，无法测试连接' };
   try {
-    const p = JSON.parse(errorBody);
-    detail = p?.error?.message || p?.message || p?.error || '';
-  } catch {
-    detail = errorBody.slice(0, 200);
+    // DEEPSEEK_BASE_URL in .env.example points at the chat completions
+    // endpoint (`.../v1/chat/completions`). Strip the chat path so we can
+    // append `/models` for the GET probe, otherwise we'd hit
+    // `.../chat/completions/models` → 404.
+    const response = await axios.get(getDeepSeekModelsUrl(), {
+      headers: { Authorization: `Bearer ${resolvedKey}` },
+      timeout: 15000,
+    });
+    if (response.status === 200) {
+      const responseData = isRecord(response.data) ? response.data : {};
+      const models = Array.isArray(responseData.data)
+        ? responseData.data
+            .filter(isRecord)
+            .map((m) => String(m.id ?? ''))
+            .filter(Boolean)
+        : [];
+      const modelIds = models.slice(0, 10);
+      return { ok: true, data: { message: 'DeepSeek API 连接成功', models: modelIds } };
+    }
+    return { ok: false, error: `HTTP ${response.status}: ${response.statusText}` };
+  } catch (err: unknown) {
+    const apiError = errorRecord(err);
+    const status =
+      typeof apiError.response === 'object' && apiError.response
+        ? (apiError.response as { status?: number }).status
+        : undefined;
+    if (status === 401 || status === 403) {
+      return { ok: false, error: 'API Key 无效或未授权，请检查密钥是否正确' };
+    }
+    if (status === 429) {
+      return { ok: false, error: '请求过于频繁，请稍后重试' };
+    }
+    if (status === 402) {
+      return { ok: false, error: '账户余额不足，请前往 DeepSeek 平台充值后重试' };
+    }
+    if (status === 503) {
+      return { ok: false, error: '服务繁忙，请稍后重试' };
+    }
+    if (apiError.code === 'ECONNREFUSED' || apiError.code === 'ENOTFOUND') {
+      return { ok: false, error: '无法连接到 API 服务器，请检查网络或 API 地址' };
+    }
+    const errorBody = await readErrorBody(err);
+    let detail = '';
+    try {
+      const p = JSON.parse(errorBody);
+      detail = p?.error?.message || p?.message || p?.error || '';
+    } catch {
+      detail = errorBody.slice(0, 200);
+    }
+    console.error('[testConnection] error:', { status, body: errorBody.slice(0, 500) });
+    return { ok: false, error: `连接失败${detail ? `: ${detail}` : `: ${errorText(err)}`}` };
   }
-  console.error('[testConnection] error:', { status, body: errorBody.slice(0, 500) });
-  return { ok: false, error: `连接失败${detail ? `: ${detail}` : `: ${errorText(err)}`}` };
-}
 };
 
 export function registerAiHandlers() {

@@ -61,3 +61,6 @@ __pycache__/
 # 用 Auraxis 演练生成的临时项目（不参与构建与单测）
 /test1/
 /demo-*/
+
+# 论文配图生成产物（本地脚本输出，不入库）
+.thesis-build/

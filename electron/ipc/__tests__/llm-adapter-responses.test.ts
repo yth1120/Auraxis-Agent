@@ -86,7 +86,14 @@ describe('Responses API 适配器', () => {
         { role: 'system', content: 'sys-prompt' },
         { role: 'user', content: 'hi' },
       ],
-      tools: [{ name: 'Read', description: 'd', isConcurrencySafe: true, input_schema: { type: 'object', properties: { p: { type: 'string' } }, required: ['p'] } }],
+      tools: [
+        {
+          name: 'Read',
+          description: 'd',
+          isConcurrencySafe: true,
+          input_schema: { type: 'object', properties: { p: { type: 'string' } }, required: ['p'] },
+        },
+      ],
       isDeepThink: true,
       reasoningEffort: 'max',
     } as never);

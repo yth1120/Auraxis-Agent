@@ -42,11 +42,7 @@ function scheduleFlush(acc: SseAccumulator): void {
  * Handle one SSE line. Returns true when the server sent `[DONE]` — callers
  * must then flush and stop reading.
  */
-function handleSseLine(
-  line: string,
-  acc: SseAccumulator,
-  onThinking?: (text: string) => void,
-): boolean {
+function handleSseLine(line: string, acc: SseAccumulator, onThinking?: (text: string) => void): boolean {
   if (!line.startsWith('data: ')) return false;
   const data = line.slice(6).trim();
   if (data === '[DONE]') return true;

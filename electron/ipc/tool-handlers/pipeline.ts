@@ -183,8 +183,7 @@ async function checkApprovalGate(
   const bashMutates = cmdText ? commandMutates(cmdText).mutates : false;
   const safeBashInSandbox = toolName === 'Bash' && effectiveSandbox !== 'full' && !bashMutates;
   const tierAsk = shouldAskForWorkTier(ctx.workTier, toolName, input, ctx.autoApprove);
-  const autoApproved =
-    tierAsk === false || shouldAutoApprove(toolName, ctx.toolCallId, permCtx) || safeBashInSandbox;
+  const autoApproved = tierAsk === false || shouldAutoApprove(toolName, ctx.toolCallId, permCtx) || safeBashInSandbox;
   if (tierAsk === true || (isDangerousTool(toolName) && !ctx.autoApprove && !autoApproved)) {
     if (!ctx.checkPermission) return { output: null, error: PERMISSION_UNINITIALIZED };
     const allowed = await ctx.checkPermission(toolName, input, ctx.toolCallId);

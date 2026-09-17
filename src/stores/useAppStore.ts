@@ -12,7 +12,8 @@ type StoreGet = Parameters<StateCreator<AppStore, [], []>>[1];
 /** 除初始状态字段之外的 action 集合。 */
 type AppActions = Omit<AppStore, keyof typeof APP_STORE_INITIAL_STATE>;
 
-const APP_STORE_INITIAL_STATE: Pick<AppStore,
+const APP_STORE_INITIAL_STATE: Pick<
+  AppStore,
   | 'theme'
   | 'sidebarCollapsed'
   | 'sidebarMode'
@@ -50,170 +51,170 @@ const APP_STORE_INITIAL_STATE: Pick<AppStore,
   | 'tabHistory'
   | 'tabHistoryIndex'
 > = {
-theme: 'light',
-sidebarCollapsed: false,
-sidebarMode: 'chat' as const,
-workAutonomyTier: 'smart' as WorkAutonomyTier,
-showSettings: false,
-showRightPanel: false,
-sidebarWidth: 260,
-leftPanelWidth: 256,
-rightPanelWidth: 320,
-paneSizes: null,
-activeLeftPanel: 'files' as LeftPanelTab,
-glassLayoutMounted: false,
-activeToolView: 'none' as const,
-settingsInitialKey: 'general',
-globalSearchOpen: false,
-terminalHeight: 300,
-agentLogFocusRequest: null,
-trajectoryFocusRequest: null,
-lastAgentShellId: null,
-agentErrorsOnly: false,
-agentTextOnly: false,
-agentRunningOnly: false,
-agentRunningFollow: true,
-openAgentTurns: [],
-agentTurnCount: 0,
-agentRawLogRequest: 0,
-agentErrorNavRequest: null,
-openFileRequest: null,
-fileTabs: [],
-activeFilePath: null,
-fileTreeVersion: 0,
-tabs: [],
-activeTabId: null,
-rightPanelView: 'inspector' as const,
-tabHistory: [],
-tabHistoryIndex: -1,
+  theme: 'light',
+  sidebarCollapsed: false,
+  sidebarMode: 'chat' as const,
+  workAutonomyTier: 'smart' as WorkAutonomyTier,
+  showSettings: false,
+  showRightPanel: false,
+  sidebarWidth: 260,
+  leftPanelWidth: 256,
+  rightPanelWidth: 320,
+  paneSizes: null,
+  activeLeftPanel: 'files' as LeftPanelTab,
+  glassLayoutMounted: false,
+  activeToolView: 'none' as const,
+  settingsInitialKey: 'general',
+  globalSearchOpen: false,
+  terminalHeight: 300,
+  agentLogFocusRequest: null,
+  trajectoryFocusRequest: null,
+  lastAgentShellId: null,
+  agentErrorsOnly: false,
+  agentTextOnly: false,
+  agentRunningOnly: false,
+  agentRunningFollow: true,
+  openAgentTurns: [],
+  agentTurnCount: 0,
+  agentRawLogRequest: 0,
+  agentErrorNavRequest: null,
+  openFileRequest: null,
+  fileTabs: [],
+  activeFilePath: null,
+  fileTreeVersion: 0,
+  tabs: [],
+  activeTabId: null,
+  rightPanelView: 'inspector' as const,
+  tabHistory: [],
+  tabHistoryIndex: -1,
 };
 
 /** 主题 / 面板 / 侧栏 / Agent 视图等通用 action。 */
 function createGeneralActions(set: StoreSet, _get: StoreGet): AppActions {
   const actions: Partial<AppStore> = {
-      toggleTheme: () =>
-        set((s) => ({
-          theme: s.theme === 'system' ? 'light' : s.theme === 'dark' ? 'light' : 'dark',
-        })),
+    toggleTheme: () =>
+      set((s) => ({
+        theme: s.theme === 'system' ? 'light' : s.theme === 'dark' ? 'light' : 'dark',
+      })),
 
-      setTheme: (mode: ThemeMode) => set({ theme: mode }),
+    setTheme: (mode: ThemeMode) => set({ theme: mode }),
 
-      toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
+    toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
 
-      setSidebarMode: (mode) => {
-        set({ sidebarMode: mode });
-      },
+    setSidebarMode: (mode) => {
+      set({ sidebarMode: mode });
+    },
 
-      setWorkAutonomyTier: (tier) => set({ workAutonomyTier: tier }),
+    setWorkAutonomyTier: (tier) => set({ workAutonomyTier: tier }),
 
-      toggleRightPanel: () => set((s) => ({ showRightPanel: !s.showRightPanel })),
+    toggleRightPanel: () => set((s) => ({ showRightPanel: !s.showRightPanel })),
 
-      setShowSettings: (show: boolean) => set({ showSettings: show }),
+    setShowSettings: (show: boolean) => set({ showSettings: show }),
 
-      setActiveToolView: (view) => set({ activeToolView: view }),
+    setActiveToolView: (view) => set({ activeToolView: view }),
 
-      setGlassLayoutMounted: (v) => set({ glassLayoutMounted: !!v }),
+    setGlassLayoutMounted: (v) => set({ glassLayoutMounted: !!v }),
 
-      openToolView: (view) =>
-        set((s) => ({
-          activeToolView: s.activeToolView === view ? 'none' : view,
-        })),
+    openToolView: (view) =>
+      set((s) => ({
+        activeToolView: s.activeToolView === view ? 'none' : view,
+      })),
 
-      setSettingsInitialKey: (key) => set({ settingsInitialKey: key }),
+    setSettingsInitialKey: (key) => set({ settingsInitialKey: key }),
 
-      setGlobalSearchOpen: (open) => set({ globalSearchOpen: open }),
+    setGlobalSearchOpen: (open) => set({ globalSearchOpen: open }),
 
-      setTerminalHeight: (h) => set({ terminalHeight: Math.min(560, Math.max(160, Math.round(h))) }),
+    setTerminalHeight: (h) => set({ terminalHeight: Math.min(560, Math.max(160, Math.round(h))) }),
 
-      requestAgentLogFocus: (agentId, toolCallId) =>
-        set({ agentLogFocusRequest: { agentId, toolCallId, ts: Date.now() } }),
+    requestAgentLogFocus: (agentId, toolCallId) =>
+      set({ agentLogFocusRequest: { agentId, toolCallId, ts: Date.now() } }),
 
-      clearAgentLogFocus: () => set({ agentLogFocusRequest: null }),
+    clearAgentLogFocus: () => set({ agentLogFocusRequest: null }),
 
-      requestTrajectoryFocus: (agentId, toolCallId) =>
-        set({ trajectoryFocusRequest: { agentId, toolCallId, ts: Date.now() } }),
+    requestTrajectoryFocus: (agentId, toolCallId) =>
+      set({ trajectoryFocusRequest: { agentId, toolCallId, ts: Date.now() } }),
 
-      clearTrajectoryFocus: () => set({ trajectoryFocusRequest: null }),
+    clearTrajectoryFocus: () => set({ trajectoryFocusRequest: null }),
 
-      setLastAgentShellId: (id) => set({ lastAgentShellId: id }),
+    setLastAgentShellId: (id) => set({ lastAgentShellId: id }),
 
-      setAgentErrorsOnly: (v) => set({ agentErrorsOnly: v }),
+    setAgentErrorsOnly: (v) => set({ agentErrorsOnly: v }),
 
-      setAgentTextOnly: (v) => set({ agentTextOnly: v }),
+    setAgentTextOnly: (v) => set({ agentTextOnly: v }),
 
-      setAgentRunningOnly: (v) => set({ agentRunningOnly: v }),
+    setAgentRunningOnly: (v) => set({ agentRunningOnly: v }),
 
-      setAgentRunningFollow: (v) => set({ agentRunningFollow: v }),
+    setAgentRunningFollow: (v) => set({ agentRunningFollow: v }),
 
-      setOpenAgentTurns: (turns) => set({ openAgentTurns: Array.isArray(turns) ? turns : [] }),
+    setOpenAgentTurns: (turns) => set({ openAgentTurns: Array.isArray(turns) ? turns : [] }),
 
-      toggleAllAgentTurns: () =>
-        set((s) => {
-          const current = Array.isArray(s.openAgentTurns) ? s.openAgentTurns : [];
-          // Turn iterations are 0-based (first iteration_start emits 0), so
-          // "expand all" must produce 0..n-1 — 1..n silently skips round 0.
-          return {
-            openAgentTurns:
-              current.length >= s.agentTurnCount && s.agentTurnCount > 0
-                ? []
-                : Array.from({ length: s.agentTurnCount }, (_, i) => i),
-          };
-        }),
+    toggleAllAgentTurns: () =>
+      set((s) => {
+        const current = Array.isArray(s.openAgentTurns) ? s.openAgentTurns : [];
+        // Turn iterations are 0-based (first iteration_start emits 0), so
+        // "expand all" must produce 0..n-1 — 1..n silently skips round 0.
+        return {
+          openAgentTurns:
+            current.length >= s.agentTurnCount && s.agentTurnCount > 0
+              ? []
+              : Array.from({ length: s.agentTurnCount }, (_, i) => i),
+        };
+      }),
 
-      setAgentTurnCount: (n) => set({ agentTurnCount: n }),
+    setAgentTurnCount: (n) => set({ agentTurnCount: n }),
 
-      requestAgentRawLog: () => set({ agentRawLogRequest: Date.now() }),
+    requestAgentRawLog: () => set({ agentRawLogRequest: Date.now() }),
 
-      requestAgentErrorNav: (dir) => set({ agentErrorNavRequest: { ts: Date.now(), dir } }),
+    requestAgentErrorNav: (dir) => set({ agentErrorNavRequest: { ts: Date.now(), dir } }),
 
-      clearAgentErrorNav: () => set({ agentErrorNavRequest: null }),
+    clearAgentErrorNav: () => set({ agentErrorNavRequest: null }),
 
-      setSidebarWidth: (w: number) => set({ sidebarWidth: Math.max(0, Math.min(420, w)) }),
+    setSidebarWidth: (w: number) => set({ sidebarWidth: Math.max(0, Math.min(420, w)) }),
 
-      setLeftPanelWidth: (w: number) => set({ leftPanelWidth: Math.max(200, Math.min(420, w)) }),
+    setLeftPanelWidth: (w: number) => set({ leftPanelWidth: Math.max(200, Math.min(420, w)) }),
 
-      setRightPanelWidth: (w: number) => set({ rightPanelWidth: Math.max(320, Math.min(2400, w)) }),
+    setRightPanelWidth: (w: number) => set({ rightPanelWidth: Math.max(320, Math.min(2400, w)) }),
 
-      setPaneSizes: (sizes: number[]) => set({ paneSizes: sizes }),
+    setPaneSizes: (sizes: number[]) => set({ paneSizes: sizes }),
 
-      setActiveLeftPanel: (tab: LeftPanelTab) => set({ activeLeftPanel: tab }),
+    setActiveLeftPanel: (tab: LeftPanelTab) => set({ activeLeftPanel: tab }),
 
-      incrementFileTreeVersion: () => set((s) => ({ fileTreeVersion: s.fileTreeVersion + 1 })),
+    incrementFileTreeVersion: () => set((s) => ({ fileTreeVersion: s.fileTreeVersion + 1 })),
 
-      requestOpenFile: (path) => set({ openFileRequest: { path, requestId: Date.now() } }),
+    requestOpenFile: (path) => set({ openFileRequest: { path, requestId: Date.now() } }),
 
-      clearOpenFileRequest: () => set({ openFileRequest: null }),
+    clearOpenFileRequest: () => set({ openFileRequest: null }),
 
-      openFileTab: (path) =>
-        set((s) => {
-          if (s.fileTabs.some((t) => t.path === path)) {
-            return { activeFilePath: path };
-          }
-          const name = path.split(/[/\\]/).pop() || path;
-          let tabs = s.fileTabs;
-          if (tabs.length >= MAX_FILE_TABS) {
-            const evictIdx = tabs[0].path === s.activeFilePath && tabs.length > 1 ? 1 : 0;
-            tabs = tabs.filter((_, i) => i !== evictIdx);
-          }
-          return { fileTabs: [...tabs, { path, name }], activeFilePath: path };
-        }),
+    openFileTab: (path) =>
+      set((s) => {
+        if (s.fileTabs.some((t) => t.path === path)) {
+          return { activeFilePath: path };
+        }
+        const name = path.split(/[/\\]/).pop() || path;
+        let tabs = s.fileTabs;
+        if (tabs.length >= MAX_FILE_TABS) {
+          const evictIdx = tabs[0].path === s.activeFilePath && tabs.length > 1 ? 1 : 0;
+          tabs = tabs.filter((_, i) => i !== evictIdx);
+        }
+        return { fileTabs: [...tabs, { path, name }], activeFilePath: path };
+      }),
 
-      closeFileTab: (path) =>
-        set((s) => {
-          const idx = s.fileTabs.findIndex((t) => t.path === path);
-          if (idx < 0) return s;
-          const tabs = s.fileTabs.filter((t) => t.path !== path);
-          let active = s.activeFilePath;
-          if (active === path) {
-            const next = tabs[idx] ?? tabs[idx - 1];
-            active = next ? next.path : null;
-          }
-          return { fileTabs: tabs, activeFilePath: active };
-        }),
+    closeFileTab: (path) =>
+      set((s) => {
+        const idx = s.fileTabs.findIndex((t) => t.path === path);
+        if (idx < 0) return s;
+        const tabs = s.fileTabs.filter((t) => t.path !== path);
+        let active = s.activeFilePath;
+        if (active === path) {
+          const next = tabs[idx] ?? tabs[idx - 1];
+          active = next ? next.path : null;
+        }
+        return { fileTabs: tabs, activeFilePath: active };
+      }),
 
-      setActiveFilePath: (path) => set({ activeFilePath: path }),
+    setActiveFilePath: (path) => set({ activeFilePath: path }),
 
-      clearFileTabs: () => set({ fileTabs: [], activeFilePath: null }),
+    clearFileTabs: () => set({ fileTabs: [], activeFilePath: null }),
   };
   return actions as AppActions;
 }
@@ -221,107 +222,107 @@ function createGeneralActions(set: StoreSet, _get: StoreGet): AppActions {
 /** 文件标签页与底部 tab 历史（后退/前进）action。 */
 function createTabActions(set: StoreSet, get: StoreGet): AppActions {
   const actions: Partial<AppStore> = {
-      addTab: (tab) => {
-        const id = Math.random().toString(36).slice(2, 11);
-        set((s) => {
-          const newHistory = [...s.tabHistory.slice(0, s.tabHistoryIndex + 1), id];
-          return {
-            tabs: [...s.tabs, { ...tab, id }],
-            activeTabId: id,
-            tabHistory: newHistory,
-            tabHistoryIndex: newHistory.length - 1,
-          };
-        });
-        return id;
-      },
+    addTab: (tab) => {
+      const id = Math.random().toString(36).slice(2, 11);
+      set((s) => {
+        const newHistory = [...s.tabHistory.slice(0, s.tabHistoryIndex + 1), id];
+        return {
+          tabs: [...s.tabs, { ...tab, id }],
+          activeTabId: id,
+          tabHistory: newHistory,
+          tabHistoryIndex: newHistory.length - 1,
+        };
+      });
+      return id;
+    },
 
-      closeTab: (tabId: string) => {
-        set((s) => {
-          const newTabs = s.tabs.filter((t) => t.id !== tabId);
-          const newActive = s.activeTabId === tabId ? (newTabs[newTabs.length - 1]?.id ?? null) : s.activeTabId;
-          const newHistory = s.tabHistory.filter((h) => h !== tabId);
-          const newIndex = newActive ? newHistory.lastIndexOf(newActive) : -1;
-          return {
-            tabs: newTabs,
-            activeTabId: newActive,
-            tabHistory: newHistory,
-            tabHistoryIndex: newIndex >= 0 ? newIndex : newHistory.length - 1,
-          };
-        });
-      },
+    closeTab: (tabId: string) => {
+      set((s) => {
+        const newTabs = s.tabs.filter((t) => t.id !== tabId);
+        const newActive = s.activeTabId === tabId ? (newTabs[newTabs.length - 1]?.id ?? null) : s.activeTabId;
+        const newHistory = s.tabHistory.filter((h) => h !== tabId);
+        const newIndex = newActive ? newHistory.lastIndexOf(newActive) : -1;
+        return {
+          tabs: newTabs,
+          activeTabId: newActive,
+          tabHistory: newHistory,
+          tabHistoryIndex: newIndex >= 0 ? newIndex : newHistory.length - 1,
+        };
+      });
+    },
 
-      setActiveTab: (tabId: string) => {
-        set((s) => {
-          const exists = s.tabs.some((t) => t.id === tabId);
-          if (!exists) return s;
-          if (navigating) return { activeTabId: tabId };
-          const newHistory = [...s.tabHistory.slice(0, s.tabHistoryIndex + 1), tabId];
-          return {
-            activeTabId: tabId,
-            tabHistory: newHistory,
-            tabHistoryIndex: newHistory.length - 1,
-          };
-        });
-      },
+    setActiveTab: (tabId: string) => {
+      set((s) => {
+        const exists = s.tabs.some((t) => t.id === tabId);
+        if (!exists) return s;
+        if (navigating) return { activeTabId: tabId };
+        const newHistory = [...s.tabHistory.slice(0, s.tabHistoryIndex + 1), tabId];
+        return {
+          activeTabId: tabId,
+          tabHistory: newHistory,
+          tabHistoryIndex: newHistory.length - 1,
+        };
+      });
+    },
 
-      updateTab: (tabId: string, updates) => {
-        set((s) => ({
-          tabs: s.tabs.map((t) => (t.id === tabId ? { ...t, ...updates } : t)),
-        }));
-      },
+    updateTab: (tabId: string, updates) => {
+      set((s) => ({
+        tabs: s.tabs.map((t) => (t.id === tabId ? { ...t, ...updates } : t)),
+      }));
+    },
 
-      closeAllTabs: () => {
-        set({ tabs: [], activeTabId: null, tabHistory: [], tabHistoryIndex: -1 });
-      },
+    closeAllTabs: () => {
+      set({ tabs: [], activeTabId: null, tabHistory: [], tabHistoryIndex: -1 });
+    },
 
-      setRightPanelView: (view) => {
-        set({ rightPanelView: view });
-      },
+    setRightPanelView: (view) => {
+      set({ rightPanelView: view });
+    },
 
-      goBack: () => {
-        const { tabHistoryIndex, tabHistory, tabs } = get();
-        let idx = tabHistoryIndex - 1;
-        while (idx >= 0) {
-          const targetId = tabHistory[idx];
-          if (tabs.some((t) => t.id === targetId)) {
-            navigating = true;
-            set({ activeTabId: targetId, tabHistoryIndex: idx });
-            navigating = false;
-            return;
-          }
-          idx--;
+    goBack: () => {
+      const { tabHistoryIndex, tabHistory, tabs } = get();
+      let idx = tabHistoryIndex - 1;
+      while (idx >= 0) {
+        const targetId = tabHistory[idx];
+        if (tabs.some((t) => t.id === targetId)) {
+          navigating = true;
+          set({ activeTabId: targetId, tabHistoryIndex: idx });
+          navigating = false;
+          return;
         }
-        // Every earlier entry is closed — clamp so the 后退 button disables
-        // instead of staying enabled as a dead no-op.
-        set({ tabHistoryIndex: -1 });
-      },
+        idx--;
+      }
+      // Every earlier entry is closed — clamp so the 后退 button disables
+      // instead of staying enabled as a dead no-op.
+      set({ tabHistoryIndex: -1 });
+    },
 
-      goForward: () => {
-        const { tabHistoryIndex, tabHistory, tabs } = get();
-        let idx = tabHistoryIndex + 1;
-        while (idx < tabHistory.length) {
-          const targetId = tabHistory[idx];
-          if (tabs.some((t) => t.id === targetId)) {
-            navigating = true;
-            set({ activeTabId: targetId, tabHistoryIndex: idx });
-            navigating = false;
-            return;
-          }
-          idx++;
+    goForward: () => {
+      const { tabHistoryIndex, tabHistory, tabs } = get();
+      let idx = tabHistoryIndex + 1;
+      while (idx < tabHistory.length) {
+        const targetId = tabHistory[idx];
+        if (tabs.some((t) => t.id === targetId)) {
+          navigating = true;
+          set({ activeTabId: targetId, tabHistoryIndex: idx });
+          navigating = false;
+          return;
         }
-        // Every later entry is closed — clamp so 前进 disables.
-        set({ tabHistoryIndex: tabHistory.length - 1 });
-      },
+        idx++;
+      }
+      // Every later entry is closed — clamp so 前进 disables.
+      set({ tabHistoryIndex: tabHistory.length - 1 });
+    },
 
-      canGoBack: () => {
-        const { tabHistoryIndex } = get();
-        return tabHistoryIndex > 0;
-      },
+    canGoBack: () => {
+      const { tabHistoryIndex } = get();
+      return tabHistoryIndex > 0;
+    },
 
-      canGoForward: () => {
-        const { tabHistoryIndex, tabHistory } = get();
-        return tabHistoryIndex < tabHistory.length - 1;
-      },
+    canGoForward: () => {
+      const { tabHistoryIndex, tabHistory } = get();
+      return tabHistoryIndex < tabHistory.length - 1;
+    },
   };
   return actions as AppActions;
 }

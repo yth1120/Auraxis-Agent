@@ -34,13 +34,18 @@ export function clearAgentTombstones(): void {
   removedAgentIds.clear();
 }
 
-type AgentCoreKeys = 'setCurrentAgent' | 'setPlanFile' | 'addAgentPermission' | 'removeAgentPermission' | 'addAgent' | 'updateAgent' | 'removeAgent' | 'appendAgentLog';
+type AgentCoreKeys =
+  | 'setCurrentAgent'
+  | 'setPlanFile'
+  | 'addAgentPermission'
+  | 'removeAgentPermission'
+  | 'addAgent'
+  | 'updateAgent'
+  | 'removeAgent'
+  | 'appendAgentLog';
 
 /** 注册表/权限/日志等核心 action。 */
-function createAgentCoreActions(
-  set: SetState,
-  _get: GetState,
-): Pick<AgentStoreActions, AgentCoreKeys> {
+function createAgentCoreActions(set: SetState, _get: GetState): Pick<AgentStoreActions, AgentCoreKeys> {
   return {
     setCurrentAgent: (id) => {
       set({ currentAgentId: id });
@@ -144,10 +149,7 @@ type AgentControlKeys =
   | 'clearAgents';
 
 /** 启动 agent（调度器 + 首条指令）。 */
-function createAgentStartActions(
-  set: SetState,
-  _get: GetState,
-): Pick<AgentStoreActions, AgentStartKeys> {
+function createAgentStartActions(set: SetState, _get: GetState): Pick<AgentStoreActions, AgentStartKeys> {
   return {
     startAgent: async (request, projectPath) => {
       const api = agentIpc();
@@ -237,10 +239,7 @@ function createAgentStartActions(
 }
 
 /** 停止/暂停/恢复/优先级/状态刷新等控制 action。 */
-function createAgentControlActions(
-  set: SetState,
-  get: GetState,
-): Pick<AgentStoreActions, AgentControlKeys> {
+function createAgentControlActions(set: SetState, get: GetState): Pick<AgentStoreActions, AgentControlKeys> {
   return {
     stopAgent: async (agentId) => {
       const api = agentIpc();

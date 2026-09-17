@@ -29,7 +29,6 @@ export async function prepareLoopContext(config: AgentLoopConfig): Promise<Prepa
   }
   if (config.surface === 'work') {
     try {
-      
       const settings = await runtimePorts().readSettingsSnapshot();
       const before = effectiveSystemPrompt;
       effectiveSystemPrompt = runtimePorts().appendWorkRules(effectiveSystemPrompt, config.surface, {

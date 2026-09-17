@@ -27,7 +27,8 @@ const THINKING_BLOCK_RE = /<thinking>[\s\S]*?<\/thinking>/gi;
 const LEGACY_TOOL_BLOCK_RE = /<\/?(?:function_call|tool_call|invoke|parameter)[^>]*>/gi;
 
 // DSML 风格的工具调用排练块（纯对话通道没有工具时，模型偶尔把"假调用"写成文本）
-const DSML_BLOCK_RE = /<\s*[｜|\s]*DSML[｜|\s]*(?:tool_?\s*)?calls[^>]*>[\s\S]*?<\/\s*[｜|\s]*DSML[｜|\s]*(?:tool_?\s*)?calls[^>]*>/gi;
+const DSML_BLOCK_RE =
+  /<\s*[｜|\s]*DSML[｜|\s]*(?:tool_?\s*)?calls[^>]*>[\s\S]*?<\/\s*[｜|\s]*DSML[｜|\s]*(?:tool_?\s*)?calls[^>]*>/gi;
 const DSML_UNTERMINATED_RE = /<\s*[｜|\s]*DSML[｜|\s]*(?:tool_?\s*)?calls[^>]*>[\s\S]*$/i;
 const DSML_TAG_RE = /<\/?\s*[｜|]*DSML\b[^>]*>/gi;
 

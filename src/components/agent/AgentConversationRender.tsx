@@ -385,8 +385,16 @@ function toolTodoCounts(entry: AgentLogEntry): { total: number; done: number; ac
 }
 
 /** 行摘要：TodoWrite 显示进度，其它工具显示入参摘要。 */
-function toolRowSummary(entry: AgentLogEntry, counts: { done: number; total: number } | null, t: (k: never, v?: never) => string): string {
-  if (counts) return (t as unknown as (k: string, v: Record<string, unknown>) => string)('conv.todoProgress', { done: counts.done, total: counts.total });
+function toolRowSummary(
+  entry: AgentLogEntry,
+  counts: { done: number; total: number } | null,
+  t: (k: never, v?: never) => string,
+): string {
+  if (counts)
+    return (t as unknown as (k: string, v: Record<string, unknown>) => string)('conv.todoProgress', {
+      done: counts.done,
+      total: counts.total,
+    });
   return summarizeInput(entry.toolName, entry.input);
 }
 

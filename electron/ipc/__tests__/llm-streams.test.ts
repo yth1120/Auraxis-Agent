@@ -1,5 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
-import { AnthropicStreamAccumulator, OpenAiStreamAccumulator, type ProviderStreamCallbacks } from '../../agent-runtime/llm-streams';
+import {
+  AnthropicStreamAccumulator,
+  OpenAiStreamAccumulator,
+  type ProviderStreamCallbacks,
+} from '../../agent-runtime/llm-streams';
 
 /** 构造一条 SSE 事件（带结尾空行，模拟真实分片边界）。 */
 function sse(payload: unknown): Buffer {

@@ -35,10 +35,14 @@ describe('agent iteration budget', () => {
   });
 
   it('detects the graceful business-limit message from both execution paths', () => {
-    expect(isBusinessIterationLimitMessage('已达到业务迭代上限 (3)，任务暂停收尾。已完成 6 次工具调用，如需继续可发送跟进任务。')).toBe(
+    expect(
+      isBusinessIterationLimitMessage(
+        '已达到业务迭代上限 (3)，任务暂停收尾。已完成 6 次工具调用，如需继续可发送跟进任务。',
+      ),
+    ).toBe(true);
+    expect(isBusinessIterationLimitMessage('已达到业务迭代上限 50 次，任务暂停收尾。已完成 120 次工具调用。')).toBe(
       true,
     );
-    expect(isBusinessIterationLimitMessage('已达到业务迭代上限 50 次，任务暂停收尾。已完成 120 次工具调用。')).toBe(true);
     expect(isBusinessIterationLimitMessage('达到安全硬上限 500 次迭代，强制终止。')).toBe(false);
     expect(isBusinessIterationLimitMessage(undefined)).toBe(false);
     expect(isBusinessIterationLimitMessage('')).toBe(false);

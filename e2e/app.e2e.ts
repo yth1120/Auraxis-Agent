@@ -208,9 +208,10 @@ test('输入区模型选择与思考深度面板联动', async () => {
   await expect(page.getByRole('menuitemradio').first()).toBeVisible();
 
   // 选择 Flash 模型后面板关闭，触发按钮展示新模型名
-  await page.getByRole('menuitemradio', { name: 'DeepSeek V4 Flash 轻快响应，适合高频对话与简单任务' }).click();
+  // 名字随模型版本变化（V4.1），用前缀匹配避免每次改名都要改 E2E。
+  await page.getByRole('menuitemradio', { name: /DeepSeek V4\.1 Flash/ }).click();
   await expect(page.getByRole('slider', { name: '思考深度' })).toBeHidden();
-  await expect(modelTrigger).toContainText('DeepSeek V4 Flash');
+  await expect(modelTrigger).toContainText('DeepSeek V4.1 Flash');
 
   // 统一运行权限面板
   const permissionBtn = page.getByRole('button', { name: '运行权限' });

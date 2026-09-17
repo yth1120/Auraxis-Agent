@@ -35,10 +35,7 @@ import {
 } from '../agent-runtime/context-manager';
 import { buildModeHint, loadLlmContext, saveLlmContext, tryReplayStoredContext } from './query-context';
 import { readSettings } from './settings-store';
-import {
-  BUSINESS_ITERATION_MAX,
-  resolveIterationBudget,
-} from './agent-iteration-budget';
+import { BUSINESS_ITERATION_MAX, resolveIterationBudget } from './agent-iteration-budget';
 
 // ─── Types ────────────────────────────────────────────────
 

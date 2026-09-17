@@ -98,15 +98,12 @@ function InspectorEmptyState({
       </div>
     );
   }
-  const emptyText =
-    sidebarMode === 'work' ? tPanel('inspector.emptyWork') : tPanel('inspector.emptyCode');
+  const emptyText = sidebarMode === 'work' ? tPanel('inspector.emptyWork') : tPanel('inspector.emptyCode');
   return (
     <div className="h-full overflow-y-auto px-3 pb-6 pt-3">
       <div className="bg-[var(--color-bg-secondary)] rounded-xl p-6 flex flex-col items-center text-center gap-2">
         <ApartmentOutlined className="text-2xl text-[var(--color-text-faint)]" />
-        <p className="text-sm font-semibold text-[var(--color-text-secondary)] m-0">
-          {tPanel('inspector.emptyTitle')}
-        </p>
+        <p className="text-sm font-semibold text-[var(--color-text-secondary)] m-0">{tPanel('inspector.emptyTitle')}</p>
         <p className="text-2xs text-[var(--color-text-muted)] m-0 leading-relaxed">{emptyText}</p>
       </div>
       <SnapshotCard projectRoot={projectRoot ?? null} now={now} />
@@ -397,9 +394,7 @@ export default function WorkspaceInspector() {
 
       {codeAgent && deliverables.length > 0 && <DeliverablesCard files={deliverables} onPreview={openPreview} />}
 
-      {settled && (
-        <RollbackCard onRollback={rollbackAgent} />
-      )}
+      {settled && <RollbackCard onRollback={rollbackAgent} />}
 
       <SnapshotCard projectRoot={projectRoot} now={now} />
 
