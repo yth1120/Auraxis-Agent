@@ -11,7 +11,7 @@ import { app } from 'electron';
 import { rmSync } from 'fs';
 import type { CliArgs } from './cli-args';
 import { agentLoopRun } from './ipc/agent-loop';
-import type { AgentObserver, AgentLoopEvent, TaskPlan } from './ipc/agent-loop';
+import type { AgentObserver, AgentLoopEvent, TaskPlan } from './ipc/agent-loop-types';
 import { getAllTools } from './tool-registry';
 import { resolveModelApiBase, resolveModelApiKey } from './ipc/model-config';
 import { readSettings } from './ipc/settings-store';
@@ -19,6 +19,7 @@ import { resolveCredential } from './credentials';
 import { getAgentDef } from './ipc/agent-handlers';
 import type { SandboxMode } from './sandbox-policy';
 import { isPermissionPreset, PERMISSION_PRESETS } from './contracts/permission';
+import type { ApprovalPolicy } from './types';
 
 /** Tools that never mutate anything — safe to allow even in headless ask mode. */
 const READ_ONLY_TOOLS = new Set([
@@ -75,40 +76,116 @@ function toolSummary(toolName: string, input: Record<string, unknown>): string {
   }
 }
 
+function firstTruthy<T>(...values: Array<T | undefined>): T | undefined {
+  return values.find((value) => !!value);
+}
+
+/** Resolve the API key in the same priority order the CLI documents. */
+async function resolveHeadlessApiKey(
+  opts: HeadlessRunOptions,
+  settings: Record<string, unknown>,
+  model: string,
+): Promise<string> {
+  if (opts.apiKey) return opts.apiKey;
+  const fromModel = await resolveModelApiKey(model);
+  if (fromModel) return fromModel;
+  if (process.env.DEEPSEEK_API_KEY) return process.env.DEEPSEEK_API_KEY;
+  const credential = await resolveCredential('DEEPSEEK_API_KEY').catch(() => undefined);
+  if (credential?.value) return credential.value;
+  return typeof settings.deepseekApiKey === 'string' ? settings.deepseekApiKey : '';
+}
+
+interface HeadlessRunConfig {
+  model: string;
+  apiKey: string;
+  apiBase: string;
+  projectRoot: string;
+  mode: ApprovalPolicy;
+  sandboxMode: SandboxMode;
+  autoApprove: boolean;
+}
+
+async function resolveHeadlessConfig(
+  opts: HeadlessRunOptions,
+  settings: Record<string, unknown>,
+): Promise<HeadlessRunConfig> {
+  const model =
+    firstTruthy(opts.model, typeof settings.defaultModel === 'string' ? settings.defaultModel : undefined) ??
+    'deepseek-v4-pro';
+  const apiBase = opts.apiBase || (await resolveModelApiBase(model));
+  const preset =
+    typeof settings.permissionPreset === 'string' && isPermissionPreset(settings.permissionPreset)
+      ? PERMISSION_PRESETS[settings.permissionPreset]
+      : undefined;
+  const settingsSandbox =
+    settings.sandboxMode === 'read' || settings.sandboxMode === 'workspace-write' || settings.sandboxMode === 'full'
+      ? (settings.sandboxMode as SandboxMode)
+      : undefined;
+  const mode = opts.mode || preset?.mode || 'auto';
+  return {
+    model,
+    apiKey: await resolveHeadlessApiKey(opts, settings, model),
+    apiBase,
+    projectRoot:
+      firstTruthy(opts.project, typeof settings.projectPath === 'string' ? settings.projectPath : undefined) ??
+      process.cwd(),
+    mode,
+    sandboxMode: opts.sandbox || preset?.sandboxMode || settingsSandbox || 'workspace-write',
+    autoApprove: opts.autoApprove !== undefined ? opts.autoApprove : preset ? preset.autoApprove : mode === 'auto',
+  };
+}
+
+interface PlainLine {
+  stream: 'stdout' | 'stderr';
+  text: string;
+}
+
+/** Render one engine event for the human-readable (non-JSON) output mode. */
+function formatPlainEvent(e: AgentLoopEvent, verbose: boolean): PlainLine | null {
+  switch (e.type) {
+    case 'text_chunk':
+      return { stream: 'stdout', text: e.text };
+    case 'thinking_chunk': {
+      if (!verbose || !e.chunk.trim()) return null;
+      return { stream: 'stderr', text: `[思考] ${e.chunk.trim().split('\n')[0].slice(0, 120)}\n` };
+    }
+    case 'tool_start': {
+      const summary = toolSummary(e.toolName, e.input || {});
+      return { stream: 'stderr', text: `[工具] ${e.toolName}${summary ? ` ${summary}` : ''}\n` };
+    }
+    case 'tool_end':
+      return { stream: 'stderr', text: `[完成] ${e.toolName} (${e.durationMs}ms)\n` };
+    case 'tool_error':
+      return { stream: 'stderr', text: `[失败] ${e.toolName}: ${String(e.error).split('\n')[0]}\n` };
+    case 'tool_progress':
+      return verbose && e.progress.trim() ? { stream: 'stderr', text: `[进度] ${e.progress.trim()}\n` } : null;
+    case 'plan_created':
+      return { stream: 'stderr', text: `[计划] 已生成 ${e.plan.tasks.length} 个任务\n` };
+    case 'deviance_warning':
+      return { stream: 'stderr', text: `[警告] ${e.message.split('\n')[0]}\n` };
+    case 'context_compressed':
+      return { stream: 'stderr', text: `[压缩] ${e.tokensBefore} → ${e.tokensAfter} tokens\n` };
+    case 'error':
+      return { stream: 'stderr', text: `[错误] ${e.error}\n` };
+    case 'usage':
+      return verbose ? { stream: 'stderr', text: `[用量] in=${e.inputTokens} out=${e.outputTokens}\n` } : null;
+    default:
+      return null;
+  }
+}
+
 export async function runHeadlessTask(opts: HeadlessRunOptions): Promise<number> {
   const settings = (await readSettings().catch(() => ({}))) as Record<string, unknown>;
-
-  const model =
-    opts.model || (typeof settings.defaultModel === 'string' ? settings.defaultModel : undefined) || 'deepseek-v4-pro';
-  const apiKey =
-    opts.apiKey ||
-    (await resolveModelApiKey(model)) ||
-    process.env.DEEPSEEK_API_KEY ||
-    (await resolveCredential('DEEPSEEK_API_KEY').catch(() => undefined))?.value ||
-    (typeof settings.deepseekApiKey === 'string' ? settings.deepseekApiKey : undefined) ||
-    '';
+  const { model, apiKey, apiBase, projectRoot, mode, sandboxMode, autoApprove } = await resolveHeadlessConfig(
+    opts,
+    settings,
+  );
   if (!apiKey) {
     process.stderr.write(
       '错误: 未配置 API Key。请使用 --api-key、设置 DEEPSEEK_API_KEY 环境变量，或先在桌面应用设置中配置。\n',
     );
     return 2;
   }
-
-  const apiBase = opts.apiBase || (await resolveModelApiBase(model));
-  const projectRoot =
-    opts.project || (typeof settings.projectPath === 'string' ? settings.projectPath : undefined) || process.cwd();
-  const preset =
-    typeof settings.permissionPreset === 'string' && isPermissionPreset(settings.permissionPreset)
-      ? PERMISSION_PRESETS[settings.permissionPreset]
-      : undefined;
-  const mode = opts.mode || preset?.mode || 'auto';
-  const sandboxMode: SandboxMode =
-    opts.sandbox ||
-    preset?.sandboxMode ||
-    (settings.sandboxMode === 'read' || settings.sandboxMode === 'workspace-write' || settings.sandboxMode === 'full'
-      ? (settings.sandboxMode as SandboxMode)
-      : 'workspace-write');
-  const autoApprove = opts.autoApprove !== undefined ? opts.autoApprove : preset ? preset.autoApprove : mode === 'auto';
   const json = opts.json === true;
   const verbose = opts.verbose === true || json;
 
@@ -135,48 +212,10 @@ export async function runHeadlessTask(opts: HeadlessRunOptions): Promise<number>
       process.stdout.write(`${JSON.stringify({ ...e, ts: Date.now() })}\n`);
       return;
     }
-    switch (e.type) {
-      case 'text_chunk':
-        process.stdout.write(e.text);
-        break;
-      case 'thinking_chunk':
-        if (verbose && e.chunk.trim()) {
-          const line = e.chunk.trim().split('\n')[0].slice(0, 120);
-          process.stderr.write(`[思考] ${line}\n`);
-        }
-        break;
-      case 'tool_start': {
-        const summary = toolSummary(e.toolName, e.input || {});
-        process.stderr.write(`[工具] ${e.toolName}${summary ? ` ${summary}` : ''}\n`);
-        break;
-      }
-      case 'tool_end':
-        process.stderr.write(`[完成] ${e.toolName} (${e.durationMs}ms)\n`);
-        break;
-      case 'tool_error':
-        process.stderr.write(`[失败] ${e.toolName}: ${String(e.error).split('\n')[0]}\n`);
-        break;
-      case 'tool_progress':
-        if (verbose && e.progress.trim()) process.stderr.write(`[进度] ${e.progress.trim()}\n`);
-        break;
-      case 'plan_created':
-        process.stderr.write(`[计划] 已生成 ${e.plan.tasks.length} 个任务\n`);
-        break;
-      case 'deviance_warning':
-        process.stderr.write(`[警告] ${e.message.split('\n')[0]}\n`);
-        break;
-      case 'context_compressed':
-        process.stderr.write(`[压缩] ${e.tokensBefore} → ${e.tokensAfter} tokens\n`);
-        break;
-      case 'error':
-        process.stderr.write(`[错误] ${e.error}\n`);
-        break;
-      case 'usage':
-        if (verbose) process.stderr.write(`[用量] in=${e.inputTokens} out=${e.outputTokens}\n`);
-        break;
-      default:
-        break;
-    }
+    const line = formatPlainEvent(e, verbose);
+    if (!line) return;
+    if (line.stream === 'stdout') process.stdout.write(line.text);
+    else process.stderr.write(line.text);
   };
 
   const observer: AgentObserver = {

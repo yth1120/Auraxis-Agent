@@ -347,6 +347,90 @@ export async function sessionQuerySearch(query: string, limit = 8): Promise<FtsH
   return searchFts(query.trim(), safeLimit);
 }
 
+async function readDirSafe(dir: string): Promise<string[]> {
+  try {
+    return await fs.readdir(dir);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Rebuild every `*.jsonl` session log in `dir` into FTS docs. Parsing goes
+ * through the same `sessionDocFromJsonl` used by incremental refresh, so a
+ * full rebuild and a live refresh produce identical documents.
+ */
+async function rebuildJsonlDir(
+  dir: string,
+  accepts: (file: string) => boolean,
+  toDoc: (id: string, parts: string[], ts: number) => FtsDoc | null,
+): Promise<number> {
+  let count = 0;
+  for (const file of await readDirSafe(dir)) {
+    if (!accepts(file)) continue;
+    const id = file.replace(/\.jsonl$/, '');
+    try {
+      const raw = await fs.readFile(path.join(dir, file), 'utf8');
+      const { parts, ts } = sessionDocFromJsonl(raw, 'agent');
+      const doc = toDoc(id, parts, ts);
+      if (!doc) continue;
+      await addFtsDoc(doc);
+      count += 1;
+    } catch {
+      /* skip unreadable file */
+    }
+  }
+  return count;
+}
+
+function rebuildChatLogs(): Promise<number> {
+  return rebuildJsonlDir(
+    chatLogRoot(),
+    (file) => file.endsWith('.jsonl'),
+    (id, parts, ts) =>
+      parts.length > 0
+        ? { type: 'chat', id, title: `会话 ${id}`, text: parts.join('\n').slice(-50_000), ts }
+        : null,
+  );
+}
+
+function rebuildAgentLogs(): Promise<number> {
+  return rebuildJsonlDir(
+    sessionLogRoot(),
+    (file) => file.startsWith('agent-') && file.endsWith('.jsonl'),
+    (id, parts, ts) =>
+      parts.length > 0
+        ? { type: 'agent', id, title: `Agent ${id}`, text: parts.join('\n').slice(-50_000), ts }
+        : null,
+  );
+}
+
+/** Agent snapshots: result summaries (title + result). */
+async function rebuildAgentSnapshots(): Promise<number> {
+  let count = 0;
+  for (const file of await readDirSafe(snapshotRoot())) {
+    if (!file.endsWith('.json')) continue;
+    const id = file.slice(0, -5);
+    try {
+      const raw = await fs.readFile(path.join(snapshotRoot(), file), 'utf8');
+      const snap = JSON.parse(raw) as { name?: string; result?: string; error?: string; startTime?: number };
+      const text = `${snap.name || id}\n${snap.result || ''}\n${snap.error || ''}`;
+      if (!text.trim()) continue;
+      await addFtsDoc({
+        type: 'agent',
+        id,
+        title: snap.name || id,
+        text: text.slice(0, 20_000),
+        ts: snap.startTime || 0,
+      });
+      count += 1;
+    } catch {
+      /* skip corrupt snapshot */
+    }
+  }
+  return count;
+}
+
 export async function rebuildFts(): Promise<number> {
   index = { docs: {}, terms: {} };
   const db = ftsDb();
@@ -358,113 +442,7 @@ export async function rebuildFts(): Promise<number> {
       /* noop */
     }
   }
-  let count = 0;
-
-  // Chat logs: aggregate each session's user + assistant text.
-  let files: string[] = [];
-  try {
-    files = await fs.readdir(chatLogRoot());
-  } catch {
-    /* no logs */
-  }
-  for (const file of files) {
-    if (!file.endsWith('.jsonl')) continue;
-    const id = file.slice(0, -6);
-    try {
-      const raw = await fs.readFile(path.join(chatLogRoot(), file), 'utf8');
-      const parts: string[] = [];
-      let ts = 0;
-      for (const line of raw.split('\n')) {
-        if (!line.trim()) continue;
-        try {
-          const e = JSON.parse(line) as { type?: string; ts?: number; data?: { text?: string } };
-          if (typeof e.ts === 'number' && e.ts > ts) ts = e.ts;
-          const text = e.data?.text;
-          if (text) parts.push(e.type === 'user' ? `用户：${text}` : text);
-        } catch {
-          /* skip */
-        }
-      }
-      if (parts.length > 0) {
-        await addFtsDoc({ type: 'chat', id, title: `会话 ${id}`, text: parts.join('\n').slice(-50_000), ts });
-        count++;
-      }
-    } catch {
-      /* skip */
-    }
-  }
-
-  // Agent session logs: text chunks.
-  try {
-    files = await fs.readdir(sessionLogRoot());
-  } catch {
-    files = [];
-  }
-  for (const file of files) {
-    if (!file.startsWith('agent-') || !file.endsWith('.jsonl')) continue;
-    const id = file.slice(0, -6);
-    try {
-      const raw = await fs.readFile(path.join(sessionLogRoot(), file), 'utf8');
-      const parts: string[] = [];
-      let ts = 0;
-      for (const line of raw.split('\n')) {
-        if (!line.trim()) continue;
-        try {
-          const e = JSON.parse(line) as {
-            type?: string;
-            ts?: number;
-            timestamp?: number;
-            text?: string;
-            toolName?: string;
-            data?: { text?: string; toolName?: string; event?: string; error?: string };
-          };
-          const eventTs = typeof e.ts === 'number' ? e.ts : typeof e.timestamp === 'number' ? e.timestamp : 0;
-          if (eventTs > ts) ts = eventTs;
-          const text = e.data?.text ?? e.text;
-          if (text) parts.push(e.type === 'user' ? `用户：${text}` : text);
-          const toolName = e.data?.toolName ?? e.toolName;
-          if (toolName) parts.push(`工具：${toolName}`);
-        } catch {
-          /* skip */
-        }
-      }
-      if (parts.length > 0) {
-        await addFtsDoc({ type: 'agent', id, title: `Agent ${id}`, text: parts.join('\n').slice(-50_000), ts });
-        count++;
-      }
-    } catch {
-      /* skip */
-    }
-  }
-
-  // Agent snapshots: result summaries (title + result).
-  try {
-    files = await fs.readdir(snapshotRoot());
-  } catch {
-    files = [];
-  }
-  for (const file of files) {
-    if (!file.endsWith('.json')) continue;
-    const id = file.slice(0, -5);
-    try {
-      const raw = await fs.readFile(path.join(snapshotRoot(), file), 'utf8');
-      const snap = JSON.parse(raw) as { name?: string; result?: string; error?: string; startTime?: number };
-      const text = `${snap.name || id}\n${snap.result || ''}\n${snap.error || ''}`;
-      if (text.trim()) {
-        await addFtsDoc({
-          type: 'agent',
-          id,
-          title: snap.name || id,
-          text: text.slice(0, 20_000),
-          ts: snap.startTime || 0,
-        });
-        count++;
-      }
-    } catch {
-      /* skip */
-    }
-  }
-
+  const count = (await rebuildChatLogs()) + (await rebuildAgentLogs()) + (await rebuildAgentSnapshots());
   await persist();
   return count;
 }

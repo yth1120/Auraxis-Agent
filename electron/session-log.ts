@@ -33,116 +33,61 @@ function tsOf(e: Record<string, unknown>): number {
   return v;
 }
 
-/**
- * Map a raw engine event (AgentLoopEvent / legacy AgentLogEntry) into the
- * unified SessionEvent vocabulary. Returns null for unmappable records.
- */
-export function mapAgentEventToSessionEvent(e: Record<string, unknown>): Omit<SessionEvent, 'seq'> | null {
-  const type = e.type as string | undefined;
-  if (!type) return null;
-  const ts = tsOf(e);
+type MappedEvent = Omit<SessionEvent, 'seq'>;
 
+const TOOL_ACTIONS: Record<string, 'start' | 'end' | 'error' | 'progress'> = {
+  tool_start: 'start',
+  tool_end: 'end',
+  tool_error: 'error',
+  tool_aborted: 'error',
+  tool_progress: 'progress',
+};
+
+const TEXT_TYPES = new Set(['text', 'text_chunk', 'assistant_chunk']);
+const PLAN_TYPES = new Set(['plan_created', 'plan_updated']);
+const USAGE_TYPES = new Set(['usage', 'usage_update']);
+const LOOP_PROGRESS_TYPES = new Set([
+  'iteration_start',
+  'iteration_end',
+  'turn_start',
+  'turn_end',
+  'step_start',
+  'step_end',
+  'request_start',
+]);
+
+function mapToolEvent(type: string, e: Record<string, unknown>, ts: number): MappedEvent {
+  const action = TOOL_ACTIONS[type];
+  const base = { action, toolName: e.toolName, toolCallId: e.toolCallId, stepGroupId: e.stepGroupId };
+  if (action === 'start') return { type: 'tool', ts, data: { ...base, input: e.input } };
+  if (action === 'end') {
+    return {
+      type: 'tool',
+      ts,
+      data: { ...base, input: e.input, output: e.output, durationMs: e.durationMs, summary: e.summary },
+    };
+  }
+  if (action === 'error') return { type: 'tool', ts, data: { ...base, input: e.input, error: e.error } };
+  return { type: 'tool', ts, data: { ...base, progress: e.progress } };
+}
+
+function mapUsageEvent(e: Record<string, unknown>, ts: number): MappedEvent {
+  return {
+    type: 'system',
+    ts,
+    data: {
+      event: 'usage',
+      inputTokens: e.inputTokens,
+      outputTokens: e.outputTokens,
+      reasoningTokens: e.reasoningTokens,
+      cacheHitTokens: e.cacheHitTokens,
+      cacheMissTokens: e.cacheMissTokens,
+    },
+  };
+}
+
+function mapLoopProgressEvent(type: string, e: Record<string, unknown>, ts: number): MappedEvent | null {
   switch (type) {
-    case 'user':
-      return { type: 'user', ts, data: { text: e.text ?? '' } };
-    case 'text':
-    case 'text_chunk':
-    case 'assistant_chunk':
-      return { type: 'assistant_chunk', ts, data: { text: e.text ?? '' } };
-    case 'thinking_chunk':
-      return { type: 'thinking_chunk', ts, data: { chunk: e.chunk ?? '', isNewBlock: !!e.isNewBlock } };
-    case 'tool_start':
-      return {
-        type: 'tool',
-        ts,
-        data: {
-          action: 'start',
-          toolName: e.toolName,
-          toolCallId: e.toolCallId,
-          input: e.input,
-          stepGroupId: e.stepGroupId,
-        },
-      };
-    case 'tool_end':
-      return {
-        type: 'tool',
-        ts,
-        data: {
-          action: 'end',
-          toolName: e.toolName,
-          toolCallId: e.toolCallId,
-          input: e.input,
-          output: e.output,
-          durationMs: e.durationMs,
-          stepGroupId: e.stepGroupId,
-          summary: e.summary,
-        },
-      };
-    case 'tool_error':
-    case 'tool_aborted':
-      return {
-        type: 'tool',
-        ts,
-        data: {
-          action: 'error',
-          toolName: e.toolName,
-          toolCallId: e.toolCallId,
-          input: e.input,
-          error: e.error,
-          stepGroupId: e.stepGroupId,
-        },
-      };
-    case 'tool_progress':
-      return {
-        type: 'tool',
-        ts,
-        data: {
-          action: 'progress',
-          toolName: e.toolName,
-          toolCallId: e.toolCallId,
-          progress: e.progress,
-          stepGroupId: e.stepGroupId,
-        },
-      };
-    case 'plan_created':
-    case 'plan_updated':
-      return {
-        type: 'system',
-        ts,
-        data: { event: type === 'plan_created' ? 'plan_created' : 'plan_updated', plan: e.plan },
-      };
-    case 'deviance_warning':
-      return { type: 'system', ts, data: { event: 'deviance', message: e.message } };
-    case 'context_compressed':
-      return {
-        type: 'system',
-        ts,
-        data: {
-          event: 'context_compressed',
-          tokensBefore: e.tokensBefore,
-          tokensAfter: e.tokensAfter,
-          messagesRemoved: e.messagesRemoved,
-          tokensSaved: e.tokensSaved,
-        },
-      };
-    case 'usage':
-    case 'usage_update':
-      return {
-        type: 'system',
-        ts,
-        data: {
-          event: 'usage',
-          inputTokens: e.inputTokens,
-          outputTokens: e.outputTokens,
-          reasoningTokens: e.reasoningTokens,
-          cacheHitTokens: e.cacheHitTokens,
-          cacheMissTokens: e.cacheMissTokens,
-        },
-      };
-    case 'system_message':
-      return { type: 'system', ts, data: { event: 'system_message', level: e.level, content: e.content } };
-    case 'user_message':
-      return { type: 'system', ts, data: { event: 'user_message', content: e.text ?? '' } };
     case 'iteration_start':
       return { type: 'system', ts, data: { event: 'iteration', action: 'start', iteration: e.iteration } };
     case 'iteration_end':
@@ -177,10 +122,35 @@ export function mapAgentEventToSessionEvent(e: Record<string, unknown>): Omit<Se
       };
     case 'request_start':
       return { type: 'system', ts, data: { event: 'request', model: e.model, provider: e.provider } };
-    case 'done':
-      return { type: 'system', ts, data: { event: 'done' } };
-    case 'error':
-      return { type: 'system', ts, data: { event: 'error', error: e.error } };
+    default:
+      return null;
+  }
+}
+
+function mapSimpleEvent(type: string, e: Record<string, unknown>, ts: number): MappedEvent {
+  switch (type) {
+    case 'user':
+      return { type: 'user', ts, data: { text: e.text ?? '' } };
+    case 'thinking_chunk':
+      return { type: 'thinking_chunk', ts, data: { chunk: e.chunk ?? '', isNewBlock: !!e.isNewBlock } };
+    case 'deviance_warning':
+      return { type: 'system', ts, data: { event: 'deviance', message: e.message } };
+    case 'context_compressed':
+      return {
+        type: 'system',
+        ts,
+        data: {
+          event: 'context_compressed',
+          tokensBefore: e.tokensBefore,
+          tokensAfter: e.tokensAfter,
+          messagesRemoved: e.messagesRemoved,
+          tokensSaved: e.tokensSaved,
+        },
+      };
+    case 'system_message':
+      return { type: 'system', ts, data: { event: 'system_message', level: e.level, content: e.content } };
+    case 'user_message':
+      return { type: 'system', ts, data: { event: 'user_message', content: e.text ?? '' } };
     case 'system':
       return {
         type: 'system',
@@ -189,9 +159,36 @@ export function mapAgentEventToSessionEvent(e: Record<string, unknown>): Omit<Se
       };
     case 'agent_status':
       return { type: 'agent_status', ts, data: { status: e.status, text: e.text } };
+    case 'done':
+      return { type: 'system', ts, data: { event: 'done' } };
+    case 'error':
+      return { type: 'system', ts, data: { event: 'error', error: e.error } };
     default:
       return { type: 'system', ts, data: { event: 'unknown', raw: e } };
   }
+}
+
+/**
+ * Map a raw engine event (AgentLoopEvent / legacy AgentLogEntry) into the
+ * unified SessionEvent vocabulary. Returns null for unmappable records.
+ */
+export function mapAgentEventToSessionEvent(e: Record<string, unknown>): MappedEvent | null {
+  const type = e.type as string | undefined;
+  if (!type) return null;
+  const ts = tsOf(e);
+
+  if (type in TOOL_ACTIONS) return mapToolEvent(type, e, ts);
+  if (TEXT_TYPES.has(type)) return { type: 'assistant_chunk', ts, data: { text: e.text ?? '' } };
+  if (PLAN_TYPES.has(type)) {
+    return {
+      type: 'system',
+      ts,
+      data: { event: type === 'plan_created' ? 'plan_created' : 'plan_updated', plan: e.plan },
+    };
+  }
+  if (USAGE_TYPES.has(type)) return mapUsageEvent(e, ts);
+  if (LOOP_PROGRESS_TYPES.has(type)) return mapLoopProgressEvent(type, e, ts);
+  return mapSimpleEvent(type, e, ts);
 }
 
 /** Append raw engine events to the durable agent log (mapped to SessionEvent). */
