@@ -6,6 +6,30 @@ import { normalizeDeepSeekMessages, type ApiMessage } from '../contracts/core';
 import { getDeepSeekUserId } from '../auth-store';
 import { sendToRenderer, sendUsageToRenderer } from './ai-handlers-utils';
 
+/** 解析单条 SSE 载荷并下发 usage / 正文 / 思考增量；坏 JSON 直接跳过。 */
+function dispatchStreamPayload(win: BrowserWindow, requestId: string, data: string): void {
+  try {
+    const parsed = JSON.parse(data);
+    const usage = parsed.usage;
+    if (usage) {
+      sendUsageToRenderer(win, requestId, {
+        inputTokens: usage.prompt_tokens || 0,
+        outputTokens: usage.completion_tokens || 0,
+        reasoningTokens: usage.completion_tokens_details?.reasoning_tokens,
+        cacheHitTokens: usage.prompt_cache_hit_tokens,
+        cacheMissTokens: usage.prompt_cache_miss_tokens,
+      });
+    }
+    const content = parsed.choices?.[0]?.delta?.content;
+    if (content) sendToRenderer(win, requestId, 'chunk', content);
+    // DeepSeek thinking mode: reasoning_content 单独流式下发，供 Chat 渲染思考块。
+    const reasoning = parsed.choices?.[0]?.delta?.reasoning_content;
+    if (reasoning) sendToRenderer(win, requestId, 'thinking', reasoning);
+  } catch {
+    // skip malformed JSON
+  }
+}
+
 export async function streamDeepSeek(
   request: {
     model: string;
@@ -100,35 +124,10 @@ export async function streamDeepSeek(
       buffer = lines.pop() || '';
 
       for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          const data = line.slice(6).trim();
-          if (data === '[DONE]') return;
-
-          try {
-            const parsed = JSON.parse(data);
-            const usage = parsed.usage;
-            if (usage) {
-              sendUsageToRenderer(win, requestId, {
-                inputTokens: usage.prompt_tokens || 0,
-                outputTokens: usage.completion_tokens || 0,
-                reasoningTokens: usage.completion_tokens_details?.reasoning_tokens,
-                cacheHitTokens: usage.prompt_cache_hit_tokens,
-                cacheMissTokens: usage.prompt_cache_miss_tokens,
-              });
-            }
-            const content = parsed.choices?.[0]?.delta?.content;
-            if (content) {
-              sendToRenderer(win, requestId, 'chunk', content);
-            }
-            // DeepSeek thinking mode: reasoning_content 单独流式下发，供 Chat 渲染思考块。
-            const reasoning = parsed.choices?.[0]?.delta?.reasoning_content;
-            if (reasoning) {
-              sendToRenderer(win, requestId, 'thinking', reasoning);
-            }
-          } catch {
-            // skip malformed JSON
-          }
-        }
+        if (!line.startsWith('data: ')) continue;
+        const data = line.slice(6).trim();
+        if (data === '[DONE]') return;
+        dispatchStreamPayload(win, requestId, data);
       }
     }
   } finally {
