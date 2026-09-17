@@ -1,10 +1,11 @@
+import type { ToolResult as ExecutorResult } from './tool-handlers/path-utils';
 /** agent-loop-types.ts — pure loop contracts shared by the loop implementation. */
 import type { ToolDef } from '../tool-defs';
 import type { DeepSeekToolChoice } from '../contracts/advanced';
 import type { AgentLogEntry } from '../advanced-defs';
 import type { ApprovalPolicy, WorkAutonomyTier } from '../types';
 import type { SandboxMode } from '../sandbox-policy';
-import type { executeToolCall as ExecuteToolCall } from './tool-handlers';
+import type { ToolContext } from './tool-handlers/path-utils';
 
 export interface ContentBlock {
   type: 'text';
@@ -128,7 +129,7 @@ export interface AgentLoopConfig {
   planModel?: string;
   adapter?: string;
   fallbackModel?: string;
-  executeTool?: typeof ExecuteToolCall;
+  executeTool?: (toolName: string, input: Record<string, unknown>, ctx: ToolContext) => Promise<ExecutorResult>;
   goal?: { text: string; maxRounds: number } | null;
   forcePlanning?: boolean;
   resumeFrom?: {
