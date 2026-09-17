@@ -21,7 +21,7 @@ export const useSettingsStore = create<SettingsStore>()(
     (set, get) => ({
       deepseekApiKey: '',
       deepseekApiKeyConfigured: false,
-      defaultModel: 'deepseek-v4-flash',
+      defaultModel: 'deepseek-flash',
       fallbackModel: '',
       projectPath: null,
       notifyOnAgentComplete: true,

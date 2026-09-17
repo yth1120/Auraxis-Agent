@@ -27,6 +27,7 @@ export const BUILT_IN_MODELS: AIModel[] = SHARED_MODELS.map((m) => ({
   contextWindow: m.contextWindow,
   supportsImages: m.supportsImages,
   experimental: m.experimental,
+  legacy: m.legacy,
   apiBase: m.apiBase,
 }));
 
@@ -445,6 +446,7 @@ export async function fetchModels(): Promise<AIModel[]> {
         contextWindow: m.contextWindow,
         supportsImages: m.supportsImages,
         experimental: m.experimental,
+        legacy: m.legacy,
         apiBase: m.apiBase,
       }));
     }

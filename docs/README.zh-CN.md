@@ -902,7 +902,7 @@ SQLite 投影缓存与 FTS 索引均带 `PRAGMA user_version = 1`，后续结构
 `model-config.ts` 中的 `getAllModels()` 函数按以下优先顺序解析：
 
 ```
-1. 内置模型 (deepseek-v4-flash, deepseek-v4-pro, deepseek-v4-flash-vision-exp)
+1. 内置模型 (deepseek-flash = V4.1 Flash、deepseek-v4-pro；deepseek-v4-flash / deepseek-v4-flash-vision-exp 作为旧名保留并路由到 V4.1 Flash)
    ↓
 2. AURAXIS_MODELS 环境变量（JSON 数组）
    ↓
@@ -946,12 +946,12 @@ SQLite 投影缓存与 FTS 索引均带 `PRAGMA user_version = 1`，后续结构
 
 ### 10.4 双 API 格式支持
 
-模型可以指定使用 OpenAI 兼容格式或 Anthropic 格式。默认使用 OpenAI 格式（`DEEPSEEK_BASE_URL`）。当设置了 `DEEPSEEK_ANTHROPIC_BASE_URL` 时，`deepseek-v4-flash` 等模型使用 Anthropic 格式端点。每个模型可以通过 `apiBase` 字段单独覆盖。
+模型可以指定使用 OpenAI 兼容格式、Anthropic 格式或 Responses 格式。默认使用 OpenAI 格式（`DEEPSEEK_BASE_URL`）。当设置了 `DEEPSEEK_ANTHROPIC_BASE_URL` 时，`deepseek-flash` 等模型使用 Anthropic 格式端点；`apiBase` 以 `/responses` 结尾时切换到官方原生 **Responses API**（Codex 类客户端格式）。每个模型可以通过 `apiBase` 字段单独覆盖。
 
 ### 10.5 DeepSeek 官方能力与接口
 
 - **思考强度**：`low / high / max` 三档（`reasoning_effort`）；Chat 模式按 DeepSeek 风格固定 high 并由思考开关控制，Work/Code 保留滑轨选择
-- **V4 Flash Vision Exp（实验版）**：内置图片理解模型（`deepseek-v4-flash-vision-exp`）；图片仅在 `user` 消息中受支持，格式为 JPEG/PNG/GIF/WebP，ReadImage 工具结果会以图片内容块交给该模型
+- **V4.1 Flash（`deepseek-flash`）**：原生多模态——`user` 消息可携带图片（JPEG/PNG/GIF/WebP），ReadImage 结果以图片内容块下发；已下线的旧名（`deepseek-v4-flash-vision-exp`、`deepseek-v4-flash`）仍会解析到该模型；图片仅在 `user` 消息中受支持，格式为 JPEG/PNG/GIF/WebP，ReadImage 工具结果会以图片内容块交给该模型
 - **strict tools（Beta）**：严格工具模式，空 schema 工具自动兼容处理，避免「对象不能为空」类 400 错误
 - **计划生成 JSON 模式**：Agent 规划阶段用 JSON 模式生成 TaskPlan
 - **对话前缀续写**：代码块「继续写」走对话前缀（prefix）续写

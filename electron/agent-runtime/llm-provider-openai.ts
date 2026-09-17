@@ -2,6 +2,7 @@
 import axios from 'axios';
 import { createStreamFilter } from './text-filter';
 import { runtimePorts } from './ports';
+import { resolveModelId } from '../contracts/core';
 
 import type { LlmInvokeParams } from './llm-types';
 import type { AssistantMessage } from './agent-loop-types';
@@ -13,7 +14,9 @@ const STRICT_TOOLS_HOST = 'api.deepseek.com';
 
 /** 组装 OpenAI 兼容请求体（system 注入、strict tools、深度思考、JSON 模式、user_id）。 */
 async function buildRequestBody(params: LlmInvokeParams, strictTools: boolean): Promise<Record<string, unknown>> {
-  const { model, systemPrompt, messages, tools, isDeepThink } = params;
+  const { systemPrompt, messages, tools, isDeepThink } = params;
+  // 旧模型名统一规范化（deepseek-v4-flash → deepseek-flash）。
+  const model = resolveModelId(params.model);
   const formattedTools = buildOpenAIFormatTools(tools, { strict: strictTools });
 
   // Callers may pass systemPrompt separately (e.g. Planning phase); inject it if missing.
@@ -35,10 +38,13 @@ async function buildRequestBody(params: LlmInvokeParams, strictTools: boolean): 
     body.tools = formattedTools;
     body.tool_choice = params.toolChoice ?? 'auto';
   }
-  if (params.temperature !== undefined) body.temperature = params.temperature;
-  if (isDeepThink && model.startsWith('deepseek-')) {
-    body.thinking = { type: 'enabled' };
-    body.reasoning_effort = params.reasoningEffort || 'high';
+  if (model.startsWith('deepseek-')) {
+    // 2026-09 起思考模式默认开启：必须显式发 disabled，否则"关闭思考"仍然会思考。
+    body.thinking = { type: isDeepThink ? 'enabled' : 'disabled' };
+    if (isDeepThink) body.reasoning_effort = params.reasoningEffort || 'high';
+    // 思考模式忽略 temperature，不发送以免误导（官方说明：传了也无效）。
+  } else if (params.temperature !== undefined) {
+    body.temperature = params.temperature;
   }
   if (params.responseFormat === 'json_object') body.response_format = { type: 'json_object' };
   const userId = await runtimePorts().deepSeekUserId();

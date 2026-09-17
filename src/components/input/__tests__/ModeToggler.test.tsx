@@ -69,24 +69,25 @@ describe('ModePanelContent', () => {
   it('renders all models and thinking depth directly', () => {
     useChatStore.setState({ reasoningEffort: 'medium' });
     render(<ModePanelContent />);
-    expect(screen.getByText('DeepSeek V4 Flash')).toBeDefined();
+    expect(screen.getByText('DeepSeek V4.1 Flash')).toBeDefined();
     expect(screen.getByText('DeepSeek V4 Pro')).toBeDefined();
-    expect(screen.getByText('DeepSeek V4 Flash Vision Exp')).toBeDefined();
-    expect(screen.getByText('实验')).toBeDefined();
+    expect(screen.getByText('DeepSeek V4 Flash（旧名 → V4.1 Flash）')).toBeDefined();
+    expect(screen.getByText('DeepSeek V4 Flash Vision Exp（旧名 → V4.1 Flash）')).toBeDefined();
+    expect(screen.getAllByText('旧名').length).toBe(2);
     expect(screen.getByText('思考深度')).toBeDefined();
     expect(screen.getByRole('slider', { name: '思考深度' })).toBeDefined();
     expect(screen.getByText('中度思考')).toBeDefined();
   });
 
-  it('clicking DeepSeek V4 Flash switches model', () => {
+  it('clicking DeepSeek V4.1 Flash switches model', () => {
     render(<ModePanelContent />);
-    fireEvent.click(screen.getByText('DeepSeek V4 Flash'));
-    expect(useChatStore.getState().selectedModel).toBe('deepseek-v4-flash');
+    fireEvent.click(screen.getByText('DeepSeek V4.1 Flash'));
+    expect(useChatStore.getState().selectedModel).toBe('deepseek-flash');
   });
 
-  it('clicking DeepSeek V4 Flash Vision Exp switches model', () => {
+  it('clicking the legacy Flash name still switches model (kept for compatibility)', () => {
     render(<ModePanelContent />);
-    fireEvent.click(screen.getByText('DeepSeek V4 Flash Vision Exp'));
+    fireEvent.click(screen.getByText('DeepSeek V4 Flash Vision Exp（旧名 → V4.1 Flash）'));
     expect(useChatStore.getState().selectedModel).toBe('deepseek-v4-flash-vision-exp');
   });
 
@@ -122,7 +123,7 @@ describe('ModePanelContent', () => {
 
   it('renders content via ModePanelContent', () => {
     render(<ModePanelContent />);
-    expect(screen.getByText('DeepSeek V4 Flash')).toBeDefined();
+    expect(screen.getByText('DeepSeek V4.1 Flash')).toBeDefined();
     expect(screen.getByText('DeepSeek V4 Pro')).toBeDefined();
     expect(screen.getByText('思考深度')).toBeDefined();
   });

@@ -2,6 +2,36 @@ import { describe, it, expect } from 'vitest';
 import { stripModelArtifacts, isAllArtifacts } from '../../agent-runtime/text-filter';
 
 describe('stripModelArtifacts', () => {
+  it('流式：开口标记被逐 token 拆散时也不漏出排练块碎片', async () => {
+    const { createStreamFilter } = await import('../../agent-runtime/text-filter');
+    const filter = createStreamFilter();
+    const bar = '\uFF5C\uFF5CDSML\uFF5C\uFF5C';
+    const chunks = [
+      '好的。',
+      `<\uFF5C\uFF5CDS`,
+      `ML\uFF5C\uFF5Ctool_`,
+      `calls><${bar}invoke name="Write">`,
+      `<${bar}parameter name="content">hello`,
+      `</${bar}parameter>`,
+      `</${bar}invoke>`,
+      `</${bar}tool_calls>`,
+      '完成。',
+    ];
+    const out = chunks.map((c) => filter(c)).join('');
+    expect(out).toBe('好的。完成。');
+  });
+
+  it('丢弃 DSML 风格的工具调用排练块（整块，含内容）', () => {
+    const open = '\uFF5C\uFF5CDSML\uFF5C\uFF5C';
+    const close = '\uFF5C\uFF5CDSML\uFF5C\uFF5C';
+    const input = `前文<${open}tool_calls><${open}invoke name="Write"><${open}parameter name="content">hello</${close}parameter></${close}invoke></${close}tool_calls>后文`;
+    const out = stripModelArtifacts(input);
+    expect(out).not.toContain('DSML');
+    expect(out).not.toContain('hello');
+    expect(out).toContain('前文');
+    expect(out).toContain('后文');
+  });
+
   it('去除 <thinking> 整块（含内容）', () => {
     const input = 'Hello <thinking>internal reasoning here</thinking>World';
     const result = stripModelArtifacts(input);

@@ -66,7 +66,7 @@ export async function generateSummary(
   const prompt = `请总结以下已完成的交互历史。\n\n计划状态:\n${planStatus}\n\n活动记录:\n${activityLog || '(无详细记录)'}\n\n请生成简短摘要（5-10句话）。`;
   try {
     const result = await llmClientInvoke({
-      model: llmConfig.model || 'deepseek-v4-flash',
+      model: llmConfig.model || 'deepseek-flash',
       apiKey: llmConfig.apiKey,
       apiBase: llmConfig.apiBase,
       systemPrompt: SUMMARY_SYSTEM_PROMPT,

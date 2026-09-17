@@ -374,6 +374,8 @@ export const enUS: Record<I18nKey, string> = {
   'model.desc.pro': 'Deep reasoning for complex tasks and coding',
   'model.desc.vision': 'Image understanding (experimental) for screenshots, charts, and document images',
   'model.experimental': 'Experimental',
+  'model.desc.flash41': 'Native multimodal: image understanding + fast responses (official default)',
+  'model.legacy': 'Legacy',
   'think.title': 'Thinking depth',
   'think.switch': 'Thinking',
   'think.switchOn': 'Enable thinking mode',
@@ -770,6 +772,13 @@ export const enUS: Record<I18nKey, string> = {
   'auth.rememberMe': 'Remember me and sign in automatically next time',
   'auth.createAccount': 'Create account',
   'auth.noAccount': 'No account yet? Create one',
+  'auth.forgotPassword': "Can't sign in? Reset local account",
+  'auth.resetTitle': 'Reset the local account?',
+  'auth.resetBody':
+    'This deletes the account and password stored on this machine (project files, sessions and settings are untouched). You will create the account again and sign in once.',
+  'auth.resetConfirm': 'Reset and start over',
+  'auth.bridgeMissing':
+    'Preload script missing: this build is incomplete, so every local service is unavailable. Re-run npm run electron:compile and start the app again.',
   'auth.login': 'Sign in',
   'auth.haveAccount': 'Already have an account? Sign in',
   'auth.createdNotice': 'Account created — please sign in',

@@ -906,7 +906,7 @@ The SQLite projection cache and FTS index both carry `PRAGMA user_version = 1` f
 `getAllModels()` in `model-config.ts` resolves models in this priority order:
 
 ```
-1. Built-in models (deepseek-v4-flash, deepseek-v4-pro, deepseek-v4-flash-vision-exp)
+1. Built-in models (deepseek-flash = V4.1 Flash, deepseek-v4-pro; deepseek-v4-flash / deepseek-v4-flash-vision-exp kept as legacy aliases routed to V4.1 Flash)
    ↓
 2. AURAXIS_MODELS environment variable (JSON array)
    ↓
@@ -951,12 +951,12 @@ See `.env.example` ([view file](../.env.example)):
 
 ### 10.4 Dual API Format Support
 
-Models can use either OpenAI-compatible or Anthropic format. OpenAI format is the default (`DEEPSEEK_BASE_URL`). When `DEEPSEEK_ANTHROPIC_BASE_URL` is set, models such as `deepseek-v4-flash` use the Anthropic-format endpoint. Each model can override via its `apiBase` field.
+Models can use OpenAI-compatible, Anthropic or Responses format. OpenAI format is the default (`DEEPSEEK_BASE_URL`). When `DEEPSEEK_ANTHROPIC_BASE_URL` is set, models such as `deepseek-flash` use the Anthropic-format endpoint; an `apiBase` ending in `/responses` switches to the native **Responses API** (Codex-style clients). Each model can override via its `apiBase` field.
 
 ### 10.5 DeepSeek Official Capabilities & Interfaces
 
 - **Reasoning effort**: `low / high / max` (`reasoning_effort`); Chat follows DeepSeek style (fixed high, controlled by the thinking toggle), Work/Code keep the slider
-- **V4 Flash Vision Exp (experimental)**: built-in image-understanding model (`deepseek-v4-flash-vision-exp`); images are accepted only in `user` messages, supported formats are JPEG/PNG/GIF/WebP, and ReadImage tool results are delivered as image content for this model
+- **V4.1 Flash (deepseek-flash)**: multimodal by default — images are accepted in `user` messages (JPEG/PNG/GIF/WebP) and ReadImage results are delivered as image content. The retired legacy names (`deepseek-v4-flash-vision-exp`, `deepseek-v4-flash`) still resolve to it; images are accepted only in `user` messages, supported formats are JPEG/PNG/GIF/WebP, and ReadImage tool results are delivered as image content for this model
 - **strict tools (Beta)**: strict tool mode with automatic handling of empty schemas, avoiding "object cannot be empty" 400 errors
 - **Plan-generation JSON mode**: agent planning uses JSON mode to produce TaskPlan
 - **Conversation prefix continuation**: code-block "continue writing" uses the conversation prefix

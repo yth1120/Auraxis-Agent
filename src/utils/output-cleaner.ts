@@ -26,6 +26,11 @@ const THINKING_BLOCK_RE = /<thinking>[\s\S]*?<\/thinking>/gi;
 // Legacy XML-format tool call blocks (occasional model hallucination)
 const LEGACY_TOOL_BLOCK_RE = /<\/?(?:function_call|tool_call|invoke|parameter)[^>]*>/gi;
 
+// DSML 风格的工具调用排练块（纯对话通道没有工具时，模型偶尔把"假调用"写成文本）
+const DSML_BLOCK_RE = /<\s*[｜|\s]*DSML[｜|\s]*(?:tool_?\s*)?calls[^>]*>[\s\S]*?<\/\s*[｜|\s]*DSML[｜|\s]*(?:tool_?\s*)?calls[^>]*>/gi;
+const DSML_UNTERMINATED_RE = /<\s*[｜|\s]*DSML[｜|\s]*(?:tool_?\s*)?calls[^>]*>[\s\S]*$/i;
+const DSML_TAG_RE = /<\/?\s*[｜|]*DSML\b[^>]*>/gi;
+
 // Chat template markers that models occasionally leak into output
 // (<|im_start|>, <|im_end|>, <|assistant|>, <|user|>, <|system|>, etc.)
 const CHAT_TEMPLATE_RE = /<\|[^|]*\|>/g;
@@ -49,6 +54,7 @@ export function cleanStreamChunk(chunk: string): string {
   return chunk
     .replace(ANSI_RE, '')
     .replace(ZERO_WIDTH_RE, '')
+    .replace(DSML_TAG_RE, '')
     .replace(CHAT_TEMPLATE_RE, '')
     .replace(CR_RE, '\n')
     .replace(FINAL_ANSWER_RE, '');
@@ -71,7 +77,10 @@ export function cleanOutput(content: string): { cleanedText: string; thinkingBlo
     .replace(THINKING_BLOCK_RE, '')
     .replace(ANSI_RE, '')
     .replace(ZERO_WIDTH_RE, '')
+    .replace(DSML_BLOCK_RE, '')
+    .replace(DSML_UNTERMINATED_RE, '')
     .replace(LEGACY_TOOL_BLOCK_RE, '')
+    .replace(DSML_TAG_RE, '')
     .replace(CHAT_TEMPLATE_RE, '')
     .replace(XML_PI_RE, '')
     .replace(DOCTYPE_RE, '')

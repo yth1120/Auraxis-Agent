@@ -114,29 +114,60 @@ export interface ModelDefinition {
   supportsImages?: boolean;
   /** 官方标记为实验性质的模型。 */
   experimental?: boolean;
+  /** 官方已下线、但仍被接受并路由到新模型的旧名字（保留用于兼容已保存的设置）。 */
+  legacy?: boolean;
   apiBase?: string;
   apiKey?: string;
 }
 
 export const BUILT_IN_MODELS: ModelDefinition[] = [
   {
-    id: 'deepseek-v4-flash',
-    name: 'DeepSeek V4 Flash',
-    provider: 'deepseek',
-    maxTokens: 384000,
-    contextWindow: 1_000_000,
-  },
-  { id: 'deepseek-v4-pro', name: 'DeepSeek V4 Pro', provider: 'deepseek', maxTokens: 384000, contextWindow: 1_000_000 },
-  {
-    id: 'deepseek-v4-flash-vision-exp',
-    name: 'DeepSeek V4 Flash Vision Exp',
+    // 2026-09-10 官方发布 V4.1-Flash：新架构、原生多模态（图片输入）。
+    // 官方名 `deepseek-flash`；旧的 flash / flash-vision-exp 名字已被路由到它。
+    id: 'deepseek-flash',
+    name: 'DeepSeek V4.1 Flash',
     provider: 'deepseek',
     maxTokens: 384000,
     contextWindow: 1_000_000,
     supportsImages: true,
-    experimental: true,
+  },
+  { id: 'deepseek-v4-pro', name: 'DeepSeek V4 Pro', provider: 'deepseek', maxTokens: 384000, contextWindow: 1_000_000 },
+  {
+    // 旧名（官方已下线对应模型，请求被路由到 V4.1 Flash，按 Flash 计费）。
+    id: 'deepseek-v4-flash',
+    name: 'DeepSeek V4 Flash（旧名 → V4.1 Flash）',
+    provider: 'deepseek',
+    maxTokens: 384000,
+    contextWindow: 1_000_000,
+    supportsImages: true,
+    legacy: true,
+  },
+  {
+    id: 'deepseek-v4-flash-vision-exp',
+    name: 'DeepSeek V4 Flash Vision Exp（旧名 → V4.1 Flash）',
+    provider: 'deepseek',
+    maxTokens: 384000,
+    contextWindow: 1_000_000,
+    supportsImages: true,
+    legacy: true,
   },
 ];
+
+/**
+ * 官方已下线的模型名 → 当前规范名。
+ * 旧设置里保存的 `deepseek-v4-flash` / `deepseek-v4-flash-vision-exp` 会被
+ * 路由到 V4.1 Flash；这里在发请求前统一规范化，避免依赖官方的临时路由。
+ */
+export const LEGACY_MODEL_ALIASES: Record<string, string> = {
+  'deepseek-v4-flash': 'deepseek-flash',
+  'deepseek-v4-flash-vision-exp': 'deepseek-flash',
+  'deepseek-v4.1-flash': 'deepseek-flash',
+};
+
+/** 把旧模型名规范化为当前模型名（未知模型原样返回）。 */
+export function resolveModelId(model: string): string {
+  return LEGACY_MODEL_ALIASES[model.toLowerCase()] ?? model;
+}
 
 const API_IMAGE_PART_TYPES = new Set(['image_url', 'image', 'file']);
 const DEEPSEEK_IMAGE_MIME_TYPES = new Set(['jpeg', 'png', 'gif', 'webp']);

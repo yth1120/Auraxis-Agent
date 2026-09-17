@@ -251,7 +251,9 @@ describe('llm-adapter format helpers', () => {
     expect(modelSupportsImageInput('gpt-4o')).toBe(true);
     expect(modelSupportsImageInput('example-vision-model')).toBe(true);
     expect(modelSupportsImageInput('deepseek-vl')).toBe(true);
-    expect(modelSupportsImageInput('deepseek-v4-flash')).toBe(false);
+    // V4.1 起 Flash 原生多模态；旧名被路由到 deepseek-flash，同样支持图片。
+    expect(modelSupportsImageInput('deepseek-v4-flash')).toBe(true);
+    expect(modelSupportsImageInput('deepseek-flash')).toBe(true);
     expect(modelSupportsImageInput('deepseek-v4-flash-vision-exp')).toBe(true);
     expect(isDeepSeekVisionModel('deepseek-v4-flash-vision-exp')).toBe(true);
     expect(isDeepSeekVisionModel('deepseek-v4-pro')).toBe(false);
@@ -267,6 +269,29 @@ function openaiBody(parts: string[]) {
 }
 
 describe('invokeDeepSeekOpenAI — 流式解析', () => {
+  // SSE 契约样本：与渲染层兜底路径 (src/services/__tests__/ai-service-sse.test.ts)
+  // 使用同一段输入，两侧必须解析出相同的文本与思考序列。
+  it('SSE 契约样本：文本/思考序列与渲染层一致', async () => {
+    vi.mocked(axios.post).mockResolvedValue(
+      openaiBody([
+        'data: {"choices":[{"delta":{"reasoning_content":"先想"}}]}\n\n',
+        'data: {"choices":[{"delta":{"reasoning_content":"再想"}}]}\n\n',
+        'data: {"choices":[{"delta":{"content":"你好"}}]}\n\n',
+        'data: {"choices":[{"delta":{"content":"，世界"}}]}\n\n',
+        'data: {"choices":[{"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":11,"completion_tokens":7}}\n\n',
+        'data: [DONE]\n\n',
+      ]) as any,
+    );
+    const out = await llmClientInvoke({
+      ...baseParams(),
+      model: 'deepseek-flash',
+      messages: [{ role: 'user', content: 'hi' }] as never,
+      isDeepThink: true,
+    });
+    expect(out!.rawText).toBe('你好，世界');
+    expect(out!.thinkingText).toBe('先想再想');
+  });
+
   it('解析文本与 reasoning 增量并回调', async () => {
     vi.mocked(axios.post).mockResolvedValue(
       openaiBody([
@@ -417,7 +442,8 @@ describe('invokeDeepSeekOpenAI — 流式解析', () => {
     expect(url).toBe(baseParams().apiBase);
     expect(body.messages[0].role).toBe('system');
     expect(body.tool_choice).toBe('auto');
-    expect(body.temperature).toBe(0.2);
+    // 思考模式忽略 temperature（官方说明"传入不报错但无效"），因此不再发送。
+    expect(body.temperature).toBeUndefined();
     expect(body.thinking).toEqual({ type: 'enabled' });
     expect(body.reasoning_effort).toBe('high');
     expect(body.stream_options).toEqual({ include_usage: true });
@@ -425,6 +451,49 @@ describe('invokeDeepSeekOpenAI — 流式解析', () => {
     // DeepSeek 非视觉模型剔除 image 部分
     expect(body.messages[1].content).toHaveLength(1);
     expect(opts.headers.Authorization).toBe('Bearer key');
+  });
+
+  it('非思考模式显式发送 thinking=disabled，并把旧模型名规范化', async () => {
+    vi.mocked(axios.post).mockResolvedValue(openaiBody(['data: [DONE]\n\n']) as any);
+    await llmClientInvoke({
+      ...baseParams(),
+      model: 'deepseek-v4-flash', // 旧名 → deepseek-flash
+      messages: [{ role: 'user', content: 'hi' }] as never,
+      isDeepThink: false,
+    });
+    const body = vi.mocked(axios.post).mock.calls.at(-1)![1] as any;
+    // 2026-09 起思考默认开启：不显式 disabled 会导致"关闭思考"仍然思考。
+    expect(body.thinking).toEqual({ type: 'disabled' });
+    expect(body.reasoning_effort).toBeUndefined();
+    expect(body.model).toBe('deepseek-flash');
+  });
+
+  it('Anthropic 兼容格式用 reasoning.effort 控制开关（none 关闭）', async () => {
+    vi.mocked(axios.post).mockResolvedValue(openaiBody(['data: [DONE]\n\n']) as any);
+    await llmClientInvoke({
+      ...baseParams(),
+      apiBase: 'https://api.deepseek.com/anthropic/v1/messages',
+      model: 'deepseek-flash',
+      messages: [{ role: 'user', content: 'hi' }] as never,
+      isDeepThink: false,
+    });
+    const off = vi.mocked(axios.post).mock.calls.at(-1)![1] as any;
+    expect(off.reasoning).toEqual({ effort: 'none' });
+    expect(off.output_config).toBeUndefined();
+
+    vi.mocked(axios.post).mockResolvedValue(openaiBody(['data: [DONE]\n\n']) as any);
+    await llmClientInvoke({
+      ...baseParams(),
+      apiBase: 'https://api.deepseek.com/anthropic/v1/messages',
+      model: 'deepseek-v4-flash',
+      messages: [{ role: 'user', content: 'hi' }] as never,
+      isDeepThink: true,
+      reasoningEffort: 'max',
+    });
+    const on = vi.mocked(axios.post).mock.calls.at(-1)![1] as any;
+    expect(on.model).toBe('deepseek-flash');
+    expect(on.reasoning).toEqual({ effort: 'max' });
+    expect(on.output_config).toEqual({ effort: 'max' });
   });
 
   it('空入参工具不启用 strict，避免 DeepSeek 400', async () => {

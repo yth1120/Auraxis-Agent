@@ -142,12 +142,14 @@ describe('getAllModels', () => {
     const { getAllModels } = await importFresh();
     const models = await getAllModels();
     expect(models.length).toBeGreaterThanOrEqual(3);
+    expect(models.find((m: { id: string }) => m.id === 'deepseek-flash')).toBeTruthy();
     expect(models.find((m: { id: string }) => m.id === 'deepseek-v4-flash')).toBeTruthy();
     expect(models.find((m: { id: string }) => m.id === 'deepseek-v4-pro')).toBeTruthy();
     const vision = models.find((m: any) => m.id === 'deepseek-v4-flash-vision-exp');
     expect(vision).toBeTruthy();
     expect(vision?.supportsImages).toBe(true);
-    expect(vision?.experimental).toBe(true);
+    // 旧的 vision-exp 已被 V4.1 Flash 取代：保留条目但标记为旧名。
+    expect(vision?.legacy).toBe(true);
   });
 
   it('合并 env 自定义模型（去重）', async () => {

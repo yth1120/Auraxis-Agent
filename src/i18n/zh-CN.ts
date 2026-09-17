@@ -382,6 +382,8 @@ export const zhCN = {
   'model.desc.pro': '深度推理，适合复杂任务与编码',
   'model.desc.vision': '图像理解（实验版），支持截图、图表与文档图片',
   'model.experimental': '实验',
+  'model.desc.flash41': '原生多模态：图片理解 + 轻快响应（官方推荐）',
+  'model.legacy': '旧名',
   'think.title': '思考深度',
   'think.switch': '思考',
   'think.switchOn': '开启思考模式',
@@ -767,6 +769,13 @@ export const zhCN = {
   'auth.rememberMe': '记住我，下次自动登录',
   'auth.createAccount': '创建账户',
   'auth.noAccount': '还没有账户？创建账户',
+  'auth.forgotPassword': '登录不进去？重置本地账户',
+  'auth.resetTitle': '重置本地账户？',
+  'auth.resetBody':
+    '将删除本机保存的账户与密码（项目文件、会话记录、设置都不受影响）。重置后需要重新创建账户并登录一次。',
+  'auth.resetConfirm': '重置并重新创建',
+  'auth.bridgeMissing':
+    '预加载脚本未加载：当前构建不完整，所有本地服务都不可用。请重新运行 npm run electron:compile 后再启动。',
   'auth.login': '登录',
   'auth.haveAccount': '已有账户？返回登录',
   'auth.createdNotice': '账户已创建，请登录',

@@ -71,7 +71,7 @@ export interface StepMetrics {
 
 const DEFAULT_MAX_RETRIES = 3;
 const DEFAULT_COMPACT_THRESHOLD = 100_000;
-const DEFAULT_COMPACT_MODEL = 'deepseek-v4-flash';
+const DEFAULT_COMPACT_MODEL = 'deepseek-flash';
 
 interface StepTracker {
   startedAt: number;

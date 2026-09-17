@@ -2,6 +2,7 @@
 import axios from 'axios';
 import { createStreamFilter } from './text-filter';
 import { runtimePorts } from './ports';
+import { resolveModelId } from '../contracts/core';
 
 import type { LlmInvokeParams } from './llm-types';
 import type { AssistantMessage } from './agent-loop-types';
@@ -10,7 +11,9 @@ import { AnthropicStreamAccumulator } from './llm-streams';
 
 /** 组装 Anthropic Messages 请求体（system 提升为顶层字段、工具映射、思考档位、user_id）。 */
 async function buildAnthropicRequestBody(params: LlmInvokeParams): Promise<Record<string, unknown>> {
-  const { model, systemPrompt, messages, tools, isDeepThink } = params;
+  const { systemPrompt, messages, tools, isDeepThink } = params;
+  // 旧模型名统一规范化（deepseek-v4-flash → deepseek-flash）。
+  const model = resolveModelId(params.model);
   const anthropicTools = buildAnthropicFormatTools(tools);
 
   // Anthropic Messages API: system 必须是顶层字段；数组里只能有 user/assistant，
@@ -40,9 +43,14 @@ async function buildAnthropicRequestBody(params: LlmInvokeParams): Promise<Recor
       body.tool_choice = { type: 'tool', name: tc.function.name };
     }
   }
-  if (params.temperature !== undefined) body.temperature = params.temperature;
-  if (isDeepThink && model.startsWith('deepseek-')) {
-    body.output_config = { effort: params.reasoningEffort || 'high' };
+  if (model.startsWith('deepseek-')) {
+    // Anthropic 兼容格式：reasoning.effort = none 关闭思考（默认是开启的），
+    // output_config.effort 控制档位（low/high/max）。
+    const effort = params.reasoningEffort || 'high';
+    body.reasoning = { effort: isDeepThink ? effort : 'none' };
+    if (isDeepThink) body.output_config = { effort };
+  } else if (params.temperature !== undefined) {
+    body.temperature = params.temperature;
   }
   const userId = await runtimePorts().deepSeekUserId();
   if (userId) body.metadata = { user_id: userId };

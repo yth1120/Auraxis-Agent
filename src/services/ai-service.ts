@@ -2,6 +2,7 @@ import { getApiKeyFromStore } from '../stores/useSettingsStore';
 import type { ApiMessage } from '../../electron/types';
 import { normalizeDeepSeekMessages } from '../../electron/types';
 import { getDeepSeekBaseUrl } from '../../electron/api-config';
+import { resolveModelId } from '../../electron/contracts/core';
 
 interface ChatRequest {
   model: string;
@@ -83,18 +84,20 @@ export async function streamChat(
     throw new Error('Missing DeepSeek API key. Please set it in settings.');
   }
 
+  // 旧模型名统一规范化（deepseek-v4-flash → deepseek-flash）。
+  const model = resolveModelId(request.model);
   const body: Record<string, unknown> = {
-    model: request.model,
+    model,
     max_tokens: request.maxOutputTokens ?? 8192,
-    messages: normalizeDeepSeekMessages(request.messages, request.model),
+    messages: normalizeDeepSeekMessages(request.messages, model),
     stream: true,
   };
 
-  if (request.isDeepThink) {
-    if (request.model.startsWith('deepseek-')) {
-      body.thinking = { type: 'enabled' };
-      body.reasoning_effort = request.reasoningEffort || 'high';
-    }
+  if (model.startsWith('deepseek-')) {
+    // 2026-09 起思考模式默认开启：关闭时必须显式发 disabled，
+    // 否则"关闭深度思考"实际仍在思考（与主进程 provider 行为对齐）。
+    body.thinking = { type: request.isDeepThink ? 'enabled' : 'disabled' };
+    if (request.isDeepThink) body.reasoning_effort = request.reasoningEffort || 'high';
   }
 
   const response = await fetch(getApiUrl(), {

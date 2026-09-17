@@ -24,6 +24,12 @@ const ARTIFACT_PATTERNS: RegExp[] = [
   // unterminated trailing block (native tool_calls take over after it).
   /<function>[\s\S]*?<\/function>/gi,
   /<function>[\s\S]*$/i,
+  // DSML 风格的工具调用排练块：纯对话通道没有工具时，模型偶尔把一次"假调用"
+  // 写成文本（`… DSML …`）。整块丢弃，不留标签碎片。
+  /<\s*[｜|\s]*DSML[｜|\s]*(?:tool_?\s*)?calls[^>]*>[\s\S]*?<\/\s*[｜|\s]*DSML[｜|\s]*(?:tool_?\s*)?calls[^>]*>/gi,
+  /<\s*[｜|\s]*DSML[｜|\s]*(?:tool_?\s*)?calls[^>]*>[\s\S]*$/i,
+  // 兜底：上面整块匹配按"最近闭合"截断后可能残留配对标签，这里一并清掉。
+  /<\/?\s*[｜|\s]*DSML[^>]*>/gi,
   // Chat template markers that models occasionally leak into output
   // (<|im_start|>, <|im_end|>, <|assistant|>, <|user|>, <|system|>, etc.)
   /<\|[^|]*\|>/g,
@@ -60,14 +66,30 @@ export function stripModelArtifacts(text: string): string {
  */
 export function createStreamFilter(): (chunk: string) => string {
   let swallowing = false;
+  /**
+   * 未定性的尾巴：可能是一个被逐 token 拆散的排练块开口前缀（`<…DS`）。
+   * 直接放行会漏出标记碎片，所以先扣住，等后续 chunk 补齐或确认不是标记。
+   */
+  let pending = '';
+  const OPEN_RE = /<function>|<\s*[｜|\s]*DSML[｜|\s]*(?:tool_?\s*)?calls[^>]*>/i;
+  const CLOSE_RE = /<\/function>|<\/FINAL_ANSWER>|<\/\s*[｜|\s]*DSML[｜|\s]*(?:tool_?\s*)?calls[^>]*>/i;
+  /** 尾部未闭合、且只由标签字符组成的片段（`<`、`<｜｜DS`、`<function`）。 */
+  const partialTagSuffixLength = (text: string): number => {
+    const idx = text.lastIndexOf('<');
+    if (idx < 0) return 0;
+    const suffix = text.slice(idx);
+    return /^<[｜|\w_\s]{0,63}$/.test(suffix) ? suffix.length : 0;
+  };
   return (chunk: string): string => {
     let out = '';
-    let rest = chunk;
+    let rest = pending + chunk;
+    pending = '';
     while (rest.length > 0) {
       if (swallowing) {
         // Look for the end of the rehearsal block. Models close it with
-        // </function>, or just run into their stop marker.
-        const close = rest.match(/<\/function>|<\/FINAL_ANSWER>/i);
+        // </function>, an outermost DSML closer (…calls / …invoke), or their
+        // stop marker.
+        const close = rest.match(CLOSE_RE);
         if (!close || close.index === undefined) {
           rest = ''; // whole remainder is inside the swallowed block
         } else {
@@ -75,13 +97,20 @@ export function createStreamFilter(): (chunk: string) => string {
           swallowing = false;
         }
       } else {
-        const open = rest.search(/<function>/i);
+        // DSML 排练块的开口（纯对话通道没有工具时模型会把它写成文本）。
+        const open = rest.search(OPEN_RE);
         if (open === -1) {
-          out += rest;
+          // 没有完整开口：只放行确定不是标记前缀的部分，其余留到下一 chunk。
+          const hold = partialTagSuffixLength(rest);
+          out += rest.slice(0, rest.length - hold);
+          pending = rest.slice(rest.length - hold);
           rest = '';
         } else {
           out += rest.slice(0, open);
-          rest = rest.slice(open).replace(/^<function>/i, '');
+          rest = rest
+            .slice(open)
+            .replace(/^<function>/i, '')
+            .replace(/^<\s*[｜|\s]*DSML[｜|\s]*(?:tool_?\s*)?calls[^>]*>/i, '');
           swallowing = true;
         }
       }

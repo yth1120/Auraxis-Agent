@@ -25,6 +25,7 @@ function modelName(modelId: string): string {
 }
 
 function modelDescriptionKey(modelId: string): I18nKey {
+  if (modelId === 'deepseek-flash') return 'model.desc.flash41';
   if (modelId === 'deepseek-v4-flash') return 'model.desc.flash';
   if (modelId === 'deepseek-v4-pro') return 'model.desc.pro';
   return 'model.desc.vision';
@@ -138,6 +139,11 @@ export const ModePanelContent = memo(function ModePanelContent({ onSelect }: { o
                 >
                   {m.name}
                 </span>
+                {m.legacy && (
+                  <span className="inline-flex h-4 shrink-0 items-center whitespace-nowrap rounded-full px-1.5 text-[10px] leading-4 font-medium bg-[var(--color-bg-inset)] text-text-muted">
+                    {t('model.legacy')}
+                  </span>
+                )}
                 {m.experimental && (
                   <span className="inline-flex h-4 shrink-0 items-center whitespace-nowrap rounded-full px-1.5 text-[10px] leading-4 font-medium bg-[var(--color-warning-soft)] text-warning">
                     {t('model.experimental')}
