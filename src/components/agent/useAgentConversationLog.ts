@@ -146,6 +146,14 @@ export function useAgentConversationLog({
     const viewer = logViewerRef.current;
     if (viewer) viewer.scrollTop = viewer.scrollHeight;
   };
+
+  // 跳转高亮只在"刚跳过去"的几秒内需要：常驻高亮会让历史行看起来一直是选中态，
+  // 用户无法区分"我刚跳到的错误"和"早就看过的错误"。到点自动淡出。
+  useEffect(() => {
+    if (!highlightedToolId) return;
+    const timer = setTimeout(() => setHighlightedToolId(null), 2600);
+    return () => clearTimeout(timer);
+  }, [highlightedToolId]);
   const scrollLogTo = (selector: string) => {
     const viewer = logViewerRef.current;
     const element = viewer?.querySelector(selector);

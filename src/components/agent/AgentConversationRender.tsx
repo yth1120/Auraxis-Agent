@@ -8,7 +8,7 @@ import {
   WarningCircle as ExclamationCircleOutlined,
 } from '@/components/common/icons';
 import clsx from 'clsx';
-import { t } from '../../i18n';
+import { t, type I18nKey } from '../../i18n';
 import type { AgentInfo, AgentLogEntry } from '../../types/agent';
 import { useAgentStore } from '../../stores/useAgentStore';
 import { useAppStore } from '../../stores/useAppStore';
@@ -253,6 +253,21 @@ export function Checklist({ todos }: { todos: NonNullable<AgentLogEntry['todos']
   );
 }
 
+/** 子代理状态 → i18n 文案（避免在执行流里直接显示英文状态码）。 */
+const SUBAGENT_STATUS_KEYS: Record<string, I18nKey> = {
+  running: 'work.status.running',
+  queued: 'work.status.queued',
+  paused: 'work.status.paused',
+  completed: 'work.status.completed',
+  error: 'work.status.error',
+  stopped: 'work.status.stopped',
+  review: 'work.status.review',
+};
+
+function subagentStatusKey(status: string): I18nKey {
+  return SUBAGENT_STATUS_KEYS[status] ?? 'work.status.running';
+}
+
 /** 行首：展开态只留 chevron，收起态叠工具图标 + 悬停 chevron。 */
 function ToolRowLeading({ open, failed, toolName }: { open: boolean; failed: boolean; toolName?: string }) {
   if (open) return <CaretDownOutlined size={14} className="ax-tool-row-chevron" />;
@@ -338,7 +353,7 @@ function ToolRowBody({
                 <span className="min-w-0 flex-1 truncate text-xs text-text-secondary">
                   {subagent.name.split(':')[1]?.trim() || subagent.name}
                 </span>
-                <span className="shrink-0 text-2xs text-text-muted">{subagent.status}</span>
+                <span className="shrink-0 text-2xs text-text-muted">{t(subagentStatusKey(subagent.status))}</span>
               </button>
             );
           })}

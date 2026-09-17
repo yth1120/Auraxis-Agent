@@ -198,7 +198,9 @@ export default function AgentConversation({
                           data-agent-entry-type={entry.type}
                           className={clsx(
                             'transition-colors duration-200',
-                            highlightedToolId === entry.toolCallId && 'bg-primary-soft ring-2 ring-primary/30',
+                            // 跳转高亮：柔和淡入淡出，1px ring 贴合整体 hairline 语言。
+                            highlightedToolId === entry.toolCallId &&
+                              'bg-primary-soft ring-1 ring-primary/25 transition-[background-color,box-shadow] duration-500',
                           )}
                         >
                           <LogEntry
