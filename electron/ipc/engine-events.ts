@@ -7,7 +7,7 @@
  * (see event-bridge.ts) convert it to renderer-facing event streams, so the
  * engine never depends on a specific UI channel.
  */
-import type { AgentLoopEvent } from './agent-loop';
+import type { AgentLoopEvent } from './agent-loop-types';
 
 export type EngineEvent = AgentLoopEvent;
 
