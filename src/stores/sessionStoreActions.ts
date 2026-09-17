@@ -17,7 +17,14 @@ type SetState = StoreApi<SessionStore>['setState'];
 type GetState = StoreApi<SessionStore>['getState'];
 type SessionStoreActions = Omit<SessionStore, 'sessions' | 'currentSessionId' | 'pendingMode'>;
 
-export function createSessionStoreActions(set: SetState, get: GetState): SessionStoreActions {
+type SessionCrudKeys = 'saveSession' | 'loadSession' | 'deleteSession' | 'getCurrentSession' | 'setCurrentSessionId' | 'touchCurrentSession' | 'renameSession' | 'togglePin' | 'toggleArchive' | 'moveSessionToProject' | 'newSession';
+type SessionLifecycleKeys = 'forkSession' | 'exportSession' | 'syncFromLogs';
+
+/** 会话 CRUD 与元数据维护。 */
+function createSessionCrudActions(
+  set: SetState,
+  get: GetState,
+): Pick<SessionStoreActions, SessionCrudKeys> {
   return {
     saveSession: (messages, model, projectRoot, mode, targetId) => {
       const state = get();
@@ -137,7 +144,15 @@ export function createSessionStoreActions(set: SetState, get: GetState): Session
       set({ currentSessionId: id, pendingMode: mode ?? 'chat' });
       return id;
     },
+  };
+}
 
+/** 分支、导出与日志同步。 */
+function createSessionLifecycleActions(
+  set: SetState,
+  get: GetState,
+): Pick<SessionStoreActions, SessionLifecycleKeys> {
+  return {
     forkSession: (sessionId, messageId) => {
       const state = get();
       const original = state.sessions.find((s) => s.id === sessionId);
@@ -242,5 +257,12 @@ export function createSessionStoreActions(set: SetState, get: GetState): Session
         // Non-fatal: keep the localStorage cache.
       }
     },
+  };
+}
+
+export function createSessionStoreActions(set: SetState, get: GetState): SessionStoreActions {
+  return {
+    ...createSessionCrudActions(set, get),
+    ...createSessionLifecycleActions(set, get),
   };
 }

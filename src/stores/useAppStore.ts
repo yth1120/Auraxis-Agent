@@ -1,51 +1,96 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import type { StateCreator } from 'zustand';
 import type { AppStore, LeftPanelTab, ThemeMode } from '../types/chat';
 import type { WorkAutonomyTier } from '../types/advanced';
 
 let navigating = false;
 const MAX_FILE_TABS = 8;
 
-export const useAppStore = create<AppStore>()(
-  persist(
-    (set, get) => ({
-      theme: 'light',
-      sidebarCollapsed: false,
-      sidebarMode: 'chat' as const,
-      workAutonomyTier: 'smart' as WorkAutonomyTier,
-      showSettings: false,
-      showRightPanel: false,
-      sidebarWidth: 260,
-      leftPanelWidth: 256,
-      rightPanelWidth: 320,
-      paneSizes: null,
-      activeLeftPanel: 'files' as LeftPanelTab,
-      glassLayoutMounted: false,
-      activeToolView: 'none' as const,
-      settingsInitialKey: 'general',
-      globalSearchOpen: false,
-      terminalHeight: 300,
-      agentLogFocusRequest: null,
-      trajectoryFocusRequest: null,
-      lastAgentShellId: null,
-      agentErrorsOnly: false,
-      agentTextOnly: false,
-      agentRunningOnly: false,
-      agentRunningFollow: true,
-      openAgentTurns: [],
-      agentTurnCount: 0,
-      agentRawLogRequest: 0,
-      agentErrorNavRequest: null,
-      openFileRequest: null,
-      fileTabs: [],
-      activeFilePath: null,
-      fileTreeVersion: 0,
-      tabs: [],
-      activeTabId: null,
-      rightPanelView: 'inspector' as const,
-      tabHistory: [],
-      tabHistoryIndex: -1,
+type StoreSet = Parameters<StateCreator<AppStore, [], []>>[0];
+type StoreGet = Parameters<StateCreator<AppStore, [], []>>[1];
+/** 除初始状态字段之外的 action 集合。 */
+type AppActions = Omit<AppStore, keyof typeof APP_STORE_INITIAL_STATE>;
 
+const APP_STORE_INITIAL_STATE: Pick<AppStore,
+  | 'theme'
+  | 'sidebarCollapsed'
+  | 'sidebarMode'
+  | 'workAutonomyTier'
+  | 'showSettings'
+  | 'showRightPanel'
+  | 'sidebarWidth'
+  | 'leftPanelWidth'
+  | 'rightPanelWidth'
+  | 'paneSizes'
+  | 'activeLeftPanel'
+  | 'glassLayoutMounted'
+  | 'activeToolView'
+  | 'settingsInitialKey'
+  | 'globalSearchOpen'
+  | 'terminalHeight'
+  | 'agentLogFocusRequest'
+  | 'trajectoryFocusRequest'
+  | 'lastAgentShellId'
+  | 'agentErrorsOnly'
+  | 'agentTextOnly'
+  | 'agentRunningOnly'
+  | 'agentRunningFollow'
+  | 'openAgentTurns'
+  | 'agentTurnCount'
+  | 'agentRawLogRequest'
+  | 'agentErrorNavRequest'
+  | 'openFileRequest'
+  | 'fileTabs'
+  | 'activeFilePath'
+  | 'fileTreeVersion'
+  | 'tabs'
+  | 'activeTabId'
+  | 'rightPanelView'
+  | 'tabHistory'
+  | 'tabHistoryIndex'
+> = {
+theme: 'light',
+sidebarCollapsed: false,
+sidebarMode: 'chat' as const,
+workAutonomyTier: 'smart' as WorkAutonomyTier,
+showSettings: false,
+showRightPanel: false,
+sidebarWidth: 260,
+leftPanelWidth: 256,
+rightPanelWidth: 320,
+paneSizes: null,
+activeLeftPanel: 'files' as LeftPanelTab,
+glassLayoutMounted: false,
+activeToolView: 'none' as const,
+settingsInitialKey: 'general',
+globalSearchOpen: false,
+terminalHeight: 300,
+agentLogFocusRequest: null,
+trajectoryFocusRequest: null,
+lastAgentShellId: null,
+agentErrorsOnly: false,
+agentTextOnly: false,
+agentRunningOnly: false,
+agentRunningFollow: true,
+openAgentTurns: [],
+agentTurnCount: 0,
+agentRawLogRequest: 0,
+agentErrorNavRequest: null,
+openFileRequest: null,
+fileTabs: [],
+activeFilePath: null,
+fileTreeVersion: 0,
+tabs: [],
+activeTabId: null,
+rightPanelView: 'inspector' as const,
+tabHistory: [],
+tabHistoryIndex: -1,
+};
+
+/** 主题 / 面板 / 侧栏 / Agent 视图等通用 action。 */
+function createGeneralActions(set: StoreSet, _get: StoreGet): AppActions {
+  const actions: Partial<AppStore> = {
       toggleTheme: () =>
         set((s) => ({
           theme: s.theme === 'system' ? 'light' : s.theme === 'dark' ? 'light' : 'dark',
@@ -169,7 +214,13 @@ export const useAppStore = create<AppStore>()(
       setActiveFilePath: (path) => set({ activeFilePath: path }),
 
       clearFileTabs: () => set({ fileTabs: [], activeFilePath: null }),
+  };
+  return actions as AppActions;
+}
 
+/** 文件标签页与底部 tab 历史（后退/前进）action。 */
+function createTabActions(set: StoreSet, get: StoreGet): AppActions {
+  const actions: Partial<AppStore> = {
       addTab: (tab) => {
         const id = Math.random().toString(36).slice(2, 11);
         set((s) => {
@@ -271,6 +322,16 @@ export const useAppStore = create<AppStore>()(
         const { tabHistoryIndex, tabHistory } = get();
         return tabHistoryIndex < tabHistory.length - 1;
       },
+  };
+  return actions as AppActions;
+}
+
+export const useAppStore = create<AppStore>()(
+  persist(
+    (set, get) => ({
+      ...APP_STORE_INITIAL_STATE,
+      ...createGeneralActions(set, get),
+      ...createTabActions(set, get),
     }),
     {
       name: 'auraxis-app-storage',
