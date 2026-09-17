@@ -12,6 +12,7 @@ import { toolRegistry } from './registry';
 import { workspaceRootsOf, type ToolContext, type ToolResult } from './path-utils';
 import { getActiveWorktree } from './worktree';
 import { FILE_MODIFY_TOOLS, backupBeforeModify } from './backup';
+import { conflictDetector } from '../conflict-detector';
 import { cacheTaskResult } from './task-cache';
 import { workDocsOnlyVerdict } from '../../work-docs-policy';
 import { resolveSafeTarget } from '../path-security';
@@ -207,7 +208,6 @@ async function executeWithHooks(
 
   let conflictLocked = false;
   if (FILE_MODIFY_TOOLS.has(toolName) && filePath && ctx.agentId) {
-    const { conflictDetector } = require('../conflict-detector');
     const result = conflictDetector.lockFile(filePath, ctx.agentId);
     if (!result.success) {
       const lockedBy = (result.lockedBy || []).join(', ');
@@ -236,7 +236,6 @@ async function executeWithHooks(
     ).catch(() => {});
   } finally {
     if (conflictLocked) {
-      const { conflictDetector } = require('../conflict-detector');
       conflictDetector.unlockFile(filePath, ctx.agentId!);
     }
   }

@@ -27,14 +27,14 @@ const agent: AgentInfo = {
       timestamp: 2,
       toolCallId: 'tc1',
       toolName: 'Read',
-      input: { file_path: 'electron/ipc/step-engine.ts' },
+      input: { file_path: 'electron/agent-runtime/step-engine.ts' },
     },
     {
       type: 'tool_end',
       timestamp: 3,
       toolCallId: 'tc1',
       toolName: 'Read',
-      input: { file_path: 'electron/ipc/step-engine.ts' },
+      input: { file_path: 'electron/agent-runtime/step-engine.ts' },
       durationMs: 120,
     },
     {

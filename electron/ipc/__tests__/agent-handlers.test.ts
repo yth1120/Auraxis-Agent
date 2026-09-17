@@ -119,9 +119,16 @@ describe('runSubAgent — 同步执行路径', () => {
   });
 
   it('未配置 API Key 拒绝', async () => {
+    // 断言"没有密钥"的用例必须与开发机 .env / shell 环境隔离。
+    const savedKey = process.env.DEEPSEEK_API_KEY;
+    delete process.env.DEEPSEEK_API_KEY;
     const { readSettings } = await import('../settings-store');
     vi.mocked(readSettings).mockResolvedValueOnce({});
-    expect(await runSubAgent(baseParams())).toEqual({ output: null, error: '未配置 DeepSeek API Key' });
+    try {
+      expect(await runSubAgent(baseParams())).toEqual({ output: null, error: '未配置 DeepSeek API Key' });
+    } finally {
+      if (savedKey !== undefined) process.env.DEEPSEEK_API_KEY = savedKey;
+    }
   });
 
   it('成功路径：运行 → 完成 → 广播并落盘日志', async () => {

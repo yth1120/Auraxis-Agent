@@ -49,6 +49,18 @@ export function getSubAgent(agentId: string): AgentInfo | undefined {
   return agents.get(agentId);
 }
 
+/**
+ * Work 模式子代理的交付验收：把处于 review 的子代理置为 completed。
+ * 返回 false 表示该 id 不存在或不在待验收状态（调用方继续尝试其它注册表）。
+ */
+export function approveSubAgentDelivery(agentId: string): boolean {
+  const agent = agents.get(agentId);
+  if (!agent || agent.status !== 'review') return false;
+  agent.status = 'completed';
+  agent.endTime = Date.now();
+  return true;
+}
+
 export function deleteSubAgent(agentId: string): void {
   agentAborts.get(agentId)?.abort();
   agentAborts.delete(agentId);

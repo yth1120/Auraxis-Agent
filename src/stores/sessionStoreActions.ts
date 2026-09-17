@@ -46,17 +46,13 @@ function createSessionCrudActions(
         archived: prev?.archived,
       };
       set((s) => {
-        const sessionsUpdated =
-          existing >= 0
-            ? s.sessions.map((ses) => (ses.id === currentId ? session : ses))
-            : [session, ...s.sessions].slice(0, 200);
-        if (existing >= 0) {
-          return targetId ? { sessions: sessionsUpdated } : { sessions: sessionsUpdated, currentSessionId: session.id };
-        }
-        return {
-          sessions: sessionsUpdated,
-          ...(targetId ? {} : { currentSessionId: session.id }),
-        };
+        // 存在性必须在 set 回调内重新判定：并发保存（流结束 + pagehide 落盘）
+        // 时外层快照会过期，导致同一 id 被插入两次，或删除后静默丢失本次保存。
+        const existsNow = s.sessions.some((ses) => ses.id === session.id);
+        const sessionsUpdated = existsNow
+          ? s.sessions.map((ses) => (ses.id === session.id ? session : ses))
+          : [session, ...s.sessions].slice(0, 200);
+        return targetId ? { sessions: sessionsUpdated } : { sessions: sessionsUpdated, currentSessionId: session.id };
       });
       if (session.id && messages.some((m) => m.role === 'user')) {
         void maybeGenerateLlmTitle(session.id, title, messages, get);

@@ -225,6 +225,7 @@ async function runSubAgentToCompletion(run: SubAgentRun): Promise<{ output: unkn
     const result = await run.runLoop();
     run.finishOk(result);
     if (controller.signal.aborted) return { output: null, error: 'Agent 被取消' };
+    const awaitingReview = params.surface === 'work' && agent.status === 'review';
     return {
       output: {
         agentType: params.subagentType,
@@ -232,6 +233,9 @@ async function runSubAgentToCompletion(run: SubAgentRun): Promise<{ output: unkn
         result: result.allText || '任务完成',
         toolCallCount: agent.toolCallCount,
         iterations: agent.iterations,
+        ...(awaitingReview
+          ? { status: 'review', note: 'Work 模式：本次子任务已产出结果，等待用户在交付验收面板确认。' }
+          : { status: 'completed' }),
       },
     };
   } catch (err: unknown) {
@@ -325,7 +329,27 @@ export async function runSubAgent(params: SubAgentParams): Promise<{ output: unk
       settleSubAgent(agent, agentId, 'stopped', {}, broadcast);
       return;
     }
-    settleSubAgent(agent, agentId, 'completed', { result: result.allText || '任务完成' }, broadcast);
+    const resultText = result.allText || '任务完成';
+    // Work 模式：子代理完成后不直接算交付，先进入验收（与调度器路径的
+    // applyLoopResult 保持一致），用户批准后才变成 completed。
+    if (params.surface === 'work') {
+      settleSubAgent(
+        agent,
+        agentId,
+        'review',
+        {
+          result: resultText,
+          delivery: {
+            files: agent.delivery?.files ?? [],
+            result: resultText.slice(0, 2000),
+            summary: resultText.slice(0, 2000),
+          },
+        },
+        broadcast,
+      );
+      return;
+    }
+    settleSubAgent(agent, agentId, 'completed', { result: resultText }, broadcast);
   };
 
   const finishErr = (err: unknown) => {

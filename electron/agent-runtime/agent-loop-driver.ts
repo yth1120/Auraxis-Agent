@@ -256,7 +256,6 @@ function buildEngineConfig(p: EngineConfigParams): StepEngineConfig {
     makeToolCallId: (tc) => tc.id,
     onToolSummary: (r, tc) => buildToolSummary(tc.name, r.output, r.input),
     emit: (event) => observer.emit(event),
-    onUsage: (usage) => observer.emit({ type: 'usage', ...usage }),
     onBeforeRequest: async (msgs) => {
       // UserPromptSubmit 生命周期钩子。
       const lastUser = [...msgs].reverse().find((m) => m.role === 'user');

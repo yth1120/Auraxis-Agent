@@ -6,7 +6,15 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     setupFiles: ['src/test/setup.ts'],
-    exclude: ['dist-electron/**', 'dist/**', 'packages/auraxis-sdk/dist/**', 'release/**', 'node_modules/**'],
+    exclude: [
+      'dist-electron/**',
+      'dist/**',
+      'packages/auraxis-sdk/dist/**',
+      'release/**',
+      'node_modules/**',
+      // 用 Auraxis 生成/演练的临时项目（含各自的 .test.js）不参与本项目单测。
+      'test1/**',
+    ],
     coverage: {
       provider: 'v8',
       // json-summary 输出 coverage/coverage-summary.json，设置面板的

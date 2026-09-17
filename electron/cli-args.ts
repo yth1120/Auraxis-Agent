@@ -32,6 +32,8 @@ export interface CliArgs {
   apiBase?: string;
   mode?: CliApprovalMode;
   sandbox?: CliSandboxMode;
+  /** 能力面：chat（无工具）/ work（仅文档）/ code（全工具，默认）。 */
+  surface?: 'chat' | 'work' | 'code';
   deepThink?: boolean;
   reasoningEffort?: CliReasoningEffort;
   toolChoice?: DeepSeekToolChoice;
@@ -101,6 +103,8 @@ export function parseCliArgs(argv: string[]): CliArgs {
   out.verbose = has(argv, '--verbose');
   out.autoApprove = has(argv, '--auto-approve');
   out.approvePlan = has(argv, '--approve-plan');
+  const surface = valueOf(argv, '--surface');
+  if (surface === 'chat' || surface === 'work' || surface === 'code') out.surface = surface;
 
   const pluginIdx = argv.indexOf('--plugin');
   if (pluginIdx >= 0) {
@@ -132,6 +136,7 @@ export function cliUsage(): string {
     '  --reasoning-effort <high|max>  思考强度（默认 high）',
     '  --max-iterations <n>        最大执行轮数',
     '  --auto-approve              自动批准全部工具调用（单次 CLI 默认启用）',
+    '  --surface <chat|work|code>  能力面：work = 仅文档可写（默认 code）',
     '  --approve-plan              计划模式自动批准生成计划',
     '  --json                      输出 NDJSON 事件 + 最终结果',
     '  --verbose                   把工具调用/思考输出打印到 stderr',

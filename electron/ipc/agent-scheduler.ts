@@ -1,6 +1,7 @@
 import { errorText } from '../errors';
 import { BrowserWindow, app } from 'electron';
 import { secureHandle } from './trust';
+import { approveSubAgentDelivery } from './agent-subagent-registry';
 import { resolveTrustedProjectRoot } from './project-access';
 import { existsSync } from 'fs';
 import { assertObject, assertString } from './shared';
@@ -122,7 +123,11 @@ export function registerSchedulerIpc() {
     try {
       assertString(agentId, 'agentId');
       const ok = scheduler.approveDelivery(agentId);
-      return ok ? { ok: true, data: { approved: true } } : { ok: false, error: '任务不存在或不在待验收状态' };
+      // 子代理（Agent 工具创建的 Work 任务）不在调度器里，回退到子代理注册表。
+      const subAgentOk = ok ? false : approveSubAgentDelivery(agentId);
+      return ok || subAgentOk
+        ? { ok: true, data: { approved: true } }
+        : { ok: false, error: '任务不存在或不在待验收状态' };
     } catch (error: unknown) {
       return { ok: false, error: errorText(error) };
     }

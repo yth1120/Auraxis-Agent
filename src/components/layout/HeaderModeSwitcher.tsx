@@ -3,6 +3,9 @@ import { ChatCircle, Code, ListChecks } from '@/components/common/icons';
 import { Tooltip } from 'antd';
 import clsx from 'clsx';
 import { useAppStore } from '../../stores/useAppStore';
+import { useChatStore } from '../../stores/useChatStore';
+import { useSessionStore } from '../../stores/useSessionStore';
+import { crossesCapabilityBoundary, pickSessionForMode, type SidebarMode } from '../../stores/sessionModeSwitch';
 import { useT } from '../../i18n';
 
 interface Props {
@@ -88,8 +91,21 @@ export default function HeaderModeSwitcher({ collapsed }: Props) {
   }, [measureItems, recalcThumb]);
 
   const switchMode = (mode: ModeKey) => {
+    const app = useAppStore.getState();
+    const from = app.sidebarMode as SidebarMode;
     setSidebarMode(mode);
     useAppStore.getState().setActiveToolView('none');
+    // 跨能力边界（Chat ↔ Work/Code）时切到该模式自己的会话：
+    // 不把 Chat 历史带进工具引擎，也不让 Agent 会话被当成纯聊天打开。
+    if (!crossesCapabilityBoundary(from, mode)) return;
+    const sessions = useSessionStore.getState().sessions;
+    const target = pickSessionForMode(sessions, mode);
+    if (target) {
+      useChatStore.getState().switchSession(target.id);
+      return;
+    }
+    useSessionStore.getState().newSession(mode);
+    useChatStore.getState().clearMessages();
   };
 
   // 模式切换按钮上的对话模式按用户要求显示为 Chat（其余文案保持中文）。

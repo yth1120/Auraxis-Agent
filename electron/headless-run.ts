@@ -259,9 +259,11 @@ export async function runHeadlessTask(opts: HeadlessRunOptions): Promise<number>
       apiBase,
       systemPrompt,
       projectRoot,
-      tools: getAllTools(),
+      // chat 面在 CLI 里同样是"无工具"通道：不注册任何工具，结构上不可能改文件。
+      tools: opts.surface === 'chat' ? [] : getAllTools(),
       mode,
       sandboxMode,
+      surface: opts.surface,
       autoApprove,
       approvedPlanSteps: undefined,
       checkPermission,

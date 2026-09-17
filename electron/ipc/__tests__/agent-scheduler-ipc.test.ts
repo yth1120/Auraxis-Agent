@@ -52,6 +52,8 @@ vi.mock('../agent-scheduler-core', () => ({
 }));
 vi.mock('../agent-subagent-registry', () => ({
   sendMessageToSubAgent: vi.fn(() => ({ ok: false, error: 'sub-agent miss' })),
+  // Work 交付验收会回退到子代理注册表；这里返回 false 表示"不在待验收状态"。
+  approveSubAgentDelivery: vi.fn(() => false),
 }));
 
 import { registerSchedulerIpc } from '../agent-scheduler';

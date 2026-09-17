@@ -174,6 +174,9 @@ import { searchWithProvider } from '../../web-search';
 import { spawnSync } from 'child_process';
 import dns from 'dns';
 import { shouldAutoApprove } from '../permission-handlers';
+import { loadRules, matchRule } from '../../rules';
+import { runHooksFor } from '../../hooks';
+import { toolRegistry } from '../tool-handlers/registry';
 
 const dnsLookupMock = vi.mocked(dns.promises.lookup);
 
@@ -334,6 +337,62 @@ describe('RunCode 工具', () => {
     );
     expect(r.error).toContain('用户拒绝了该工具调用权限');
     expect(checkPermission).toHaveBeenCalledWith('mcp__some_tool', expect.anything(), undefined);
+  });
+
+  it('项目规则 deny 时短路：不进入审批、不执行', async () => {
+    vi.mocked(loadRules).mockResolvedValueOnce([{ prefix: 'rm ', mode: 'deny' }] as never);
+    vi.mocked(matchRule).mockReturnValueOnce({
+      decision: 'deny',
+      justification: '危险命令',
+      pattern: ['rm '],
+    } as never);
+    const checkPermission = vi.fn(async () => true);
+    const r = await executeToolCall(
+      'Bash',
+      { command: 'rm -rf dist' },
+      ctx({ mode: 'ask', autoApprove: false, checkPermission }),
+    );
+    expect(r.error).toContain('命令被规则拒绝');
+    expect(r.error).toContain('危险命令');
+    expect(checkPermission).not.toHaveBeenCalled();
+  });
+
+  it('项目规则 allow 时跳过审批门（即使 ask 模式 + 审批会被拒绝）', async () => {
+    vi.mocked(shouldAutoApprove).mockReturnValueOnce(false);
+    vi.mocked(loadRules).mockResolvedValueOnce([{ prefix: 'echo ', mode: 'allow' }] as never);
+    vi.mocked(matchRule).mockReturnValueOnce({ decision: 'allow' } as never);
+    const checkPermission = vi.fn(async () => false);
+    // 规则放行后确实会进入执行：把 Bash 执行器替换掉，避免真实起进程。
+    const bashSpy = vi
+      .spyOn(toolRegistry, 'Bash')
+      .mockResolvedValueOnce({ output: { stdout: 'pipeline-rule-allow' } } as never);
+    const r = await executeToolCall(
+      'Bash',
+      { command: 'echo pipeline-rule-allow' },
+      ctx({ mode: 'ask', autoApprove: false, checkPermission }),
+    );
+    expect(checkPermission).not.toHaveBeenCalled();
+    expect(r.error ?? '').not.toContain('用户拒绝了该工具调用权限');
+    expect(bashSpy).toHaveBeenCalled();
+    bashSpy.mockRestore();
+  });
+
+  it('自动模式下自行提权沙箱被拒（不经执行）', async () => {
+    const checkPermission = vi.fn(async () => true);
+    const r = await executeToolCall(
+      'Bash',
+      { command: 'echo hi', sandbox_permissions: 'full' },
+      ctx({ mode: 'auto', autoApprove: false, sandboxMode: 'read', checkPermission }),
+    );
+    expect(r.error).toContain('模型不允许在自动模式下自行提升沙箱权限');
+    expect(checkPermission).not.toHaveBeenCalled();
+  });
+
+  it('PreToolUse Hook 阻止时给出可读原因且不执行', async () => {
+    vi.mocked(runHooksFor).mockResolvedValueOnce({ blocked: true, outputs: ['禁止写入该目录'] } as never);
+    const r = await executeToolCall('TodoWrite', { todos: [] }, ctx());
+    expect(r.error).toContain('PreToolUse Hook 阻止了');
+    expect(r.error).toContain('禁止写入该目录');
   });
 });
 

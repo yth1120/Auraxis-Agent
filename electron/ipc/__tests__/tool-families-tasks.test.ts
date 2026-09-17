@@ -310,7 +310,13 @@ describe('SendMessage / InterruptAgent / Report — 任务控制', () => {
 
 describe('EnterPlanMode / ExitPlanMode', () => {
   it('无 API Key 拒绝', async () => {
-    expect((await executeToolCall('EnterPlanMode', { goal: 'g' }, ctx())).error).toBe('未配置 API Key');
+    const savedKey = process.env.DEEPSEEK_API_KEY;
+    delete process.env.DEEPSEEK_API_KEY;
+    try {
+      expect((await executeToolCall('EnterPlanMode', { goal: 'g' }, ctx())).error).toBe('未配置 API Key');
+    } finally {
+      if (savedKey !== undefined) process.env.DEEPSEEK_API_KEY = savedKey;
+    }
   });
 
   it('LLM 未产出有效计划时降级提示', async () => {

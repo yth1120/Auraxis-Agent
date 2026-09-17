@@ -56,9 +56,12 @@ export function createChatMessageActions(deps: ChatMessageActionsDeps) {
       const sessionProject = session.projectRoot;
       if (sessionProject) useSettingsStore.getState().setProjectPath(sessionProject);
       useInspectorStore.getState().clear();
-      useAppStore.getState().setSidebarMode('chat');
+      // 会话自带 mode：打开会话时恢复它自己的模式，避免"Code 会话被强制当 Chat 打开"，
+      // 也避免跨能力边界时把历史带进另一条引擎通道。
+      const sessionMode = (session as { mode?: 'chat' | 'work' | 'code' }).mode ?? 'chat';
+      useAppStore.getState().setSidebarMode(sessionMode);
       useAppStore.getState().setActiveToolView('none');
-      useSessionStore.setState({ pendingMode: 'chat' });
+      useSessionStore.setState({ pendingMode: sessionMode });
       const map: Record<string, ToolCall> = {};
       for (const m of session.messages) {
         if (m.toolCalls) for (const tc of m.toolCalls) map[tc.id] = tc;
