@@ -35,6 +35,129 @@ async function requireProjectRoot(projectRoot?: string): Promise<string> {
   return resolveTrustedProjectRoot(projectRoot);
 }
 
+interface SearchHit {
+  name: string;
+  path: string;
+  isDirectory: boolean;
+  snippet?: string;
+  matchType?: 'name' | 'content';
+}
+
+const SEARCH_MAX_RESULTS = 50;
+const SEARCH_MAX_DEPTH = 4;
+const SEARCH_READ_BYTES = 256 * 1024;
+const SEARCH_TEXT_EXT = new Set([
+  'ts',
+  'tsx',
+  'js',
+  'jsx',
+  'mjs',
+  'cjs',
+  'json',
+  'md',
+  'mdx',
+  'css',
+  'scss',
+  'html',
+  'py',
+  'rs',
+  'go',
+  'java',
+  'c',
+  'cc',
+  'cpp',
+  'h',
+  'hpp',
+  'cs',
+  'rb',
+  'php',
+  'sh',
+  'yml',
+  'yaml',
+  'toml',
+  'txt',
+  'vue',
+  'svelte',
+  'xml',
+  'svg',
+]);
+const SEARCH_SKIP_DIRS = new Set([
+  'node_modules',
+  'dist',
+  'dist-electron',
+  'release',
+  'coverage',
+  'out',
+  'build',
+  '.git',
+]);
+
+/** 只读前 256KB，避免把超大文件整体载入内存。 */
+async function readTextHead(fullPath: string): Promise<string> {
+  const fh = await open(fullPath, 'r');
+  try {
+    const buf = Buffer.alloc(SEARCH_READ_BYTES);
+    const { bytesRead } = await fh.read(buf, 0, buf.length, 0);
+    return buf.toString('utf8', 0, bytesRead);
+  } finally {
+    await fh.close();
+  }
+}
+
+async function searchFileContent(
+  fullPath: string,
+  entryName: string,
+  lowerKeyword: string,
+  results: SearchHit[],
+): Promise<void> {
+  const ext = entryName.includes('.') ? entryName.split('.').pop()!.toLowerCase() : '';
+  if (!SEARCH_TEXT_EXT.has(ext)) return;
+  try {
+    const text = await readTextHead(fullPath);
+    const idx = text.toLowerCase().indexOf(lowerKeyword);
+    if (idx < 0) return;
+    const start = Math.max(0, idx - 40);
+    const end = Math.min(text.length, idx + lowerKeyword.length + 80);
+    results.push({
+      name: entryName,
+      path: fullPath,
+      isDirectory: false,
+      snippet: text.slice(start, end).replace(/\s+/g, ' ').trim(),
+      matchType: 'content',
+    });
+  } catch {
+    // 二进制或不可读文件跳过
+  }
+}
+
+async function searchDirRecursive(
+  dirPath: string,
+  depth: number,
+  lowerKeyword: string,
+  results: SearchHit[],
+): Promise<void> {
+  if (depth > SEARCH_MAX_DEPTH || results.length >= SEARCH_MAX_RESULTS) return;
+  let entries;
+  try {
+    entries = await readdir(dirPath, { withFileTypes: true });
+  } catch {
+    return; // skip inaccessible directories
+  }
+  for (const entry of entries) {
+    if (entry.name.startsWith('.') || SEARCH_SKIP_DIRS.has(entry.name)) continue;
+    const fullPath = path.join(dirPath, entry.name);
+    const nameMatches = entry.name.toLowerCase().includes(lowerKeyword);
+    if (nameMatches) {
+      results.push({ name: entry.name, path: fullPath, isDirectory: entry.isDirectory(), matchType: 'name' });
+    }
+    if (entry.isDirectory()) {
+      await searchDirRecursive(fullPath, depth + 1, lowerKeyword, results);
+    } else if (!nameMatches && results.length < SEARCH_MAX_RESULTS) {
+      await searchFileContent(fullPath, entry.name, lowerKeyword, results);
+    }
+  }
+}
+
 export function registerFileHandlers() {
   secureHandle('file:open', async (event, _projectRoot?: string) => {
     assertTrustedIpcSender(event);
@@ -176,121 +299,9 @@ export function registerFileHandlers() {
       if (!keyword || keyword.length < 1) {
         return { ok: true, data: [] };
       }
-
       const root = await requireProjectRoot(projectRoot);
-      const results: {
-        name: string;
-        path: string;
-        isDirectory: boolean;
-        snippet?: string;
-        matchType?: 'name' | 'content';
-      }[] = [];
-      const lowerKeyword = keyword.toLowerCase();
-      const TEXT_EXT = new Set([
-        'ts',
-        'tsx',
-        'js',
-        'jsx',
-        'mjs',
-        'cjs',
-        'json',
-        'md',
-        'mdx',
-        'css',
-        'scss',
-        'html',
-        'py',
-        'rs',
-        'go',
-        'java',
-        'c',
-        'cc',
-        'cpp',
-        'h',
-        'hpp',
-        'cs',
-        'rb',
-        'php',
-        'sh',
-        'yml',
-        'yaml',
-        'toml',
-        'txt',
-        'vue',
-        'svelte',
-        'xml',
-        'svg',
-      ]);
-      const SKIP_DIRS = new Set([
-        'node_modules',
-        'dist',
-        'dist-electron',
-        'release',
-        'coverage',
-        'out',
-        'build',
-        '.git',
-      ]);
-
-      const searchDir = async (dirPath: string, depth: number): Promise<void> => {
-        if (depth > 4 || results.length >= 50) return;
-
-        try {
-          const entries = await readdir(dirPath, { withFileTypes: true });
-
-          for (const entry of entries) {
-            if (entry.name.startsWith('.') || SKIP_DIRS.has(entry.name)) continue;
-
-            const fullPath = path.join(dirPath, entry.name);
-
-            if (entry.name.toLowerCase().includes(lowerKeyword)) {
-              results.push({
-                name: entry.name,
-                path: fullPath,
-                isDirectory: entry.isDirectory(),
-                matchType: 'name' as const,
-              });
-            }
-
-            if (entry.isDirectory()) {
-              await searchDir(fullPath, depth + 1);
-            } else if (!entry.name.toLowerCase().includes(lowerKeyword) && results.length < 50) {
-              const ext = entry.name.includes('.') ? entry.name.split('.').pop()!.toLowerCase() : '';
-              if (!TEXT_EXT.has(ext)) continue;
-              try {
-                // 只读前 256KB，避免把超大文件整体载入内存。
-                const fh = await open(fullPath, 'r');
-                let text = '';
-                try {
-                  const buf = Buffer.alloc(256 * 1024);
-                  const { bytesRead } = await fh.read(buf, 0, buf.length, 0);
-                  text = buf.toString('utf8', 0, bytesRead);
-                } finally {
-                  await fh.close();
-                }
-                const idx = text.toLowerCase().indexOf(lowerKeyword);
-                if (idx >= 0) {
-                  const start = Math.max(0, idx - 40);
-                  const end = Math.min(text.length, idx + lowerKeyword.length + 80);
-                  results.push({
-                    name: entry.name,
-                    path: fullPath,
-                    isDirectory: false,
-                    snippet: text.slice(start, end).replace(/\s+/g, ' ').trim(),
-                    matchType: 'content' as const,
-                  });
-                }
-              } catch {
-                // 二进制或不可读文件跳过
-              }
-            }
-          }
-        } catch {
-          // skip inaccessible directories
-        }
-      };
-
-      await searchDir(root, 0);
+      const results: SearchHit[] = [];
+      await searchDirRecursive(root, 0, keyword.toLowerCase(), results);
       return { ok: true, data: results };
     } catch (error: unknown) {
       return { ok: false, error: errorText(error) };
