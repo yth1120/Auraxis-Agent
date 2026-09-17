@@ -1,4 +1,4 @@
-import { createAgent } from '../constants/commands';
+import { createAgent } from './agent-launch';
 import { useAgentStore } from '../stores/useAgentStore';
 
 /** Icon key resolved by UI layers; keeps the skill registry React-free. */
