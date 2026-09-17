@@ -5,6 +5,62 @@ import { useAgentStore } from '../../stores/useAgentStore';
 import { useAppStore } from '../../stores/useAppStore';
 import type { TurnGroup } from './AgentConversationUtils';
 
+/** 工具终态（end/error）已结算的 toolCallId 集合。 */
+function endedToolCallIds(log: AgentLogEntry[]): Set<string> {
+  const ended = new Set<string>();
+  for (const entry of log) {
+    if ((entry.type === 'tool_end' || entry.type === 'tool_error') && entry.toolCallId) ended.add(entry.toolCallId);
+  }
+  return ended;
+}
+
+/** 把连续同类文本/思考块合并，丢掉空白文本行。 */
+function mergeEntryRun(entries: AgentLogEntry[]): AgentLogEntry[] {
+  const merged: AgentLogEntry[] = [];
+  for (const entry of entries) {
+    const prev = merged[merged.length - 1];
+    if ((entry.type === 'text' || entry.type === 'thinking') && prev && prev.type === entry.type) {
+      prev.text = (prev.text ?? '') + (entry.text ?? '');
+      continue;
+    }
+    if (entry.type === 'text' && !(entry.text ?? '').trim()) continue;
+    merged.push(entry);
+  }
+  return merged;
+}
+
+/** 按 turn_start / iteration_start 边界把日志折叠成回合分组。 */
+function buildTurnGroups(log: AgentLogEntry[]): TurnGroup[] {
+  const ended = endedToolCallIds(log);
+  const hasTurnMarkers = log.some((entry) => entry.type === 'turn_start');
+  const list: TurnGroup[] = [];
+  let current: TurnGroup | null = null;
+  let lastIteration = 1;
+  for (const entry of log) {
+    const startsTurn = hasTurnMarkers ? entry.type === 'turn_start' : entry.type === 'iteration_start';
+    if (startsTurn) {
+      lastIteration = entry.iteration ?? list.length + 1;
+      current = { iteration: lastIteration, entries: [], startTs: entry.timestamp };
+      list.push(current);
+      continue;
+    }
+    const endsTurn = hasTurnMarkers ? entry.type === 'turn_end' : entry.type === 'iteration_end';
+    if (endsTurn) {
+      if (current) current.end = entry;
+      continue;
+    }
+    if (!current) {
+      current = { iteration: lastIteration, entries: [], startTs: entry.timestamp };
+      list.push(current);
+    }
+    if (entry.type === 'iteration_end') current.metricsEnd = entry;
+    if (entry.type === 'tool_start' && entry.toolCallId && ended.has(entry.toolCallId)) continue;
+    current.entries.push(entry);
+  }
+  for (const turn of list) turn.entries = mergeEntryRun(turn.entries);
+  return list;
+}
+
 export function useAgentConversationLog({
   agent,
   agentErrorsOnly,
@@ -58,58 +114,7 @@ export function useAgentConversationLog({
   const logLen = log.length;
   const lastEntry = log[logLen - 1];
 
-  const turnGroups = useMemo<TurnGroup[]>(() => {
-    const ended = new Set<string>();
-    for (const entry of log) {
-      if ((entry.type === 'tool_end' || entry.type === 'tool_error') && entry.toolCallId) ended.add(entry.toolCallId);
-    }
-    const hasTurnMarkers = log.some((entry) => entry.type === 'turn_start');
-    const list: TurnGroup[] = [];
-    let current: TurnGroup | null = null;
-    let lastIteration = 1;
-    for (const entry of log) {
-      if (hasTurnMarkers && entry.type === 'turn_start') {
-        current = { iteration: entry.iteration ?? list.length + 1, entries: [], startTs: entry.timestamp };
-        list.push(current);
-        continue;
-      }
-      if (hasTurnMarkers && entry.type === 'turn_end') {
-        if (current) current.end = entry;
-        continue;
-      }
-      if (!hasTurnMarkers && entry.type === 'iteration_start') {
-        lastIteration = entry.iteration ?? list.length + 1;
-        current = { iteration: lastIteration, entries: [], startTs: entry.timestamp };
-        list.push(current);
-        continue;
-      }
-      if (!hasTurnMarkers && entry.type === 'iteration_end') {
-        if (current) current.end = entry;
-        continue;
-      }
-      if (!current) {
-        current = { iteration: lastIteration, entries: [], startTs: entry.timestamp };
-        list.push(current);
-      }
-      if (entry.type === 'iteration_end') current.metricsEnd = entry;
-      if (entry.type === 'tool_start' && entry.toolCallId && ended.has(entry.toolCallId)) continue;
-      current.entries.push(entry);
-    }
-    for (const turn of list) {
-      const merged: AgentLogEntry[] = [];
-      for (const entry of turn.entries) {
-        const prev = merged[merged.length - 1];
-        if ((entry.type === 'text' || entry.type === 'thinking') && prev && prev.type === entry.type) {
-          prev.text = (prev.text ?? '') + (entry.text ?? '');
-          continue;
-        }
-        if (entry.type === 'text' && !(entry.text ?? '').trim()) continue;
-        merged.push(entry);
-      }
-      turn.entries = merged;
-    }
-    return list;
-  }, [log]);
+  const turnGroups = useMemo<TurnGroup[]>(() => buildTurnGroups(log), [log]);
 
   useEffect(() => {
     if (!agentErrorNavRequest || !agent) return;
