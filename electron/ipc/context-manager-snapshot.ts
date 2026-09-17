@@ -1,5 +1,5 @@
 /** context-manager-snapshot.ts — atomic-group safe truncation algorithm. */
-import { matchesPlanTask, estimateTokens } from './agent-loop';
+import { matchesPlanTask, estimateTokens } from './agent-loop-context';
 import type { LoopMessage, TaskPlan } from './agent-loop';
 import { buildAtomicGroups, HEAD_LOCK_COUNT, TAIL_LOCK_COUNT } from './context-manager-utils';
 import { devLog } from './shared';

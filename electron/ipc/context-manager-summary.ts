@@ -1,6 +1,7 @@
 /** context-manager-summary.ts — summary generation and injection. */
 import { errorText } from '../errors';
-import { llmClientInvoke, Planner } from './agent-loop';
+import { llmClientInvoke } from './llm-adapter';
+import { Planner } from './agent-loop-planner';
 import type { LLMSummaryConfig, LoopMessage, TaskPlan } from './agent-loop';
 import { toolCallFn, parsedToolArgs } from './context-manager-utils';
 

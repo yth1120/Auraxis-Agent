@@ -1,5 +1,5 @@
 /** context-manager-compact.ts — unified compaction pipeline and triggers. */
-import { estimateTokens } from './agent-loop';
+import { estimateTokens } from './agent-loop-context';
 import type { LoopMessage, TaskPlan } from './agent-loop';
 import { pruneToolResults } from '../tool-result-prune';
 import { compressHistorySteps } from '../step-compressor';

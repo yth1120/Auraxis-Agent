@@ -20,7 +20,7 @@
  */
 
 import type { LoopMessage } from './agent-loop';
-import { estimateTokens } from './agent-loop';
+import { estimateTokens } from './agent-loop-context';
 
 // Re-export estimateTokens so query-engine doesn't need a separate import
 export { estimateTokens };

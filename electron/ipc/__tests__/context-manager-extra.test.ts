@@ -1,10 +1,19 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-vi.mock('../agent-loop', () => ({
+vi.mock('../llm-adapter', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../llm-adapter')>()),
   llmClientInvoke: vi.fn(async () => null),
+}));
+vi.mock('../agent-loop-planner', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../agent-loop-planner')>()),
+  Planner: { getSummary: vi.fn((plan: unknown) => (plan ? '计划摘要' : '无计划')) },
+}));
+vi.mock('../agent-loop-context', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../agent-loop-context')>()),
+  estimateTokens: vi.fn((msgs: { content?: unknown }[]) =>
+    msgs.reduce((sum, m) => sum + String(m.content ?? '').length / 4 + 2, 0),
+  ),
   matchesPlanTask: vi.fn(() => false),
-  Planner: { getSummary: vi.fn((plan: any) => (plan ? '计划摘要' : '无计划')) },
-  estimateTokens: vi.fn((msgs: any[]) => msgs.reduce((sum, m) => sum + String(m.content ?? '').length / 4 + 2, 0)),
 }));
 
 import {
@@ -18,7 +27,8 @@ import {
   compactHistory,
   SNIP_COMPACT_TOKEN_BUDGET,
 } from '../context-manager';
-import { llmClientInvoke, matchesPlanTask } from '../agent-loop';
+import { llmClientInvoke } from '../llm-adapter';
+import { matchesPlanTask } from '../agent-loop-context';
 
 const user = (content: string) => ({ role: 'user', content });
 const assistant = (content: string) => ({ role: 'assistant', content });
