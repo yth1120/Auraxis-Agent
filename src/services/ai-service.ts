@@ -22,6 +22,53 @@ function getApiUrl(): string {
   return getDeepSeekBaseUrl();
 }
 
+/** RAF-throttled accumulator for streamed text chunks. */
+interface SseAccumulator {
+  pending: string;
+  rafId: number | null;
+  lastFlush: number;
+  flush: () => void;
+}
+
+/** Emit immediately when the last flush is ≥30ms old, otherwise on the next RAF. */
+function scheduleFlush(acc: SseAccumulator): void {
+  if (acc.rafId !== null) return;
+  if (performance.now() - acc.lastFlush >= 30) acc.flush();
+  else acc.rafId = requestAnimationFrame(acc.flush);
+}
+
+/**
+ * Handle one SSE line. Returns true when the server sent `[DONE]` — callers
+ * must then flush and stop reading.
+ */
+function handleSseLine(
+  line: string,
+  acc: SseAccumulator,
+  onThinking?: (text: string) => void,
+): boolean {
+  if (!line.startsWith('data: ')) return false;
+  const data = line.slice(6).trim();
+  if (data === '[DONE]') return true;
+  try {
+    const parsed = JSON.parse(data);
+    const content = parsed.choices?.[0]?.delta?.content;
+    if (content) {
+      acc.pending += content;
+      scheduleFlush(acc);
+    }
+    const reasoning = parsed.choices?.[0]?.delta?.reasoning_content;
+    if (reasoning) onThinking?.(reasoning);
+  } catch {
+    // skip malformed JSON
+  }
+  return false;
+}
+
+function finishStream(acc: SseAccumulator): void {
+  if (acc.rafId !== null) cancelAnimationFrame(acc.rafId);
+  acc.flush();
+}
+
 export async function streamChat(
   request: ChatRequest,
   onChunk: (text: string) => void,
@@ -70,28 +117,24 @@ export async function streamChat(
   let buffer = '';
 
   // RAF throttle — match Electron path's 30ms pattern
-  let pending = '';
-  let rafId: number | null = null;
-  let lastFlush = 0;
-
-  const flush = () => {
-    rafId = null;
-    lastFlush = performance.now();
-    if (pending.length > 0) {
-      onChunk(pending);
-      pending = '';
-    }
-  };
-
-  const onDone = () => {
-    if (rafId !== null) cancelAnimationFrame(rafId);
-    flush();
+  const acc: SseAccumulator = {
+    pending: '',
+    rafId: null,
+    lastFlush: 0,
+    flush: () => {
+      acc.rafId = null;
+      acc.lastFlush = performance.now();
+      if (acc.pending.length > 0) {
+        onChunk(acc.pending);
+        acc.pending = '';
+      }
+    },
   };
 
   while (true) {
     const { done, value } = await reader.read();
     if (done) {
-      onDone();
+      finishStream(acc);
       break;
     }
 
@@ -100,32 +143,9 @@ export async function streamChat(
     buffer = lines.pop() || '';
 
     for (const line of lines) {
-      if (line.startsWith('data: ')) {
-        const data = line.slice(6).trim();
-        if (data === '[DONE]') {
-          onDone();
-          return;
-        }
-
-        try {
-          const parsed = JSON.parse(data);
-          const content = parsed.choices?.[0]?.delta?.content;
-          if (content) {
-            pending += content;
-            const now = performance.now();
-            if (!rafId && now - lastFlush >= 30) {
-              flush();
-            } else if (!rafId) {
-              rafId = requestAnimationFrame(flush);
-            }
-          }
-          const reasoning = parsed.choices?.[0]?.delta?.reasoning_content;
-          if (reasoning) {
-            onThinking?.(reasoning);
-          }
-        } catch {
-          // skip malformed JSON
-        }
+      if (handleSseLine(line, acc, onThinking)) {
+        finishStream(acc);
+        return;
       }
     }
   }

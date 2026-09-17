@@ -45,17 +45,237 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   { name: 'help', description: '显示帮助信息', usage: '/help' },
 ];
 
-export function executeCommand(
-  name: string,
-  args: string,
-  ctx: {
-    clearMessages: () => void;
-    setSelectedModel: (model: string) => void;
-    setInputValue: (value: string) => void;
-    toggleTheme: () => void;
-    theme: string;
-  },
-): boolean {
+function cmdModel(trimmedArgs: string, ctx: CommandContext): boolean {
+  if (!trimmedArgs) {
+    ctx.setInputValue('/model ');
+    return false;
+  }
+  void fetchModels().then((models) => {
+    const match = models.find((m) => m.id === trimmedArgs || m.name === trimmedArgs);
+    if (!match) {
+      message.error(t('cmd.msg.modelNotFound', { name: trimmedArgs }));
+      ctx.setInputValue('');
+      return;
+    }
+    ctx.setSelectedModel(match.id);
+    ctx.setInputValue('');
+  });
+  return true;
+}
+
+function cmdAgent(trimmedArgs: string, ctx: CommandContext): boolean {
+  if (!trimmedArgs) {
+    ctx.setInputValue('/agent ');
+    return false;
+  }
+  const agentType = trimmedArgs as 'Explore' | 'Plan' | 'general-purpose';
+  if (!['Explore', 'Plan', 'general-purpose'].includes(agentType)) {
+    ctx.setInputValue(`/agent `);
+    return false;
+  }
+  useAppStore.getState().setSidebarMode('code');
+  void createAgent({ name: `${agentType} Agent`, type: agentType }).then((id) => {
+    if (id) useAgentStore.getState().setCurrentAgent(id);
+  });
+  ctx.setInputValue('');
+  return true;
+}
+
+function cmdGoal(trimmedArgs: string, ctx: CommandContext): boolean {
+  if (!trimmedArgs) {
+    ctx.setInputValue('/goal ');
+    return false;
+  }
+  const goal = {
+    text: trimmedArgs,
+    status: 'running' as const,
+    startedAt: Date.now(),
+  };
+  useChatStore.getState().setGoal(goal);
+  const sessionId = useSessionStore.getState().currentSessionId;
+  if (sessionId && window.electronAPI?.goal) {
+    void window.electronAPI.goal.create(sessionId, trimmedArgs, DEFAULT_GOAL_MAX_ROUNDS);
+  }
+  ctx.setInputValue('');
+  message.success(t('cmd.msg.goalStarted'));
+  return true;
+}
+
+function cmdSkill(trimmedArgs: string, ctx: CommandContext): boolean {
+  const skill = AGENT_SKILLS.find(
+    (s) =>
+      s.name === trimmedArgs ||
+      s.key === trimmedArgs ||
+      s.name.toLowerCase() === trimmedArgs.toLowerCase() ||
+      s.key.toLowerCase() === trimmedArgs.toLowerCase(),
+  );
+  if (!skill) {
+    // Fall through to the real SKILL.md registry before asking for more input.
+    void (async () => {
+      const list = await window.electronAPI?.skills?.list();
+      const match = (list?.data?.skills ?? []).find(
+        (s) => s.name === trimmedArgs || s.name.toLowerCase() === trimmedArgs.toLowerCase(),
+      );
+      if (!match) {
+        message.error(t('cmd.msg.skillNotFound', { name: trimmedArgs }));
+        return;
+      }
+      const read = await window.electronAPI?.skills?.read(match.name);
+      const body = read?.ok && read.data?.body ? read.data.body : '';
+      const id = await createAgent({
+        name: match.name,
+        type: 'general-purpose',
+        instruction: body || match.description || match.name,
+        displayText: `${match.name}：${match.description || ''}`,
+      });
+      if (id) useAgentStore.getState().setCurrentAgent(id);
+    })();
+    ctx.setInputValue('');
+    return true;
+  }
+  useAppStore.getState().setSidebarMode('code');
+  startAgentSkill(skill);
+  ctx.setInputValue('');
+  return true;
+}
+
+function cmdPlan(trimmedArgs: string, ctx: CommandContext): boolean {
+  const chat = useChatStore.getState();
+  // Plan-first is the Work mode personality — /plan enters it directly.
+  useAppStore.getState().setSidebarMode('work');
+  if (trimmedArgs) {
+    chat.setPendingPlanMode(false);
+    void createAgent({
+      name: trimmedArgs.length > 24 ? trimmedArgs.slice(0, 24) + '…' : trimmedArgs,
+      type: 'general-purpose',
+      instruction: trimmedArgs,
+      displayText: trimmedArgs,
+      mode: 'plan',
+      autoApprove: PERMISSION_PRESETS[useSettingsStore.getState().permissionPreset].autoApprove,
+    }).then((id) => {
+      if (id) {
+        useAgentStore.getState().setCurrentAgent(id);
+        message.success(t('cmd.msg.planStarted'));
+      }
+    });
+  } else {
+    chat.setPendingPlanMode(true);
+    message.success(t('cmd.msg.planArmed'));
+  }
+  ctx.setInputValue('');
+  return true;
+}
+
+function cmdTool(trimmedArgs: string, ctx: CommandContext): boolean {
+  const chat = useChatStore.getState();
+  const arg = trimmedArgs.trim();
+  if (!arg) {
+    message.info(t('cmd.msg.toolChoiceUsage'));
+    return true;
+  }
+  if (arg === 'auto' || arg === 'none' || arg === 'required') {
+    chat.setPendingToolChoice(arg);
+  } else {
+    chat.setPendingToolChoice({ type: 'function', function: { name: arg } });
+  }
+  message.success(t('cmd.msg.toolChoiceSet', { tool: arg }));
+  ctx.setInputValue('');
+  return true;
+}
+
+function cmdReview(trimmedArgs: string, ctx: CommandContext): boolean {
+  const scope = trimmedArgs || t('cmd.msg.reviewScope');
+  void createAgent({
+    name: t('cmd.msg.reviewName'),
+    type: 'Explore',
+    instruction: `请对当前项目的「${scope}」进行代码审查：检查逻辑错误、安全漏洞、性能问题与边界条件。对每个问题给出文件路径、行号和修复建议，最后按严重程度排序输出。只读分析，不要修改任何文件。`,
+    displayText: t('cmd.msg.reviewDisplay', { scope }),
+    mode: 'ask',
+    autoApprove: false,
+    sandboxMode: 'read',
+  }).then((id) => {
+    if (id) {
+      useAgentStore.getState().setCurrentAgent(id);
+      useAppStore.getState().setSidebarMode('code');
+      useAppStore.getState().setRightPanelView('review');
+      if (!useAppStore.getState().showRightPanel) useAppStore.getState().toggleRightPanel();
+      ctx.setInputValue('');
+      message.success(t('cmd.msg.reviewStarted'));
+    }
+  });
+  return true;
+}
+
+function cmdWorkflow(trimmedArgs: string, ctx: CommandContext): boolean {
+  if (!trimmedArgs) {
+    ctx.setInputValue('/workflow ');
+    return false;
+  }
+  const projectRoot = useSettingsStore.getState().projectPath;
+  if (!projectRoot) {
+    ctx.setInputValue('');
+    message.warning(t('cmd.msg.needProject'));
+    return true;
+  }
+  void (async () => {
+    const list = await window.electronAPI?.workflow?.list(projectRoot);
+    const def = (list?.data || []).find((d) => d.id === trimmedArgs || d.name === trimmedArgs);
+    if (!def) {
+      message.error(t('cmd.msg.workflowNotFound', { name: trimmedArgs }));
+      return;
+    }
+    const r = await window.electronAPI?.workflow?.run({ workflowId: def.id, projectRoot });
+    if (r?.ok) message.success(t('cmd.msg.workflowStarted', { id: r.data?.runId ?? '' }));
+    else message.error(r?.error || t('cmd.msg.startFailed'));
+  })();
+  ctx.setInputValue('');
+  return true;
+}
+
+function cmdMemories(trimmedArgs: string, ctx: CommandContext): boolean {
+  if (!trimmedArgs || !['on', 'off'].includes(trimmedArgs)) {
+    ctx.setInputValue('/memories ');
+    return false;
+  }
+  useChatStore.getState().setMemoriesEnabled(trimmedArgs === 'on');
+  ctx.setInputValue('');
+  message.success(trimmedArgs === 'on' ? t('cmd.msg.memoriesOn') : t('cmd.msg.memoriesOff'));
+  return true;
+}
+
+function cmdFeedback(trimmedArgs: string, ctx: CommandContext): boolean {
+  if (!trimmedArgs) {
+    ctx.setInputValue('/feedback ');
+    return false;
+  }
+  void window.electronAPI?.feedback?.submit(trimmedArgs).then((r) => {
+    if (r?.ok) message.success(t('cmd.msg.feedbackRecorded'));
+    else message.error(r?.error || t('cmd.msg.feedbackFailed'));
+  });
+  ctx.setInputValue('');
+  return true;
+}
+
+function cmdTheme(trimmedArgs: string, ctx: CommandContext): boolean {
+  if (!trimmedArgs || !['system', 'dark', 'light'].includes(trimmedArgs)) {
+    ctx.setInputValue('/theme ');
+    return false;
+  }
+  const appState = useAppStore.getState();
+  appState.setTheme(trimmedArgs as 'system' | 'dark' | 'light');
+  ctx.setInputValue('');
+  return true;
+}
+
+export interface CommandContext {
+  clearMessages: () => void;
+  setSelectedModel: (model: string) => void;
+  setInputValue: (value: string) => void;
+  toggleTheme: () => void;
+  theme: string;
+}
+
+export function executeCommand(name: string, args: string, ctx: CommandContext): boolean {
   const trimmedArgs = args.trim();
 
   switch (name) {
@@ -63,227 +283,49 @@ export function executeCommand(
       ctx.clearMessages();
       return true;
 
-    case 'model': {
-      if (!trimmedArgs) {
-        ctx.setInputValue('/model ');
-        return false;
-      }
-      void fetchModels().then((models) => {
-        const match = models.find((m) => m.id === trimmedArgs || m.name === trimmedArgs);
-        if (!match) {
-          message.error(t('cmd.msg.modelNotFound', { name: trimmedArgs }));
-          ctx.setInputValue('');
-          return;
-        }
-        ctx.setSelectedModel(match.id);
-        ctx.setInputValue('');
-      });
-      return true;
-    }
+    case 'model':
+      return cmdModel(trimmedArgs, ctx);
 
-    case 'agent': {
-      if (!trimmedArgs) {
-        ctx.setInputValue('/agent ');
-        return false;
-      }
-      const agentType = trimmedArgs as 'Explore' | 'Plan' | 'general-purpose';
-      if (!['Explore', 'Plan', 'general-purpose'].includes(agentType)) {
-        ctx.setInputValue(`/agent `);
-        return false;
-      }
-      useAppStore.getState().setSidebarMode('code');
-      void createAgent({ name: `${agentType} Agent`, type: agentType }).then((id) => {
-        if (id) useAgentStore.getState().setCurrentAgent(id);
-      });
-      ctx.setInputValue('');
-      return true;
-    }
 
-    case 'goal': {
-      if (!trimmedArgs) {
-        ctx.setInputValue('/goal ');
-        return false;
-      }
-      const goal = {
-        text: trimmedArgs,
-        status: 'running' as const,
-        startedAt: Date.now(),
-      };
-      useChatStore.getState().setGoal(goal);
-      const sessionId = useSessionStore.getState().currentSessionId;
-      if (sessionId && window.electronAPI?.goal) {
-        void window.electronAPI.goal.create(sessionId, trimmedArgs, DEFAULT_GOAL_MAX_ROUNDS);
-      }
-      ctx.setInputValue('');
-      message.success(t('cmd.msg.goalStarted'));
-      return true;
-    }
+    case 'agent':
+      return cmdAgent(trimmedArgs, ctx);
 
-    case 'skill': {
-      const skill = AGENT_SKILLS.find(
-        (s) =>
-          s.name === trimmedArgs ||
-          s.key === trimmedArgs ||
-          s.name.toLowerCase() === trimmedArgs.toLowerCase() ||
-          s.key.toLowerCase() === trimmedArgs.toLowerCase(),
-      );
-      if (!skill) {
-        // Fall through to the real SKILL.md registry before asking for more input.
-        void (async () => {
-          const list = await window.electronAPI?.skills?.list();
-          const match = (list?.data?.skills ?? []).find(
-            (s) => s.name === trimmedArgs || s.name.toLowerCase() === trimmedArgs.toLowerCase(),
-          );
-          if (!match) {
-            message.error(t('cmd.msg.skillNotFound', { name: trimmedArgs }));
-            return;
-          }
-          const read = await window.electronAPI?.skills?.read(match.name);
-          const body = read?.ok && read.data?.body ? read.data.body : '';
-          const id = await createAgent({
-            name: match.name,
-            type: 'general-purpose',
-            instruction: body || match.description || match.name,
-            displayText: `${match.name}：${match.description || ''}`,
-          });
-          if (id) useAgentStore.getState().setCurrentAgent(id);
-        })();
-        ctx.setInputValue('');
-        return true;
-      }
-      useAppStore.getState().setSidebarMode('code');
-      startAgentSkill(skill);
-      ctx.setInputValue('');
-      return true;
-    }
 
-    case 'plan': {
-      const chat = useChatStore.getState();
-      // Plan-first is the Work mode personality — /plan enters it directly.
-      useAppStore.getState().setSidebarMode('work');
-      if (trimmedArgs) {
-        chat.setPendingPlanMode(false);
-        void createAgent({
-          name: trimmedArgs.length > 24 ? trimmedArgs.slice(0, 24) + '…' : trimmedArgs,
-          type: 'general-purpose',
-          instruction: trimmedArgs,
-          displayText: trimmedArgs,
-          mode: 'plan',
-          autoApprove: PERMISSION_PRESETS[useSettingsStore.getState().permissionPreset].autoApprove,
-        }).then((id) => {
-          if (id) {
-            useAgentStore.getState().setCurrentAgent(id);
-            message.success(t('cmd.msg.planStarted'));
-          }
-        });
-      } else {
-        chat.setPendingPlanMode(true);
-        message.success(t('cmd.msg.planArmed'));
-      }
-      ctx.setInputValue('');
-      return true;
-    }
+    case 'goal':
+      return cmdGoal(trimmedArgs, ctx);
 
-    case 'tool': {
-      const chat = useChatStore.getState();
-      const arg = trimmedArgs.trim();
-      if (!arg) {
-        message.info(t('cmd.msg.toolChoiceUsage'));
-        return true;
-      }
-      if (arg === 'auto' || arg === 'none' || arg === 'required') {
-        chat.setPendingToolChoice(arg);
-      } else {
-        chat.setPendingToolChoice({ type: 'function', function: { name: arg } });
-      }
-      message.success(t('cmd.msg.toolChoiceSet', { tool: arg }));
-      ctx.setInputValue('');
-      return true;
-    }
 
-    case 'review': {
-      const scope = trimmedArgs || t('cmd.msg.reviewScope');
-      void createAgent({
-        name: t('cmd.msg.reviewName'),
-        type: 'Explore',
-        instruction: `请对当前项目的「${scope}」进行代码审查：检查逻辑错误、安全漏洞、性能问题与边界条件。对每个问题给出文件路径、行号和修复建议，最后按严重程度排序输出。只读分析，不要修改任何文件。`,
-        displayText: t('cmd.msg.reviewDisplay', { scope }),
-        mode: 'ask',
-        autoApprove: false,
-        sandboxMode: 'read',
-      }).then((id) => {
-        if (id) {
-          useAgentStore.getState().setCurrentAgent(id);
-          useAppStore.getState().setSidebarMode('code');
-          useAppStore.getState().setRightPanelView('review');
-          if (!useAppStore.getState().showRightPanel) useAppStore.getState().toggleRightPanel();
-          ctx.setInputValue('');
-          message.success(t('cmd.msg.reviewStarted'));
-        }
-      });
-      return true;
-    }
+    case 'skill':
+      return cmdSkill(trimmedArgs, ctx);
 
-    case 'workflow': {
-      if (!trimmedArgs) {
-        ctx.setInputValue('/workflow ');
-        return false;
-      }
-      const projectRoot = useSettingsStore.getState().projectPath;
-      if (!projectRoot) {
-        ctx.setInputValue('');
-        message.warning(t('cmd.msg.needProject'));
-        return true;
-      }
-      void (async () => {
-        const list = await window.electronAPI?.workflow?.list(projectRoot);
-        const def = (list?.data || []).find((d) => d.id === trimmedArgs || d.name === trimmedArgs);
-        if (!def) {
-          message.error(t('cmd.msg.workflowNotFound', { name: trimmedArgs }));
-          return;
-        }
-        const r = await window.electronAPI?.workflow?.run({ workflowId: def.id, projectRoot });
-        if (r?.ok) message.success(t('cmd.msg.workflowStarted', { id: r.data?.runId ?? '' }));
-        else message.error(r?.error || t('cmd.msg.startFailed'));
-      })();
-      ctx.setInputValue('');
-      return true;
-    }
 
-    case 'memories': {
-      if (!trimmedArgs || !['on', 'off'].includes(trimmedArgs)) {
-        ctx.setInputValue('/memories ');
-        return false;
-      }
-      useChatStore.getState().setMemoriesEnabled(trimmedArgs === 'on');
-      ctx.setInputValue('');
-      message.success(trimmedArgs === 'on' ? t('cmd.msg.memoriesOn') : t('cmd.msg.memoriesOff'));
-      return true;
-    }
+    case 'plan':
+      return cmdPlan(trimmedArgs, ctx);
 
-    case 'feedback': {
-      if (!trimmedArgs) {
-        ctx.setInputValue('/feedback ');
-        return false;
-      }
-      void window.electronAPI?.feedback?.submit(trimmedArgs).then((r) => {
-        if (r?.ok) message.success(t('cmd.msg.feedbackRecorded'));
-        else message.error(r?.error || t('cmd.msg.feedbackFailed'));
-      });
-      ctx.setInputValue('');
-      return true;
-    }
 
-    case 'theme': {
-      if (!trimmedArgs || !['system', 'dark', 'light'].includes(trimmedArgs)) {
-        ctx.setInputValue('/theme ');
-        return false;
-      }
-      const appState = useAppStore.getState();
-      appState.setTheme(trimmedArgs as 'system' | 'dark' | 'light');
-      ctx.setInputValue('');
-      return true;
-    }
+    case 'tool':
+      return cmdTool(trimmedArgs, ctx);
+
+
+    case 'review':
+      return cmdReview(trimmedArgs, ctx);
+
+
+    case 'workflow':
+      return cmdWorkflow(trimmedArgs, ctx);
+
+
+    case 'memories':
+      return cmdMemories(trimmedArgs, ctx);
+
+
+    case 'feedback':
+      return cmdFeedback(trimmedArgs, ctx);
+
+
+    case 'theme':
+      return cmdTheme(trimmedArgs, ctx);
+
 
     case 'help':
       ctx.setInputValue('');
