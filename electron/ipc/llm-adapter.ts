@@ -10,7 +10,7 @@
  *   registerLlmAdapter('my-provider', async (params) => { ... });
  *   invokeLlm({ ...params, adapter: 'my-provider' });
  */
-import type { AssistantMessage } from './agent-loop';
+import type { AssistantMessage } from './agent-loop-types';
 import { modelSupportsImageInput, isDeepSeekVisionModel } from '../types';
 import type { LlmAdapter, LlmInvokeParams } from './llm-types';
 

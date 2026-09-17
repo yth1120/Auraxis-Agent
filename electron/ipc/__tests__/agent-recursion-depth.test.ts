@@ -52,7 +52,8 @@ describe('sub-agent recursion depth — wiring is in place', () => {
     expect(cfgMatch![0]).toContain('depth?: number');
 
     // The unified step engine forwards depth into the shared tool runner.
-    const stepSrc = read('step-engine.ts');
+    // StepEngineConfig lives in the leaf contracts module (step-engine.ts re-exports it).
+    const stepSrc = read('step-engine-contracts.ts');
     const toolSrc = read('step-engine-tools.ts');
     expect(toolSrc).toContain('depth: cfg.depth');
     const stepCfgMatch = stepSrc.match(/export interface StepEngineConfig\s*\{[\s\S]*?\n\}/);

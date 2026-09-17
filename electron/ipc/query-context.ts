@@ -14,7 +14,7 @@
 import type { ApprovalPolicy } from '../contracts/core';
 import { LLM_CONTEXT_CLEAR_EVENT, LLM_CONTEXT_SNAPSHOT_EVENT } from '../contracts/session-types';
 import { appendChatEvents, readChatLog } from '../chat-log';
-import type { LoopMessage } from './agent-loop-core';
+import type { LoopMessage } from './agent-loop-types';
 
 export const AGENTS_MD_PREFIX = '## 项目指令（AGENTS.md）';
 export const MEMORY_PREAMBLE_PREFIX = '## 项目记忆（带证据溯源，来自之前的会话）';

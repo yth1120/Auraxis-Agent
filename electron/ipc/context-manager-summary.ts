@@ -2,7 +2,7 @@
 import { errorText } from '../errors';
 import { llmClientInvoke } from './llm-adapter';
 import { Planner } from './agent-loop-planner';
-import type { LLMSummaryConfig, LoopMessage, TaskPlan } from './agent-loop';
+import type { LLMSummaryConfig, LoopMessage, TaskPlan } from './agent-loop-types';
 import { toolCallFn, parsedToolArgs } from './context-manager-utils';
 
 const SUMMARY_SYSTEM_PROMPT = `You are a concise summarizer. Output a short summary in Chinese covering:

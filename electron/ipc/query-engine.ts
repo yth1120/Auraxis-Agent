@@ -20,7 +20,7 @@ import type { ApprovalPolicy } from '../types';
 import type { SandboxMode } from '../sandbox-policy';
 import { errorRecord, errorText } from '../errors';
 import { makeTurnId, type EngineEvent } from './engine-events';
-import type { ContextConfig, LoopMessage } from './agent-loop';
+import type { ContextConfig, LoopMessage } from './agent-loop-types';
 import { isDeniedError } from './tool-runner';
 import { runStep, createStepState } from './step-engine';
 import type { StepEngineConfig } from './step-engine-contracts';

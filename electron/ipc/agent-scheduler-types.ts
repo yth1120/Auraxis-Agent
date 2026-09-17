@@ -5,7 +5,7 @@
  * runtime class easier to audit and lets tests import the shapes without
  * loading the full scheduler.
  */
-import type { AgentObserver, AgentStateSnapshot, LoopMessage, TaskPlan } from './agent-loop';
+import type { AgentObserver, AgentStateSnapshot, LoopMessage, TaskPlan } from './agent-loop-types';
 import type { DeepSeekToolChoice, WorkAutonomyTier, WorkDelivery } from '../contracts/advanced';
 import type { ApprovalPolicy } from '../types';
 import type { SandboxMode } from '../sandbox-policy';

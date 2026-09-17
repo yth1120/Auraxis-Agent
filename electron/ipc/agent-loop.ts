@@ -55,17 +55,19 @@ export async function readErrorBody(err: unknown): Promise<string> {
   }
 }
 import {
-  AssistantMessage,
   createDevianceDetector,
   DEFAULT_CONTEXT_CONFIG,
   restrictPlanToApproved,
   markInjected,
-  type TaskPlan,
-  type AgentLoopConfig,
-  type AgentLoopResult,
-  type ContextConfig,
-  type LoopMessage,
 } from './agent-loop-core';
+import type {
+  AssistantMessage,
+  TaskPlan,
+  AgentLoopConfig,
+  AgentLoopResult,
+  ContextConfig,
+  LoopMessage,
+} from './agent-loop-types';
 export * from './agent-loop-core';
 
 // ─── AgentLoop ──────────────────────────────────────────

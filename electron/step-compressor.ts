@@ -10,7 +10,7 @@
  * 计划相关关键步骤）+ 确定性启发式评分，不调用 LLM。
  */
 
-import type { LoopMessage } from './ipc/agent-loop-core';
+import type { LoopMessage } from './ipc/agent-loop-types';
 import { isRecord } from './utils/guards';
 
 export interface StepCompressorPlanTask {

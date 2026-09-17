@@ -1,4 +1,5 @@
 {
   "maxCycles": 0,
-  "maxRuntimeCycles": 0
+  "maxRuntimeCycles": 0,
+  "maxTypeCycles": 0
 }

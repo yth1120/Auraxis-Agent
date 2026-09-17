@@ -7,10 +7,26 @@
 import type { ApprovalPolicy, WorkAutonomyTier } from '../types';
 import type { ToolDef } from '../tool-defs';
 import type { SandboxMode } from '../sandbox-policy';
-import type { AssistantMessage, LoopMessage, TaskPlan, StopDecision } from './agent-loop';
+import type { AssistantMessage, LoopMessage, TaskPlan, StopDecision } from './agent-loop-types';
 import type { DeepSeekToolChoice } from '../contracts/advanced';
 import type { RunnerToolCall, RunnerToolResult } from './tool-runner';
 import type { EngineEvent } from './engine-events';
+
+/**
+ * Mutable per-run state threaded through every step.
+ * 原在 step-engine.ts；step-engine-tools 只需要它的类型，
+ * 放在契约模块里避免 `step-engine-tools → step-engine` 的类型边。
+ */
+export interface StepState {
+  messages: LoopMessage[];
+  iteration: number;
+  toolCallCount: number;
+  consecutiveTextOnly: number;
+  emptyResponseCount: number;
+  allText: string;
+  /** Session start time — used for per-step time context. */
+  startedAt: number;
+}
 
 export interface StepEngineConfig {
   requestId: string;

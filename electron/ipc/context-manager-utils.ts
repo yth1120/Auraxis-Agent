@@ -1,5 +1,5 @@
 /** context-manager-utils.ts — pure context helpers. */
-import type { LoopMessage } from './agent-loop';
+import type { LoopMessage } from './agent-loop-types';
 import type { AtomicGroup } from './context-manager-types';
 import { estimateTokens } from './agent-loop-context';
 import { isRecord } from '../utils/guards';

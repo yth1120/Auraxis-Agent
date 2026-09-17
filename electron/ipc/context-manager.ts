@@ -19,7 +19,7 @@
  *      `[System Notification]: 早期详细历史已折叠释放。核心成果摘要如下：...`
  */
 
-import type { LoopMessage } from './agent-loop';
+import type { LoopMessage } from './agent-loop-types';
 import { estimateTokens } from './agent-loop-context';
 
 // Re-export estimateTokens so query-engine doesn't need a separate import

@@ -1,6 +1,6 @@
 /** agent-scheduler-lifecycle.ts — pure terminal-result transitions and cleanup. */
 import type { BrowserWindow } from 'electron';
-import type { AgentLoopResult } from './agent-loop';
+import type { AgentLoopResult } from './agent-loop-types';
 import type { AgentInstance } from './agent-scheduler-types';
 import { broadcast, notifyFrontend } from './agent-scheduler-support';
 import { ptyRegistry } from './pty-tool';

@@ -1,5 +1,6 @@
 import { invokeLlm } from './llm-adapter';
-import { Planner, parsePlanFromLLMText, type AgentObserver, type TaskPlan, type LoopMessage } from './agent-loop-core';
+import { Planner, parsePlanFromLLMText } from './agent-loop-core';
+import type { AgentObserver, TaskPlan, LoopMessage } from './agent-loop-types';
 import type { ApprovalPolicy } from '../types';
 
 export const PLANNING_SYSTEM_PROMPT = `你是任务规划器。你唯一的工作是分析用户的需求，生成结构化的 JSON 执行计划。

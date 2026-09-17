@@ -1,5 +1,5 @@
 /** context-manager-types.ts — shared context manager contracts. */
-import type { LoopMessage } from './agent-loop';
+import type { LoopMessage } from './agent-loop-types';
 
 /** An indivisible group of messages — removed or kept as a unit. */
 export interface AtomicGroup {

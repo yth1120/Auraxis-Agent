@@ -14,6 +14,9 @@ const root = path.resolve(__dirname, '..');
 const budget = JSON.parse(fs.readFileSync(path.join(__dirname, 'cycle-budget.json'), 'utf8'));
 const maxCycles = budget.maxCycles ?? 0;
 const maxRuntimeCycles = budget.maxRuntimeCycles ?? Number.MAX_SAFE_INTEGER;
+// 类型环同样锁 0（P1-a）：类型边虽然会被 TS 擦除，但互引的类型模块会让
+// 「谁是叶子」持续模糊，搬迁一次就重新长回来。预算锁定后新引入的类型环会直接失败。
+const maxTypeCycles = budget.maxTypeCycles ?? 0;
 const SKIP_DIRS = new Set([
   'node_modules',
   '__tests__',
@@ -150,7 +153,7 @@ const runtimeCycles = findCycles(
 
 const relative = (file) => path.relative(root, file).replace(/\\/g, '/');
 console.log(
-  `静态值循环: ${valueCycles.length} (budget ${maxCycles})｜运行时环(含动态 import): ${runtimeCycles.length} (budget ${maxRuntimeCycles})｜含类型导入: ${allCycles.length}`,
+  `静态值循环: ${valueCycles.length} (budget ${maxCycles})｜运行时环(含动态 import): ${runtimeCycles.length} (budget ${maxRuntimeCycles})｜含类型导入: ${allCycles.length} (budget ${maxTypeCycles})`,
 );
 
 // --list：把每个环的内部边打出来（运行时环 + 仅因 import type 成环的环），
@@ -170,7 +173,7 @@ if (process.argv.includes('--list')) {
   }
 }
 
-if (valueCycles.length > maxCycles || runtimeCycles.length > maxRuntimeCycles) {
+if (valueCycles.length > maxCycles || runtimeCycles.length > maxRuntimeCycles || allCycles.length > maxTypeCycles) {
   console.error('静态循环超出预算，新增的静态环会导致模块初始化顺序问题：');
   for (const group of [...valueCycles, ...runtimeCycles].slice(0, 5)) {
     console.error(`  ${group.map(relative).join(' → ')}`);

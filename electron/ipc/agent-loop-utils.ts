@@ -1,5 +1,6 @@
 import { devLog } from './shared';
-import { Planner, createDevianceDetector, type AgentObserver, type TaskPlan } from './agent-loop-core';
+import { Planner, createDevianceDetector } from './agent-loop-core';
+import type { AgentObserver, TaskPlan } from './agent-loop-types';
 import type { BatchToolResult } from '../tool-registry';
 import { isRecord } from '../utils/guards';
 

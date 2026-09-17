@@ -1,5 +1,5 @@
-import type { StepEngineConfig } from './step-engine-contracts';
-export type { StepEngineConfig };
+import type { StepEngineConfig, StepState } from './step-engine-contracts';
+export type { StepEngineConfig, StepState };
 
 /**
  * step-engine.ts — unified ReAct step driver (Phase 2).
@@ -11,7 +11,7 @@ export type { StepEngineConfig };
  * longer re-implement the same body twice.
  */
 
-import type { AssistantMessage, LoopMessage } from './agent-loop';
+import type { AssistantMessage, LoopMessage } from './agent-loop-types';
 
 import { errorRecord, errorText } from '../errors';
 import {
@@ -38,18 +38,6 @@ export {
 } from './step-engine-context';
 
 // ─── State ──────────────────────────────────────────────
-
-/** Mutable per-run state threaded through every step. */
-export interface StepState {
-  messages: LoopMessage[];
-  iteration: number;
-  toolCallCount: number;
-  consecutiveTextOnly: number;
-  emptyResponseCount: number;
-  allText: string;
-  /** Session start time — used for per-step time context. */
-  startedAt: number;
-}
 
 export function createStepState(messages: LoopMessage[]): StepState {
   return {

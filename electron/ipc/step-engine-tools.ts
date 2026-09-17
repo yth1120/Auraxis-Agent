@@ -2,7 +2,7 @@
 import type { SandboxMode } from '../sandbox-policy';
 import { isDeniedError, type ToolRunCallbacks, type ToolRunContext } from './tool-runner';
 import type { EngineEvent } from './engine-events';
-import type { StepEngineConfig, StepState } from './step-engine';
+import type { StepEngineConfig, StepState } from './step-engine-contracts';
 
 export function buildStepToolBatch(
   cfg: StepEngineConfig,
