@@ -49,25 +49,33 @@ function collectCoverageClaims(metric) {
 const currentTestCountMentioned = docs.some((file) => {
   if (!fs.existsSync(file)) return false;
   const text = fs.readFileSync(file, 'utf8');
-  return text.includes('274 个测试文件') || text.includes('274 test files');
+  return text.includes('278 个测试文件') || text.includes('278 test files');
 });
 if (!currentTestCountMentioned) {
-  failures.push('文档未记录当前全量测试文件数 271');
+  failures.push('文档未记录当前全量测试文件数 278');
 }
 
 const currentCaseCountMentioned = docs.some((file) => {
   if (!fs.existsSync(file)) return false;
   const text = fs.readFileSync(file, 'utf8');
-  return text.includes('2,122') || text.includes('2122');
+  return text.includes('2,144') || text.includes('2144');
 });
 if (!currentCaseCountMentioned) {
-  failures.push('文档未记录当前全量通过用例数 2094');
+  failures.push('文档未记录当前全量通过用例数 2144');
 }
 
 for (const file of docs) {
   if (!fs.existsSync(file)) continue;
   const text = fs.readFileSync(file, 'utf8');
-  if (text.includes('261 个测试文件') || text.includes('261 files') || text.includes('1,992')) {
+  if (
+    text.includes('261 个测试文件') ||
+    text.includes('261 files') ||
+    text.includes('1,992') ||
+    text.includes('274 个测试文件') ||
+    text.includes('274 test files') ||
+    text.includes('2,122') ||
+    text.includes('2122')
+  ) {
     failures.push(`${path.relative(root, file)}: 仍包含旧的测试数量`);
   }
   if (text.includes('2032 用例') || text.includes('2,032')) {

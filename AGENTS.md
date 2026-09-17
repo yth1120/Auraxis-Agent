@@ -44,6 +44,7 @@ npm run check            # lint + 主进程编译 + 渲染层类型检查 + 全�
 - **模块边界**：`electron/tool-handlers.ts` 只保留兼容导出与任务中止接线，注册表、安全管线及内部工具分别放在 `electron/ipc/tool-handlers/{registry,pipeline,internal,bash,file-tools,network,terminal,integrations,agents,session,runtime,worktree,lsp,review,execution}`；`electron/tool-defs.ts` 是聚合入口，定义放在 `electron/tool-defs/`。调度器实现、权限、支持、状态/队列/查询/快照/生命周期/运行器与类型分别放在 `agent-scheduler-class-impl.ts` / `agent-scheduler-permission.ts` / `agent-scheduler-support.ts` / `agent-scheduler-{types,queue,query,snapshot,lifecycle,runner,cleanup}.ts`；loop 纯类型放在 `agent-loop-types.ts`，Planner/Deviance、消息去重、Context、StopPolicy、上下文准备、注入与规划拦截分别放在 `agent-loop-{planner,messages,context,stop,prepare,inject,interceptors}.ts`，规划编排与工具日志放在 `agent-loop-planning.ts` / `agent-loop-utils.ts`，内置 Agent 定义放在 `agent-defs.ts`，子 Agent 注册表与观察器放在 `agent-subagent-registry.ts`；LLM 类型、适配器与协议实现分别放在 `llm-types.ts` / `llm-adapter.ts` / `llm-provider-{format,anthropic,openai}.ts`；memory SQLite/JSON 后端与 schema/行映射/实体模块分别放在 `memory-db-{sqlite,json,sqlite-schema,sqlite-rows,sqlite-memory,sqlite-evidence,sqlite-belief,sqlite-audit}.ts`，`memory-db-backends.ts` 只做兼容导出；上下文纯工具、截断、摘要与管线分别放在 `context-manager-{utils,snapshot,summary,compact}.ts`；step-engine 的上下文、工具结果与批量工具上下文放在 `step-engine-{context,tool-results,tools}.ts`；preload 按平台/核心/AI/其余域拆到 `preload-{platform,core,ai,rest,shared,api}.ts`。渲染层聊天 Store 的流运行时、非流式消息动作、前缀续写、完整流动作、跨 Store 副作用与计划监听分别放在 `src/stores/{chatStreamRuntime,chatActions,chatContinueCode,chatSendMessage,chatRuntime,chatStoreSideEffects,chatPlanListener}.ts`；Agent 动作/事件/缓冲放在 `src/stores/{agentStoreActions,agentStoreEvents,agentStoreBuffers}.ts`；会话与设置的 helper/actions 放 `src/stores/{sessionStoreHelpers,sessionStoreActions,settingsStoreActions}.ts`。
 - **能力 seam**：已有 `SessionStore`、`ShellExecutor`、`LlmAdapter` 三个可替换接口；换实现走 seam，不直接改消费方。
 - **Work 模式边界**：Work 模式只允许创建/修改/删除文档与非代码文件（门禁见 `electron/work-docs-policy.ts`），任何对代码文件的 Write/Edit/NotebookEdit/StrReplaceEditor/Delete 都会被硬拒绝；Code 模式不受影响。
+- **迭代预算**：Agent 的迭代上限只允许经 `electron/ipc/agent-iteration-budget.ts` 的 `resolveIterationBudget()` 解析（请求 → 设置 `agentMaxIterations` → 默认 200，收敛 1–500）；渲染层**禁止**自带默认值覆盖设置。续写（`continueAgent` / 输入框跟进）必须批出新窗口并以 500 硬上限封顶，否则 `resumeFrom.iteration` 会让任务在第一步再次停下。
 
 ## 模型工具开发约定
 
@@ -93,7 +94,7 @@ npm run check            # lint + 主进程编译 + 渲染层类型检查 + 全�
 ## 测试与验证
 
 - 新增/改动必须过：`npx tsc6 --noEmit`（渲染层）、`npm run electron:compile`（主进程）、`npx vitest run`（全量）、`npx vite build`（构建）。
-- 单元覆盖率门槛：lines/statements ≥ 80%、branches ≥ 80%、functions ≥ 80%（`vitest.config.mts`）；最近一次全仓库分支门禁报告为 89.68% statements / 92.05% lines / 80.94% branches / 88.27% functions，四项均已达标。
+- 单元覆盖率门槛：lines/statements ≥ 80%、branches ≥ 80%、functions ≥ 80%（`vitest.config.mts`）；最近一次全仓库分支门禁报告为 89.39% statements / 91.83% lines / 80.52% branches / 88.47% functions，四项均已达标。
 - 全仓库分支门禁统计范围：`electron/**`、`src/stores/**`、`src/core/**`；`main.ts` / `preload*.ts`（含拆分出的 preload 领域模块）依赖真实 Electron 窗口生命周期，由真实 Electron E2E、SDK smoke 与 headless CLI 验证并明确排除。CI 全量单元测试是三项平台阻断项，Linux 默认执行单元 coverage gate（见 `.github/workflows/build.yml`）。
 - 覆盖率报告：`npm run test:coverage` 同时输出 `coverage/coverage-summary.json`（gitignore，开发期产物），设置面板「测试覆盖率」页经 `coverage:get` IPC 实时读取该文件；README / AGENTS / docs 中的用例数与覆盖率数字以最近一次全量覆盖率为准，更新后必须同步。
 - 覆盖率统计范围：全仓库可单测部分（不含 `src/components/` 与主进程入口）；UI 由组件级测试覆盖，桌面端到端链路由 `npm run test:smoke` 覆盖。

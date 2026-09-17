@@ -22,9 +22,15 @@ Auraxis v3.3.0 是一款基于 Electron 的桌面端智能体工作台，融合�
 - **真实 API 验收**：`deepseek-v4-flash` 完成无头端到端
   文件/搜索/网络/会话/技能/目标/任务流程验证，并验证生成的零依赖
   ESM + `node:test` 项目（13/13 用例通过）；内联工作流保持 fail-closed。
-- **模型**：内置 DeepSeek V4 Flash、V4 Pro 与新增的实验版 V4 Flash Vision Exp；
-  视觉模型接收 JPEG / PNG / GIF / WebP 图片与 `ReadImage` 结果，非视觉 DeepSeek
-  模型自动降级为文本。
+- **模型**：内置 `deepseek-flash`（DeepSeek V4.1 Flash，原生多模态，1M 上下文 /
+  384K 输出）、`deepseek-v4-pro`，并兼容旧名 `deepseek-v4-flash` /
+  `deepseek-v4-flash-vision-exp`（由 `resolveModelId()` 归一化）。因 DeepSeek 自
+  2026-09 起默认开启思考，请求层显式发送启用/禁用；`apiBase` 以 `/responses`
+  结尾时自动走 Responses API 适配器。视觉模型接收 JPEG / PNG / GIF / WebP 图片与
+  `ReadImage` 结果。
+- **迭代预算**：`resolveIterationBudget()`（请求 → 设置 → 默认 200，收敛 1–500）
+  被调度器、子代理、统一引擎与无头 CLI 共用；预算耗尽的任务在输入框发送下一条
+  消息即可续跑，并获得以 500 硬上限封顶的新窗口。
 - **飞书 / Lark MCP**：官方 OpenAPI 预设（`@larksuiteoapi/lark-mcp`），支持
   一键 stdio 配置、域名选择、轻量 / IM / 全量工具预设、加密 App ID / App Secret
   存储，以及 `tenant_access_token` 实时连接测试。
@@ -38,7 +44,7 @@ Auraxis v3.3.0 是一款基于 Electron 的桌面端智能体工作台，融合�
   聚焦模块；移除生产代码剩余 `any`；迁移 Zustand selector 与废弃 AntD props；
   加固 IPC / Agent / Store 类型；修复登录与 Windows userData；稳定测试、
   E2E 与三平台 CI，并本地锁定 `image-size`。
-- **质量门禁**：274 个测试文件 / 2,122 用例通过（平台/CI 相关跳过不在其中），
+- **质量门禁**：278 个测试文件 / 2,144 用例通过（平台/CI 相关跳过不在其中），
   SDK 构建、SDK 真实 runtime 冒烟、E2E、审计与三平台 Release CI 均通过。
 
 ### 技术栈
@@ -201,8 +207,9 @@ Auraxis/
 │       ├── schedule-store.ts    # 会话内跟进任务（after/at/every）
 │       ├── session-store.ts     # 聊天/Agent 统一 JSONL 事件日志
 │       ├── sandbox-runner.ts    # 原生沙箱调度（restricted/AppContainer/linux/macos）
+│       ├── agent-iteration-budget.ts # 迭代预算解析（请求 → 设置 → 200，收敛 1–500）
 │       ├── acp-server.ts / sdk-server.ts / headless-run.ts  # ACP / JSON-RPC SDK / 无头执行
-│       └── __tests__/           # 主进程测试（全仓 274 个测试文件 / 2,122 用例）
+│       └── __tests__/           # 主进程测试（全仓 278 个测试文件 / 2,144 用例）
 │
 ├── src/                         # 渲染进程代码（浏览器环境）
 │   ├── main.tsx                 # React 入口
@@ -438,7 +445,7 @@ Auraxis 有**两条驱动、一套循环**：聊天与 Agent 的每次 LLM 步�
 ```
 用户输入 → buildSystemPrompt() → prepareMessages()
     ↓
-ReAct 循环（最多 500 次迭代，业务上限 200 + 安全硬上限 500）：
+ReAct 循环（业务上限默认 200，可在 1–500 内配置；安全硬上限 500）：
     1. LLM 调用（llmClientInvoke，3 次重试，指数退避 2s/4s/8s/16s max）
     2. 如果无工具调用 → 检查 <FINAL_ANSWER> → 停止
     3. 如果有工具调用 → executeToolCall() → 结构化 summary → 追加结果 → 返回步骤 1
@@ -455,7 +462,7 @@ ReAct 循环（最多 500 次迭代，业务上限 200 + 安全硬上限 500）�
 - **API 重试**：429/5xx/网络错误自动重试 3 次指数退避
 - **上下文压缩**：基于规则的压缩，token 阈值约 100K
 - **停止信号**：`<FINAL_ANSWER>` + `stop_reason` 检查；ReviewArtifact 是可选验证工具，不设强制质量门
-- **业务迭代上限**：200 次（可配置），安全硬上限：500 次
+- **迭代预算**：按「请求 → `agentMaxIterations` 设置 → 默认 200」解析并收敛到 1–500（`electron/ipc/agent-iteration-budget.ts`），安全硬上限 500；预算耗尽时任务优雅收尾
 - **结构化摘要**：9 种工具输出携带 `summary` 供前端类型化卡片渲染
 - **暴露方式**：`ai:sendQuery` IPC
 
@@ -491,6 +498,7 @@ Agent 驱动（agentLoopRun，步进委托 step-engine）：
 - **上下文管理**：支持 LLM 摘要和基于规则的回退
 - **新项目检测**：自动检测空目录/无 package.json，注入初始化指引
 - **暂停/恢复**：完整状态捕获（messages/plan/iteration/toolCallCount），满容量自动重入队列
+- **预算耗尽后继续**：在输入框发送任意消息即可接着同一任务续跑（同一份执行记录，不新建任务）；调度器会批出一个新窗口并以 500 硬上限封顶，因此续跑不会在第一步就再次停下。输入框在可续写时会显示「在「任务名」基础上继续…」
 - **最大递归深度**：3（Agent 工具可嵌套调用子 Agent，记录父子关系）
 - **暴露方式**：`agent:create` IPC 和 `runSubAgent()` 函数
 
@@ -754,7 +762,7 @@ Agent 循环 (agent-loop.ts) — agentLoopRun()
 - **默认最大并发数**：3（可通过 `agent:setMaxConcurrent` IPC 调节）
 - **Agent 状态机**：`idle → queued → running → completed/error/stopped/paused`
 - **实时通知**：每次状态变更通过 `agent:updated` 频道广播给前端
-- **200 次迭代上限**：每个 Agent 最多 200 次迭代（可通过 `maxIterations` 配置，硬安全闸 200）
+- **迭代预算**：每次运行默认 200 次（设置 → Agent 运行时 → `agentMaxIterations`，收敛 1–500）；预算耗尽的任务在下一次输入框发送时续跑并获得新窗口，累计迭代数以 500 硬上限封顶
 
 ### 6.4 工作区隔离
 
@@ -950,8 +958,8 @@ SQLite 投影缓存与 FTS 索引均带 `PRAGMA user_version = 1`，后续结构
 
 ### 10.5 DeepSeek 官方能力与接口
 
-- **思考强度**：`low / high / max` 三档（`reasoning_effort`）；Chat 模式按 DeepSeek 风格固定 high 并由思考开关控制，Work/Code 保留滑轨选择
-- **V4.1 Flash（`deepseek-flash`）**：原生多模态——`user` 消息可携带图片（JPEG/PNG/GIF/WebP），ReadImage 结果以图片内容块下发；已下线的旧名（`deepseek-v4-flash-vision-exp`、`deepseek-v4-flash`）仍会解析到该模型；图片仅在 `user` 消息中受支持，格式为 JPEG/PNG/GIF/WebP，ReadImage 工具结果会以图片内容块交给该模型
+- **思考强度**：`low / high / max` 三档（`reasoning_effort`）；Chat 模式按 DeepSeek 风格固定 high 并由思考开关控制，Work/Code 保留滑轨选择。因 DeepSeek 默认开启思考，每次请求都显式发送 `enabled` / `disabled`（思考态不发送 temperature）
+- **V4.1 Flash（`deepseek-flash`）**：原生多模态——`user` 消息可携带图片（JPEG/PNG/GIF/WebP），ReadImage 结果以图片内容块下发；已下线的旧名（`deepseek-v4-flash-vision-exp`、`deepseek-v4-flash`）仍会解析到该模型
 - **strict tools（Beta）**：严格工具模式，空 schema 工具自动兼容处理，避免「对象不能为空」类 400 错误
 - **计划生成 JSON 模式**：Agent 规划阶段用 JSON 模式生成 TaskPlan
 - **对话前缀续写**：代码块「继续写」走对话前缀（prefix）续写
@@ -1026,12 +1034,12 @@ dist-electron/ + dist/ ──→ electron-builder ──→ release/
 - **测试框架**：Vitest（`describe`, `it`, `expect`, `vi` 通过 globals 注入）
 - **主进程测试**：`electron/**/__tests__/`，node 环境，依赖 `electron` 的模块用 `vi.mock('electron', ...)` 隔离
 - **渲染进程测试**：`src/**/__tests__/`，jsdom 环境（@testing-library/react）
-- **测试总数**：274 个测试文件 / 2,122 个用例通过（平台/CI 相关跳过不在其中）
+- **测试总数**：278 个测试文件 / 2,144 个用例通过（平台/CI 相关跳过不在其中）
 - **覆盖率口径**：门槛统计范围包括 `electron/**`、`src/stores/**`、`src/core/**`；UI 组件（`src/components/`）与主进程入口（`main.ts` / `preload*.ts` 等）不计入该门槛，另有组件级测试与 Playwright 端到端测试（`npm run test:e2e`）覆盖
-- **覆盖率阈值**：行/语句 ≥ 80%，分支 ≥ 80%，函数 ≥ 80%（最近一次全仓库分支门禁报告为 89.68% statements / 92.05% lines / 80.94% branches / 88.27% functions，四项均已达标；Electron 主入口与 preload 桥由真实 E2E、SDK smoke 与 headless CLI 验证，Linux CI 默认执行覆盖率门禁，`check-doc-stats` 允许 ≤0.6pp 的平台差异）
+- **覆盖率阈值**：行/语句 ≥ 80%，分支 ≥ 80%，函数 ≥ 80%（最近一次全仓库分支门禁报告为 89.39% statements / 91.83% lines / 80.52% branches / 88.47% functions，四项均已达标；Electron 主入口与 preload 桥由真实 E2E、SDK smoke 与 headless CLI 验证，Linux CI 默认执行覆盖率门禁，`check-doc-stats` 允许 ≤0.6pp 的平台差异）
 - **覆盖率报告**：`npm run test:coverage` 同时输出 `coverage/coverage-summary.json`（gitignore 的开发期产物）；设置面板「测试覆盖率」页经 `coverage:get` IPC 实时读取，纯浏览器 dev 由 Vite 中间件提供同一路径，生产构建将其拷入 `dist/coverage/`。报告缺失时面板提示运行命令，不显示伪造数字。
 - **端到端测试**：16 条 Playwright UI 链路通过（真实 Electron，含本地注册 → 登录 → 记住我持久化）
-- **实战验收（DeepSeek 真实 API）**：Chat 流式回答、Code 自动代批 Bash、Code「每次确认」权限卡（允许一次后写入文件）、Work 智能放行执行流、Work 计划审批面板均跑通；另用 `deepseek-v4-flash` 完成无头端到端组合运行，覆盖 TodoWrite / Bash / Write / Read / Grep / Glob / WebSearch / WebFetch / ListSkills / ListAgents / SessionQuery / Goal / Task / Job 流程，创建并验证了一个 ESM + `node:test` 示例（13/13 用例通过），并确认内联 `RunWorkflow` 保持 fail-closed；沙箱脚本直启 `dist-electron/main.js` 时增加 cwd 回退（`electron/sandbox-runner.ts`）。
+- **实战验收（DeepSeek 真实 API）**：Chat 流式回答、Code 自动代批 Bash、Code「每次确认」权限卡（允许一次后写入文件）、Work 智能放行执行流、Work 计划审批面板均跑通；`deepseek-flash`（V4.1）另完成图片输入（色块识别正确）、思考开/关、多轮工具链、三种能力面门禁（chat 零工具调用）与全新零依赖 CommonJS + `node:test` 项目的创建与 `npm test` 真实验证；内联 `RunWorkflow` 保持 fail-closed。将 `agentMaxIterations` 设为 3 的实测中，任务恰好在预算处收尾且已写文件真实落盘，随后在输入框发送消息即可续跑。宿主无法创建受限令牌时，Windows 原生沙箱会拒绝执行而非降级为非沙箱运行（`electron/sandbox-runner.ts`）。
 - **压力测试（本地 mock LLM + 真实 Electron）**：200 会话冷启动约 1.4s、会话切换约 155ms、FTS 重建约 178ms；18 个 Agent（6 并发）与 30 个 Agent（8 并发）全部完成、无失败；极端负载（30 个任务 + 200 行侧栏同时渲染）下快速模式切换偶发 8–11s 卡顿并有一次超过 15s，负载结束后自动恢复；默认 3 并发下无此现象。
 - **环境**：已通过 winget 安装 Python 3.10.11；`npm run sdk:test:py` 7 个用例通过，`npm run sdk:smoke` 已验证真实无头 runtime。
 - **运行命令**：`npm test`（全量）、`npm run test:backend`（主进程）、`npm run test:frontend`（渲染进程）、`npm run test:coverage`（覆盖率报告）

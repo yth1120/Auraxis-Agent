@@ -24,9 +24,17 @@ The project follows **paper-driven development**: 7 arXiv papers' core technique
   file/search/web/session/skill/goal/task flows and verified a generated
   zero-dependency ESM + `node:test` project (13/13 tests); inline workflows
   stayed fail-closed by default.
-- **Models**: built-in DeepSeek V4 Flash, V4 Pro, and the new experimental
-  V4 Flash Vision Exp. Vision routes JPEG / PNG / GIF / WebP image content and
-  `ReadImage` output through image blocks; non-vision DeepSeek models degrade to text.
+- **Models**: built-in `deepseek-flash` (DeepSeek V4.1 Flash, natively
+  multimodal, 1M context / 384K output), `deepseek-v4-pro`, and the legacy aliases
+  `deepseek-v4-flash` / `deepseek-v4-flash-vision-exp` (normalized by
+  `resolveModelId()`). Thinking is explicitly enabled/disabled per request
+  because DeepSeek enables it by default; an `apiBase` ending in `/responses`
+  routes through the Responses API adapter. Vision routes JPEG / PNG / GIF /
+  WebP image content and `ReadImage` output through image blocks.
+- **Iteration budget**: `resolveIterationBudget()` (request → Settings →
+  default 200, clamped to 1–500) is shared by the scheduler, sub-agent,
+  unified-query and headless-CLI paths; a budget-exhausted task resumes with the
+  next composer message and gets a fresh window bounded by the 500 hard cap.
 - **Feishu / Lark MCP**: official OpenAPI preset (`@larksuiteoapi/lark-mcp`)
   with one-click stdio setup, domain selection, lightweight / IM / full tool
   presets, encrypted App ID / Secret storage, and a live
@@ -42,7 +50,7 @@ The project follows **paper-driven development**: 7 arXiv papers' core technique
   Zustand selectors and deprecated AntD props migrated; IPC / agent / store
   typings hardened; login and Windows userData recovery; test / E2E / CI
   matrix stabilization and local `image-size` pinning.
-- **Quality gates**: 274 test files / 2,122 passing cases (platform-dependent
+- **Quality gates**: 278 test files / 2,144 passing cases (platform-dependent
   skips excluded), SDK build, SDK live smoke, E2E, audit, and three-platform release CI.
 
 ### Tech Stack
@@ -205,8 +213,9 @@ Auraxis/
 │       ├── schedule-store.ts    # In-session follow-up tasks (after/at/every)
 │       ├── session-store.ts     # Unified JSONL event logs (chat & agent)
 │       ├── sandbox-runner.ts    # Native sandbox dispatch (restricted/AppContainer/linux/macos)
+│       ├── agent-iteration-budget.ts # Iteration budget resolution (request → settings → 200, clamp 1–500)
 │       ├── acp-server.ts / sdk-server.ts / headless-run.ts  # ACP / JSON-RPC SDK / headless
-│       └── __tests__/           # Main-process tests (274 files / 2,122 cases repo-wide)
+│       └── __tests__/           # Main-process tests (278 files / 2,144 cases repo-wide)
 │
 ├── src/                         # Renderer code (browser environment)
 │   ├── main.tsx                 # React entry
@@ -442,7 +451,7 @@ Used by the main chat UI. Flow:
 ```
 User input → buildSystemPrompt() → prepareMessages()
     ↓
-ReAct loop (max 500 iterations; business cap 200 + safety hard cap 500):
+ReAct loop (business cap 200 default, configurable 1–500; safety hard cap 500):
     1. LLM call (llmClientInvoke, 3 retries, exponential backoff 2s/4s/8s/16s max)
     2. No tool calls → check <FINAL_ANSWER> → stop
     3. Tool calls → executeToolCall() → structured summary → append results → back to 1
@@ -459,7 +468,7 @@ Return result to chat UI
 - **API retries**: 429 / 5xx / network errors auto-retry 3 times with exponential backoff
 - **Context compaction**: rule-based, token threshold ~100K
 - **Stop signals**: `<FINAL_ANSWER>` + `stop_reason` checks; ReviewArtifact is optional (no forced quality gate)
-- **Business iteration cap**: 200 (configurable), safety hard cap 500
+- **Iteration budget**: resolved as request → `agentMaxIterations` setting → default 200, clamped to 1–500 (`electron/ipc/agent-iteration-budget.ts`); safety hard cap 500. Reaching the budget pauses the run gracefully
 - **Structured summaries**: 9 tool outputs carry `summary` for typed frontend cards
 - **Exposed via**: `ai:sendQuery` IPC
 
@@ -495,6 +504,7 @@ Return result
 - **Context management**: LLM summaries with rule-based fallback
 - **New-project detection**: detects empty dirs / missing package.json and injects initialization guidance
 - **Pause / resume**: full state capture (messages / plan / iteration / toolCallCount), auto re-queue at capacity
+- **Continue after the budget**: sending any message in the composer resumes the same task (same transcript, no new task); the scheduler grants a fresh budget window bounded by the 500 hard cap, so a capped run never stops again on its first step. The composer placeholder names the target task while a follow-up is possible
 - **Max recursion depth**: 3 (the Agent tool can nest sub-agents, recording parent-child links)
 - **Exposed via**: `agent:create` IPC and the `runSubAgent()` function
 
@@ -758,7 +768,7 @@ The singleton `AgentScheduler` (`agent-scheduler.ts`) manages parallel agent exe
 - **Default max concurrency**: 3 (adjustable via `agent:setMaxConcurrent` IPC)
 - **Agent state machine**: `idle → queued → running → completed/error/stopped/paused`
 - **Live notifications**: every state change broadcasts via the `agent:updated` channel
-- **200-iteration cap**: each agent runs at most 200 iterations (configurable via `maxIterations`; hard safety gate 200)
+- **Iteration budget**: per run, default 200 (Settings → Agent runtime → `agentMaxIterations`, clamped to 1–500); a budget-exhausted task resumes with the next composer message and gets a fresh window, with the cumulative count bounded by the 500 hard cap
 
 ### 6.4 Workspace Isolation
 
@@ -955,8 +965,8 @@ Models can use OpenAI-compatible, Anthropic or Responses format. OpenAI format i
 
 ### 10.5 DeepSeek Official Capabilities & Interfaces
 
-- **Reasoning effort**: `low / high / max` (`reasoning_effort`); Chat follows DeepSeek style (fixed high, controlled by the thinking toggle), Work/Code keep the slider
-- **V4.1 Flash (deepseek-flash)**: multimodal by default — images are accepted in `user` messages (JPEG/PNG/GIF/WebP) and ReadImage results are delivered as image content. The retired legacy names (`deepseek-v4-flash-vision-exp`, `deepseek-v4-flash`) still resolve to it; images are accepted only in `user` messages, supported formats are JPEG/PNG/GIF/WebP, and ReadImage tool results are delivered as image content for this model
+- **Reasoning effort**: `low / high / max` (`reasoning_effort`); Chat follows DeepSeek style (fixed high, controlled by the thinking toggle), Work/Code keep the slider. Because DeepSeek enables thinking by default, every request carries an explicit `enabled` / `disabled` flag (temperature is not sent while thinking)
+- **V4.1 Flash (deepseek-flash)**: multimodal by default — images are accepted in `user` messages (JPEG/PNG/GIF/WebP) and ReadImage results are delivered as image content. The retired legacy names (`deepseek-v4-flash-vision-exp`, `deepseek-v4-flash`) still resolve to it
 - **strict tools (Beta)**: strict tool mode with automatic handling of empty schemas, avoiding "object cannot be empty" 400 errors
 - **Plan-generation JSON mode**: agent planning uses JSON mode to produce TaskPlan
 - **Conversation prefix continuation**: code-block "continue writing" uses the conversation prefix
@@ -1031,12 +1041,12 @@ The app uses a built-in `.env` parser to load environment variables from `.env` 
 - **Framework**: Vitest (`describe`, `it`, `expect`, `vi` injected via globals)
 - **Main-process tests**: `electron/**/__tests__/`, node environment; modules depending on `electron` are isolated with `vi.mock('electron', ...)`
 - **Renderer tests**: `src/**/__tests__/`, jsdom environment (@testing-library/react)
-- **Total**: 274 test files / 2,122 cases passing (platform-dependent skips excluded)
+- **Total**: 278 test files / 2,144 cases passing (platform-dependent skips excluded)
 - **Coverage scope**: the branch gate counts `electron/**`, `src/stores/**`, `src/core/**`; UI components (`src/components/`) and main-process entry points (`main.ts` / `preload*.ts` etc.) are excluded from the gate and covered by component tests + Playwright E2E (`npm run test:e2e`)
-- **Coverage thresholds**: lines/statements ≥ 80%, branches ≥ 80%, functions ≥ 80% (latest full branch gate: 89.68% statements / 92.05% lines / 80.94% branches / 88.27% functions; Electron main entry and the preload bridge are verified by E2E and SDK smoke; Linux CI runs the coverage gate by default; `check-doc-stats` tolerates ≤0.6pp platform drift)
+- **Coverage thresholds**: lines/statements ≥ 80%, branches ≥ 80%, functions ≥ 80% (latest full branch gate: 89.39% statements / 91.83% lines / 80.52% branches / 88.47% functions; Electron main entry and the preload bridge are verified by E2E and SDK smoke; Linux CI runs the coverage gate by default; `check-doc-stats` tolerates ≤0.6pp platform drift)
 - **Coverage report**: `npm run test:coverage` outputs `coverage/coverage-summary.json` (gitignored dev artifact); the Settings "Test coverage" page reads it live via the `coverage:get` IPC; pure browser dev is served by a Vite middleware, and production builds copy it into `dist/coverage/`. When the report is missing, the panel shows the command to run instead of fake numbers
 - **E2E**: 16 Playwright UI flows passing (real Electron, including register → login → remember-me persistence)
-- **Real-API acceptance (DeepSeek)**: chat streaming, Code auto-approve Bash, Code "confirm each time" permission card (write after one approval), Work smart-execution flow, and Work plan-approval panel all verified; `deepseek-v4-flash` additionally drove a headless end-to-end combos run using TodoWrite / Bash / Write / Read / Grep / Glob / WebSearch / WebFetch / ListSkills / ListAgents / SessionQuery / Goal / Task / Job flows, created and verified an ESM + `node:test` sample (13/13 tests), and confirmed inline `RunWorkflow` remains fail-closed; sandbox scripts add cwd fallback when launching `dist-electron/main.js` directly (`electron/sandbox-runner.ts`)
+- **Real-API acceptance (DeepSeek)**: chat streaming, Code auto-approve Bash, Code "confirm each time" permission card (write after one approval), Work smart-execution flow, and Work plan-approval panel all verified. On `deepseek-flash` (V4.1): image input (a colour swatch read back correctly), thinking on/off, multi-turn tool chains, chat/work/code surface gates (chat issues zero tool calls), and a fresh zero-dependency CommonJS + `node:test` project created and verified through `npm test` all pass; inline `RunWorkflow` remains fail-closed. A capped run (budget 3 from `agentMaxIterations`) stopped exactly at the budget with the files it wrote already on disk, and a composer follow-up resumed it. When the host cannot create the restricted token, the native Windows sandbox refuses execution instead of downgrading to an unsandboxed run (`electron/sandbox-runner.ts`)
 - **Stress testing (local mock LLM + real Electron)**: 200 sessions cold start ~1.4s, session switch ~155ms, FTS rebuild ~178ms; 18 agents (6 concurrent) and 30 agents (8 concurrent) all completed without failure; under extreme load (30 tasks + 200 sidebar rows) fast mode switches occasionally stalled 8–11s with one >15s, recovering automatically after load; no issue at the default 3-concurrency setting
 - **Environment**: Python 3.10.11 installed via winget; `npm run sdk:test:py` passes 7 cases and `npm run sdk:smoke` verifies the live headless runtime
 - **Commands**: `npm test` (all), `npm run test:backend` (main process), `npm run test:frontend` (renderer), `npm run test:coverage` (coverage report)

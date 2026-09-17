@@ -48,8 +48,9 @@
   agent-loop context scan with `devLog` traces so fallbacks are diagnosable.
 - Removed fixed-duration sleeps from `workflow-run` and `RollbackToMessage`
   tests (polling / shared teardown instead) to cut flake surface.
-- Coverage after the cleanup: 89.68% statements / 92.05% lines / 80.94%
-  branches / 88.27% functions (274 test files / 2,122 passing cases).
+- Coverage after that cleanup pass: 89.68% statements / 92.05% lines / 80.94%
+  branches / 88.27% functions (the suite has kept growing since; current numbers
+  live in the README).
 
 ### Fixed
 
@@ -84,6 +85,21 @@
   `prefer-const`, `no-useless-escape`, `no-misleading-character-class` and
   `preserve-caught-error` are enforced again, and the nine violations they exposed
   are fixed.
+
+### Docs
+
+- Synced every maintained document with the current code: 278 test files /
+  2,144 passing cases and 89.39% statements / 91.83% lines / 80.52% branches /
+  88.47% functions (README, AGENTS.md, both architecture guides, the vitest
+  comment, and the doc-parity guard itself, which also now rejects the previous
+  generation of numbers).
+- Documented the iteration budget as it actually behaves: resolution order
+  (request → Settings → 200, clamped to 1–500), the 500 hard cap, resuming a
+  budget-exhausted task from the composer, the follow-up placeholder, and the
+  fail-closed native-sandbox behaviour.
+- Refreshed the release highlights: V4.1 Flash as the current multimodal default
+  with legacy-name routing and explicit thinking flags, the Responses API route,
+  and the latest real-API acceptance evidence.
 - Added complexity / max-depth / max-lines budgets as warnings plus
   `npm run lint:budget` (wired into CI and `npm run check`), so code-health debt can
   only shrink; the ceiling is now 103 warnings and must be lowered after each cleanup.
