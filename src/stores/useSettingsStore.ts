@@ -10,71 +10,11 @@ import {
   PERMISSION_PRESETS,
   isPermissionPreset,
   permissionPresetFromSandbox,
-  type PermissionPreset,
 } from '../types/advanced';
 import { createSettingsStoreActions } from './settingsStoreActions';
+import type { AccountInfo, CostCurrency, SandboxMode, SettingsStore } from './settingsStoreTypes';
+export type { AccountInfo, CostCurrency, SandboxMode, SettingsStore };
 import { isRecord } from '../../electron/utils/guards';
-
-export type CostCurrency = 'RMB' | 'USD';
-/** Hard sandbox boundary for Agent tasks (mirrors electron SandboxMode). */
-export type SandboxMode = 'read' | 'workspace-write' | 'full';
-
-export interface AccountInfo {
-  balance: string;
-  toppedUp: string;
-  currency: string;
-}
-
-export interface SettingsStore {
-  deepseekApiKey: string;
-  deepseekApiKeyConfigured: boolean;
-  defaultModel: string;
-  fallbackModel: string;
-  projectPath: string | null;
-  notifyOnAgentComplete: boolean;
-  notificationMode: 'never' | 'background' | 'always';
-  permissionNotifications: boolean;
-  alwaysShowMessageActions: boolean;
-  costCurrency: CostCurrency;
-  account: AccountInfo | null;
-  inputPricePerM: number;
-  outputPricePerM: number;
-  zoomLevel: number;
-  sidebarGlass: number;
-  aquaGlass: number;
-  wallpaper: string | null;
-  sidebarGlassSupported: boolean;
-  sidebarGlassReady: boolean;
-  permissionPreset: PermissionPreset;
-  sandboxMode: SandboxMode;
-  webSearchProvider: string;
-  exaApiKey: string;
-  perplexityApiKey: string;
-  maxOutputTokens: number;
-  setApiKey: (key: string) => void;
-  setDefaultModel: (model: string) => void;
-  setFallbackModel: (model: string) => void;
-  setProjectPath: (path: string | null) => void;
-  setNotifyOnAgentComplete: (enabled: boolean) => void;
-  setNotificationMode: (mode: 'never' | 'background' | 'always') => void;
-  setPermissionNotifications: (enabled: boolean) => void;
-  setAlwaysShowMessageActions: (enabled: boolean) => void;
-  setCostCurrency: (currency: CostCurrency) => void;
-  setAccount: (info: AccountInfo | null) => void;
-  setInputPricePerM: (price: number) => void;
-  setOutputPricePerM: (price: number) => void;
-  setZoomLevel: (level: number) => void;
-  setSidebarGlass: (value: number) => void;
-  setAquaGlass: (value: number) => void;
-  setWallpaper: (wallpaper: string | null) => void;
-  setSidebarGlassSupported: (supported: boolean) => void;
-  setPermissionPreset: (preset: PermissionPreset) => void;
-  setWebSearchProvider: (provider: string) => void;
-  setMaxOutputTokens: (tokens: number) => void;
-  setExaApiKey: (key: string) => void;
-  setPerplexityApiKey: (key: string) => void;
-  clearApiKeys: () => void;
-}
 
 export const useSettingsStore = create<SettingsStore>()(
   persist(

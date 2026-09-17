@@ -1,7 +1,7 @@
 /** settingsStoreActions.ts — Settings persistence/IPC-backed mutations. */
 import type { StoreApi } from 'zustand';
 import { PERMISSION_PRESETS } from '../types/advanced';
-import type { CostCurrency, SettingsStore } from './useSettingsStore';
+import type { CostCurrency, SettingsStore } from './settingsStoreTypes';
 
 type SetState = StoreApi<SettingsStore>['setState'];
 type GetState = StoreApi<SettingsStore>['getState'];
