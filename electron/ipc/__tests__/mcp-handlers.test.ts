@@ -27,12 +27,12 @@ vi.mock('../../credentials', () => ({
 vi.mock('../settings-store', () => ({
   readSettings: h.readSettings,
 }));
-vi.mock('../../tool-registry', () => ({
+vi.mock('../mcp-tool-cache', () => ({
   invalidateMcpToolCache: vi.fn(),
 }));
 
 import { registerMcpHandlers, getAllMcpTools } from '../mcp-handlers';
-import { invalidateMcpToolCache } from '../../tool-registry';
+import { invalidateMcpToolCache } from '../mcp-tool-cache';
 
 function fakeChild() {
   const child: any = new EventEmitter();

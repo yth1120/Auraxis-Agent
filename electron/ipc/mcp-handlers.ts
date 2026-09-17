@@ -7,7 +7,7 @@ import spawn from 'cross-spawn';
 import { resolveCredential } from '../credentials';
 import { readSettings } from './settings-store';
 import type { MCPServerConfig, MCPToolDef, MCPStatus } from '../advanced-defs';
-import { invalidateMcpToolCache } from '../tool-registry';
+import { invalidateMcpToolCache } from './mcp-tool-cache';
 import { assertString } from './shared';
 import { safeProcessEnv } from '../safe-env';
 

@@ -12,29 +12,27 @@ import { errorText } from './errors';
 import { TOOL_DEFINITIONS } from './tool-defs';
 import type { ToolDef } from './tool-defs';
 import { getAllMcpTools, callMcpTool } from './ipc/mcp-handlers';
+import { getCachedMcpTools, setCachedMcpTools } from './ipc/mcp-tool-cache';
+
+// 兼容既有调用方：失效逻辑已移到中立缓存模块。
+export { invalidateMcpToolCache } from './ipc/mcp-tool-cache';
 
 const MCP_PREFIX = 'mcp__';
 const MAX_TOTAL_TOOLS = 96;
 
-let cachedMcpTools: ToolDef[] | null = null;
-
-/** Invalidate MCP tool cache — called when MCP servers connect/disconnect. */
-export function invalidateMcpToolCache(): void {
-  cachedMcpTools = null;
-}
-
 function getMcpToolDefs(): ToolDef[] {
+  const cachedMcpTools = getCachedMcpTools();
   if (cachedMcpTools) return cachedMcpTools;
 
   const mcpTools = getAllMcpTools();
-  cachedMcpTools = mcpTools.map((t) => ({
+  const defs = mcpTools.map((t) => ({
     name: `${MCP_PREFIX}${t.serverId}__${t.name}`,
     description: `[MCP:${t.serverName}] ${t.description || `MCP tool: ${t.name}`}`,
     input_schema: (t.inputSchema || { type: 'object', properties: {}, required: [] }) as ToolDef['input_schema'],
     isConcurrencySafe: false,
   }));
-
-  return cachedMcpTools;
+  setCachedMcpTools(defs);
+  return defs;
 }
 
 // ─── Plugin tools placeholder ──────────────────────────────

@@ -52,65 +52,80 @@ function resolveImport(fromFile, spec) {
   return null;
 }
 
-const STATIC_IMPORT_RE = /(?:^|\n)\s*(?:import|export)\b[^;\n]*?from\s+'([^']+)'/g;
+// 区分值导入与 `import type`：类型导入会被 TS 擦除，不参与运行时模块初始化，
+// 因此只对「值环」设预算；类型环单独统计（理想也清零，但不是阻塞项）。
+const STATIC_IMPORT_RE = /(?:^|\n)\s*(?:import|export)(\s+type)?\b[^;\n]*?from\s+'([^']+)'/g;
 
 const files = [...sourceFiles(path.join(root, 'electron')), ...sourceFiles(path.join(root, 'src'))];
 const graph = new Map();
+const typeGraph = new Map();
 for (const file of files) {
   const targets = new Set();
+  const typeTargets = new Set();
   const text = fs.readFileSync(file, 'utf8');
   for (const match of text.matchAll(STATIC_IMPORT_RE)) {
-    const resolved = resolveImport(file, match[1]);
-    if (resolved) targets.add(resolved);
+    const resolved = resolveImport(file, match[2]);
+    if (!resolved) continue;
+    if (match[1]) typeTargets.add(resolved);
+    else targets.add(resolved);
   }
   graph.set(file, [...targets]);
+  typeGraph.set(file, [...typeTargets]);
 }
 
-/** Tarjan 强连通分量：>1 个节点（或自环）即为环。 */
-let index = 0;
-const indices = new Map();
-const low = new Map();
-const onStack = new Set();
-const stack = [];
-const cycles = [];
+/** Tarjan 强连通分量：>1 个节点即为环。 */
+function findCycles(edges) {
+  let index = 0;
+  const indices = new Map();
+  const low = new Map();
+  const onStack = new Set();
+  const stack = [];
+  const cycles = [];
 
-function strongConnect(node, component = []) {
-  indices.set(node, index);
-  low.set(node, index);
-  index += 1;
-  stack.push(node);
-  onStack.add(node);
+  function strongConnect(node) {
+    indices.set(node, index);
+    low.set(node, index);
+    index += 1;
+    stack.push(node);
+    onStack.add(node);
 
-  for (const next of graph.get(node) ?? []) {
-    if (!indices.has(next)) {
-      strongConnect(next);
-      low.set(node, Math.min(low.get(node), low.get(next)));
-    } else if (onStack.has(next)) {
-      low.set(node, Math.min(low.get(node), indices.get(next)));
+    for (const next of edges.get(node) ?? []) {
+      if (!indices.has(next)) {
+        strongConnect(next);
+        low.set(node, Math.min(low.get(node), low.get(next)));
+      } else if (onStack.has(next)) {
+        low.set(node, Math.min(low.get(node), indices.get(next)));
+      }
+    }
+
+    if (low.get(node) === indices.get(node)) {
+      const group = [];
+      let member;
+      do {
+        member = stack.pop();
+        onStack.delete(member);
+        group.push(member);
+      } while (member !== node);
+      if (group.length > 1) cycles.push(group);
     }
   }
 
-  if (low.get(node) === indices.get(node)) {
-    const group = [];
-    let member;
-    do {
-      member = stack.pop();
-      onStack.delete(member);
-      group.push(member);
-    } while (member !== node);
-    if (group.length > 1) cycles.push(group);
-  }
-  return component;
+  for (const file of edges.keys()) if (!indices.has(file)) strongConnect(file);
+  return cycles;
 }
 
-for (const file of graph.keys()) if (!indices.has(file)) strongConnect(file);
+const valueCycles = findCycles(graph);
+const combined = new Map(
+  [...graph.keys()].map((file) => [file, [...(graph.get(file) ?? []), ...(typeGraph.get(file) ?? [])]]),
+);
+const allCycles = findCycles(combined);
 
 const relative = (file) => path.relative(root, file).replace(/\\/g, '/');
-console.log(`静态循环依赖: ${cycles.length} (budget ${maxCycles})`);
+console.log(`静态值循环: ${valueCycles.length} (budget ${maxCycles})｜含类型导入的环: ${allCycles.length}`);
 
-if (cycles.length > maxCycles) {
+if (valueCycles.length > maxCycles) {
   console.error('静态循环超出预算，新增的静态环会导致模块初始化顺序问题：');
-  for (const group of cycles.slice(0, 5)) {
+  for (const group of valueCycles.slice(0, 5)) {
     console.error(`  ${group.map(relative).join(' → ')}`);
   }
   console.error('修好后请下调 scripts/cycle-budget.json 的 maxCycles。');
