@@ -29,6 +29,53 @@ import {
 } from './WorkspaceInspectorSections';
 import { AGENT_STATUS_META, basename, latestAgentTodos } from './WorkspaceInspectorUtils';
 
+/** 仅 Code/Work 模式且已选中任务时返回该任务，否则 undefined（兼作类型收窄）。 */
+function pickCodeAgent<T>(isCode: boolean, agent: T | undefined): T | undefined {
+  return isCode ? agent : undefined;
+}
+
+/** 内容判定：任务 / 工具分组 / 系统消息任一非空即认为面板有内容。 */
+function inspectorContentState<T>(
+  isCode: boolean,
+  tasks: unknown[],
+  groups: Array<{ items: unknown[] }>,
+  systemMessages: T[],
+  agentCount: number,
+): { sysMessages: T[]; hasContent: boolean; showAgentTasks: boolean } {
+  const sysMessages: T[] = isCode ? [] : systemMessages;
+  const hasContent = tasks.length > 0 || groups.some((g) => g.items.length > 0) || sysMessages.length > 0;
+  return { sysMessages, hasContent, showAgentTasks: isCode && agentCount > 0 };
+}
+
+/** Agent 状态徽章与文案（无选中任务时为 null）。 */
+function inspectorStatus(
+  agent: { status: string } | undefined,
+  tPanel: (key: I18nKey) => string,
+): { statusMeta: { labelKey: I18nKey; cls: string } | null; statusLabel: string | null } {
+  if (!agent) return { statusMeta: null, statusLabel: null };
+  const meta = AGENT_STATUS_META[agent.status] ?? {
+    labelKey: 'status.stopped' as I18nKey,
+    cls: 'bg-[var(--color-text-faint)]',
+  };
+  return { statusMeta: meta, statusLabel: tPanel(meta.labelKey) };
+}
+
+/** 运行时长（秒）与累计 token。 */
+function inspectorMetrics(
+  agent: { startTime?: number; totalInputTokens?: number; totalOutputTokens?: number } | undefined,
+  now: number,
+): { elapsed: number; totalTokens: number } {
+  const elapsed = agent?.startTime ? Math.max(0, Math.floor((now - agent.startTime) / 1000)) : 0;
+  const totalTokens = (agent?.totalInputTokens ?? 0) + (agent?.totalOutputTokens ?? 0);
+  return { elapsed, totalTokens };
+}
+
+/** 任务是否已进入终态（完成 / 失败 / 停止）。 */
+function isAgentSettled(agent: { status: string } | undefined): boolean {
+  if (!agent) return false;
+  return agent.status === 'completed' || agent.status === 'error' || agent.status === 'stopped';
+}
+
 /** 无内容时的空态：有任务时只显示任务卡，否则显示空态说明 + 快照卡。 */
 function InspectorEmptyState({
   showAgentTasks,
@@ -89,18 +136,12 @@ export default function WorkspaceInspector() {
   const agent = useStoreWithEqualityFn(useAgentStore, (s) => s.agents.find((a) => a.id === currentAgentId), shallow);
   const agents = useAgentStore((s) => s.agents);
 
-  const statusMeta = agent
-    ? (AGENT_STATUS_META[agent.status] ?? {
-        labelKey: 'status.stopped' as I18nKey,
-        cls: 'bg-[var(--color-text-faint)]',
-      })
-    : null;
-  const statusLabel = statusMeta ? tPanel(statusMeta.labelKey) : null;
+  const codeAgent = pickCodeAgent(isCode, agent);
+  const { statusMeta, statusLabel } = inspectorStatus(agent, tPanel);
 
   const deliverables = useMemo(() => collectDeliverables(agent), [agent]);
 
-  const elapsed = agent?.startTime ? Math.max(0, Math.floor((now - agent.startTime) / 1000)) : 0;
-  const totalTokens = (agent?.totalInputTokens ?? 0) + (agent?.totalOutputTokens ?? 0);
+  const { elapsed, totalTokens } = inspectorMetrics(agent, now);
 
   const qualityRuns = useMemo(() => (agent ? collectQualityRuns(agent.log ?? []) : []), [agent]);
   const latestFailure = useMemo(() => (agent ? findLatestFailure(agent.log ?? [], agent.error) : null), [agent]);
@@ -138,7 +179,7 @@ export default function WorkspaceInspector() {
   }, [fileTokens]);
   const [diffCount, setDiffCount] = useState(0);
   const [diffRefresh, setDiffRefresh] = useState(0);
-  const settled = agent && (agent.status === 'completed' || agent.status === 'error' || agent.status === 'stopped');
+  const settled = isAgentSettled(agent);
   useEffect(() => {
     if (!agent || !settled) {
       setDiffCount(0);
@@ -279,8 +320,13 @@ export default function WorkspaceInspector() {
   );
 
   // System prompts only apply to the foreground chat inspector.
-  const sysMessages = isCode ? [] : systemMessages;
-  const hasContent = tasks.length > 0 || groups.some((g) => g.items.length > 0) || sysMessages.length > 0;
+  const { sysMessages, hasContent, showAgentTasks } = inspectorContentState(
+    isCode,
+    tasks,
+    groups,
+    systemMessages,
+    agents.length,
+  );
 
   const redoTask = (task: { title: string }) => {
     if (!agent) return;
@@ -293,7 +339,7 @@ export default function WorkspaceInspector() {
   if (!hasContent) {
     return (
       <InspectorEmptyState
-        showAgentTasks={isCode && agents.length > 0}
+        showAgentTasks={showAgentTasks}
         sidebarMode={sidebarMode}
         projectRoot={projectRoot ?? undefined}
         now={now}
@@ -304,9 +350,9 @@ export default function WorkspaceInspector() {
 
   return (
     <div className="h-full overflow-y-auto px-3 pb-6 pt-3">
-      {isCode && agent && (
+      {codeAgent && (
         <AgentInspectorHeader
-          agent={agent}
+          agent={codeAgent}
           statusMeta={statusMeta}
           statusLabel={statusLabel}
           elapsed={elapsed}
@@ -316,7 +362,7 @@ export default function WorkspaceInspector() {
         />
       )}
 
-      {isCode && agents.length > 1 && agent && <AgentTasksCard now={now} />}
+      {codeAgent && agents.length > 1 && <AgentTasksCard now={now} />}
 
       {activeToolCount > 0 && (
         <div className="flex items-center gap-2 px-4 py-2 mb-3 rounded-lg text-xs text-primary bg-primary-soft">
@@ -327,11 +373,11 @@ export default function WorkspaceInspector() {
         </div>
       )}
 
-      {isCode && agent && <AgentSummaryCard agent={agent} />}
+      {codeAgent && <AgentSummaryCard agent={codeAgent} />}
 
-      {isCode && agent && qualityRuns.length > 0 && (
+      {codeAgent && qualityRuns.length > 0 && (
         <QualityGateCard
-          agent={agent}
+          agent={codeAgent}
           runs={qualityRuns}
           failure={latestFailure}
           lintFixing={lintFixing}
@@ -339,7 +385,7 @@ export default function WorkspaceInspector() {
         />
       )}
 
-      {isCode && agent && nextSteps.length > 0 && <NextStepsCard agent={agent} steps={nextSteps} />}
+      {codeAgent && nextSteps.length > 0 && <NextStepsCard agent={codeAgent} steps={nextSteps} />}
 
       <TaskChecklist tasks={tasks} onRedo={isCode && agent ? redoTask : undefined} />
 
@@ -349,9 +395,9 @@ export default function WorkspaceInspector() {
 
       <ContextManifest groups={groups} fileTokens={fileTokens} maxFileTokens={maxFileTokens} />
 
-      {isCode && agent && deliverables.length > 0 && <DeliverablesCard files={deliverables} onPreview={openPreview} />}
+      {codeAgent && deliverables.length > 0 && <DeliverablesCard files={deliverables} onPreview={openPreview} />}
 
-      {isCode && agent && (agent.status === 'completed' || agent.status === 'error' || agent.status === 'stopped') && (
+      {settled && (
         <RollbackCard onRollback={rollbackAgent} />
       )}
 
