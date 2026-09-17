@@ -253,6 +253,135 @@ export function Checklist({ todos }: { todos: NonNullable<AgentLogEntry['todos']
   );
 }
 
+/** 行首：展开态只留 chevron，收起态叠工具图标 + 悬停 chevron。 */
+function ToolRowLeading({ open, failed, toolName }: { open: boolean; failed: boolean; toolName?: string }) {
+  if (open) return <CaretDownOutlined size={14} className="ax-tool-row-chevron" />;
+  return (
+    <>
+      <span className="ax-tool-row-icon">
+        {failed ? <StateDot state="error" /> : <ToolIcon toolName={toolName} size={14} />}
+      </span>
+      <CaretDownOutlined size={14} className="ax-tool-row-chevron ax-tool-row-chevron-hover" />
+    </>
+  );
+}
+
+/** 展开态内容：TodoWrite 清单 / Bash 终端 / 其它工具卡片 + 子代理与「查看轨迹」。 */
+function ToolRowBody({
+  entry,
+  running,
+  failed,
+  isBash,
+  bashTerm,
+  command,
+  cwd,
+  homePath,
+  subagents,
+}: {
+  entry: AgentLogEntry;
+  running?: boolean;
+  failed: boolean;
+  isBash: boolean;
+  bashTerm: { content: string; exitCode?: number };
+  command: string;
+  cwd: string | undefined;
+  homePath: string;
+  subagents: AgentInfo[];
+}) {
+  const currentAgentId = useAgentStore((s) => s.currentAgentId);
+  return (
+    <div className="flex flex-col">
+      {entry.toolName === 'TodoWrite' && entry.todos ? (
+        <Checklist todos={entry.todos} />
+      ) : isBash ? (
+        <TerminalBlock
+          className="ax-tool-card-surface"
+          command={command}
+          cwd={cwd}
+          home={homePath}
+          output={failed && !bashTerm.content ? entry.error || '' : bashTerm.content}
+          running={running}
+          failed={failed}
+          exitCode={bashTerm.exitCode}
+          durationMs={entry.durationMs}
+        />
+      ) : (
+        <div className="ax-tool-card-surface">{renderToolBody(entry)}</div>
+      )}
+      {entry.toolName === 'Agent' && subagents.length > 0 && (
+        <div className="mt-1.5 ml-2 flex flex-col gap-0.5 border-l-2 border-border-dim pl-2.5">
+          {subagents.map((subagent) => {
+            const subRunning = subagent.status === 'running' || subagent.status === 'queued';
+            const subFailed = subagent.status === 'error' || subagent.status === 'stopped';
+            return (
+              <button
+                key={subagent.id}
+                type="button"
+                className="flex items-center gap-2 min-w-0 rounded-md px-2 py-1 text-left cursor-pointer border-none bg-transparent hover:bg-[var(--color-hover)]"
+                onClick={() => useAgentStore.getState().setCurrentAgent(subagent.id)}
+                title={`${subagent.description || subagent.name} · ${subagent.status}`}
+              >
+                <span
+                  className={clsx(
+                    'shrink-0 flex items-center justify-center w-4 h-4',
+                    subRunning ? 'text-primary' : subFailed ? 'text-danger' : 'text-success',
+                  )}
+                >
+                  {subRunning ? (
+                    <ExecutingIndicator size={12} />
+                  ) : subFailed ? (
+                    <ExclamationCircleOutlined />
+                  ) : (
+                    <CheckIcon />
+                  )}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-xs text-text-secondary">
+                  {subagent.name.split(':')[1]?.trim() || subagent.name}
+                </span>
+                <span className="shrink-0 text-2xs text-text-muted">{subagent.status}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+      <button
+        type="button"
+        className="ax-tool-inspect"
+        onClick={() => {
+          if (entry.toolCallId && currentAgentId)
+            useAppStore.getState().requestTrajectoryFocus(currentAgentId, entry.toolCallId);
+        }}
+      >
+        <EyeIcon size={12} />
+        {t('tl.inspect')}
+      </button>
+    </div>
+  );
+}
+
+/** TodoWrite 的完成/进行中计数（其它工具为 null）。 */
+function toolTodoCounts(entry: AgentLogEntry): { total: number; done: number; active: number } | null {
+  if (entry.toolName !== 'TodoWrite' || !entry.todos) return null;
+  return {
+    total: entry.todos.length,
+    done: entry.todos.filter((todo) => todo.status === 'completed').length,
+    active: entry.todos.filter((todo) => todo.status === 'in_progress').length,
+  };
+}
+
+/** 行摘要：TodoWrite 显示进度，其它工具显示入参摘要。 */
+function toolRowSummary(entry: AgentLogEntry, counts: { done: number; total: number } | null, t: (k: never, v?: never) => string): string {
+  if (counts) return (t as unknown as (k: string, v: Record<string, unknown>) => string)('conv.todoProgress', { done: counts.done, total: counts.total });
+  return summarizeInput(entry.toolName, entry.input);
+}
+
+/** 摘要后缀：进行中 todo 数或子代理数。 */
+function toolRowSuffix(entry: AgentLogEntry, counts: { active: number } | null, subagentCount: number): string | null {
+  if (counts && counts.active > 0) return `+${counts.active}`;
+  if (entry.toolName === 'Agent' && subagentCount > 0) return `+${subagentCount}`;
+  return null;
+}
+
 export function AgentToolRow({
   entry,
   running,
@@ -274,17 +403,8 @@ export function AgentToolRow({
     [rowKey],
   );
   const failed = entry.type === 'tool_error';
-  const todoCounts =
-    entry.toolName === 'TodoWrite' && entry.todos
-      ? {
-          total: entry.todos.length,
-          done: entry.todos.filter((todo) => todo.status === 'completed').length,
-          active: entry.todos.filter((todo) => todo.status === 'in_progress').length,
-        }
-      : null;
-  const summary = todoCounts
-    ? t('conv.todoProgress', { done: todoCounts.done, total: todoCounts.total })
-    : summarizeInput(entry.toolName, entry.input);
+  const todoCounts = toolTodoCounts(entry);
+  const summary = toolRowSummary(entry, todoCounts, t as never);
   const isBash = entry.toolName === 'Bash';
   const inputPath =
     isFileTool(entry.toolName) && typeof entry.input?.file_path === 'string' ? entry.input.file_path : undefined;
@@ -302,22 +422,8 @@ export function AgentToolRow({
   const command = isBash && typeof entry.input?.command === 'string' ? entry.input.command : '';
   const cwd = isBash && typeof entry.input?.workdir === 'string' ? entry.input.workdir : undefined;
   const homePath = window.electronAPI?.homePath || '';
-  const suffix =
-    todoCounts && todoCounts.active > 0
-      ? `+${todoCounts.active}`
-      : entry.toolName === 'Agent' && subagents.length > 0
-        ? `+${subagents.length}`
-        : null;
-  const leading = open ? (
-    <CaretDownOutlined size={14} className="ax-tool-row-chevron" />
-  ) : (
-    <>
-      <span className="ax-tool-row-icon">
-        {failed ? <StateDot state="error" /> : <ToolIcon toolName={entry.toolName} size={14} />}
-      </span>
-      <CaretDownOutlined size={14} className="ax-tool-row-chevron ax-tool-row-chevron-hover" />
-    </>
-  );
+  const suffix = toolRowSuffix(entry, todoCounts, subagents.length);
+  const leading = <ToolRowLeading open={open} failed={failed} toolName={entry.toolName} />;
   const failureLine = failed && entry.error ? entry.error.split('\n')[0] : null;
   const summaryText = failureLine ?? summary;
   const statusLabel = running ? t('tl.running') : failed ? t('tl.failed') : null;
@@ -368,72 +474,17 @@ export function AgentToolRow({
         )}
       </div>
       {open && (
-        <div className="flex flex-col">
-          {entry.toolName === 'TodoWrite' && entry.todos ? (
-            <Checklist todos={entry.todos} />
-          ) : isBash ? (
-            <TerminalBlock
-              className="ax-tool-card-surface"
-              command={command}
-              cwd={cwd}
-              home={homePath}
-              output={failed && !bashTerm.content ? entry.error || '' : bashTerm.content}
-              running={running}
-              failed={failed}
-              exitCode={bashTerm.exitCode}
-              durationMs={entry.durationMs}
-            />
-          ) : (
-            <div className="ax-tool-card-surface">{renderToolBody(entry)}</div>
-          )}
-          {entry.toolName === 'Agent' && subagents.length > 0 && (
-            <div className="mt-1.5 ml-2 flex flex-col gap-0.5 border-l-2 border-border-dim pl-2.5">
-              {subagents.map((subagent) => {
-                const running = subagent.status === 'running' || subagent.status === 'queued';
-                const failed = subagent.status === 'error' || subagent.status === 'stopped';
-                return (
-                  <button
-                    key={subagent.id}
-                    type="button"
-                    className="flex items-center gap-2 min-w-0 rounded-md px-2 py-1 text-left cursor-pointer border-none bg-transparent hover:bg-[var(--color-hover)]"
-                    onClick={() => useAgentStore.getState().setCurrentAgent(subagent.id)}
-                    title={`${subagent.description || subagent.name} · ${subagent.status}`}
-                  >
-                    <span
-                      className={clsx(
-                        'shrink-0 flex items-center justify-center w-4 h-4',
-                        running ? 'text-primary' : failed ? 'text-danger' : 'text-success',
-                      )}
-                    >
-                      {running ? (
-                        <ExecutingIndicator size={12} />
-                      ) : failed ? (
-                        <ExclamationCircleOutlined />
-                      ) : (
-                        <CheckIcon />
-                      )}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate text-xs text-text-secondary">
-                      {subagent.name.split(':')[1]?.trim() || subagent.name}
-                    </span>
-                    <span className="shrink-0 text-2xs text-text-muted">{subagent.status}</span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-          <button
-            type="button"
-            className="ax-tool-inspect"
-            onClick={() => {
-              if (entry.toolCallId && currentAgentId)
-                useAppStore.getState().requestTrajectoryFocus(currentAgentId, entry.toolCallId);
-            }}
-          >
-            <EyeIcon size={12} />
-            {t('tl.inspect')}
-          </button>
-        </div>
+        <ToolRowBody
+          entry={entry}
+          running={running}
+          failed={failed}
+          isBash={isBash}
+          bashTerm={bashTerm}
+          command={command}
+          cwd={cwd}
+          homePath={homePath}
+          subagents={subagents}
+        />
       )}
     </div>
   );
