@@ -71,8 +71,7 @@ export function normalizeTodos(value: unknown): AgentLogEntry['todos'] | undefin
   return todos.length > 0 ? todos : undefined;
 }
 
-export function toBackendPatch(snapshot: BackendAgentSnapshot): Partial<AgentInfo> {
-  const patch: Partial<AgentInfo> = {};
+function assignAgentScalars(patch: Partial<AgentInfo>, snapshot: BackendAgentSnapshot): void {
   if (snapshot.name) patch.name = snapshot.name;
   if (snapshot.description !== undefined) patch.description = snapshot.description;
   if (isAgentType(snapshot.type)) patch.type = snapshot.type;
@@ -93,6 +92,16 @@ export function toBackendPatch(snapshot: BackendAgentSnapshot): Partial<AgentInf
   if (snapshot.surface === 'work' || snapshot.surface === 'code' || snapshot.surface === 'chat') {
     patch.surface = snapshot.surface;
   }
+  if (snapshot.error !== undefined) patch.error = snapshot.error;
+  if (snapshot.result !== undefined) patch.result = snapshot.result;
+  if (snapshot.model) patch.model = snapshot.model;
+  const workTier = snapshot.workTier;
+  if (workTier === 'plan' || workTier === 'smart' || workTier === 'full') patch.workTier = workTier;
+  const projectPath = snapshot.projectPath || snapshot.projectRoot;
+  if (typeof projectPath === 'string' && projectPath) patch.projectRoot = projectPath;
+}
+
+function assignPlanPatch(patch: Partial<AgentInfo>, snapshot: BackendAgentSnapshot): void {
   const plan = normalizeTodos(isRecord(snapshot.plan) ? snapshot.plan.todos : undefined);
   if (isRecord(snapshot.plan) && Array.isArray(snapshot.plan.tasks)) {
     const taskTodos = snapshot.plan.tasks
@@ -102,41 +111,43 @@ export function toBackendPatch(snapshot: BackendAgentSnapshot): Partial<AgentInf
       )
       .map((task) => ({ content: task.description, status: task.status, activeForm: `执行: ${task.description}` }));
     patch.plan = taskTodos.length > 0 ? { todos: taskTodos } : plan ? { todos: plan } : null;
-  } else if (plan) {
+    return;
+  }
+  if (plan) {
     patch.plan = { todos: plan };
-  } else if (isRecord(snapshot.plan)) {
+    return;
+  }
+  if (isRecord(snapshot.plan)) {
     patch.plan = null;
   }
-  if (snapshot.error !== undefined) patch.error = snapshot.error;
-  if (snapshot.result !== undefined) patch.result = snapshot.result;
-  if (snapshot.model) patch.model = snapshot.model;
-  const workTier = snapshot.workTier;
-  if (workTier === 'plan' || workTier === 'smart' || workTier === 'full') patch.workTier = workTier;
-  if (
-    isRecord(snapshot.delivery) &&
-    Array.isArray(snapshot.delivery.files) &&
-    typeof snapshot.delivery.result === 'string'
-  ) {
-    const files = snapshot.delivery.files.filter((file): file is string => typeof file === 'string');
+}
+
+function assignDeliveryPatch(patch: Partial<AgentInfo>, snapshot: BackendAgentSnapshot): void {
+  const delivery = snapshot.delivery;
+  if (!isRecord(delivery) || !Array.isArray(delivery.files) || typeof delivery.result !== 'string') return;
+  {
+    const files = delivery.files.filter((file): file is string => typeof file === 'string');
     patch.delivery = {
       files,
-      result: snapshot.delivery.result,
-      ...(typeof snapshot.delivery.summary === 'string' ? { summary: snapshot.delivery.summary } : {}),
+      result: delivery.result,
+      ...(typeof delivery.summary === 'string' ? { summary: delivery.summary } : {}),
     };
   }
-  const projectPath = snapshot.projectPath || snapshot.projectRoot;
-  if (typeof projectPath === 'string' && projectPath) patch.projectRoot = projectPath;
+}
+
+export function toBackendPatch(snapshot: BackendAgentSnapshot): Partial<AgentInfo> {
+  const patch: Partial<AgentInfo> = {};
+  assignAgentScalars(patch, snapshot);
+  assignPlanPatch(patch, snapshot);
+  assignDeliveryPatch(patch, snapshot);
   return patch;
 }
 
 // Convert a raw backend event into a log entry the UI can render.
 // Returns null for events that aren't shown as log entries (text_chunk goes
 // through the RAF buffer instead).
-export function logEntryFromEvent(event: AgentRuntimeEvent): AgentLogEntry | null {
+function toolEventEntry(event: AgentRuntimeEvent): AgentLogEntry | null {
   switch (event.type) {
-    case 'text_chunk':
-      // Handled by the RAF buffer; never produces a direct log entry here.
-      return null;
     case 'tool_start':
       return {
         type: 'tool_start',
@@ -186,6 +197,16 @@ export function logEntryFromEvent(event: AgentRuntimeEvent): AgentLogEntry | nul
         streamOutput: event.streamOutput,
         stepGroupId: event.stepGroupId,
       };
+    case 'tool_progress':
+      // API retry hints, long-tool liveness pings.
+      return event.progress ? { type: 'progress', timestamp: Date.now(), text: event.progress } : null;
+    default:
+      return null;
+  }
+}
+
+function iterationEventEntry(event: AgentRuntimeEvent): AgentLogEntry | null {
+  switch (event.type) {
     case 'iteration_start':
       return {
         type: 'iteration_start',
@@ -216,15 +237,6 @@ export function logEntryFromEvent(event: AgentRuntimeEvent): AgentLogEntry | nul
         turnId: event.turnId,
         reason: event.reason,
       };
-    case 'tool_progress':
-      // API retry hints, long-tool liveness pings.
-      return event.progress ? { type: 'progress', timestamp: Date.now(), text: event.progress } : null;
-    case 'deviance_warning':
-      return event.message ? { type: 'warning', timestamp: Date.now(), text: event.message } : null;
-    case 'system_message':
-      return event.level === 'warning' && event.content
-        ? { type: 'warning', timestamp: Date.now(), text: event.content }
-        : null;
     case 'context_compressed':
       return {
         type: 'progress',
@@ -237,6 +249,19 @@ export function logEntryFromEvent(event: AgentRuntimeEvent): AgentLogEntry | nul
           tokensSaved: event.tokensSaved,
         },
       };
+    default:
+      return null;
+  }
+}
+
+function miscEventEntry(event: AgentRuntimeEvent): AgentLogEntry | null {
+  switch (event.type) {
+    case 'deviance_warning':
+      return event.message ? { type: 'warning', timestamp: Date.now(), text: event.message } : null;
+    case 'system_message':
+      return event.level === 'warning' && event.content
+        ? { type: 'warning', timestamp: Date.now(), text: event.content }
+        : null;
     case 'context_injected':
       if (event.producer === 'external') {
         return { type: 'user_message', timestamp: Date.now(), text: event.detail || '' };
@@ -263,4 +288,16 @@ export function logEntryFromEvent(event: AgentRuntimeEvent): AgentLogEntry | nul
     default:
       return null;
   }
+}
+
+export function logEntryFromEvent(event: AgentRuntimeEvent): AgentLogEntry | null {
+  if (event.type === 'text_chunk') {
+    // Handled by the RAF buffer; never produces a direct log entry here.
+    return null;
+  }
+  const tool = toolEventEntry(event);
+  if (tool) return tool;
+  const iteration = iterationEventEntry(event);
+  if (iteration) return iteration;
+  return miscEventEntry(event);
 }

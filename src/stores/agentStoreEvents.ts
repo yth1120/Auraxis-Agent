@@ -11,6 +11,91 @@ export interface AgentEventRuntimeDeps {
   buffers: AgentStoreBuffers;
 }
 
+/** 流式 chunk / 工具进度：走缓冲区，不产生独立日志行。 */
+function handleChunkEvent(event: AgentRuntimeEvent, id: string, deps: AgentEventRuntimeDeps): boolean {
+  if (event.type === 'text_chunk') {
+    deps.buffers.queueChunk(id, event.text || '', 'text');
+    return true;
+  }
+  if (event.type === 'thinking_chunk') {
+    deps.buffers.queueChunk(id, event.chunk || event.text || '', 'thinking');
+    return true;
+  }
+  if (event.type !== 'tool_progress') return false;
+  const text = event.progress || '';
+  if (!text) return true;
+  // Raw command output belongs to the running tool's terminal; only
+  // planning/liveness pings stay as standalone progress lines.
+  if (event.toolName !== 'Planning' && event.toolCallId) {
+    deps.buffers.queueToolProgress(id, event.toolCallId, text);
+  } else {
+    deps.appendLog(id, [{ type: 'progress', timestamp: Date.now(), text }]);
+  }
+  return true;
+}
+
+/** Scheduler-path plan lifecycle：TaskPlan({tasks}) → {todos} 渲染形状。 */
+function handlePlanEvent(event: AgentRuntimeEvent, id: string, deps: AgentEventRuntimeDeps): boolean {
+  if (event.type !== 'plan_created' && event.type !== 'plan_updated') return false;
+  const raw = event.plan;
+  if (raw) {
+    const taskTodos = (raw.tasks ?? [])
+      .filter(
+        (t): t is { description: string; status: string } =>
+          isRecord(t) && typeof t.description === 'string' && typeof t.status === 'string',
+      )
+      .map((t) => ({ content: t.description, status: t.status, activeForm: `执行: ${t.description}` }));
+    const todos = normalizeTodos(raw.todos) ?? (taskTodos.length > 0 ? taskTodos : undefined);
+    if (todos) {
+      const plan: AgentInfo['plan'] = { todos };
+      deps.setState((s) => ({ agents: s.agents.map((a) => (a.id === id ? { ...a, plan } : a)) }));
+    }
+  }
+  return true;
+}
+
+/** usage 累加：输入/输出/推理/缓存命中与未命中。 */
+function handleUsageEvent(event: AgentRuntimeEvent, id: string, deps: AgentEventRuntimeDeps): boolean {
+  if (event.type !== 'usage') return false;
+  deps.setState((s) => ({
+    agents: s.agents.map((a) =>
+      a.id === id
+        ? {
+            ...a,
+            totalInputTokens: (a.totalInputTokens || 0) + (event.inputTokens || 0),
+            totalOutputTokens: (a.totalOutputTokens || 0) + (event.outputTokens || 0),
+            totalReasoningTokens: (a.totalReasoningTokens || 0) + (event.reasoningTokens || 0),
+            totalCacheHitTokens: (a.totalCacheHitTokens || 0) + (event.cacheHitTokens || 0),
+            totalCacheMissTokens: (a.totalCacheMissTokens || 0) + (event.cacheMissTokens || 0),
+          }
+        : a,
+    ),
+  }));
+  return true;
+}
+
+/** 结算事件携带运行中终端的实时输出，保持行内内容连续。 */
+function attachSettledStreamOutput(event: AgentRuntimeEvent, id: string, deps: AgentEventRuntimeDeps): void {
+  const settles =
+    (event.type === 'tool_end' || event.type === 'tool_error' || event.type === 'tool_aborted') && !!event.toolCallId;
+  if (!settles) return;
+  const agent = deps.getState().agents.find((a) => a.id === id);
+  const start = agent?.log.find((e) => e.type === 'tool_start' && e.toolCallId === event.toolCallId);
+  if (start?.streamOutput) event.streamOutput = start.streamOutput;
+}
+
+/** Write/Edit/Bash 完成后让文件树失效重载。 */
+function bumpFileTreeOnMutation(event: AgentRuntimeEvent): void {
+  const mutates =
+    event.type === 'tool_end' && (event.toolName === 'Write' || event.toolName === 'Edit' || event.toolName === 'Bash');
+  if (!mutates) return;
+  try {
+    useAppStore.getState().incrementFileTreeVersion();
+  } catch {
+    /* non-critical */
+  }
+}
+
 export function createAgentEventRuntime(deps: AgentEventRuntimeDeps) {
   const eventSubs = new Map<string, () => void>();
   const cleanupTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -25,93 +110,20 @@ export function createAgentEventRuntime(deps: AgentEventRuntimeDeps) {
     const api = agentIpc();
     if (!api?.onEvent) return;
     const unsub = api.onEvent(id, (event: AgentRuntimeEvent) => {
-      if (event.type === 'text_chunk') {
-        deps.buffers.queueChunk(id, event.text || '', 'text');
-        return;
-      }
-      if (event.type === 'thinking_chunk') {
-        deps.buffers.queueChunk(id, event.chunk || event.text || '', 'thinking');
-        return;
-      }
-      if (event.type === 'tool_progress') {
-        const text = event.progress || '';
-        if (!text) return;
-        // Raw command output belongs to the running tool's terminal; only
-        // planning/liveness pings stay as standalone progress lines.
-        if (event.toolName !== 'Planning' && event.toolCallId) {
-          deps.buffers.queueToolProgress(id, event.toolCallId, text);
-        } else {
-          deps.appendLog(id, [{ type: 'progress', timestamp: Date.now(), text }]);
-        }
-        return;
-      }
-      if (event.type === 'plan_created' || event.type === 'plan_updated') {
-        // Scheduler-path plan lifecycle. The raw event carries the backend
-        // TaskPlan ({tasks}) — normalize to the {todos} shape the header
-        // progress bar and the inspector's TaskChecklist render.
-        const raw = event.plan;
-        if (raw) {
-          const taskTodos = (raw.tasks ?? [])
-            .filter(
-              (t): t is { description: string; status: string } =>
-                isRecord(t) && typeof t.description === 'string' && typeof t.status === 'string',
-            )
-            .map((t) => ({ content: t.description, status: t.status, activeForm: `执行: ${t.description}` }));
-          const todos = normalizeTodos(raw.todos) ?? (taskTodos.length > 0 ? taskTodos : undefined);
-          if (todos) {
-            const plan: AgentInfo['plan'] = { todos };
-            deps.setState((s) => ({
-              agents: s.agents.map((a) => (a.id === id ? { ...a, plan } : a)),
-            }));
-          }
-        }
-        return;
-      }
-      if (event.type === 'usage') {
-        deps.setState((s) => ({
-          agents: s.agents.map((a) =>
-            a.id === id
-              ? {
-                  ...a,
-                  totalInputTokens: (a.totalInputTokens || 0) + (event.inputTokens || 0),
-                  totalOutputTokens: (a.totalOutputTokens || 0) + (event.outputTokens || 0),
-                  totalReasoningTokens: (a.totalReasoningTokens || 0) + (event.reasoningTokens || 0),
-                  totalCacheHitTokens: (a.totalCacheHitTokens || 0) + (event.cacheHitTokens || 0),
-                  totalCacheMissTokens: (a.totalCacheMissTokens || 0) + (event.cacheMissTokens || 0),
-                }
-              : a,
-          ),
-        }));
-        return;
-      }
+      if (handleChunkEvent(event, id, deps)) return;
+      if (handlePlanEvent(event, id, deps)) return;
+      if (handleUsageEvent(event, id, deps)) return;
       // Flush pending chunks before appending a non-chunk event to preserve
       // temporal ordering (tool_start/tool_end must appear after prior text).
       if (deps.buffers.hasPendingChunks(id)) {
         deps.buffers.flushChunks();
       }
-      if (
-        (event.type === 'tool_end' || event.type === 'tool_error' || event.type === 'tool_aborted') &&
-        event.toolCallId
-      ) {
-        // Carry the live terminal payload onto the settled row.
-        const agent = deps.getState().agents.find((a) => a.id === id);
-        const start = agent?.log.find((e) => e.type === 'tool_start' && e.toolCallId === event.toolCallId);
-        if (start?.streamOutput) event.streamOutput = start.streamOutput;
-      }
+      attachSettledStreamOutput(event, id, deps);
       const entry = logEntryFromEvent(event);
       if (entry) {
         deps.appendLog(id, [entry]);
       }
-      if (
-        event.type === 'tool_end' &&
-        (event.toolName === 'Write' || event.toolName === 'Edit' || event.toolName === 'Bash')
-      ) {
-        try {
-          useAppStore.getState().incrementFileTreeVersion();
-        } catch {
-          /* non-critical */
-        }
-      }
+      bumpFileTreeOnMutation(event);
     });
     eventSubs.set(id, unsub);
   }

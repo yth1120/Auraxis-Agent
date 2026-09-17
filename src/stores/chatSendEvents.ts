@@ -28,151 +28,220 @@ export interface QueryEventDeps {
   minInterval: number;
 }
 
+/** 工具生命周期事件（start/end/error/aborted/progress 共用一个联合成员）。 */
+type ToolLifecycleEvent = Extract<ToolStreamEvent, { toolCallId: string }>;
+type TextChunkEvent = Extract<ToolStreamEvent, { text: string }>;
+type ContextInjectedEvent = Extract<ToolStreamEvent, { producer: string }>;
+type ContextCompressedEvent = Extract<ToolStreamEvent, { tokensBefore: number }>;
+type PlanGeneratedEvent = Extract<ToolStreamEvent, { planId: string }>;
+
+function handleTextChunk(ctx: QueryEventDeps, event: TextChunkEvent): void {
+  ctx.chatLog?.queue(ctx.logSessionId, 'assistant_chunk', { text: event.text });
+  ctx.acc.text += event.text;
+  if (performance.now() - ctx.getLastFlush() >= ctx.minInterval) ctx.flushAll();
+  else ctx.scheduleFlush();
+}
+
+function handleToolStart(ctx: QueryEventDeps, event: ToolLifecycleEvent): void {
+  ctx.chatLog?.queue(ctx.logSessionId, 'tool', {
+    action: 'start',
+    toolName: event.toolName,
+    toolCallId: event.toolCallId,
+    requestId: event.requestId,
+    input: event.input,
+  });
+  ctx.flushAll();
+  useInspectorStore.getState().incrementActiveTools();
+  useSessionStore.getState().touchCurrentSession(ctx.get().messages.length + 2);
+  ctx.set(
+    appendToolCall(ctx.assistantId, {
+      id: event.toolCallId,
+      requestId: event.requestId,
+      toolName: event.toolName,
+      input: event.input,
+      status: 'running',
+      startTime: event.timestamp,
+      stepGroupId: event.stepGroupId,
+    }),
+  );
+}
+
+/** 工具结束后登记撤销条目（Write/Edit 才会产生）。 */
+function registerUndoForFileMutation(ctx: QueryEventDeps, event: ToolLifecycleEvent): void {
+  if ((event.toolName !== 'Write' && event.toolName !== 'Edit') || !event.input) return;
+  const filePath = typeof event.input.file_path === 'string' ? event.input.file_path : '';
+  if (!filePath) return;
+  const projectPath = ctx.get().currentProjectPath || useSettingsStore.getState().projectPath;
+  const toolName = event.toolName;
+  queueMicrotask(() => {
+    try {
+      useUndoStore.getState().addUndo({
+        id: `undo-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        sessionId: '',
+        timestamp: Date.now(),
+        type: toolName === 'Write' ? 'file:write' : 'file:edit',
+        description: `${toolName === 'Write' ? '写入' : '编辑'} ${filePath.split(/[\\/]/).pop() || filePath}`,
+        revert: async () => {
+          if (projectPath && window.electronAPI?.undo) {
+            await window.electronAPI.undo.revertLast(projectPath);
+          }
+        },
+      });
+    } catch {
+      /* non-critical */
+    }
+  });
+}
+
+function handleToolEnd(ctx: QueryEventDeps, event: ToolLifecycleEvent): void {
+  ctx.chatLog?.queue(ctx.logSessionId, 'tool', {
+    action: 'end',
+    toolName: event.toolName,
+    toolCallId: event.toolCallId,
+    requestId: event.requestId,
+    output: event.output,
+  });
+  ctx.flushAll();
+  useInspectorStore.getState().decrementActiveTools();
+  useSessionStore.getState().touchCurrentSession(ctx.get().messages.length + 1);
+  const outputObj = event.output as Record<string, unknown> | null | undefined;
+  const oldContent = outputObj?.oldContent as string | undefined;
+  const newContent = outputObj?.newContent as string | undefined;
+  ctx.set(
+    updateToolCall(ctx.assistantId, event.toolCallId, {
+      status: 'done',
+      output: event.output,
+      endTime: event.timestamp,
+      ...(oldContent !== undefined ? { oldContent } : {}),
+      ...(newContent !== undefined ? { newContent } : {}),
+    }),
+  );
+  if (event.toolName === 'Write' || event.toolName === 'Edit') {
+    try {
+      useAppStore.getState().incrementFileTreeVersion();
+    } catch {
+      /* non-critical */
+    }
+  }
+  registerUndoForFileMutation(ctx, event);
+}
+
+function handleToolError(ctx: QueryEventDeps, event: ToolLifecycleEvent): void {
+  ctx.chatLog?.queue(ctx.logSessionId, 'tool', {
+    action: 'error',
+    toolName: event.toolName,
+    toolCallId: event.toolCallId,
+    requestId: event.requestId,
+    error: event.error,
+  });
+  handleSettledTool(ctx, event, { status: 'error', error: event.error, endTime: event.timestamp });
+}
+
+function handleToolAborted(ctx: QueryEventDeps, event: ToolLifecycleEvent): void {
+  handleSettledTool(ctx, event, {
+    status: 'done',
+    error: event.error,
+    endTime: event.timestamp,
+    streamOutput: undefined,
+  });
+}
+
+/** error/aborted 共用的结算路径：清活动计数、touch 会话、更新工具卡片。 */
+function handleSettledTool(
+  ctx: QueryEventDeps,
+  event: ToolLifecycleEvent,
+  patch: Parameters<typeof updateToolCall>[2],
+): void {
+  ctx.flushAll();
+  useInspectorStore.getState().decrementActiveTools();
+  useSessionStore.getState().touchCurrentSession(ctx.get().messages.length + 1);
+  ctx.set(updateToolCall(ctx.assistantId, event.toolCallId, patch));
+}
+
+function handleContextInjected(ctx: QueryEventDeps, event: ContextInjectedEvent): void {
+  const disclosure = { source: event.source, producer: event.producer, detail: event.detail };
+  ctx.set((s) => ({
+    messages: [
+      ...s.messages,
+      {
+        id: `disclosure-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        role: 'system' as const,
+        content: `${disclosure.producer} 已注入上下文`,
+        timestamp: Date.now(),
+        tags: ['injected'] as Message['tags'],
+        disclosure,
+      },
+    ],
+  }));
+}
+
+function handleContextCompressed(ctx: QueryEventDeps, event: ContextCompressedEvent): void {
+  const compaction = {
+    tokensBefore: event.tokensBefore,
+    tokensAfter: event.tokensAfter,
+    messagesRemoved: event.messagesRemoved,
+    tokensSaved: event.tokensSaved,
+  };
+  ctx.set((s) => ({
+    lastCompression: { ...compaction, timestamp: Date.now() },
+    messages: [
+      ...s.messages,
+      {
+        id: `compact-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        role: 'system' as const,
+        content: '上下文已压缩',
+        timestamp: Date.now(),
+        tags: ['system'] as Message['tags'],
+        compaction,
+      },
+    ],
+  }));
+}
+
+function handlePlanGenerated(ctx: QueryEventDeps, event: PlanGeneratedEvent): void {
+  useInspectorStore.getState().addPlan({
+    planId: event.planId,
+    steps: event.steps,
+    status: 'pending' as const,
+    filePath: event.filePath,
+    agentId: event.agentId,
+  });
+  if (event.filePath) useAgentStore.getState().setPlanFile(event.filePath, event.agentId);
+  ctx.flushAll();
+}
+
+/** done / error：收尾流运行时、用量与活动工具计数。 */
+function handleStreamFinished(ctx: QueryEventDeps): void {
+  ctx.flushAll();
+  clearStreamRuntime(streamRuntime);
+  ctx.usage?.flush();
+  useInspectorStore.getState().setActiveToolCount(0);
+}
+
 export function createQueryEventHandler(deps: QueryEventDeps) {
-  const {
-    set,
-    get,
-    chatLog,
-    usage,
-    logSessionId,
-    assistantId,
-    acc,
-    thinkingBuf,
-    toolProgressDoneBuf,
-    flushAll,
-    scheduleFlush,
-    getLastFlush,
-    minInterval,
-  } = deps;
   return (event: ToolStreamEvent) => {
     streamRuntime.lastEventTime = Date.now();
     switch (event.type) {
       case 'text_chunk':
-        chatLog?.queue(logSessionId, 'assistant_chunk', { text: event.text });
-        acc.text += event.text;
-        if (performance.now() - getLastFlush() >= minInterval) flushAll();
-        else scheduleFlush();
-        break;
+        return handleTextChunk(deps, event);
       case 'tool_start':
-        chatLog?.queue(logSessionId, 'tool', {
-          action: 'start',
-          toolName: event.toolName,
-          toolCallId: event.toolCallId,
-          requestId: event.requestId,
-          input: event.input,
-        });
-        flushAll();
-        useInspectorStore.getState().incrementActiveTools();
-        useSessionStore.getState().touchCurrentSession(get().messages.length + 2);
-        set(
-          appendToolCall(assistantId, {
-            id: event.toolCallId,
-            requestId: event.requestId,
-            toolName: event.toolName,
-            input: event.input,
-            status: 'running',
-            startTime: event.timestamp,
-            stepGroupId: event.stepGroupId,
-          }),
-        );
-        break;
+        return handleToolStart(deps, event);
       case 'tool_progress':
-        toolProgressDoneBuf.set(event.toolCallId, (toolProgressDoneBuf.get(event.toolCallId) || '') + event.progress);
-        scheduleFlush();
-        break;
+        deps.toolProgressDoneBuf.set(
+          event.toolCallId,
+          (deps.toolProgressDoneBuf.get(event.toolCallId) || '') + event.progress,
+        );
+        deps.scheduleFlush();
+        return;
       case 'tool_end':
-        chatLog?.queue(logSessionId, 'tool', {
-          action: 'end',
-          toolName: event.toolName,
-          toolCallId: event.toolCallId,
-          requestId: event.requestId,
-          output: event.output,
-        });
-        flushAll();
-        useInspectorStore.getState().decrementActiveTools();
-        useSessionStore.getState().touchCurrentSession(get().messages.length + 1);
-        {
-          const outputObj = event.output as Record<string, unknown> | null | undefined;
-          const oldContent = outputObj?.oldContent as string | undefined;
-          const newContent = outputObj?.newContent as string | undefined;
-          set(
-            updateToolCall(assistantId, event.toolCallId, {
-              status: 'done',
-              output: event.output,
-              endTime: event.timestamp,
-              ...(oldContent !== undefined ? { oldContent } : {}),
-              ...(newContent !== undefined ? { newContent } : {}),
-            }),
-          );
-        }
-        if (event.toolName === 'Write' || event.toolName === 'Edit') {
-          try {
-            useAppStore.getState().incrementFileTreeVersion();
-          } catch {
-            /* non-critical */
-          }
-        }
-        if ((event.toolName === 'Write' || event.toolName === 'Edit') && event.input) {
-          const filePath = typeof event.input.file_path === 'string' ? event.input.file_path : '';
-          if (filePath) {
-            const projectPath = get().currentProjectPath || useSettingsStore.getState().projectPath;
-            const toolName = event.toolName;
-            queueMicrotask(() => {
-              try {
-                useUndoStore.getState().addUndo({
-                  id: `undo-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-                  sessionId: '',
-                  timestamp: Date.now(),
-                  type: toolName === 'Write' ? 'file:write' : 'file:edit',
-                  description: `${toolName === 'Write' ? '写入' : '编辑'} ${filePath.split(/[\\/]/).pop() || filePath}`,
-                  revert: async () => {
-                    if (projectPath && window.electronAPI?.undo) {
-                      await window.electronAPI.undo.revertLast(projectPath);
-                    }
-                  },
-                });
-              } catch {
-                /* non-critical */
-              }
-            });
-          }
-        }
-        break;
+        return handleToolEnd(deps, event);
       case 'tool_error':
-        chatLog?.queue(logSessionId, 'tool', {
-          action: 'error',
-          toolName: event.toolName,
-          toolCallId: event.toolCallId,
-          requestId: event.requestId,
-          error: event.error,
-        });
-        flushAll();
-        useInspectorStore.getState().decrementActiveTools();
-        useSessionStore.getState().touchCurrentSession(get().messages.length + 1);
-        set(
-          updateToolCall(assistantId, event.toolCallId, {
-            status: 'error',
-            error: event.error,
-            endTime: event.timestamp,
-          }),
-        );
-        break;
+        return handleToolError(deps, event);
       case 'tool_aborted':
-        flushAll();
-        useInspectorStore.getState().decrementActiveTools();
-        useSessionStore.getState().touchCurrentSession(get().messages.length + 1);
-        set(
-          updateToolCall(assistantId, event.toolCallId, {
-            status: 'done',
-            error: event.error,
-            endTime: event.timestamp,
-            streamOutput: undefined,
-          }),
-        );
-        break;
+        return handleToolAborted(deps, event);
       case 'iteration':
-        set({ currentIteration: event.iteration, maxIterations: event.maxIterations });
-        break;
+        deps.set({ currentIteration: event.iteration, maxIterations: event.maxIterations });
+        return;
       case 'system_message':
         useInspectorStore.getState().addSystemMessage({
           id: `sys-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -180,83 +249,31 @@ export function createQueryEventHandler(deps: QueryEventDeps) {
           level: event.level,
           timestamp: Date.now(),
         });
-        break;
-      case 'context_injected': {
-        const disclosure = { source: event.source, producer: event.producer, detail: event.detail };
-        set((s) => ({
-          messages: [
-            ...s.messages,
-            {
-              id: `disclosure-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-              role: 'system' as const,
-              content: `${disclosure.producer} 已注入上下文`,
-              timestamp: Date.now(),
-              tags: ['injected'] as Message['tags'],
-              disclosure,
-            },
-          ],
-        }));
-        break;
-      }
+        return;
+      case 'context_injected':
+        return handleContextInjected(deps, event);
       case 'thinking_chunk':
-        thinkingBuf.push({ chunk: event.chunk, isNewBlock: event.isNewBlock });
-        scheduleFlush();
-        break;
+        deps.thinkingBuf.push({ chunk: event.chunk, isNewBlock: event.isNewBlock });
+        deps.scheduleFlush();
+        return;
       case 'usage_update':
-        usage?.add({
+        deps.usage?.add({
           input: event.inputTokens,
           output: event.outputTokens,
           reasoning: event.reasoningTokens || 0,
           cacheHit: event.cacheHitTokens || 0,
           cacheMiss: event.cacheMissTokens || 0,
         });
-        break;
-      case 'context_compressed': {
-        const compaction = {
-          tokensBefore: event.tokensBefore,
-          tokensAfter: event.tokensAfter,
-          messagesRemoved: event.messagesRemoved,
-          tokensSaved: event.tokensSaved,
-        };
-        set((s) => ({
-          lastCompression: { ...compaction, timestamp: Date.now() },
-          messages: [
-            ...s.messages,
-            {
-              id: `compact-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-              role: 'system' as const,
-              content: '上下文已压缩',
-              timestamp: Date.now(),
-              tags: ['system'] as Message['tags'],
-              compaction,
-            },
-          ],
-        }));
-        break;
-      }
+        return;
+      case 'context_compressed':
+        return handleContextCompressed(deps, event);
       case 'plan_generated':
-        useInspectorStore.getState().addPlan({
-          planId: event.planId,
-          steps: event.steps,
-          status: 'pending' as const,
-          filePath: event.filePath,
-          agentId: event.agentId,
-        });
-        if (event.filePath) useAgentStore.getState().setPlanFile(event.filePath, event.agentId);
-        flushAll();
-        break;
+        return handlePlanGenerated(deps, event);
       case 'done':
-        flushAll();
-        clearStreamRuntime(streamRuntime);
-        usage?.flush();
-        useInspectorStore.getState().setActiveToolCount(0);
-        break;
       case 'error':
-        flushAll();
-        clearStreamRuntime(streamRuntime);
-        usage?.flush();
-        useInspectorStore.getState().setActiveToolCount(0);
-        break;
+        return handleStreamFinished(deps);
+      default:
+        return;
     }
   };
 }
