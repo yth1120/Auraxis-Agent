@@ -47,6 +47,120 @@ export interface SessionStore {
 
 const TITLE_MAX = 15;
 
+/** Accumulator threaded through the event → projection fold. */
+interface ProjectionState {
+  messages: ProjectedMessage[];
+  meta: SessionMeta;
+  openTools: Map<string, ProjectedToolCall>;
+  assistant: ProjectedMessage | null;
+}
+
+function pushSystemMessage(state: ProjectionState, e: SessionEvent, text: string): void {
+  state.messages.push({ id: `system-${e.seq}`, role: 'system', content: text, timestamp: e.ts });
+}
+
+function ensureAssistant(state: ProjectionState, seq: number, ts: number): ProjectedMessage {
+  if (!state.assistant || state.assistant.role !== 'assistant') {
+    state.assistant = { id: `assistant-${seq}`, role: 'assistant', content: '', timestamp: ts, toolCalls: [] };
+    state.messages.push(state.assistant);
+  }
+  return state.assistant;
+}
+
+function applySystemEvent(state: ProjectionState, e: SessionEvent, data: Record<string, unknown>): void {
+  if (data.event === 'session_meta' && data.meta && typeof data.meta === 'object') {
+    Object.assign(state.meta, data.meta);
+  } else if (typeof data.text === 'string') {
+    pushSystemMessage(state, e, data.text);
+  }
+}
+
+function applyUserEvent(state: ProjectionState, e: SessionEvent, data: Record<string, unknown>): void {
+  state.assistant = null;
+  state.messages.push({
+    id: `user-${e.seq}`,
+    role: 'user',
+    content: typeof data.text === 'string' ? data.text : '',
+    timestamp: e.ts,
+  });
+}
+
+function closeOpenTool(
+  tc: ProjectedToolCall,
+  action: 'end' | 'error',
+  data: Record<string, unknown>,
+  ts: number,
+): void {
+  if (action === 'end') {
+    tc.status = 'done';
+    tc.output = data.output;
+  } else {
+    tc.status = 'error';
+    tc.error = typeof data.error === 'string' ? data.error : String(data.error ?? '');
+  }
+  tc.endTime = ts;
+}
+
+function applyToolEvent(state: ProjectionState, e: SessionEvent, data: Record<string, unknown>): void {
+  const assistant = ensureAssistant(state, e.seq, e.ts);
+  const action = data.action;
+  if (action === 'progress') return;
+  const toolName = typeof data.toolName === 'string' ? data.toolName : 'tool';
+  const toolCallId = typeof data.toolCallId === 'string' ? data.toolCallId : '';
+  const key = toolCallId || `${toolName}:${JSON.stringify(data.input ?? {})}`;
+  const input = data.input && typeof data.input === 'object' ? (data.input as Record<string, unknown>) : undefined;
+
+  if (action === 'start') {
+    const tc: ProjectedToolCall = {
+      id: toolCallId || `tool-${e.seq}`,
+      toolName,
+      status: 'running',
+      startTime: e.ts,
+      seq: e.seq,
+      input,
+    };
+    state.openTools.set(key, tc);
+    assistant.toolCalls!.push(tc);
+    return;
+  }
+  if (action !== 'end' && action !== 'error') return;
+  const found = state.openTools.get(key);
+  if (found) {
+    closeOpenTool(found, action, data, e.ts);
+    state.openTools.delete(key);
+    return;
+  }
+  assistant.toolCalls!.push({
+    id: toolCallId || `tool-${e.seq}`,
+    toolName,
+    status: action === 'end' ? 'done' : 'error',
+    startTime: e.ts,
+    endTime: e.ts,
+    seq: e.seq,
+    input,
+    output: action === 'end' ? data.output : undefined,
+    error: action === 'error' ? String(data.error ?? '') : undefined,
+  });
+}
+
+/** Fold one session event into the projection accumulator. */
+function applySessionEvent(state: ProjectionState, e: SessionEvent): void {
+  const data = (e.data ?? {}) as Record<string, unknown>;
+  if (e.type === 'system') return applySystemEvent(state, e, data);
+  if (e.type === 'agent_status') {
+    if (typeof data.text === 'string') pushSystemMessage(state, e, data.text);
+    return;
+  }
+  if (e.type === 'thinking_chunk') return; // reasoning is not a message
+  if (e.type === 'user') return applyUserEvent(state, e, data);
+  if (e.type === 'assistant_chunk') {
+    const m = ensureAssistant(state, e.seq, e.ts);
+    if (typeof data.text === 'string') m.content += data.text;
+    return;
+  }
+  if (e.type === 'tool') applyToolEvent(state, e, data);
+}
+
 export class JsonlSessionStore implements SessionStore {
   private readonly kind: 'chat' | 'agent';
   private readonly prefix: string;
@@ -304,102 +418,14 @@ export class JsonlSessionStore implements SessionStore {
     const events = await this.read(sessionId);
     if (events.length === 0) return null;
 
-    const messages: ProjectedMessage[] = [];
-    const meta: SessionMeta = {};
-    const openTools = new Map<string, ProjectedToolCall>();
-    let assistant: ProjectedMessage | null = null;
-
-    const ensureAssistant = (seq: number, ts: number): ProjectedMessage => {
-      if (!assistant || assistant.role !== 'assistant') {
-        assistant = { id: `assistant-${seq}`, role: 'assistant', content: '', timestamp: ts, toolCalls: [] };
-        messages.push(assistant);
-      }
-      return assistant;
+    const state: ProjectionState = {
+      messages: [],
+      meta: {},
+      openTools: new Map(),
+      assistant: null,
     };
-
-    for (const e of events) {
-      const data = e.data ?? {};
-      if (e.type === 'system') {
-        if (data.event === 'session_meta' && data.meta && typeof data.meta === 'object') {
-          Object.assign(meta, data.meta);
-        } else if (typeof data.text === 'string') {
-          messages.push({ id: `system-${e.seq}`, role: 'system', content: data.text, timestamp: e.ts });
-        }
-        continue;
-      }
-      if (e.type === 'agent_status') {
-        if (typeof data.text === 'string') {
-          messages.push({ id: `system-${e.seq}`, role: 'system', content: data.text, timestamp: e.ts });
-        }
-        continue;
-      }
-      if (e.type === 'thinking_chunk') continue; // reasoning is not a message
-      if (e.type === 'user') {
-        assistant = null;
-        messages.push({
-          id: `user-${e.seq}`,
-          role: 'user',
-          content: typeof data.text === 'string' ? data.text : '',
-          timestamp: e.ts,
-        });
-        continue;
-      }
-      if (e.type === 'assistant_chunk') {
-        const m = ensureAssistant(e.seq, e.ts);
-        if (typeof data.text === 'string') m.content += data.text;
-        continue;
-      }
-      if (e.type === 'tool') {
-        const m = ensureAssistant(e.seq, e.ts);
-        const toolName = typeof data.toolName === 'string' ? data.toolName : 'tool';
-        const toolCallId = typeof data.toolCallId === 'string' ? data.toolCallId : '';
-        const action = data.action;
-        if (action === 'progress') continue;
-        const key = toolCallId || `${toolName}:${JSON.stringify(data.input ?? {})}`;
-        const input =
-          data.input && typeof data.input === 'object' ? (data.input as Record<string, unknown>) : undefined;
-
-        if (action === 'start') {
-          const tc: ProjectedToolCall = {
-            id: toolCallId || `tool-${e.seq}`,
-            toolName,
-            status: 'running',
-            startTime: e.ts,
-            seq: e.seq,
-            input,
-          };
-          openTools.set(key, tc);
-          m.toolCalls!.push(tc);
-        } else if (action === 'end' || action === 'error') {
-          const tc = openTools.get(key);
-          if (tc) {
-            if (action === 'end') {
-              tc.status = 'done';
-              tc.output = data.output;
-              tc.endTime = e.ts;
-            } else {
-              tc.status = 'error';
-              tc.error = typeof data.error === 'string' ? data.error : String(data.error ?? '');
-              tc.endTime = e.ts;
-            }
-            openTools.delete(key);
-          } else {
-            m.toolCalls!.push({
-              id: toolCallId || `tool-${e.seq}`,
-              toolName,
-              status: action === 'end' ? 'done' : 'error',
-              startTime: e.ts,
-              endTime: e.ts,
-              seq: e.seq,
-              input,
-              output: action === 'end' ? data.output : undefined,
-              error: action === 'error' ? String(data.error ?? '') : undefined,
-            });
-          }
-        }
-        continue;
-      }
-    }
+    for (const e of events) applySessionEvent(state, e);
+    const { messages, meta } = state;
 
     const projected: ProjectedSession = {
       id: sessionId,

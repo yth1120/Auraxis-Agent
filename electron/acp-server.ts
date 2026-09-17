@@ -67,6 +67,23 @@ export class AcpServer {
     private send: (msg: AcpRpcMessage) => void,
   ) {}
 
+  private reply(msg: AcpRpcMessage, result: unknown): void {
+    this.send({ jsonrpc: '2.0', id: msg.id ?? null, result });
+  }
+
+  private fail(msg: AcpRpcMessage, code: number, message: string): void {
+    this.send({ jsonrpc: '2.0', id: msg.id ?? null, error: { code, message } });
+  }
+
+  /** Look up the session named in `params.sessionId`; reports the error itself. */
+  private requireSession(msg: AcpRpcMessage): AcpSession | null {
+    const params = msg.params ?? {};
+    const session = this.sessions.get(String(params.sessionId ?? ''));
+    if (session) return session;
+    this.fail(msg, -32001, 'Session not found');
+    return null;
+  }
+
   async handle(raw: unknown): Promise<void> {
     const msg = raw as AcpRpcMessage;
     if (!msg || msg.jsonrpc !== '2.0') {
@@ -74,138 +91,129 @@ export class AcpServer {
       return;
     }
     try {
-      switch (msg.method) {
-        case 'initialize': {
-          const params = msg.params ?? {};
-          const clientVersion = params.protocolVersion ?? { major: 0, minor: 1 };
-          this.send({
-            jsonrpc: '2.0',
-            id: msg.id ?? null,
-            result: {
-              protocolVersion: clientVersion,
-              agentCapabilities: {
-                transcriptTypes: ['text', 'plan'],
-                promptTypes: ['text', 'plan'],
-                fileTypes: ['text'],
-                capabilities: [],
-              },
-              agentInfo: {
-                name: 'auraxis',
-                description: 'Auraxis coding agent',
-                version: '0.0.1',
-                url: '',
-              },
-            },
-          });
-          return;
-        }
-        case 'session/new': {
-          const id = `acp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-          const params = msg.params ?? {};
-          this.sessions.set(id, {
-            id,
-            seq: 0,
-            abort: new AbortController(),
-            projectRoot: typeof params.cwd === 'string' ? params.cwd : undefined,
-            running: false,
-          });
-          this.send({ jsonrpc: '2.0', id: msg.id ?? null, result: { sessionId: id } });
-          return;
-        }
-        case 'session/prompt': {
-          const p = msg.params ?? {};
-          const session = this.sessions.get(String(p.sessionId ?? ''));
-          if (!session) {
-            this.send({ jsonrpc: '2.0', id: msg.id ?? null, error: { code: -32001, message: 'Session not found' } });
-            return;
-          }
-          const prompt = isRecord(p.prompt) ? p.prompt : {};
-          const text = typeof prompt.text === 'string' ? prompt.text : '';
-          const promptType: 'text' | 'plan' = prompt.type === 'plan' ? 'plan' : 'text';
-          if (!text.trim()) {
-            this.send({
-              jsonrpc: '2.0',
-              id: msg.id ?? null,
-              error: { code: -32602, message: 'prompt.text is required' },
-            });
-            return;
-          }
-          if (session.running) {
-            this.send({
-              jsonrpc: '2.0',
-              id: msg.id ?? null,
-              error: { code: -32002, message: '上一个 prompt 仍在运行中' },
-            });
-            return;
-          }
-          session.seq += 1;
-          const sequenceId = session.seq;
-          const sessionId = session.id;
-          session.running = true;
-          this.send({ jsonrpc: '2.0', id: msg.id ?? null, result: { sessionId, sequenceId } });
-          void this.runPrompt(session, sequenceId, text, promptType);
-          return;
-        }
-        case 'session/read_file': {
-          const p = msg.params ?? {};
-          const session = this.sessions.get(String(p.sessionId ?? ''));
-          if (!session) {
-            this.send({ jsonrpc: '2.0', id: msg.id ?? null, error: { code: -32001, message: 'Session not found' } });
-            return;
-          }
-          const filePath = await this.resolveFilePath(session, typeof p.filePath === 'string' ? p.filePath : '');
-          const content = await fs.readFile(filePath, 'utf8');
-          this.send({ jsonrpc: '2.0', id: msg.id ?? null, result: { content } });
-          return;
-        }
-        case 'session/update_file': {
-          const p = msg.params ?? {};
-          const session = this.sessions.get(String(p.sessionId ?? ''));
-          if (!session) {
-            this.send({ jsonrpc: '2.0', id: msg.id ?? null, error: { code: -32001, message: 'Session not found' } });
-            return;
-          }
-          if (typeof p.content !== 'string') {
-            this.send({ jsonrpc: '2.0', id: msg.id ?? null, error: { code: -32602, message: 'content is required' } });
-            return;
-          }
-          const filePath = await this.resolveFilePath(session, typeof p.filePath === 'string' ? p.filePath : '');
-          await fs.mkdir(path.dirname(filePath), { recursive: true });
-          await fs.writeFile(filePath, p.content, 'utf8');
-          this.send({ jsonrpc: '2.0', id: msg.id ?? null, result: {} });
-          return;
-        }
-        case 'session/cancel': {
-          const p = msg.params ?? {};
-          const session = this.sessions.get(String(p.sessionId ?? ''));
-          if (session) session.abort.abort();
-          this.send({ jsonrpc: '2.0', id: msg.id ?? null, result: {} });
-          return;
-        }
-        case 'session/delete': {
-          const p = msg.params ?? {};
-          const session = this.sessions.get(String(p.sessionId ?? ''));
-          if (session) {
-            session.abort.abort();
-            this.sessions.delete(session.id);
-          }
-          this.send({ jsonrpc: '2.0', id: msg.id ?? null, result: {} });
-          return;
-        }
-        case 'shutdown':
-          this.send({ jsonrpc: '2.0', id: msg.id ?? null, result: {} });
-          this.deps.onShutdown?.();
-          return;
-        default:
-          this.send({
-            jsonrpc: '2.0',
-            id: msg.id ?? null,
-            error: { code: -32601, message: `Method not found: ${msg.method}` },
-          });
-      }
+      await this.dispatch(msg);
     } catch (e: unknown) {
-      this.send({ jsonrpc: '2.0', id: msg.id ?? null, error: { code: -32603, message: errorText(e) } });
+      this.fail(msg, -32603, errorText(e));
     }
+  }
+
+  private async dispatch(msg: AcpRpcMessage): Promise<void> {
+    switch (msg.method) {
+      case 'initialize':
+        return this.handleInitialize(msg);
+      case 'session/new':
+        return this.handleSessionNew(msg);
+      case 'session/prompt':
+        return this.handleSessionPrompt(msg);
+      case 'session/read_file':
+        return this.handleSessionReadFile(msg);
+      case 'session/update_file':
+        return this.handleSessionUpdateFile(msg);
+      case 'session/cancel':
+        return this.handleSessionCancel(msg);
+      case 'session/delete':
+        return this.handleSessionDelete(msg);
+      case 'shutdown':
+        this.reply(msg, {});
+        this.deps.onShutdown?.();
+        return;
+      default:
+        this.fail(msg, -32601, `Method not found: ${msg.method}`);
+    }
+  }
+
+  private handleInitialize(msg: AcpRpcMessage): void {
+    const params = msg.params ?? {};
+    const clientVersion = params.protocolVersion ?? { major: 0, minor: 1 };
+    this.reply(msg, {
+      protocolVersion: clientVersion,
+      agentCapabilities: {
+        transcriptTypes: ['text', 'plan'],
+        promptTypes: ['text', 'plan'],
+        fileTypes: ['text'],
+        capabilities: [],
+      },
+      agentInfo: {
+        name: 'auraxis',
+        description: 'Auraxis coding agent',
+        version: '0.0.1',
+        url: '',
+      },
+    });
+  }
+
+  private handleSessionNew(msg: AcpRpcMessage): void {
+    const id = `acp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const params = msg.params ?? {};
+    this.sessions.set(id, {
+      id,
+      seq: 0,
+      abort: new AbortController(),
+      projectRoot: typeof params.cwd === 'string' ? params.cwd : undefined,
+      running: false,
+    });
+    this.reply(msg, { sessionId: id });
+  }
+
+  private handleSessionPrompt(msg: AcpRpcMessage): void {
+    const session = this.requireSession(msg);
+    if (!session) return;
+    const params = msg.params ?? {};
+    const prompt = isRecord(params.prompt) ? params.prompt : {};
+    const text = typeof prompt.text === 'string' ? prompt.text : '';
+    const promptType: 'text' | 'plan' = prompt.type === 'plan' ? 'plan' : 'text';
+    if (!text.trim()) {
+      this.fail(msg, -32602, 'prompt.text is required');
+      return;
+    }
+    if (session.running) {
+      this.fail(msg, -32002, '上一个 prompt 仍在运行中');
+      return;
+    }
+    session.seq += 1;
+    const sequenceId = session.seq;
+    session.running = true;
+    this.reply(msg, { sessionId: session.id, sequenceId });
+    void this.runPrompt(session, sequenceId, text, promptType);
+  }
+
+  private async handleSessionReadFile(msg: AcpRpcMessage): Promise<void> {
+    const session = this.requireSession(msg);
+    if (!session) return;
+    const params = msg.params ?? {};
+    const filePath = await this.resolveFilePath(session, typeof params.filePath === 'string' ? params.filePath : '');
+    const content = await fs.readFile(filePath, 'utf8');
+    this.reply(msg, { content });
+  }
+
+  private async handleSessionUpdateFile(msg: AcpRpcMessage): Promise<void> {
+    const session = this.requireSession(msg);
+    if (!session) return;
+    const params = msg.params ?? {};
+    if (typeof params.content !== 'string') {
+      this.fail(msg, -32602, 'content is required');
+      return;
+    }
+    const filePath = await this.resolveFilePath(session, typeof params.filePath === 'string' ? params.filePath : '');
+    await fs.mkdir(path.dirname(filePath), { recursive: true });
+    await fs.writeFile(filePath, params.content, 'utf8');
+    this.reply(msg, {});
+  }
+
+  private handleSessionCancel(msg: AcpRpcMessage): void {
+    const params = msg.params ?? {};
+    this.sessions.get(String(params.sessionId ?? ''))?.abort.abort();
+    this.reply(msg, {});
+  }
+
+  private handleSessionDelete(msg: AcpRpcMessage): void {
+    const params = msg.params ?? {};
+    const session = this.sessions.get(String(params.sessionId ?? ''));
+    if (session) {
+      session.abort.abort();
+      this.sessions.delete(session.id);
+    }
+    this.reply(msg, {});
   }
 
   private async resolveFilePath(session: AcpSession, raw: unknown): Promise<string> {

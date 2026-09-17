@@ -13,6 +13,7 @@ import { sessionQuerySearch } from './fts';
 import { seedAuthorizedProjectRoots } from './ipc/project-access';
 import { buildConnectSrc, buildFrameSrc } from './network-policy';
 import { errorText } from './errors';
+import type { CliArgs } from './cli-args';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -245,64 +246,64 @@ app.setName('Auraxis');
 // URL. Do not trust arbitrary local `index.html` files.
 setTrustedRendererUrl(pathToFileURL(path.join(__dirname, '../dist/index.html')).href);
 
-app.whenReady().then(async () => {
-  // 旧版本错误地在 Windows 上把 cache 路径写入后，userData 被解析到了
-  // Local\auraxis\Cache\auraxis。这里一次性把持久化账户/设置/记忆数据
-  // 带回标准 Roaming userData；只复制不移动，旧目录保留作为回退。
-  if (!headlessMode && !process.env.AURAXIS_USER_DATA_DIR && process.env.LOCALAPPDATA) {
-    try {
-      const currentUserData = app.getPath('userData');
-      const legacyUserData = path.join(process.env.LOCALAPPDATA, 'auraxis', 'Cache', 'auraxis');
-      if (legacyUserData !== currentUserData && existsSync(legacyUserData)) {
-        const files = [
-          'auraxis-auth.json',
-          'auraxis-settings.json',
-          'auraxis-global-state.json',
-          'auraxis-memory.db',
-          'auraxis-memory.db-shm',
-          'auraxis-memory.db-wal',
-          '.env',
-          'plugin-state.json',
-        ];
-        const dirs = [
-          'agent-snapshots',
-          'agent-workspaces',
-          'chat-logs',
-          'session-logs',
-          'session-cache',
-          'fts',
-          'feedback',
-          'hooks',
-          'skills',
-          'spill',
-        ];
-        for (const name of files) {
-          const legacyPath = path.join(legacyUserData, name);
-          const currentPath = path.join(currentUserData, name);
-          if (existsSync(legacyPath) && !existsSync(currentPath)) {
-            await copyFile(legacyPath, currentPath);
-          }
-        }
-        for (const name of dirs) {
-          const legacyPath = path.join(legacyUserData, name);
-          const currentPath = path.join(currentUserData, name);
-          if (existsSync(legacyPath) && !existsSync(currentPath)) {
-            await cp(legacyPath, currentPath, { recursive: true });
-          }
-        }
+/**
+ * 旧版本错误地在 Windows 上把 cache 路径写入后，userData 被解析到了
+ * Local\auraxis\Cache\auraxis。这里一次性把持久化账户/设置/记忆数据
+ * 带回标准 Roaming userData；只复制不移动，旧目录保留作为回退。
+ */
+async function migrateLegacyUserData(): Promise<void> {
+  if (headlessMode || process.env.AURAXIS_USER_DATA_DIR || !process.env.LOCALAPPDATA) return;
+  try {
+    const currentUserData = app.getPath('userData');
+    const legacyUserData = path.join(process.env.LOCALAPPDATA, 'auraxis', 'Cache', 'auraxis');
+    if (legacyUserData === currentUserData || !existsSync(legacyUserData)) return;
+    const files = [
+      'auraxis-auth.json',
+      'auraxis-settings.json',
+      'auraxis-global-state.json',
+      'auraxis-memory.db',
+      'auraxis-memory.db-shm',
+      'auraxis-memory.db-wal',
+      '.env',
+      'plugin-state.json',
+    ];
+    const dirs = [
+      'agent-snapshots',
+      'agent-workspaces',
+      'chat-logs',
+      'session-logs',
+      'session-cache',
+      'fts',
+      'feedback',
+      'hooks',
+      'skills',
+      'spill',
+    ];
+    for (const name of files) {
+      const legacyPath = path.join(legacyUserData, name);
+      const currentPath = path.join(currentUserData, name);
+      if (existsSync(legacyPath) && !existsSync(currentPath)) {
+        await copyFile(legacyPath, currentPath);
       }
-    } catch {
-      /* migration is best-effort; existing data remains in the legacy folder */
     }
+    for (const name of dirs) {
+      const legacyPath = path.join(legacyUserData, name);
+      const currentPath = path.join(currentUserData, name);
+      if (existsSync(legacyPath) && !existsSync(currentPath)) {
+        await cp(legacyPath, currentPath, { recursive: true });
+      }
+    }
+  } catch {
+    /* migration is best-effort; existing data remains in the legacy folder */
   }
-  await seedAuthorizedProjectRoots();
-  registerIpcHandlers();
-  // 打包版本启动后延迟检查更新；开发态只会把状态标记为 unsupported。
-  initUpdater();
+}
 
-  // Restore persisted undo history for the saved project (fresh app start
-  // would otherwise lose it — undo backups exist on disk but entries are
-  // only replayed after init).
+/**
+ * Restore persisted undo history for the saved project (fresh app start would
+ * otherwise lose it — undo backups exist on disk but entries are only
+ * replayed after init).
+ */
+async function restoreUndoHistory(): Promise<void> {
   try {
     const bootSettings = await (await import('./ipc/settings-store')).readSettings();
     if (typeof bootSettings?.projectPath === 'string' && bootSettings.projectPath) {
@@ -312,6 +313,134 @@ app.whenReady().then(async () => {
   } catch {
     /* non-critical */
   }
+}
+
+/** `--plugin-*` CLI surfaces. Returns true when the process handled a plugin command. */
+async function handlePluginCli(cli: CliArgs): Promise<boolean> {
+  const requested = cli.pluginList || cli.pluginScanDir !== undefined || cli.pluginEnable || cli.pluginDisable;
+  if (!requested) return false;
+  const { readSettings } = await import('./ipc/settings-store');
+  const s = await readSettings();
+  const catalog = Array.isArray(s.pluginCatalog)
+    ? (s.pluginCatalog as { id: string; name: string; version?: string; enabled: boolean }[])
+    : [];
+  if (cli.pluginScanDir !== undefined) {
+    const { scanPluginDir } = await import('./plugin-cli');
+    const manifests = await scanPluginDir(cli.pluginScanDir || path.join(app.getPath('userData'), 'plugins'));
+    for (const m of manifests) {
+      console.log(`${m.id}\t${m.name}${m.version ? ` v${m.version}` : ''}\t${m.path}`);
+    }
+    if (manifests.length === 0) console.log('（未发现插件清单）');
+  } else if (cli.pluginEnable || cli.pluginDisable) {
+    const { setPluginEnabled } = await import('./plugin-cli');
+    const id = cli.pluginEnable || cli.pluginDisable!;
+    const enabled = !!cli.pluginEnable;
+    const r = await setPluginEnabled(id, enabled);
+    if (!r.ok) {
+      console.error(r.error || '插件状态更新失败');
+      app.exit(1);
+    } else {
+      console.log(`已${enabled ? '启用' : '禁用'}插件 ${id}（enabled: ${r.enabledIds.join(', ') || '无'}）`);
+    }
+  } else {
+    for (const p of catalog) {
+      console.log(`${p.id}\t${p.name}${p.version ? ` v${p.version}` : ''}\t${p.enabled ? 'enabled' : 'disabled'}`);
+    }
+    if (catalog.length === 0) console.log('（暂无插件记录 — 先运行桌面应用以同步插件目录）');
+  }
+  app.exit(0);
+  return true;
+}
+
+async function resolveHeadlessProjectRoot(projectRoot?: string): Promise<string> {
+  if (projectRoot) return projectRoot;
+  try {
+    const s = await (await import('./ipc/settings-store')).readSettings();
+    return typeof s?.projectPath === 'string' ? s.projectPath : '';
+  } catch {
+    return '';
+  }
+}
+
+/** Headless SDK mode: no window; JSON-RPC over a loopback TCP port. */
+async function startSdkMode(): Promise<void> {
+  try {
+    const { runSubAgent } = await import('./ipc/agent-handlers');
+    const { startSdkTcpServer } = await import('./sdk-server');
+    const { port, token } = await startSdkTcpServer({
+      runAgent: async ({ prompt, description, subagentType, projectRoot }) =>
+        runSubAgent({
+          description: description || 'SDK 任务',
+          prompt,
+          subagentType: subagentType || 'general-purpose',
+          projectRoot: await resolveHeadlessProjectRoot(projectRoot),
+          requestId: `sdk-${Date.now()}`,
+          // 默认保留审批门；只有显式 AURAXIS_SDK_AUTOAPPROVE=1 才允许全自动无头执行。
+          autoApprove: process.env.AURAXIS_PACKAGED !== '1' && process.env.AURAXIS_SDK_AUTOAPPROVE === '1',
+        }),
+      searchSessions: (query, limit) => sessionQuerySearch(query, limit),
+    });
+    // Advertise the loopback port so the client can connect (stdin is not
+    // readable in Electron's main process on Windows).
+    process.stdout.write(`AURAXIS_SDK_PORT=${port}\n`);
+    process.stdout.write(`AURAXIS_SDK_TOKEN=${token}\n`);
+  } catch (e: unknown) {
+    process.stderr.write(`[sdk] failed: ${errorText(e)}\n`);
+    app.exit(1);
+  }
+}
+
+/**
+ * Minimal Agent Client Protocol server （ACP 协议）: ACP clients can create
+ * sessions and run tasks over newline-delimited JSON-RPC on stdio.
+ */
+async function startAcpMode(): Promise<void> {
+  const { startAcpServer } = await import('./acp-server');
+  const { runSubAgent } = await import('./ipc/agent-handlers');
+  startAcpServer({
+    onShutdown: () => app.exit(0),
+    runAgent: async ({ prompt, projectRoot, promptType, signal }) =>
+      runSubAgent({
+        description: 'ACP 任务',
+        prompt,
+        subagentType: promptType === 'plan' ? 'Plan' : 'general-purpose',
+        projectRoot: await resolveHeadlessProjectRoot(projectRoot),
+        requestId: `acp-${Date.now()}`,
+        autoApprove: process.env.AURAXIS_PACKAGED !== '1' && process.env.AURAXIS_ACP_AUTOAPPROVE === '1',
+        parentSignal: signal,
+      }),
+  });
+}
+
+/**
+ * Desktop startup maintenance: bounded log retention, SQLite cache prune, and
+ * a full FTS rebuild (incremental indexing keeps it fresh afterwards).
+ */
+async function runDesktopMaintenance(): Promise<void> {
+  try {
+    const { runLogRetention } = await import('./log-retention');
+    const { pruneChatCache } = await import('./chat-log');
+    const { pruneAgentCache } = await import('./session-log');
+    const { rebuildFts } = await import('./fts');
+    const userData = process.env.AURAXIS_USER_DATA_DIR || app.getPath('userData');
+    void runLogRetention({
+      dirs: [path.join(userData, 'chat-logs'), path.join(userData, 'session-logs')],
+    }).catch(() => {});
+    void Promise.all([pruneChatCache(), pruneAgentCache()]).catch(() => {});
+    void rebuildFts().catch(() => {});
+  } catch {
+    /* maintenance is best-effort */
+  }
+}
+
+app.whenReady().then(async () => {
+  await migrateLegacyUserData();
+  await seedAuthorizedProjectRoots();
+  registerIpcHandlers();
+  // 打包版本启动后延迟检查更新；开发态只会把状态标记为 unsupported。
+  initUpdater();
+
+  await restoreUndoHistory();
 
   const { parseCliArgs, cliUsage } = await import('./cli-args');
   const cli = parseCliArgs(process.argv.slice(2));
@@ -321,129 +450,21 @@ app.whenReady().then(async () => {
     app.exit(0);
     return;
   }
-  if (cli.pluginList || cli.pluginScanDir !== undefined || cli.pluginEnable || cli.pluginDisable) {
-    const { readSettings } = await import('./ipc/settings-store');
-    const s = await readSettings();
-    const catalog = Array.isArray(s.pluginCatalog)
-      ? (s.pluginCatalog as { id: string; name: string; version?: string; enabled: boolean }[])
-      : [];
-    if (cli.pluginScanDir !== undefined) {
-      const { scanPluginDir } = await import('./plugin-cli');
-      const manifests = await scanPluginDir(cli.pluginScanDir || path.join(app.getPath('userData'), 'plugins'));
-      for (const m of manifests) {
-        console.log(`${m.id}\t${m.name}${m.version ? ` v${m.version}` : ''}\t${m.path}`);
-      }
-      if (manifests.length === 0) console.log('（未发现插件清单）');
-    } else if (cli.pluginEnable || cli.pluginDisable) {
-      const { setPluginEnabled } = await import('./plugin-cli');
-      const id = cli.pluginEnable || cli.pluginDisable!;
-      const enabled = !!cli.pluginEnable;
-      const r = await setPluginEnabled(id, enabled);
-      if (!r.ok) {
-        console.error(r.error || '插件状态更新失败');
-        app.exit(1);
-      } else {
-        console.log(`已${enabled ? '启用' : '禁用'}插件 ${id}（enabled: ${r.enabledIds.join(', ') || '无'}）`);
-      }
-    } else {
-      for (const p of catalog) {
-        console.log(`${p.id}\t${p.name}${p.version ? ` v${p.version}` : ''}\t${p.enabled ? 'enabled' : 'disabled'}`);
-      }
-      if (catalog.length === 0) console.log('（暂无插件记录 — 先运行桌面应用以同步插件目录）');
-    }
-    app.exit(0);
-    return;
-  }
+  if (await handlePluginCli(cli)) return;
 
   const sdkRequested = cli.sdk || process.env.AURAXIS_SDK === '1';
   const acpRequested = cli.acp || process.env.AURAXIS_ACP === '1';
-  const runPrompt = cli.run;
   if (sdkRequested) {
-    // Headless SDK mode: no window; JSON-RPC over a loopback TCP port.
-    try {
-      const { runSubAgent } = await import('./ipc/agent-handlers');
-      const { startSdkTcpServer } = await import('./sdk-server');
-      const { port, token } = await startSdkTcpServer({
-        runAgent: async ({ prompt, description, subagentType, projectRoot }) => {
-          let root = projectRoot || '';
-          if (!root) {
-            try {
-              const s = await (await import('./ipc/settings-store')).readSettings();
-              root = typeof s?.projectPath === 'string' ? s.projectPath : '';
-            } catch {
-              /* settings unavailable */
-            }
-          }
-          return runSubAgent({
-            description: description || 'SDK 任务',
-            prompt,
-            subagentType: subagentType || 'general-purpose',
-            projectRoot: root || '',
-            requestId: `sdk-${Date.now()}`,
-            // 默认保留审批门；只有显式 AURAXIS_SDK_AUTOAPPROVE=1 才允许全自动无头执行。
-            autoApprove: process.env.AURAXIS_PACKAGED !== '1' && process.env.AURAXIS_SDK_AUTOAPPROVE === '1',
-          });
-        },
-        searchSessions: (query, limit) => sessionQuerySearch(query, limit),
-      });
-      // Advertise the loopback port so the client can connect (stdin is not
-      // readable in Electron's main process on Windows).
-      process.stdout.write(`AURAXIS_SDK_PORT=${port}\n`);
-      process.stdout.write(`AURAXIS_SDK_TOKEN=${token}\n`);
-    } catch (e: unknown) {
-      process.stderr.write(`[sdk] failed: ${errorText(e)}\n`);
-      app.exit(1);
-    }
+    await startSdkMode();
   } else if (acpRequested) {
-    // Minimal Agent Client Protocol server （ACP 协议）: ACP clients can
-    // create sessions and run tasks over newline-delimited JSON-RPC on stdio.
-    const { startAcpServer } = await import('./acp-server');
-    const { runSubAgent } = await import('./ipc/agent-handlers');
-    startAcpServer({
-      onShutdown: () => app.exit(0),
-      runAgent: async ({ prompt, projectRoot, promptType, signal }) => {
-        let root = projectRoot || '';
-        if (!root) {
-          try {
-            const s = await (await import('./ipc/settings-store')).readSettings();
-            root = typeof s?.projectPath === 'string' ? s.projectPath : '';
-          } catch {
-            /* settings unavailable */
-          }
-        }
-        return runSubAgent({
-          description: 'ACP 任务',
-          prompt,
-          subagentType: promptType === 'plan' ? 'Plan' : 'general-purpose',
-          projectRoot: root,
-          requestId: `acp-${Date.now()}`,
-          autoApprove: process.env.AURAXIS_PACKAGED !== '1' && process.env.AURAXIS_ACP_AUTOAPPROVE === '1',
-          parentSignal: signal,
-        });
-      },
-    });
-  } else if (runPrompt) {
+    await startAcpMode();
+  } else if (cli.run) {
     // `--run "<task>"` — 无头单次执行，输出最终结果
     // answer to stdout, exit 0 on success / 1 on error.
     const { cliRunTask } = await import('./headless-run');
-    await cliRunTask(cli, runPrompt);
+    await cliRunTask(cli, cli.run);
   } else {
-    // Desktop startup maintenance: bounded log retention, SQLite cache prune,
-    // and a full FTS rebuild (incremental indexing keeps it fresh afterwards).
-    try {
-      const { runLogRetention } = await import('./log-retention');
-      const { pruneChatCache } = await import('./chat-log');
-      const { pruneAgentCache } = await import('./session-log');
-      const { rebuildFts } = await import('./fts');
-      const userData = process.env.AURAXIS_USER_DATA_DIR || app.getPath('userData');
-      void runLogRetention({
-        dirs: [path.join(userData, 'chat-logs'), path.join(userData, 'session-logs')],
-      }).catch(() => {});
-      void Promise.all([pruneChatCache(), pruneAgentCache()]).catch(() => {});
-      void rebuildFts().catch(() => {});
-    } catch {
-      /* maintenance is best-effort */
-    }
+    await runDesktopMaintenance();
     // Windows 11: 始终以 Acrylic 窗口创建（渲染层决定何时透出）。
     createWindow(isWindows11());
   }
