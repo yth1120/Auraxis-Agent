@@ -318,39 +318,42 @@ export function useChatInputController({ position }: ChatInputProps) {
 
   const handleKeyDownWithMention = useCallback(
     (e: React.KeyboardEvent) => {
-      if (commandOpen) {
+      // 三个下拉（/ 命令、@ 提及、$ 技能）各自的按键处理拆成本地函数：
+      // 每个分支职责单一，主回调只负责按优先级转发，避免复杂度堆积。
+      const handleCommandMenu = (): boolean => {
         if (e.key === 'ArrowDown') {
           e.preventDefault();
           setCommandSelected((prev) => (prev + 1) % commandItems.length);
-          return;
+          return true;
         }
         if (e.key === 'ArrowUp') {
           e.preventDefault();
           setCommandSelected((prev) => (prev - 1 + commandItems.length) % commandItems.length);
-          return;
+          return true;
         }
         if (e.key === 'Enter' || e.key === 'Tab') {
           e.preventDefault();
           handleCommandSelect(commandItems[commandSelected] || SLASH_COMMANDS[0]);
-          return;
+          return true;
         }
         if (e.key === 'Escape') {
           setCommandOpen(false);
-          return;
+          return true;
         }
-      }
+        return false;
+      };
 
-      if (mentionOpen) {
+      const handleMentionMenu = (): boolean => {
         const total = mentionSessions.length + mentionItems.length;
         if (e.key === 'ArrowDown') {
           e.preventDefault();
           setMentionSelected((prev) => (prev + 1) % Math.max(1, total));
-          return;
+          return true;
         }
         if (e.key === 'ArrowUp') {
           e.preventDefault();
           setMentionSelected((prev) => (prev - 1 + total) % Math.max(1, total));
-          return;
+          return true;
         }
         if (e.key === 'Enter' || e.key === 'Tab') {
           e.preventDefault();
@@ -359,35 +362,41 @@ export function useChatInputController({ position }: ChatInputProps) {
           } else {
             handleMentionSelect(mentionItems[mentionSelected - mentionSessions.length] || mentionQuery);
           }
-          return;
+          return true;
         }
         if (e.key === 'Escape') {
           setMentionOpen(false);
-          return;
+          return true;
         }
-      }
+        return false;
+      };
 
-      if (dollarOpen) {
+      const handleDollarMenu = (): boolean => {
         if (e.key === 'ArrowDown') {
           e.preventDefault();
           setDollarSelected((prev) => (prev + 1) % Math.max(1, dollarSkills.length));
-          return;
+          return true;
         }
         if (e.key === 'ArrowUp') {
           e.preventDefault();
           setDollarSelected((prev) => (prev - 1 + dollarSkills.length) % Math.max(1, dollarSkills.length));
-          return;
+          return true;
         }
         if (e.key === 'Enter' || e.key === 'Tab') {
           e.preventDefault();
           handleDollarSelect(dollarSkills[dollarSelected] || AGENT_SKILLS[0]);
-          return;
+          return true;
         }
         if (e.key === 'Escape') {
           setDollarOpen(false);
-          return;
+          return true;
         }
-      }
+        return false;
+      };
+
+      if (commandOpen && handleCommandMenu()) return;
+      if (mentionOpen && handleMentionMenu()) return;
+      if (dollarOpen && handleDollarMenu()) return;
 
       // Enter → send; Shift+Enter → newline
       if (e.key === 'Enter') {
