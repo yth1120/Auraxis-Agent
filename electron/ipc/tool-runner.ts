@@ -112,6 +112,43 @@ export function isDeniedError(error: string | undefined): boolean {
  * Execute a tool_calls batch with concurrency-safe splitting and guaranteed
  * result ordering. Returns one result per input call, in original order.
  */
+/**
+ * Pre-flight 门控：先问权限回调，再问记忆风险门控；任一步拒绝即给出拒绝原因。
+ * 从 runToolBatch 拆出（原先该段嵌套 7 层、占 40 余行，是文件里最深的分支）。
+ */
+async function applyToolGate(
+  tc: RunnerToolCall,
+  toolCallId: string,
+  ctx: ToolRunContext,
+  cb: ToolRunCallbacks,
+): Promise<{ allowed: true } | { allowed: false; error: string }> {
+  let allowed = !cb.preCheckPermission;
+  if (cb.preCheckPermission) {
+    try {
+      allowed = await cb.preCheckPermission(tc.name, tc.input, toolCallId);
+    } catch {
+      allowed = false;
+    }
+  }
+
+  if (allowed && ctx.riskGate) {
+    try {
+      const verdict = await ctx.riskGate(tc.name, tc.input, toolCallId);
+      if (!verdict.allowed) {
+        return {
+          allowed: false,
+          error: `工具 ${tc.name} 被记忆风险门控拒绝：${verdict.reason || '证据信任不足'}`,
+        };
+      }
+    } catch {
+      allowed = false;
+    }
+  }
+
+  if (!allowed) return { allowed: false, error: `${DENIED_PREFIX}${tc.name}${DENIED_SUFFIX}` };
+  return { allowed: true };
+}
+
 export async function runToolBatch(
   calls: Array<{ id: string; name: string; input: Record<string, unknown> }>,
   ctx: ToolRunContext,
@@ -139,58 +176,23 @@ export async function runToolBatch(
       for (const idx of batchIndices) {
         const tc = batchCalls[idx];
         const toolCallId = makeToolCallId(tc);
-        let allowed = !cb.preCheckPermission;
-        if (cb.preCheckPermission) {
-          try {
-            allowed = await cb.preCheckPermission(tc.name, tc.input, toolCallId);
-          } catch {
-            allowed = false;
-          }
-        }
-        if (allowed && ctx.riskGate) {
-          try {
-            const verdict = await ctx.riskGate(tc.name, tc.input, toolCallId);
-            if (!verdict.allowed) {
-              allowed = false;
-              const deniedResult: RunnerToolResult = {
-                index: idx,
-                toolUseId: tc.id,
-                toolName: tc.name,
-                input: tc.input,
-                output: null,
-                error: `工具 ${tc.name} 被记忆风险门控拒绝：${verdict.reason || '证据信任不足'}`,
-                durationMs: 0,
-              };
-              denied.add(idx);
-              resultMap.set(idx, deniedResult);
-              try {
-                cb.onToolResult(deniedResult, tc, toolCallId);
-              } catch {
-                /* best-effort */
-              }
-              continue;
-            }
-          } catch {
-            allowed = false;
-          }
-        }
-        if (!allowed) {
-          denied.add(idx);
-          const deniedResult: RunnerToolResult = {
-            index: idx,
-            toolUseId: tc.id,
-            toolName: tc.name,
-            input: tc.input,
-            output: null,
-            error: `${DENIED_PREFIX}${tc.name}${DENIED_SUFFIX}`,
-            durationMs: 0,
-          };
-          resultMap.set(idx, deniedResult);
-          try {
-            cb.onToolResult(deniedResult, tc, toolCallId);
-          } catch {
-            /* best-effort */
-          }
+        const outcome = await applyToolGate(tc, toolCallId, ctx, cb);
+        if (outcome.allowed) continue;
+        denied.add(idx);
+        const deniedResult: RunnerToolResult = {
+          index: idx,
+          toolUseId: tc.id,
+          toolName: tc.name,
+          input: tc.input,
+          output: null,
+          error: outcome.error,
+          durationMs: 0,
+        };
+        resultMap.set(idx, deniedResult);
+        try {
+          cb.onToolResult(deniedResult, tc, toolCallId);
+        } catch {
+          /* best-effort */
         }
       }
     }
