@@ -16,7 +16,10 @@ import ts from 'typescript';
 import type { ApprovalPolicy } from './types';
 import type { SandboxMode } from './sandbox-policy';
 import { isToolConcurrencySafe } from './tool-registry';
-import { executeToolCall } from './ipc/tool-handlers';
+import { getNestedToolExecutor, type NestedToolExecutor } from './ipc/tool-handlers/executor-port';
+
+/** 经端口取执行器：切断 code-mode → tool-handlers 的运行时回边。 */
+const executeToolCall = (...args: Parameters<NestedToolExecutor>) => getNestedToolExecutor()(...args);
 import { unsafeCodeEnabled, unsafeCodeDisabledMessage } from './safe-env';
 
 export interface CodeModeHost {

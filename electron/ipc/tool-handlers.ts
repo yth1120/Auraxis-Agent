@@ -7,6 +7,8 @@
  */
 import { abortTool } from './tool-handlers/abort-registry';
 import { setTaskStopper } from './task-monitor';
+import { executeToolCall as executeToolCallImpl } from './tool-handlers/pipeline';
+import { setNestedToolExecutor } from './tool-handlers/executor-port';
 
 export { cacheTaskResult } from './tool-handlers/task-cache';
 export { abortTool } from './tool-handlers/abort-registry';
@@ -24,3 +26,6 @@ export type { ToolExecutor } from './tool-handlers/execution';
 export type { ToolContext, ToolResult } from './tool-handlers/path-utils';
 
 setTaskStopper((toolCallId) => abortTool(toolCallId));
+
+// 注册嵌套工具执行端口：code-mode 等模块经端口回调，不再反向 import 本模块。
+setNestedToolExecutor(executeToolCallImpl);
