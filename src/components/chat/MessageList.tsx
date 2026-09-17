@@ -12,6 +12,7 @@ import {
 import { useT } from '../../i18n';
 import { useChatStore } from '../../stores/useChatStore';
 import { getContentText } from '../../types/chat';
+import type { Message } from '../../types/chat';
 import MessageBubble from './MessageBubble';
 import ThinkingIndicator from './ThinkingIndicator';
 import CompactionRow from '../common/CompactionRow';
@@ -22,6 +23,72 @@ import ConversationTimeline from './ConversationTimeline';
 import { useSettingsStore } from '../../stores/useSettingsStore';
 import { useSessionStore } from '../../stores/useSessionStore';
 import { useMessageFeedbackStore } from '../../stores/useMessageFeedbackStore';
+
+/** 单条消息气泡 + 交付物 + 回滚入口（Virtuoso item renderer 拆出）。 */
+function MessageRow({
+  msg,
+  index,
+  messages,
+  projectRoot,
+}: {
+  msg: Message;
+  index: number;
+  messages: Message[];
+  projectRoot: string;
+}) {
+  if (msg.compaction) {
+    return <CompactionRow data={msg.compaction} />;
+  }
+  if (msg.disclosure) {
+    return <DisclosureRow data={msg.disclosure} />;
+  }
+  const files = (msg.toolCalls ?? [])
+    .filter((tc) => tc.toolName === 'Write' || tc.toolName === 'Edit' || tc.toolName === 'NotebookEdit')
+    .map((tc) => String((tc.input as { file_path?: unknown })?.file_path ?? ''))
+    .filter(Boolean);
+  const laterSessionIds = messages
+    .slice(index + 1)
+    .flatMap((m) => (m.toolCalls ?? []).map((tc) => tc.requestId))
+    .filter((v, i, a) => !!v && a.indexOf(v) === i);
+
+  return (
+    <div className="max-w-[var(--content-max-width,880px)] mx-auto w-full">
+      <MessageBubble message={msg} />
+      {files.length > 0 && <DeliverablesRow files={files} />}
+      {laterSessionIds.length > 0 && projectRoot && (
+        <div className="flex justify-end pr-2 -mt-0.5">
+          <RollbackToMessage sessionIds={laterSessionIds} projectRoot={projectRoot} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** 回到底部浮动按钮（滚动位置 + 底部留白来自外层）。 */
+function ScrollToBottomButton({
+  bottomInset,
+  onClick,
+  label,
+}: {
+  bottomInset: number;
+  onClick: () => void;
+  label: string;
+}) {
+  return (
+<button
+  className="ax-back-to-bottom"
+  style={{
+    left: 'calc(50% + var(--content-max-width, 880px) / 2 - 56px)',
+    bottom: `${Math.max(0, bottomInset) + 20}px`,
+  }}
+  onClick={onClick}
+  aria-label={label}
+  title={label}
+>
+  <DownOutlined />
+</button>
+  );
+}
 
 export default function MessageList({
   bottomInset = 0,
@@ -201,34 +268,14 @@ export default function MessageList({
             followOutput="auto"
             increaseViewportBy={{ top: 400, bottom: 600 }}
             atBottomStateChange={setIsAtBottom}
-            itemContent={(_index, msg) => {
-              if (msg.compaction) {
-                return <CompactionRow data={msg.compaction} />;
-              }
-              if (msg.disclosure) {
-                return <DisclosureRow data={msg.disclosure} />;
-              }
-              const files = (msg.toolCalls ?? [])
-                .filter((tc) => tc.toolName === 'Write' || tc.toolName === 'Edit' || tc.toolName === 'NotebookEdit')
-                .map((tc) => String((tc.input as { file_path?: unknown })?.file_path ?? ''))
-                .filter(Boolean);
-              const laterSessionIds = messages
-                .slice(_index + 1)
-                .flatMap((m) => (m.toolCalls ?? []).map((tc) => tc.requestId))
-                .filter((v, i, a) => !!v && a.indexOf(v) === i);
-              const projectRoot = settingsProjectPath || currentProjectPath || '';
-              return (
-                <div className="max-w-[var(--content-max-width,880px)] mx-auto w-full">
-                  <MessageBubble message={msg} />
-                  {files.length > 0 && <DeliverablesRow files={files} />}
-                  {laterSessionIds.length > 0 && projectRoot && (
-                    <div className="flex justify-end pr-2 -mt-0.5">
-                      <RollbackToMessage sessionIds={laterSessionIds} projectRoot={projectRoot} />
-                    </div>
-                  )}
-                </div>
-              );
-            }}
+            itemContent={(_index, msg) => (
+              <MessageRow
+                msg={msg}
+                index={_index}
+                messages={messages}
+                projectRoot={settingsProjectPath || currentProjectPath || ''}
+              />
+            )}
             components={{ Header, Footer }}
           />
         </div>
@@ -243,18 +290,11 @@ export default function MessageList({
         </div>
       </div>
       {!isAtBottom && messages.length > 0 && (
-        <button
-          className="ax-back-to-bottom"
-          style={{
-            left: 'calc(50% + var(--content-max-width, 880px) / 2 - 56px)',
-            bottom: `${Math.max(0, bottomInset) + 20}px`,
-          }}
+        <ScrollToBottomButton
+          bottomInset={bottomInset}
+          label={t('msglist.scrollBottom')}
           onClick={() => virtuosoRef.current?.scrollToIndex({ index: messages.length - 1, behavior: 'smooth' })}
-          aria-label={t('msglist.scrollBottom')}
-          title={t('msglist.scrollBottom')}
-        >
-          <DownOutlined />
-        </button>
+        />
       )}
     </div>
   );
