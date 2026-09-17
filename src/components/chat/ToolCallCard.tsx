@@ -85,65 +85,40 @@ const TOOL_LABEL: Record<ToolName, string | { key: I18nKey }> = {
   TaskList: 'TaskList',
 };
 
-function formatInput(name: ToolName, input: Record<string, unknown>): string {
-  switch (name) {
-    case 'Bash':
-      return (input.command as string) || '';
-    case 'Read':
-      return (input.file_path as string) || '';
-    case 'Write':
-      return (input.file_path as string) || '';
-    case 'ReadDocument':
-      return (input.file_path as string) || '';
-    case 'WriteDocument':
-      return (input.file_path as string) || '';
-    case 'SlackPostMessage':
-      return `${input.channel || ''} → ${input.text || ''}`;
-    case 'DriveRead':
-      return (input.file_id as string) || '';
-    case 'NotionCreatePage':
-      return `${input.title || ''} (${input.parent_page_id || ''})`;
-    case 'Edit':
-      return t('msg.replaceText', { path: String(input.file_path || '') });
-    case 'Grep':
-      return (input.pattern as string) || '';
-    case 'Glob':
-      return (input.pattern as string) || '';
-    case 'WebFetch':
-      return (input.url as string) || '';
-    case 'WebSearch':
-      return (input.query as string) || '';
-    case 'AskUser':
-      return (input.question as string) || '';
-    case 'Pty':
-      return `${input.action || ''}${input.session_id ? ` ${input.session_id}` : ''}`.trim();
-    case 'WriteSkill':
-      return (input.name as string) || '';
-    case 'SendMessage':
-      return `${input.agentId || ''}${input.message ? ` · ${input.message}` : ''}`.trim();
-    case 'InterruptAgent':
-      return (input.agentId as string) || '';
-    case 'Report':
-      return (input.content as string) || '';
-    case 'MountPlugin':
-      return (input.name as string) || '';
-    case 'UnmountPlugin':
-      return (input.id as string) || '';
-    case 'Ralph':
-      return (input.objective as string) || '';
-    case 'Pwsh':
-      return (input.command as string) || '';
-    case 'SessionEventSearch':
-      return (input.query as string) || '';
-    case 'SessionEventRead':
-      return `${input.sessionId || ''} #${input.seq ?? ''}`;
-    case 'SessionTrace':
-      return (input.sessionId as string) || '';
-    default:
-      return JSON.stringify(input).slice(0, 80);
-  }
-}
+/** 工具入参摘要：按工具名映射到格式化器，未注册的工具走 JSON 兜底。 */
+const INPUT_FORMATTERS: Partial<Record<ToolName, (input: Record<string, unknown>) => string>> = {
+  Bash: (i) => String(i.command || ''),
+  Read: (i) => String(i.file_path || ''),
+  Write: (i) => String(i.file_path || ''),
+  ReadDocument: (i) => String(i.file_path || ''),
+  WriteDocument: (i) => String(i.file_path || ''),
+  SlackPostMessage: (i) => `${i.channel || ''} → ${i.text || ''}`,
+  DriveRead: (i) => String(i.file_id || ''),
+  NotionCreatePage: (i) => `${i.title || ''} (${i.parent_page_id || ''})`,
+  Edit: (i) => t('msg.replaceText', { path: String(i.file_path || '') }),
+  Grep: (i) => String(i.pattern || ''),
+  Glob: (i) => String(i.pattern || ''),
+  WebFetch: (i) => String(i.url || ''),
+  WebSearch: (i) => String(i.query || ''),
+  AskUser: (i) => String(i.question || ''),
+  Pty: (i) => `${i.action || ''}${i.session_id ? ` ${i.session_id}` : ''}`.trim(),
+  WriteSkill: (i) => String(i.name || ''),
+  SendMessage: (i) => `${i.agentId || ''}${i.message ? ` · ${i.message}` : ''}`.trim(),
+  InterruptAgent: (i) => String(i.agentId || ''),
+  Report: (i) => String(i.content || ''),
+  MountPlugin: (i) => String(i.name || ''),
+  UnmountPlugin: (i) => String(i.id || ''),
+  Ralph: (i) => String(i.objective || ''),
+  Pwsh: (i) => String(i.command || ''),
+  SessionEventSearch: (i) => String(i.query || ''),
+  SessionEventRead: (i) => `${i.sessionId || ''} #${i.seq ?? ''}`,
+  SessionTrace: (i) => String(i.sessionId || ''),
+};
 
+function formatInput(name: ToolName, input: Record<string, unknown>): string {
+  const formatter = INPUT_FORMATTERS[name];
+  return formatter ? formatter(input) : JSON.stringify(input).slice(0, 80);
+}
 /** Extract terminal-ready content + exit code from a Bash ToolCall. */
 function extractBashTerminal(toolCall: ToolCall): { content: string; exitCode?: number } {
   if (toolCall.streamOutput) {
@@ -200,6 +175,89 @@ function formatOutput(name: ToolName, output: unknown): string {
 
   return JSON.stringify(output).slice(0, 500);
 }
+
+interface ToolCallExpandedProps {
+  toolCall: ToolCall;
+  diffCard: React.ReactNode;
+  bashCommand: string;
+  bashCwd: string | undefined;
+  bashTerm: { content: string; exitCode?: number } | null;
+  isRunning: boolean;
+  hasInput: boolean;
+  hasOutput: boolean;
+  showGeneric: boolean;
+}
+
+/** 展开态：Bash 终端 / diff 卡片 / 通用 IN-OUT 面板三选一。 */
+function ToolCallExpanded({
+  toolCall,
+  diffCard,
+  bashCommand,
+  bashCwd,
+  bashTerm,
+  isRunning,
+  hasInput,
+  hasOutput,
+  showGeneric,
+}: ToolCallExpandedProps) {
+  const t = useT();
+  return (
+        <div className="flex flex-col">
+          {toolCall.toolName === 'Bash' && (toolCall.output || toolCall.error || toolCall.streamOutput) ? (
+            <TerminalBlock
+              className="ax-tool-card-surface"
+              command={bashCommand}
+              cwd={bashCwd}
+              output={toolCall.error ? toolCall.error : (bashTerm?.content ?? '')}
+              running={isRunning}
+              failed={!!toolCall.error}
+              exitCode={toolCall.error ? (bashTerm?.exitCode ?? 1) : bashTerm?.exitCode}
+            />
+          ) : diffCard !== null ? (
+            diffCard
+          ) : showGeneric ? (
+            <div className="ax-tool-card-surface">
+              <div className="rounded-xl border border-border-default bg-code-bg overflow-hidden">
+                {hasInput && (
+                  <div className="grid grid-cols-[max-content_1fr] gap-x-3.5 px-3 py-2 max-h-[150px] overflow-y-auto">
+                    <span className="sticky top-0 text-2xs font-semibold text-text-faint">IN</span>
+                    <pre className="m-0 text-2xs leading-relaxed text-text-secondary whitespace-pre-wrap break-all font-mono">
+                      {JSON.stringify(toolCall.input, null, 2).slice(0, 1200)}
+                    </pre>
+                  </div>
+                )}
+                {hasInput && hasOutput && <div className="h-px bg-border-dim" />}
+                {hasOutput && (
+                  <div className="grid grid-cols-[max-content_1fr] gap-x-3.5 px-3 py-2 max-h-[200px] overflow-y-auto">
+                    <span className="sticky top-0 text-2xs font-semibold text-text-faint">
+                      {toolCall.error ? 'ERR' : 'OUT'}
+                    </span>
+                    <div className="min-w-0 flex flex-col gap-2">
+                      {Boolean((toolCall.output as Record<string, unknown> | null | undefined)?.image) && (
+                        <img
+                          src={String((toolCall.output as Record<string, unknown>).image ?? '')}
+                          alt={t('toolCard.readImageResult')}
+                          className="max-w-full max-h-[320px] rounded-md border border-[var(--color-border-dim)] object-contain bg-[var(--color-bg-inset)]"
+                        />
+                      )}
+                      <pre
+                        className={clsx(
+                          'm-0 text-2xs leading-relaxed whitespace-pre-wrap break-all font-mono',
+                          toolCall.error ? 'text-danger' : 'text-text-secondary',
+                        )}
+                      >
+                        {cleanOutput(toolCall.error || formatOutput(toolCall.toolName, toolCall.output)).cleanedText}
+                      </pre>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : null}
+        </div>
+  );
+}
+
 
 const ToolCallCard = memo(function ToolCallCard({ toolCall }: ToolCallCardProps) {
   useT();
@@ -320,59 +378,17 @@ const ToolCallCard = memo(function ToolCallCard({ toolCall }: ToolCallCardProps)
       </div>
 
       {expanded && (
-        <div className="flex flex-col">
-          {toolCall.toolName === 'Bash' && (toolCall.output || toolCall.error || toolCall.streamOutput) ? (
-            <TerminalBlock
-              className="ax-tool-card-surface"
-              command={bashCommand}
-              cwd={bashCwd}
-              output={toolCall.error ? toolCall.error : (bashTerm?.content ?? '')}
-              running={isRunning}
-              failed={!!toolCall.error}
-              exitCode={toolCall.error ? (bashTerm?.exitCode ?? 1) : bashTerm?.exitCode}
-            />
-          ) : diffCard !== null ? (
-            diffCard
-          ) : showGeneric ? (
-            <div className="ax-tool-card-surface">
-              <div className="rounded-xl border border-border-default bg-code-bg overflow-hidden">
-                {hasInput && (
-                  <div className="grid grid-cols-[max-content_1fr] gap-x-3.5 px-3 py-2 max-h-[150px] overflow-y-auto">
-                    <span className="sticky top-0 text-2xs font-semibold text-text-faint">IN</span>
-                    <pre className="m-0 text-2xs leading-relaxed text-text-secondary whitespace-pre-wrap break-all font-mono">
-                      {JSON.stringify(toolCall.input, null, 2).slice(0, 1200)}
-                    </pre>
-                  </div>
-                )}
-                {hasInput && hasOutput && <div className="h-px bg-border-dim" />}
-                {hasOutput && (
-                  <div className="grid grid-cols-[max-content_1fr] gap-x-3.5 px-3 py-2 max-h-[200px] overflow-y-auto">
-                    <span className="sticky top-0 text-2xs font-semibold text-text-faint">
-                      {toolCall.error ? 'ERR' : 'OUT'}
-                    </span>
-                    <div className="min-w-0 flex flex-col gap-2">
-                      {Boolean((toolCall.output as Record<string, unknown> | null | undefined)?.image) && (
-                        <img
-                          src={String((toolCall.output as Record<string, unknown>).image ?? '')}
-                          alt={t('toolCard.readImageResult')}
-                          className="max-w-full max-h-[320px] rounded-md border border-[var(--color-border-dim)] object-contain bg-[var(--color-bg-inset)]"
-                        />
-                      )}
-                      <pre
-                        className={clsx(
-                          'm-0 text-2xs leading-relaxed whitespace-pre-wrap break-all font-mono',
-                          toolCall.error ? 'text-danger' : 'text-text-secondary',
-                        )}
-                      >
-                        {cleanOutput(toolCall.error || formatOutput(toolCall.toolName, toolCall.output)).cleanedText}
-                      </pre>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : null}
-        </div>
+        <ToolCallExpanded
+          toolCall={toolCall}
+          diffCard={diffCard}
+          bashCommand={bashCommand}
+          bashCwd={bashCwd}
+          bashTerm={bashTerm}
+          isRunning={isRunning}
+          hasInput={hasInput}
+          hasOutput={hasOutput}
+          showGeneric={showGeneric}
+        />
       )}
     </div>
   );
