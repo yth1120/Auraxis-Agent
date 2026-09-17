@@ -38,79 +38,141 @@ const FILE_PATH_TOOLS = new Set([
   'NotebookEdit',
 ]);
 
-export async function executeToolCall(
+async function resolveExecutor(toolName: string): Promise<ToolExecutor | null> {
+  if (toolName.startsWith('mcp__')) {
+    const { executeMcpTool } = await import('../../tool-registry');
+    return async (toolInput: Record<string, unknown>) => executeMcpTool(toolName, toolInput ?? {});
+  }
+  const registered = toolRegistry[toolName as keyof typeof toolRegistry];
+  return registered ? (registered as unknown as ToolExecutor) : await dynamicPluginExecutor(toolName);
+}
+
+/** Path hygiene gate: sandbox-aware target resolution + Work-mode delete policy. */
+async function checkPathHygiene(
   toolName: string,
   input: Record<string, unknown>,
   ctx: ToolContext,
-): Promise<ToolResult> {
-  const isMcpTool = toolName.startsWith('mcp__');
-  let executor: ToolExecutor | null = null;
-  if (isMcpTool) {
-    const { executeMcpTool } = await import('../../tool-registry');
-    executor = async (toolInput: Record<string, unknown>) => executeMcpTool(toolName, toolInput ?? {});
-  } else {
-    const registered = toolRegistry[toolName as keyof typeof toolRegistry];
-    executor = registered ? (registered as unknown as ToolExecutor) : await dynamicPluginExecutor(toolName);
-  }
-  if (!executor) return { output: null, error: `未知工具: ${toolName}` };
-
-  const workGate = workDocsOnlyVerdict(ctx.surface, toolName, input);
-  if (!workGate.allowed) return { output: null, error: workGate.reason };
-
-  if (FILE_PATH_TOOLS.has(toolName)) {
-    const rawPath =
-      typeof input.file_path === 'string' && input.file_path
-        ? input.file_path
-        : typeof input.path === 'string' && input.path
-          ? input.path
-          : '';
-    if (rawPath) {
-      try {
-        const resolved = await resolveSafeTarget(rawPath, {
-          projectRoot: ctx.projectRoot,
-          workspaceRoots: workspaceRootsOf(ctx),
-          sandboxMode: ctx.sandboxMode,
-          autoApprove: ctx.autoApprove,
-          surface: ctx.surface,
-        });
-        if (ctx.surface === 'work' && toolName === 'Delete' && statSync(resolved).isDirectory()) {
-          return { output: null, error: 'Work 模式不允许删除目录，请删除具体的非代码文件' };
-        }
-      } catch (error: unknown) {
-        return { output: null, error: errorText(error) };
-      }
+): Promise<ToolResult | null> {
+  if (!FILE_PATH_TOOLS.has(toolName)) return null;
+  const rawPath =
+    typeof input.file_path === 'string' && input.file_path
+      ? input.file_path
+      : typeof input.path === 'string' && input.path
+        ? input.path
+        : '';
+  if (!rawPath) return null;
+  try {
+    const resolved = await resolveSafeTarget(rawPath, {
+      projectRoot: ctx.projectRoot,
+      workspaceRoots: workspaceRootsOf(ctx),
+      sandboxMode: ctx.sandboxMode,
+      autoApprove: ctx.autoApprove,
+      surface: ctx.surface,
+    });
+    if (ctx.surface === 'work' && toolName === 'Delete' && statSync(resolved).isDirectory()) {
+      return { output: null, error: 'Work 模式不允许删除目录，请删除具体的非代码文件' };
     }
+  } catch (error: unknown) {
+    return { output: null, error: errorText(error) };
   }
+  return null;
+}
 
-  const profileWorktreeKey = ctx.agentId || ctx.requestId;
-  const effRoot =
-    toolName !== 'EnterWorktree' ? (getActiveWorktree(profileWorktreeKey) ?? ctx.projectRoot) : ctx.projectRoot;
+function activeWorktreeRoot(toolName: string, worktreeKey: string, ctx: ToolContext): string {
+  if (toolName === 'EnterWorktree') return ctx.projectRoot;
+  return getActiveWorktree(worktreeKey) ?? ctx.projectRoot;
+}
+
+async function checkProfileGate(
+  toolName: string,
+  input: Record<string, unknown>,
+  effRoot: string,
+  ctx: ToolContext,
+): Promise<ToolResult | null> {
   const { evaluateToolProfileGate } = await import('../../permission-profile');
-  const profileGate = await evaluateToolProfileGate(
+  const gate = await evaluateToolProfileGate(
     toolName,
     input,
     effRoot,
     [...new Set([effRoot, ...workspaceRootsOf(ctx)])],
     ctx.projectRoot,
   );
-  if (!profileGate.allowed) return { output: null, error: profileGate.reason };
+  return gate.allowed ? null : { output: null, error: gate.reason };
+}
 
+type MutatesCheck = (command: string) => { mutates: boolean };
+
+interface SandboxOutcome {
+  ctx: ToolContext;
+  commandMutates: MutatesCheck;
+  /** Effective sandbox after the per-call override, for the approval gate. */
+  effectiveSandbox: SandboxMode;
+  error: ToolResult | null;
+}
+
+async function applySandboxGate(
+  toolName: string,
+  input: Record<string, unknown>,
+  ctx: ToolContext,
+): Promise<SandboxOutcome> {
   const { enforceSandbox, commandMutates } = await import('../../sandbox-policy');
-  const perCallSandbox =
+  const perCall =
     toolName === 'Bash' &&
     typeof input.sandbox_permissions === 'string' &&
     ['read', 'workspace-write', 'full'].includes(input.sandbox_permissions)
       ? (input.sandbox_permissions as SandboxMode)
       : undefined;
-  const effectiveSandbox = perCallSandbox ?? ctx.sandboxMode ?? 'full';
-  const escalatedSandbox = !!perCallSandbox && perCallSandbox !== ctx.sandboxMode;
-  if (escalatedSandbox && ctx.mode === 'auto' && !ctx.autoApprove) {
-    return { output: null, error: '模型不允许在自动模式下自行提升沙箱权限；请由用户在权限对话框中确认后重试。' };
+  const effectiveSandbox = perCall ?? ctx.sandboxMode ?? 'full';
+  const escalated = !!perCall && perCall !== ctx.sandboxMode;
+  if (escalated && ctx.mode === 'auto' && !ctx.autoApprove) {
+    return {
+      ctx,
+      commandMutates,
+      effectiveSandbox,
+      error: { output: null, error: '模型不允许在自动模式下自行提升沙箱权限；请由用户在权限对话框中确认后重试。' },
+    };
   }
   const sandbox = enforceSandbox({ sandboxMode: effectiveSandbox, toolName, input });
-  if (!sandbox.allowed) return { output: null, error: `沙箱拒绝: ${sandbox.reason}` };
-  ctx = { ...ctx, sandboxMode: effectiveSandbox };
+  if (!sandbox.allowed) {
+    return { ctx, commandMutates, effectiveSandbox, error: { output: null, error: `沙箱拒绝: ${sandbox.reason}` } };
+  }
+  return { ctx: { ...ctx, sandboxMode: effectiveSandbox }, commandMutates, effectiveSandbox, error: null };
+}
 
+/**
+ * Project rules can hard-deny a command or pre-approve it; a pre-approved
+ * command skips the remaining approval gates.
+ */
+async function checkProjectRules(
+  toolName: string,
+  input: Record<string, unknown>,
+  ctx: ToolContext,
+): Promise<{ denial: ToolResult | null; ruleAllows: boolean }> {
+  const cmdText = toolName === 'Bash' && typeof input.command === 'string' ? input.command : '';
+  if (!cmdText) return { denial: null, ruleAllows: false };
+  const { loadRules, matchRule } = await import('../../rules');
+  const rules = await loadRules(ctx.projectRoot).catch(() => []);
+  const rule = matchRule(cmdText, rules);
+  if (!rule) return { denial: null, ruleAllows: false };
+  if (rule.decision === 'deny') {
+    return {
+      denial: { output: null, error: `命令被规则拒绝（${rule.justification || rule.pattern.join(' ')}）: ${cmdText}` },
+      ruleAllows: false,
+    };
+  }
+  return { denial: null, ruleAllows: rule.decision === 'allow' };
+}
+
+const PERMISSION_UNINITIALIZED = '权限检查未初始化，已阻止危险操作。请重新创建 Agent。';
+const PERMISSION_DENIED = '用户拒绝了该工具调用权限';
+
+async function checkApprovalGate(
+  toolName: string,
+  input: Record<string, unknown>,
+  ctx: ToolContext,
+  effectiveSandbox: SandboxMode,
+  commandMutates: MutatesCheck,
+): Promise<ToolResult | null> {
   const permCtx: PermissionContext = {
     mode: ctx.mode,
     approvedPlanSteps: ctx.approvedPlanSteps,
@@ -119,47 +181,27 @@ export async function executeToolCall(
   const cmdText = toolName === 'Bash' && typeof input.command === 'string' ? input.command : '';
   const bashMutates = cmdText ? commandMutates(cmdText).mutates : false;
   const safeBashInSandbox = toolName === 'Bash' && effectiveSandbox !== 'full' && !bashMutates;
-  let ruleAllows = false;
-  if (cmdText) {
-    const { loadRules, matchRule } = await import('../../rules');
-    const rules = await loadRules(ctx.projectRoot).catch(() => []);
-    const rule = matchRule(cmdText, rules);
-    if (rule) {
-      if (rule.decision === 'deny') {
-        return { output: null, error: `命令被规则拒绝（${rule.justification || rule.pattern.join(' ')}）: ${cmdText}` };
-      }
-      if (rule.decision === 'allow') ruleAllows = true;
-    }
+  const tierAsk = shouldAskForWorkTier(ctx.workTier, toolName, input, ctx.autoApprove);
+  const autoApproved =
+    tierAsk === false || shouldAutoApprove(toolName, ctx.toolCallId, permCtx) || safeBashInSandbox;
+  if (tierAsk === true || (isDangerousTool(toolName) && !ctx.autoApprove && !autoApproved)) {
+    if (!ctx.checkPermission) return { output: null, error: PERMISSION_UNINITIALIZED };
+    const allowed = await ctx.checkPermission(toolName, input, ctx.toolCallId);
+    return allowed ? null : { output: null, error: PERMISSION_DENIED };
   }
-
-  if (ruleAllows) {
-    // Explicit prefix rule allowed the command — skip further approval.
-  } else {
-    const tierAsk = shouldAskForWorkTier(ctx.workTier, toolName, input, ctx.autoApprove);
-    if (tierAsk === true) {
-      if (!ctx.checkPermission) {
-        return { output: null, error: '权限检查未初始化，已阻止危险操作。请重新创建 Agent。' };
-      }
-      const allowed = await ctx.checkPermission(toolName, input, ctx.toolCallId);
-      if (!allowed) return { output: null, error: '用户拒绝了该工具调用权限' };
-    } else if (tierAsk === false || shouldAutoApprove(toolName, ctx.toolCallId, permCtx) || safeBashInSandbox) {
-      if (tierAsk === false) {
-        const ruleVerdict = checkPermissionRules(toolName, input);
-        if (ruleVerdict === 'deny') return { output: null, error: `工具被权限规则拒绝: ${toolName}` };
-      }
-    } else if (isDangerousTool(toolName) && !ctx.autoApprove) {
-      if (!ctx.checkPermission) {
-        return { output: null, error: '权限检查未初始化，已阻止危险操作。请重新创建 Agent。' };
-      }
-      const allowed = await ctx.checkPermission(toolName, input, ctx.toolCallId);
-      if (!allowed) return { output: null, error: '用户拒绝了该工具调用权限' };
-    }
+  if (tierAsk === false && checkPermissionRules(toolName, input) === 'deny') {
+    return { output: null, error: `工具被权限规则拒绝: ${toolName}` };
   }
+  return null;
+}
 
-  const worktreeKey = ctx.agentId || ctx.requestId;
-  const sandboxPath = toolName !== 'EnterWorktree' ? getActiveWorktree(worktreeKey) : undefined;
-  if (sandboxPath) ctx = { ...ctx, projectRoot: sandboxPath };
-
+/** Backup → conflict lock → hooks → executor → task-output cache. */
+async function executeWithHooks(
+  toolName: string,
+  input: Record<string, unknown>,
+  ctx: ToolContext,
+  executor: ToolExecutor,
+): Promise<ToolResult> {
   const filePath = (input.file_path as string) || '';
   await backupBeforeModify(filePath, toolName, ctx);
 
@@ -198,10 +240,51 @@ export async function executeToolCall(
       conflictDetector.unlockFile(filePath, ctx.agentId!);
     }
   }
-
   if (ctx.toolCallId) {
     cacheTaskResult(ctx.toolCallId, execResult.output || execResult.error, execResult.error ? 'error' : 'completed');
   }
-
   return execResult;
+}
+
+export async function executeToolCall(
+  toolName: string,
+  input: Record<string, unknown>,
+  initialCtx: ToolContext,
+): Promise<ToolResult> {
+  let ctx = initialCtx;
+  const executor = await resolveExecutor(toolName);
+  if (!executor) return { output: null, error: `未知工具: ${toolName}` };
+
+  const workGate = workDocsOnlyVerdict(ctx.surface, toolName, input);
+  if (!workGate.allowed) return { output: null, error: workGate.reason };
+
+  const pathError = await checkPathHygiene(toolName, input, ctx);
+  if (pathError) return pathError;
+
+  const effRoot = activeWorktreeRoot(toolName, ctx.agentId || ctx.requestId, ctx);
+  const profileError = await checkProfileGate(toolName, input, effRoot, ctx);
+  if (profileError) return profileError;
+
+  const sandboxOutcome = await applySandboxGate(toolName, input, ctx);
+  if (sandboxOutcome.error) return sandboxOutcome.error;
+  ctx = sandboxOutcome.ctx;
+
+  const { denial, ruleAllows } = await checkProjectRules(toolName, input, ctx);
+  if (denial) return denial;
+  if (!ruleAllows) {
+    const approvalError = await checkApprovalGate(
+      toolName,
+      input,
+      ctx,
+      sandboxOutcome.effectiveSandbox,
+      sandboxOutcome.commandMutates,
+    );
+    if (approvalError) return approvalError;
+  }
+
+  const worktreeKey = ctx.agentId || ctx.requestId;
+  const worktreeRoot = toolName === 'EnterWorktree' ? undefined : getActiveWorktree(worktreeKey);
+  if (worktreeRoot) ctx = { ...ctx, projectRoot: worktreeRoot };
+
+  return executeWithHooks(toolName, input, ctx, executor);
 }

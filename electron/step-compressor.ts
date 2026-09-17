@@ -208,54 +208,73 @@ export function groupIntoSteps(messages: LoopMessage[]): {
   return { system, preamble, orphans, steps };
 }
 
+interface StepCollections {
+  filesRead: Set<string>;
+  filesEdited: Set<string>;
+  filesWritten: Set<string>;
+  commands: string[];
+  findings: string[];
+}
+
+function collectFindings(content: LoopMessage['content'], findings: string[]): void {
+  if (Array.isArray(content)) {
+    for (const block of content) {
+      if (
+        isRecord(block) &&
+        block.type === 'text' &&
+        typeof block.text === 'string' &&
+        block.text.trim().length > 100
+      ) {
+        findings.push(block.text.trim().slice(0, 300));
+      }
+    }
+    return;
+  }
+  if (typeof content === 'string' && content.trim().length > 100) findings.push(content.trim().slice(0, 300));
+}
+
+function collectToolFiles(step: StepGroup, c: StepCollections): void {
+  for (const tc of toolCallsOf(step.assistant)) {
+    const fp = tc.input?.file_path ?? tc.input?.path;
+    const pathValue = typeof fp === 'string' && fp ? fp : null;
+    if (tc.name === 'Read' && pathValue) c.filesRead.add(pathValue);
+    if (tc.name === 'Edit' && pathValue) c.filesEdited.add(pathValue);
+    if (tc.name === 'Write' && pathValue) c.filesWritten.add(pathValue);
+    if (tc.name === 'Bash' && tc.input?.command) c.commands.push(String(tc.input.command));
+  }
+}
+
+function summaryParts(c: StepCollections, plan: { tasks: StepCompressorPlanTask[] } | null | undefined): string[] {
+  const parts: string[] = [];
+  if (c.filesRead.size > 0) parts.push(`阅读了文件: ${[...c.filesRead].join(', ')}`);
+  if (c.filesEdited.size > 0) parts.push(`编辑了文件: ${[...c.filesEdited].join(', ')}`);
+  if (c.filesWritten.size > 0) parts.push(`创建了文件: ${[...c.filesWritten].join(', ')}`);
+  if (c.commands.length > 0) parts.push(`执行了命令: ${[...new Set(c.commands)].slice(0, 5).join('; ')}`);
+  if (c.findings.length > 0) parts.push(`关键发现: ${c.findings.slice(0, 2).join(' | ')}`);
+  if (parts.length === 0) parts.push('中间步骤无关键信息');
+  const pending = plan?.tasks.filter((t) => t.status === 'pending' || t.status === 'in_progress').length ?? 0;
+  if (pending > 0) parts.push(`剩余计划任务 ${pending} 项`);
+  return parts;
+}
+
 /** 为被丢弃的步骤生成紧凑摘要（免推理，规则版）。 */
 export function buildStepSummary(
   dropped: StepGroup[],
   plan: { tasks: StepCompressorPlanTask[] } | null | undefined,
   header = '[历史上下文摘要]',
 ): string {
-  const filesRead = new Set<string>();
-  const filesEdited = new Set<string>();
-  const filesWritten = new Set<string>();
-  const commands: string[] = [];
-  const findings: string[] = [];
-
+  const collections: StepCollections = {
+    filesRead: new Set(),
+    filesEdited: new Set(),
+    filesWritten: new Set(),
+    commands: [],
+    findings: [],
+  };
   for (const step of dropped) {
-    const content = step.assistant?.content;
-    if (Array.isArray(content)) {
-      for (const block of content) {
-        if (
-          isRecord(block) &&
-          block.type === 'text' &&
-          typeof block.text === 'string' &&
-          block.text.trim().length > 100
-        ) {
-          findings.push(block.text.trim().slice(0, 300));
-        }
-      }
-    } else if (typeof content === 'string' && content.trim().length > 100) {
-      findings.push(content.trim().slice(0, 300));
-    }
-    for (const tc of toolCallsOf(step.assistant)) {
-      const fp = tc.input?.file_path ?? tc.input?.path;
-      if (tc.name === 'Read' && typeof fp === 'string' && fp) filesRead.add(fp);
-      if (tc.name === 'Edit' && typeof fp === 'string' && fp) filesEdited.add(fp);
-      if (tc.name === 'Write' && typeof fp === 'string' && fp) filesWritten.add(fp);
-      if (tc.name === 'Bash' && tc.input?.command) commands.push(String(tc.input.command));
-    }
+    collectFindings(step.assistant?.content, collections.findings);
+    collectToolFiles(step, collections);
   }
-
-  const parts: string[] = [];
-  if (filesRead.size > 0) parts.push(`阅读了文件: ${[...filesRead].join(', ')}`);
-  if (filesEdited.size > 0) parts.push(`编辑了文件: ${[...filesEdited].join(', ')}`);
-  if (filesWritten.size > 0) parts.push(`创建了文件: ${[...filesWritten].join(', ')}`);
-  if (commands.length > 0) parts.push(`执行了命令: ${[...new Set(commands)].slice(0, 5).join('; ')}`);
-  if (findings.length > 0) parts.push(`关键发现: ${findings.slice(0, 2).join(' | ')}`);
-  if (parts.length === 0) parts.push('中间步骤无关键信息');
-  if (plan) {
-    const pending = plan.tasks.filter((t) => t.status === 'pending' || t.status === 'in_progress').length;
-    if (pending > 0) parts.push(`剩余计划任务 ${pending} 项`);
-  }
+  const parts = summaryParts(collections, plan);
   return `${header} 已压缩 ${dropped.length} 个中间步骤（步骤级压缩，工具调用与结果成对保留）。${parts.join('。')}。以下是最近交互的继续。`;
 }
 

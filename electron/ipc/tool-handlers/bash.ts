@@ -312,30 +312,39 @@ function runBashBackground(command: string, workdir: string, ctx: ToolContext): 
   };
 }
 
-export async function runBash(
-  params: {
-    command: string;
-    workdir?: string;
-    timeout?: number;
-    description?: string;
-    run_in_background?: boolean;
-    sandbox_permissions?: string;
-    justification?: string;
-  },
-  ctx: ToolContext,
-): Promise<ToolResult> {
+interface BashParams {
+  command: string;
+  workdir?: string;
+  timeout?: number;
+  description?: string;
+  run_in_background?: boolean;
+  sandbox_permissions?: string;
+  justification?: string;
+}
+
+/** `read` / `workspace-write` are the restricted modes (native sandbox path). */
+function isRestrictedSandbox(ctx: ToolContext): boolean {
+  return ctx.sandboxMode === 'read' || ctx.sandboxMode === 'workspace-write';
+}
+
+/**
+ * Workspace-write / read must stay inside the project boundary. Absolute
+ * command bodies still rely on the native backend + approval, but the cwd
+ * escape (e.g. `workdir: /etc`) is hard-denied here.
+ */
+function resolveBashWorkdir(params: BashParams, ctx: ToolContext): { workdir: string; error: ToolResult | null } {
   const workdir = params.workdir ? resolvePath(params.workdir, ctx.projectRoot) : ctx.projectRoot;
-  // Workspace-write / read must stay inside the project boundary. Absolute
-  // command bodies still rely on the native backend + approval, but the cwd
-  // escape (e.g. `workdir: /etc`) is hard-denied here.
-  if ((ctx.sandboxMode === 'workspace-write' || ctx.sandboxMode === 'read') && ctx.projectRoot) {
-    const root = path.resolve(ctx.projectRoot);
-    const cwd = path.resolve(workdir);
-    if (cwd !== root && !cwd.startsWith(root + path.sep)) {
-      return { output: null, error: `沙箱拒绝: 工作目录超出项目边界（${workdir}）` };
-    }
+  if (!isRestrictedSandbox(ctx) || !ctx.projectRoot) return { workdir, error: null };
+  const root = path.resolve(ctx.projectRoot);
+  const cwd = path.resolve(workdir);
+  if (cwd !== root && !cwd.startsWith(root + path.sep)) {
+    return { workdir, error: { output: null, error: `沙箱拒绝: 工作目录超出项目边界（${workdir}）` } };
   }
-  // 提权配对: sandbox_permissions ⇔ justification.
+  return { workdir, error: null };
+}
+
+/** 提权配对: sandbox_permissions ⇔ justification. */
+function validateSandboxPairing(params: BashParams): ToolResult | null {
   const sandboxPermissions = typeof params.sandbox_permissions === 'string' ? params.sandbox_permissions.trim() : '';
   const justification = typeof params.justification === 'string' ? params.justification.trim() : '';
   if (sandboxPermissions && !justification) {
@@ -347,14 +356,54 @@ export async function runBash(
   if (sandboxPermissions && !['read', 'workspace-write', 'full'].includes(sandboxPermissions)) {
     return { output: null, error: `无效的 sandbox_permissions: ${sandboxPermissions}` };
   }
-  // 命令应运行到自然结束或用户主动停止.
-  // The 10-minute ceiling still protects against truly hung processes, but
-  // long builds/tests no longer die at the old 2-minute default.
+  return null;
+}
+
+/**
+ * Windows: try shells in order, falling back on ENOENT. When shell:true is
+ * set ENOENT should no longer occur for paths with spaces, but the retry
+ * chain stays for resilience (uninstalled Git, missing PATH entries, …).
+ */
+async function runWindowsShellChain(
+  command: string,
+  workdir: string,
+  timeout: number,
+  ctx: ToolContext,
+): Promise<ToolResult> {
+  const maxAttempts = 4;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const resolved = getWinShell();
+    const shellBin = resolved ? resolved.bin : 'powershell.exe';
+    const shellArgs = resolved ? resolved.args : ['-NoProfile'];
+    const finalCmd = resolved
+      ? fixWindowsNullRedirect(command)
+      : `[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; $OutputEncoding=[System.Text.Encoding]::UTF8; ${command}`;
+    const result = await new Promise<ToolResult>((resolve) => {
+      spawnBashChild(shellBin, shellArgs, finalCmd, workdir, timeout, ctx, resolve);
+    });
+    if (result.error?.includes('ENOENT') && resolved) {
+      markShellFailed(shellBin);
+      continue;
+    }
+    return result;
+  }
+  return { output: null, error: '无法在 Windows 上启动任何 shell (bash/cmd/powershell)' };
+}
+
+export async function runBash(params: BashParams, ctx: ToolContext): Promise<ToolResult> {
+  const { workdir, error: workdirError } = resolveBashWorkdir(params, ctx);
+  if (workdirError) return workdirError;
+  const pairingError = validateSandboxPairing(params);
+  if (pairingError) return pairingError;
+  // 命令应运行到自然结束或用户主动停止. The 10-minute ceiling still protects
+  // against truly hung processes, but long builds/tests no longer die at the
+  // old 2-minute default.
   const timeout = params.timeout && params.timeout > 0 ? Math.min(params.timeout, 600000) : 600000;
   const isWin = process.platform === 'win32';
+  const restricted = isRestrictedSandbox(ctx);
 
   if (params.run_in_background === true) {
-    if (ctx.sandboxMode === 'read' || ctx.sandboxMode === 'workspace-write') {
+    if (restricted) {
       return { output: null, error: '受限沙箱模式暂不支持后台 Bash；请使用前台执行或切换到允许的配置。' };
     }
     return runBashBackground(params.command, workdir, ctx);
@@ -364,7 +413,7 @@ export async function runBash(
   // Agent tasks reuse one PTY session per agent so shell state survives,
   // output streams natively, and long commands are not killed by a fixed
   // timeout. Sandboxed runs keep the isolated one-shot path.
-  if (ctx.agentId && ctx.sandboxMode !== 'read' && ctx.sandboxMode !== 'workspace-write') {
+  if (ctx.agentId && !restricted) {
     try {
       const persistent = await runBashPersistent(params.command, workdir, ctx);
       if (persistent) return persistent;
@@ -374,54 +423,17 @@ export async function runBash(
   }
 
   // ── Native sandbox path (Windows restricted token + Job Object) ──
-  if (ctx.sandboxMode === 'read' || ctx.sandboxMode === 'workspace-write') {
+  if (restricted) {
     return new Promise<ToolResult>((resolve) => {
       void spawnBashSandboxed(params.command, workdir, timeout, ctx, resolve);
     });
   }
-
   if (!isWin) {
     return new Promise((resolve) => {
       spawnBashChild('/bin/bash', ['-c'], params.command, workdir, timeout, ctx, resolve);
     });
   }
-
-  // Windows: try shells in order, falling back on ENOENT.
-  // When shell:true is set, ENOENT should no longer occur for paths with
-  // spaces, but we keep the retry chain for resilience against edge cases
-  // (uninstalled Git, missing PATH entries, etc.).
-  const maxAttempts = 4;
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const resolved = getWinShell();
-    let shellBin: string;
-    let shellArgs: string[];
-    let finalCmd: string;
-
-    if (resolved) {
-      shellBin = resolved.bin;
-      shellArgs = resolved.args;
-      finalCmd = fixWindowsNullRedirect(params.command);
-    } else {
-      shellBin = 'powershell.exe';
-      shellArgs = ['-NoProfile'];
-      finalCmd = `[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; $OutputEncoding=[System.Text.Encoding]::UTF8; ${params.command}`;
-    }
-
-    const result = await new Promise<ToolResult>((resolve) => {
-      spawnBashChild(shellBin, shellArgs, finalCmd, workdir, timeout, ctx, resolve);
-    });
-
-    // If spawn itself failed with ENOENT (unlikely with shell:true, but
-    // still possible), mark this shell as bad and try the next one.
-    if (result.error && result.error.includes('ENOENT') && isWin && resolved) {
-      markShellFailed(shellBin);
-      continue;
-    }
-
-    return result;
-  }
-
-  return { output: null, error: '无法在 Windows 上启动任何 shell (bash/cmd/powershell)' };
+  return runWindowsShellChain(params.command, workdir, timeout, ctx);
 }
 
 /**

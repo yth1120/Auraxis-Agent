@@ -243,103 +243,112 @@ export async function runEdit(
 }
 
 // ─── StrReplaceEditor （单工具文本编辑器） ───
-export async function runStrReplaceEditor(
-  params: {
-    command?: string;
-    path: string;
-    file_text?: string;
-    old_str?: string;
-    new_str?: string;
-    insert_line?: number;
-    view_range?: number[];
-  },
-  ctx: ToolContext,
-): Promise<ToolResult> {
+interface StrReplaceParams {
+  command?: string;
+  path: string;
+  file_text?: string;
+  old_str?: string;
+  new_str?: string;
+  insert_line?: number;
+  view_range?: number[];
+}
+
+async function editorView(resolved: string, params: StrReplaceParams, ctx: ToolContext): Promise<ToolResult> {
+  try {
+    const content = await readFile(resolved, 'utf-8');
+    const lines = content.split('\n');
+    const start = Math.max(1, Number(params.view_range?.[0]) || 1);
+    const end = Math.min(lines.length, Number(params.view_range?.[1]) || lines.length);
+    markFileObserved(ctx, resolved);
+    return {
+      output: {
+        file_path: resolved,
+        content: lines.slice(start - 1, end).join('\n'),
+        total_lines: lines.length,
+        start_line: start,
+        end_line: end,
+      },
+    };
+  } catch (err: unknown) {
+    return { output: null, error: `view 失败: ${errorText(err)}` };
+  }
+}
+
+async function editorCreate(resolved: string, params: StrReplaceParams, ctx: ToolContext): Promise<ToolResult> {
+  if (typeof params.file_text !== 'string') return { output: null, error: 'create 需要 file_text' };
+  if (await fileExists(resolved)) {
+    return { output: null, error: '文件已存在，create 会拒绝覆盖；请使用 str_replace 或 insert' };
+  }
+  try {
+    await mkdir(path.dirname(resolved), { recursive: true });
+    await writeFile(resolved, params.file_text, 'utf-8');
+    markFileObserved(ctx, resolved);
+    return { output: { file_path: resolved, action: 'created', size: params.file_text.length } };
+  } catch (err: unknown) {
+    return { output: null, error: `create 失败: ${errorText(err)}` };
+  }
+}
+
+async function editorStrReplace(resolved: string, params: StrReplaceParams, ctx: ToolContext): Promise<ToolResult> {
+  if (typeof params.old_str !== 'string' || typeof params.new_str !== 'string') {
+    return { output: null, error: 'str_replace 需要 old_str 与 new_str' };
+  }
+  try {
+    const content = await readFile(resolved, 'utf-8');
+    const count = content.split(params.old_str).length - 1;
+    if (count === 0) return { output: null, error: '未找到 old_str' };
+    if (count > 1) return { output: null, error: `old_str 匹配 ${count} 处，必须唯一` };
+    const newContent = content.replace(params.old_str, params.new_str);
+    await writeFile(resolved, newContent, 'utf-8');
+    markFileObserved(ctx, resolved);
+    return { output: { file_path: resolved, replaced: true, occurrences: 1 } };
+  } catch (err: unknown) {
+    return { output: null, error: `str_replace 失败: ${errorText(err)}` };
+  }
+}
+
+async function editorInsert(resolved: string, params: StrReplaceParams, ctx: ToolContext): Promise<ToolResult> {
+  if (typeof params.new_str !== 'string') return { output: null, error: 'insert 需要 new_str' };
+  const insertLine = Math.max(0, Math.floor(Number(params.insert_line) || 0));
+  try {
+    const content = await readFile(resolved, 'utf-8');
+    const lines = content.split('\n');
+    if (insertLine > lines.length) {
+      return { output: null, error: `insert_line ${insertLine} 超出文件行数 ${lines.length}` };
+    }
+    const next =
+      insertLine === 0
+        ? `${params.new_str}\n${content}`
+        : [...lines.slice(0, insertLine), params.new_str, ...lines.slice(insertLine)].join('\n');
+    await writeFile(resolved, next, 'utf-8');
+    markFileObserved(ctx, resolved);
+    return { output: { file_path: resolved, inserted: true, after_line: insertLine } };
+  } catch (err: unknown) {
+    return { output: null, error: `insert 失败: ${errorText(err)}` };
+  }
+}
+
+export async function runStrReplaceEditor(params: StrReplaceParams, ctx: ToolContext): Promise<ToolResult> {
   if (ctx.abortSignal?.aborted) return { output: null, error: '操作已取消' };
   if (!params.path) return { output: null, error: '缺少 path 参数' };
   const resolved = resolveToolPath(params.path, ctx.projectRoot, ctx.sandboxMode, workspaceRootsOf(ctx));
-  const isWriteCmd = params.command !== 'view';
-  const boundary = outsideWorkspace(resolved, ctx, isWriteCmd);
-  if (boundary) {
-    return { output: null, error: `${boundary}: ${params.path}` };
-  }
+  const boundary = outsideWorkspace(resolved, ctx, params.command !== 'view');
+  if (boundary) return { output: null, error: `${boundary}: ${params.path}` };
   if (isSensitiveToolPath(resolved)) {
     return { output: null, error: `禁止模型访问敏感文件: ${resolved}` };
   }
   if (!ctx.autoApprove && !isSafeExtension(resolved)) {
     return { output: null, error: `不允许编辑的文件类型: ${path.extname(resolved)}` };
   }
-
   switch (params.command) {
-    case 'view': {
-      try {
-        const content = await readFile(resolved, 'utf-8');
-        const lines = content.split('\n');
-        const start = Math.max(1, Number(params.view_range?.[0]) || 1);
-        const end = Math.min(lines.length, Number(params.view_range?.[1]) || lines.length);
-        markFileObserved(ctx, resolved);
-        return {
-          output: {
-            file_path: resolved,
-            content: lines.slice(start - 1, end).join('\n'),
-            total_lines: lines.length,
-            start_line: start,
-            end_line: end,
-          },
-        };
-      } catch (err: unknown) {
-        return { output: null, error: `view 失败: ${errorText(err)}` };
-      }
-    }
-    case 'create': {
-      if (typeof params.file_text !== 'string') return { output: null, error: 'create 需要 file_text' };
-      if (await fileExists(resolved))
-        return { output: null, error: '文件已存在，create 会拒绝覆盖；请使用 str_replace 或 insert' };
-      try {
-        await mkdir(path.dirname(resolved), { recursive: true });
-        await writeFile(resolved, params.file_text, 'utf-8');
-        markFileObserved(ctx, resolved);
-        return { output: { file_path: resolved, action: 'created', size: params.file_text.length } };
-      } catch (err: unknown) {
-        return { output: null, error: `create 失败: ${errorText(err)}` };
-      }
-    }
-    case 'str_replace': {
-      if (typeof params.old_str !== 'string' || typeof params.new_str !== 'string') {
-        return { output: null, error: 'str_replace 需要 old_str 与 new_str' };
-      }
-      try {
-        const content = await readFile(resolved, 'utf-8');
-        const count = content.split(params.old_str).length - 1;
-        if (count === 0) return { output: null, error: '未找到 old_str' };
-        if (count > 1) return { output: null, error: `old_str 匹配 ${count} 处，必须唯一` };
-        const newContent = content.replace(params.old_str, params.new_str);
-        await writeFile(resolved, newContent, 'utf-8');
-        markFileObserved(ctx, resolved);
-        return { output: { file_path: resolved, replaced: true, occurrences: 1 } };
-      } catch (err: unknown) {
-        return { output: null, error: `str_replace 失败: ${errorText(err)}` };
-      }
-    }
-    case 'insert': {
-      if (typeof params.new_str !== 'string') return { output: null, error: 'insert 需要 new_str' };
-      const insertLine = Math.max(0, Math.floor(Number(params.insert_line) || 0));
-      try {
-        const content = await readFile(resolved, 'utf-8');
-        const lines = content.split('\n');
-        if (insertLine > lines.length)
-          return { output: null, error: `insert_line ${insertLine} 超出文件行数 ${lines.length}` };
-        const next =
-          insertLine === 0
-            ? `${params.new_str}\n${content}`
-            : [...lines.slice(0, insertLine), params.new_str, ...lines.slice(insertLine)].join('\n');
-        await writeFile(resolved, next, 'utf-8');
-        markFileObserved(ctx, resolved);
-        return { output: { file_path: resolved, inserted: true, after_line: insertLine } };
-      } catch (err: unknown) {
-        return { output: null, error: `insert 失败: ${errorText(err)}` };
-      }
-    }
+    case 'view':
+      return editorView(resolved, params, ctx);
+    case 'create':
+      return editorCreate(resolved, params, ctx);
+    case 'str_replace':
+      return editorStrReplace(resolved, params, ctx);
+    case 'insert':
+      return editorInsert(resolved, params, ctx);
     default:
       return {
         output: null,
@@ -433,8 +442,78 @@ export async function runGitCommit(params: { message: string }, ctx: ToolContext
 }
 
 // ─── Grep ──────────────────────────────────────────────
+interface GrepParams {
+  pattern: string;
+  path?: string;
+  include?: string;
+}
+
+interface GrepHit {
+  file: string;
+  line: number;
+  content: string;
+}
+
+const GREP_MAX_RESULTS = 50;
+/** 跳过超大文件，避免在含大型/二进制文件的项目（乃至测试生成的临时目录）
+ *  里读入整份文件做正则扫描，导致 Grep 卡死或内存暴涨。 */
+const GREP_MAX_FILE_BYTES = 10 * 1024 * 1024;
+
+function grepIncludeMatches(include: string | undefined, fileName: string): boolean {
+  if (!include) return true;
+  return new RegExp(include.replace(/\*/g, '.*'), 'i').test(fileName);
+}
+
+/** Scan one file, appending hits until the global result cap is reached. */
+async function grepScanFile(fullPath: string, regex: RegExp, results: GrepHit[], maxBytes: number): Promise<void> {
+  try {
+    const fileStat = await stat(fullPath);
+    if (!fileStat.isFile() || fileStat.size > maxBytes) return;
+    const lines = (await readFile(fullPath, 'utf-8')).split('\n');
+    for (let i = 0; i < lines.length && results.length < GREP_MAX_RESULTS; i++) {
+      if (regex.test(lines[i])) {
+        results.push({ file: fullPath, line: i + 1, content: lines[i].trim().slice(0, 200) });
+        regex.lastIndex = 0; // Reset regex state
+      }
+    }
+  } catch (err: unknown) {
+    console.debug(`[Grep] 无法读取文件 ${fullPath}: ${errorText(err)}`);
+  }
+}
+
+async function grepSearchDir(
+  dirPath: string,
+  depth: number,
+  ctx: ToolContext,
+  include: string | undefined,
+  regex: RegExp,
+  results: GrepHit[],
+): Promise<void> {
+  if (depth > 5 || results.length >= GREP_MAX_RESULTS) return;
+  let entries;
+  try {
+    entries = await readdir(dirPath, { withFileTypes: true });
+  } catch (err: unknown) {
+    console.debug(`[Grep] 无法访问目录 ${dirPath}: ${errorText(err)}`);
+    return;
+  }
+  for (const entry of entries) {
+    if (results.length >= GREP_MAX_RESULTS) return;
+    if (entry.name.startsWith('.') || EXCLUDED_DIRS.has(entry.name)) continue;
+    const fullPath = path.join(dirPath, entry.name);
+    if (isSensitiveToolPath(fullPath)) continue;
+    if (entry.isDirectory()) {
+      await grepSearchDir(fullPath, depth + 1, ctx, include, regex, results);
+      continue;
+    }
+    if (!ctx.autoApprove && !isSafeExtension(entry.name)) continue;
+    if (!grepIncludeMatches(include, entry.name)) continue;
+    await grepScanFile(fullPath, regex, results, GREP_MAX_FILE_BYTES);
+  }
+}
+
 export async function runGrep(
-  params: { pattern: string; path?: string; include?: string },
+  params: GrepParams,
   ctx: ToolContext,
 ): Promise<ToolResult> {
   if (ctx.abortSignal?.aborted) return { output: null, error: '操作已取消' };
@@ -447,11 +526,7 @@ export async function runGrep(
     return { output: null, error: `路径越权: ${params.path}` };
   }
 
-  const results: { file: string; line: number; content: string }[] = [];
-  const MAX_RESULTS = 50;
-  /** 跳过超大文件，避免在含大型/二进制文件的项目（乃至测试生成的临时目录）
-   *  里读入整份文件做正则扫描，导致 Grep 卡死或内存暴涨。 */
-  const MAX_GREP_FILE_BYTES = 10 * 1024 * 1024;
+  const results: GrepHit[] = [];
   let regex: RegExp;
 
   try {
@@ -460,72 +535,27 @@ export async function runGrep(
     return { output: null, error: `无效的正则表达式: ${params.pattern}` };
   }
 
-  async function searchDir(dirPath: string, depth: number): Promise<void> {
-    if (depth > 5 || results.length >= MAX_RESULTS) return;
-
-    try {
-      const entries = await readdir(dirPath, { withFileTypes: true });
-      for (const entry of entries) {
-        if (results.length >= MAX_RESULTS) return;
-        if (entry.name.startsWith('.') || EXCLUDED_DIRS.has(entry.name)) continue;
-
-        const fullPath = path.join(dirPath, entry.name);
-        if (isSensitiveToolPath(fullPath)) continue;
-
-        if (entry.isDirectory()) {
-          await searchDir(fullPath, depth + 1);
-        } else if (ctx.autoApprove || isSafeExtension(entry.name)) {
-          if (params.include) {
-            const matchGlob = params.include.replace(/\*/g, '.*');
-            if (!new RegExp(matchGlob, 'i').test(entry.name)) continue;
-          }
-          try {
-            const fileStat = await stat(fullPath);
-            if (fileStat.isFile() && fileStat.size > MAX_GREP_FILE_BYTES) continue;
-            const content = await readFile(fullPath, 'utf-8');
-            const lines = content.split('\n');
-            for (let i = 0; i < lines.length && results.length < MAX_RESULTS; i++) {
-              if (regex.test(lines[i])) {
-                results.push({ file: fullPath, line: i + 1, content: lines[i].trim().slice(0, 200) });
-                regex.lastIndex = 0; // Reset regex state
-              }
-            }
-          } catch (err: unknown) {
-            console.debug(`[Grep] 无法读取文件 ${fullPath}: ${errorText(err)}`);
-          }
-        }
-      }
-    } catch (err: unknown) {
-      console.debug(`[Grep] 无法访问目录 ${dirPath}: ${errorText(err)}`);
-    }
-  }
-
   try {
     const s = await stat(searchRoot);
     if (s.isFile()) {
-      if (s.size > MAX_GREP_FILE_BYTES) {
+      if (s.size > GREP_MAX_FILE_BYTES || isSensitiveToolPath(searchRoot)) {
         return { output: { pattern: params.pattern, match_count: 0, results: [], truncated: false } };
       }
-      if (isSensitiveToolPath(searchRoot)) {
-        return { output: { pattern: params.pattern, match_count: 0, results: [], truncated: false } };
-      }
-      const content = await readFile(searchRoot, 'utf-8');
-      const lines = content.split('\n');
-      for (let i = 0; i < lines.length && results.length < MAX_RESULTS; i++) {
-        if (regex.test(lines[i])) {
-          results.push({ file: searchRoot, line: i + 1, content: lines[i].trim().slice(0, 200) });
-          regex.lastIndex = 0;
-        }
-      }
+      await grepScanFile(searchRoot, regex, results, GREP_MAX_FILE_BYTES);
     } else {
-      await searchDir(searchRoot, 0);
+      await grepSearchDir(searchRoot, 0, ctx, params.include, regex, results);
     }
   } catch (err: unknown) {
     return { output: null, error: `搜索失败: ${errorText(err)}` };
   }
 
   return {
-    output: { pattern: params.pattern, match_count: results.length, results, truncated: results.length >= MAX_RESULTS },
+    output: {
+      pattern: params.pattern,
+      match_count: results.length,
+      results,
+      truncated: results.length >= GREP_MAX_RESULTS,
+    },
   };
 }
 

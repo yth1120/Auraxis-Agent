@@ -29,68 +29,53 @@ function countRounds(messages: LoopMessage[]): number {
 const estimateTokens = estimateTokensForMessages;
 export { estimateTokens };
 
+function parseJsonObject(value: unknown): Record<string, unknown> | null {
+  const text = typeof value === 'string' ? value : JSON.stringify(value ?? null);
+  try {
+    const parsed = JSON.parse(text) as unknown;
+    return isRecord(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+/** A large file read (Read result) tied to a pending plan task. */
+function isLargeReadForPlan(parsed: Record<string, unknown>, plan: TaskPlan): boolean {
+  const filePath = parsed.file_path;
+  const totalLines = parsed.total_lines;
+  if (typeof filePath !== 'string' || !filePath || !parsed.content) return false;
+  if (typeof totalLines !== 'number' || totalLines <= 10) return false;
+  return matchesPlanTask(filePath, plan);
+}
+
+/** OpenAI-format tool payload: large Read results + Grep hits against the plan. */
+function isCriticalPayload(parsed: Record<string, unknown>, plan: TaskPlan): boolean {
+  if (isLargeReadForPlan(parsed, plan)) return true;
+  if (!parsed.pattern || !Array.isArray(parsed.results)) return false;
+  return parsed.results.some(
+    (r) => isRecord(r) && typeof r.file === 'string' && !!r.file && matchesPlanTask(r.file, plan),
+  );
+}
+
+/** Anthropic-format content block: only large Read results count. */
+function isCriticalBlock(block: unknown, plan: TaskPlan): boolean {
+  if (!isRecord(block)) return false;
+  const parsed = parseJsonObject(block.content);
+  return parsed ? isLargeReadForPlan(parsed, plan) : false;
+}
+
 /** Determine if a tool_result is critical (must not be compressed away) */
 export function isCriticalResult(toolResultMsg: LoopMessage, plan: TaskPlan | null): boolean {
   if (!plan) return false;
-
   const content = toolResultMsg.content;
   if (content == null) return false;
-
-  // Try parsing string content as JSON first (OpenAI-format: role: 'tool' + JSON string)
+  // OpenAI-format: role: 'tool' + JSON string content
   if (typeof content === 'string') {
-    let parsed: unknown = null;
-    try {
-      parsed = JSON.parse(content);
-    } catch {
-      return false;
-    }
-    if (!parsed || !isRecord(parsed)) return false;
-    const filePath = parsed.file_path;
-    const totalLines = parsed.total_lines;
-    if (
-      typeof filePath === 'string' &&
-      filePath &&
-      parsed.content &&
-      typeof totalLines === 'number' &&
-      totalLines > 10
-    ) {
-      return matchesPlanTask(filePath, plan);
-    }
-    // Also check Grep result (has pattern + results array)
-    if (parsed.pattern && Array.isArray(parsed.results)) {
-      for (const r of parsed.results) {
-        if (isRecord(r) && typeof r.file === 'string' && r.file && matchesPlanTask(r.file, plan)) return true;
-      }
-    }
-    return false;
+    const parsed = parseJsonObject(content);
+    return parsed ? isCriticalPayload(parsed, plan) : false;
   }
-
-  // For Anthropic format: content is [{type: 'tool_result', tool_use_id, content}]
-  const resultBlocks = Array.isArray(content) ? content : [content];
-  for (const block of resultBlocks) {
-    if (!isRecord(block)) continue;
-    const resultText = typeof block.content === 'string' ? block.content : JSON.stringify(block.content);
-    let parsed: unknown = null;
-    try {
-      parsed = JSON.parse(resultText);
-    } catch {
-      continue;
-    }
-    if (!parsed || !isRecord(parsed)) continue;
-
-    const filePath = parsed.file_path;
-    const totalLines = parsed.total_lines;
-    if (
-      typeof filePath === 'string' &&
-      filePath &&
-      parsed.content &&
-      typeof totalLines === 'number' &&
-      totalLines > 10
-    ) {
-      return matchesPlanTask(filePath, plan);
-    }
-  }
-  return false;
+  // Anthropic format: content is [{type: 'tool_result', tool_use_id, content}]
+  return (Array.isArray(content) ? content : [content]).some((block) => isCriticalBlock(block, plan));
 }
 
 /** Check if a file path matches any pending plan task */
