@@ -90,7 +90,7 @@ for (const file of [
 ]) {
   if (!fs.existsSync(file)) continue;
   const text = fs.readFileSync(file, 'utf8');
-  if (!text.includes(age) && !text.includes('Auraxis v3.3.0')) {
+  if (!text.includes(age) && !text.includes(`Auraxis v${appPackage.version}`)) {
     failures.push(`${path.relative(root, file)}: 未包含当前版本 ${age}`);
   }
 }
@@ -128,7 +128,7 @@ if (appPackage.version !== sdkPackage.version) {
   failures.push(`SDK 版本 ${sdkPackage.version} 与主项目 ${appPackage.version} 不一致`);
 }
 
-if (!/version = "3\.3\.0"/.test(pyproject)) {
+  if (!new RegExp(`version = "${appPackage.version.replace(/\./g, '\\.')}"`).test(pyproject)) {
   failures.push('Python SDK pyproject.toml 版本与主项目不一致');
 }
 

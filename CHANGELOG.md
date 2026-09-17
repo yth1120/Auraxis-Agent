@@ -1,6 +1,11 @@
 # Auraxis Changelog
 
-## Unreleased
+## v3.4.0 (2026-09-18)
+
+> Feature release: DeepSeek V4.1 Flash as the current multimodal default, the
+> Responses API adapter, capability-gated Chat/Work/Code surfaces, a corrected
+> iteration budget with resumable runs, plus desktop auto-update and release
+> engineering.
 
 ### Features
 

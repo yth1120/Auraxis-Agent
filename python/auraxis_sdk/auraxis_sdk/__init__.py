@@ -3,4 +3,4 @@
 from .client import AuraxisClient, AuraxisError, AuraxisRuntime, create_client
 
 __all__ = ["AuraxisClient", "AuraxisError", "AuraxisRuntime", "create_client"]
-__version__ = "2.0.0"
+__version__ = "3.4.0"
