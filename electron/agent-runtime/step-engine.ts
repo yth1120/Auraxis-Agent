@@ -24,7 +24,7 @@ import {
 import { invokeLlm } from './llm-adapter';
 import { runToolBatch } from './tool-runner';
 
-import { getAllTools } from '../tool-registry';
+import { runtimePorts } from './ports';
 import { shouldCompactByTokens, compactHistory, estimateTokens } from './context-manager';
 
 import { buildTimeContextMessage, buildTmuxContextMessage, resolveTmuxLocation } from './step-engine-context';
@@ -108,7 +108,7 @@ export async function runStep(cfg: StepEngineConfig, state: StepState, stepGroup
   let lastApiErr: unknown;
   const maxRetries = DEFAULT_MAX_RETRIES;
   const baseDelay = cfg.retryBaseDelayMs ?? 2000;
-  const tools = cfg.tools ?? getAllTools();
+  const tools = cfg.tools ?? runtimePorts().listTools();
   const fallback = cfg.fallbackModel && cfg.fallbackModel !== cfg.model ? cfg.fallbackModel : undefined;
   const totalAttempts = maxRetries + (fallback ? 1 : 0);
   let usedFallback = false;

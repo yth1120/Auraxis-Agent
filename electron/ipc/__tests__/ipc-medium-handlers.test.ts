@@ -33,7 +33,7 @@ vi.mock('electron', () => ({
 
 vi.mock('../settings-store', () => settingsStoreMock);
 vi.mock('../model-config', () => modelConfigMock);
-vi.mock('../context-manager', () => contextManagerMock);
+vi.mock('../../agent-runtime/context-manager', () => contextManagerMock);
 vi.mock('../../ssh-store', () => sshStoreMock);
 
 const sshMock = (() => {
@@ -104,9 +104,14 @@ import { registerSshHandlers } from '../ssh-handlers';
 import { registerStatsHandlers } from '../stats-handlers';
 import { readSettings } from '../settings-store';
 import { resolveModelApiBase } from '../model-config';
-import { compactHistory } from '../context-manager';
+import { compactHistory } from '../../agent-runtime/context-manager';
 import { listSshConnections, saveSshConnection, removeSshConnection } from '../../ssh-store';
 import { trackSession, trackMessage, trackTokens, trackToolCall, trackLinesGenerated } from '../stats-handlers';
+
+import { installAgentRuntimePorts } from '../runtime-ports';
+
+// agent-runtime 通过端口注入宿主能力；测试沿用与生产相同的适配层装配。
+installAgentRuntimePorts();
 
 type Handler = (event: unknown, ...args: unknown[]) => Promise<any>;
 

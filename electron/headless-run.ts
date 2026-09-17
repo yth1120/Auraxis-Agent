@@ -10,8 +10,8 @@ import { errorText } from './errors';
 import { app } from 'electron';
 import { rmSync } from 'fs';
 import type { CliArgs } from './cli-args';
-import { agentLoopRun } from './ipc/agent-loop';
-import type { AgentObserver, AgentLoopEvent, TaskPlan } from './ipc/agent-loop-types';
+import { agentLoopRun } from './agent-runtime/agent-loop';
+import type { AgentObserver, AgentLoopEvent, TaskPlan } from './agent-runtime/agent-loop-types';
 import { getAllTools } from './tool-registry';
 import { resolveModelApiBase, resolveModelApiKey } from './ipc/model-config';
 import { readSettings } from './ipc/settings-store';
@@ -20,6 +20,7 @@ import { getAgentDef } from './ipc/agent-handlers';
 import type { SandboxMode } from './sandbox-policy';
 import { isPermissionPreset, PERMISSION_PRESETS } from './contracts/permission';
 import type { ApprovalPolicy } from './types';
+import { installAgentRuntimePorts } from './ipc/runtime-ports';
 
 /** Tools that never mutate anything — safe to allow even in headless ask mode. */
 const READ_ONLY_TOOLS = new Set([
@@ -175,6 +176,8 @@ function formatPlainEvent(e: AgentLoopEvent, verbose: boolean): PlainLine | null
 }
 
 export async function runHeadlessTask(opts: HeadlessRunOptions): Promise<number> {
+  // Headless runs bypass registerIpcHandlers — install the engine ports here too.
+  installAgentRuntimePorts();
   const settings = (await readSettings().catch(() => ({}))) as Record<string, unknown>;
   const { model, apiKey, apiBase, projectRoot, mode, sandboxMode, autoApprove } = await resolveHeadlessConfig(
     opts,

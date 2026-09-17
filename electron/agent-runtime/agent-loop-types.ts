@@ -1,11 +1,11 @@
-import type { ToolResult as ExecutorResult } from './tool-handlers/path-utils';
+import type { ToolResult as ExecutorResult } from '../ipc/tool-handlers/path-utils';
 /** agent-loop-types.ts — pure loop contracts shared by the loop implementation. */
 import type { ToolDef } from '../tool-defs';
 import type { DeepSeekToolChoice } from '../contracts/advanced';
 import type { AgentLogEntry } from '../advanced-defs';
 import type { ApprovalPolicy, WorkAutonomyTier } from '../types';
 import type { SandboxMode } from '../sandbox-policy';
-import type { ToolContext } from './tool-handlers/path-utils';
+import type { ToolContext } from '../ipc/tool-handlers/path-utils';
 
 export interface ContentBlock {
   type: 'text';

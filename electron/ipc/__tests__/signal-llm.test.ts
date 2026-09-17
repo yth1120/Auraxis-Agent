@@ -3,12 +3,17 @@ import { describe, it, expect, vi } from 'vitest';
 vi.mock('electron', () => ({
   app: { getPath: () => '' },
 }));
-vi.mock('../agent-loop', () => ({
+vi.mock('../../agent-runtime/agent-loop', () => ({
   llmClientInvoke: vi.fn(),
 }));
 
 import { detectLlmSignals } from '../signal-llm';
-import { llmClientInvoke } from '../agent-loop';
+import { llmClientInvoke } from '../../agent-runtime/agent-loop';
+
+import { installAgentRuntimePorts } from '../runtime-ports';
+
+// agent-runtime 通过端口注入宿主能力；测试沿用与生产相同的适配层装配。
+installAgentRuntimePorts();
 
 const config = { model: 'deepseek-v4-flash', apiKey: 'sk', apiBase: 'https://api.example/v1/chat/completions' };
 

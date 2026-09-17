@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import { appendAssistantToHistory, readErrorBody, type LoopMessage } from '../agent-loop';
+import { appendAssistantToHistory, readErrorBody, type LoopMessage } from '../../agent-runtime/agent-loop';
 
 vi.mock('../../hooks', () => ({ runHooksFor: vi.fn(async () => []) }));
 vi.mock('../../agent-instructions', () => ({ loadAgentInstructions: vi.fn(async () => '') }));
 vi.mock('../../work-docs-policy', () => ({ appendWorkRules: vi.fn() }));
 vi.mock('../../workspace-drift', () => ({ workspaceDrift: vi.fn(), driftSummary: vi.fn() }));
 vi.mock('./shared', () => ({ devLog: vi.fn() }));
-vi.mock('../llm-adapter', () => ({
+vi.mock('../../agent-runtime/llm-adapter', () => ({
   invokeLlm: vi.fn(),
   llmClientInvoke: vi.fn(),
   registerLlmAdapter: vi.fn(),
@@ -16,7 +16,7 @@ vi.mock('../llm-adapter', () => ({
   buildOpenAIFormatTools: vi.fn(),
   buildAnthropicFormatTools: vi.fn(),
 }));
-vi.mock('../step-engine', () => ({
+vi.mock('../../agent-runtime/step-engine', () => ({
   runStep: vi.fn(),
   createStepState: vi.fn(),
 }));

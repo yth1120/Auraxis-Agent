@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { pruneToolResults } from '../../tool-result-prune';
+import { pruneToolResults } from '../../agent-runtime/tool-result-prune';
 
 const plan = { tasks: [{ description: '重构登录模块 src/auth/login.ts' }] };
 

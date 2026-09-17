@@ -1,11 +1,16 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-vi.mock('../agent-loop', () => ({
+vi.mock('../../agent-runtime/agent-loop', () => ({
   llmClientInvoke: vi.fn(async () => null),
 }));
 
 import { extractMemories } from '../memory-extractor';
-import { llmClientInvoke } from '../agent-loop';
+import { llmClientInvoke } from '../../agent-runtime/agent-loop';
+
+import { installAgentRuntimePorts } from '../runtime-ports';
+
+// agent-runtime 通过端口注入宿主能力；测试沿用与生产相同的适配层装配。
+installAgentRuntimePorts();
 
 const baseCtx = {
   projectPath: 'C:/proj',

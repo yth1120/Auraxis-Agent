@@ -3,6 +3,7 @@ import type { SandboxMode } from '../sandbox-policy';
 import { isDeniedError, type ToolRunCallbacks, type ToolRunContext } from './tool-runner';
 import type { EngineEvent } from './engine-events';
 import type { StepEngineConfig, StepState } from './step-engine-contracts';
+import { runtimePorts } from './ports';
 
 export function buildStepToolBatch(
   cfg: StepEngineConfig,
@@ -41,13 +42,8 @@ export function buildStepToolBatch(
       riskGate:
         cfg.riskGate ??
         (process.env.AURAXIS_MEMORY_RISK_GATE === '1'
-          ? async (toolName: string) => {
-              const { createMemoryRiskGate, recordRiskAudit, roleForAgent } = await import('./memory-graph');
-              const role = roleForAgent(cfg.agentName || '');
-              const verdict = createMemoryRiskGate(cfg.projectRoot, role)(toolName);
-              if (!verdict.allowed) recordRiskAudit(cfg.projectRoot, toolName, verdict);
-              return Promise.resolve({ allowed: verdict.allowed, reason: verdict.reason });
-            }
+          ? async (toolName: string) =>
+              Promise.resolve(runtimePorts().memoryRiskVerdict(cfg.projectRoot, cfg.agentName || '', toolName))
           : undefined),
     },
     callbacks: {

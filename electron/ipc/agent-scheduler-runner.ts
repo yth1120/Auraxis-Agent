@@ -1,6 +1,6 @@
 /** agent-scheduler-runner.ts — start/run one scheduler agent instance. */
 import type { BrowserWindow } from 'electron';
-import { agentLoopRun } from './agent-loop';
+import { agentLoopRun } from '../agent-runtime/agent-loop';
 import {
   buildAgentLoopOptions,
   createAgentObserver,

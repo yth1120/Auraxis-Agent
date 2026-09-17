@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { stripModelArtifacts, isAllArtifacts } from '../text-filter';
+import { stripModelArtifacts, isAllArtifacts } from '../../agent-runtime/text-filter';
 
 describe('stripModelArtifacts', () => {
   it('去除 <thinking> 整块（含内容）', () => {
@@ -134,7 +134,7 @@ describe('isAllArtifacts', () => {
 
 describe('createStreamFilter — 跨 chunk 有状态过滤', () => {
   it('吞掉跨 chunk 的 <function> 预演块', async () => {
-    const { createStreamFilter } = await import('../text-filter');
+    const { createStreamFilter } = await import('../../agent-runtime/text-filter');
     const f = createStreamFilter();
     expect(f('我先创建任务清单。<function>')).toBe('我先创建任务清单。');
     expect(f('<TodoWrite>{"tasks":[...]}\n执行假装')).toBe(''); // 全部在块内
@@ -142,13 +142,13 @@ describe('createStreamFilter — 跨 chunk 有状态过滤', () => {
   });
 
   it('剥除 <FINAL_ANSWER> 停止标记', async () => {
-    const { createStreamFilter } = await import('../text-filter');
+    const { createStreamFilter } = await import('../../agent-runtime/text-filter');
     const f = createStreamFilter();
     expect(f('任务完成。<FINAL_ANSWER>')).toBe('任务完成。');
   });
 
   it('正常文本原样透传', async () => {
-    const { createStreamFilter } = await import('../text-filter');
+    const { createStreamFilter } = await import('../../agent-runtime/text-filter');
     const f = createStreamFilter();
     expect(f('普通的一段文字，无任何标记。')).toBe('普通的一段文字，无任何标记。');
   });

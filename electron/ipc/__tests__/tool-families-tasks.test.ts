@@ -64,12 +64,12 @@ vi.mock('../../schedule-store', () => ({
 vi.mock('../plan-handlers', () => ({
   waitForPlanApproval: vi.fn(async () => []),
 }));
-vi.mock('../llm-adapter', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../llm-adapter')>()),
+vi.mock('../../agent-runtime/llm-adapter', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../agent-runtime/llm-adapter')>()),
   llmClientInvoke: vi.fn(async () => ({ rawText: '{}' })),
 }));
-vi.mock('../agent-loop-planner', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../agent-loop-planner')>()),
+vi.mock('../../agent-runtime/agent-loop-planner', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../agent-runtime/agent-loop-planner')>()),
   parsePlanFromLLMText: vi.fn(() => null),
 }));
 vi.mock('../settings-store', () => ({
@@ -88,9 +88,14 @@ import { getSubAgentStates, sendMessageToSubAgent, interruptSubAgent, reportFrom
 import { createCronJob, deleteCronJob, listCronJobs } from '../cron-handlers';
 import { createSchedule, deleteSchedule, listSchedules } from '../../schedule-store';
 import { waitForPlanApproval } from '../plan-handlers';
-import { llmClientInvoke } from '../llm-adapter';
-import { parsePlanFromLLMText } from '../agent-loop-planner';
+import { llmClientInvoke } from '../../agent-runtime/llm-adapter';
+import { parsePlanFromLLMText } from '../../agent-runtime/agent-loop-planner';
 import { readSettings } from '../settings-store';
+
+import { installAgentRuntimePorts } from '../runtime-ports';
+
+// agent-runtime 通过端口注入宿主能力；测试沿用与生产相同的适配层装配。
+installAgentRuntimePorts();
 
 function ctx(extra: Record<string, unknown> = {}) {
   return {

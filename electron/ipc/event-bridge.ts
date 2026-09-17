@@ -7,7 +7,7 @@
  * hand-rolling renderer payloads.
  */
 import type { ToolStreamEvent } from '../tool-defs';
-import type { EngineEvent } from './engine-events';
+import type { EngineEvent } from '../agent-runtime/engine-events';
 
 /**
  * Convert an engine event into the renderer chat-stream shape.

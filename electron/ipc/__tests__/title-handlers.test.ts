@@ -12,7 +12,7 @@ vi.mock('electron', () => ({
 }));
 
 import { normalizeSessionTitle, buildTitlePrompt, generateSessionTitle } from '../title-handlers';
-import { registerLlmAdapter } from '../llm-adapter';
+import { registerLlmAdapter } from '../../agent-runtime/llm-adapter';
 
 describe('session-title', () => {
   it('normalizes raw model output into a clean one-line title', () => {

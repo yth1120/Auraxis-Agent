@@ -1,6 +1,6 @@
 /** agent-scheduler-query.ts — pure scheduler snapshot projections. */
 import type { AgentInfo } from '../advanced-defs';
-import type { AgentStateSnapshot } from './agent-loop-types';
+import type { AgentStateSnapshot } from '../agent-runtime/agent-loop-types';
 import type { AgentInstance, SchedulerAgentState, SchedulerQueueItem } from './agent-scheduler-types';
 import { taskPlanToFrontendPlan } from './agent-scheduler-types';
 

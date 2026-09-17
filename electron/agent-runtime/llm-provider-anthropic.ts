@@ -1,8 +1,8 @@
 /** llm-provider-anthropic.ts — Anthropic Messages streaming implementation. */
 import axios from 'axios';
 import { createStreamFilter } from './text-filter';
-import { getDeepSeekUserId } from '../auth-store';
-import { readSettings, resolveMaxOutputTokens } from './settings-store';
+import { runtimePorts } from './ports';
+
 import type { LlmInvokeParams } from './llm-types';
 import type { AssistantMessage } from './agent-loop-types';
 import { buildAnthropicFormatTools, normalizeProviderContent, sanitizeToolCallPairing } from './llm-provider-format';
@@ -23,7 +23,7 @@ async function buildAnthropicRequestBody(params: LlmInvokeParams): Promise<Recor
 
   const body: Record<string, unknown> = {
     model,
-    max_tokens: resolveMaxOutputTokens(await readSettings().catch(() => null)),
+    max_tokens: await runtimePorts().maxOutputTokens(),
     messages: effectiveMessages,
     stream: true,
     system: systemContent,
@@ -44,7 +44,7 @@ async function buildAnthropicRequestBody(params: LlmInvokeParams): Promise<Recor
   if (isDeepThink && model.startsWith('deepseek-')) {
     body.output_config = { effort: params.reasoningEffort || 'high' };
   }
-  const userId = await getDeepSeekUserId();
+  const userId = await runtimePorts().deepSeekUserId();
   if (userId) body.metadata = { user_id: userId };
   return body;
 }

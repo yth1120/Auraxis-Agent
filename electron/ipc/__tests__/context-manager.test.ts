@@ -14,7 +14,7 @@ import {
   buildSummaryInjection,
   shouldCompactByTokens,
   shouldCompactByRounds,
-} from '../context-manager';
+} from '../../agent-runtime/context-manager';
 
 // ─── Core 1: Static Prefix Locking ─────────────────────
 

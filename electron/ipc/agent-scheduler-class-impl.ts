@@ -1,5 +1,5 @@
 import { BrowserWindow } from 'electron';
-import type { AgentLoopResult, AgentStateSnapshot } from './agent-loop-types';
+import type { AgentLoopResult, AgentStateSnapshot } from '../agent-runtime/agent-loop-types';
 // 子代理状态归 registry 所有；直接依赖它而不是穿透 handler 层，
 // 否则 scheduler → handler → agent-loop 会把编排层拉进循环依赖。
 import { getSubAgentStates } from './agent-subagent-registry';

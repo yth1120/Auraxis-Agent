@@ -7,7 +7,7 @@
  */
 
 import { secureHandle } from './trust';
-import { invokeLlm } from './llm-adapter';
+import { invokeLlm } from '../agent-runtime/llm-adapter';
 import { resolveModelApiBase, resolveModelApiKey } from './model-config';
 import { readSettings } from './settings-store';
 import { resolveCredential } from '../credentials';

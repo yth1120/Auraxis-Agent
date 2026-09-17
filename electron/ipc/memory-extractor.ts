@@ -3,7 +3,7 @@
  * structured, durable memories via the LLM for long-term persistence.
  */
 
-import { llmClientInvoke } from './agent-loop';
+import { llmClientInvoke } from '../agent-runtime/agent-loop';
 import type { EvidenceRecord, MemoryRecord } from './memory-db';
 import { isRecord } from '../utils/guards';
 

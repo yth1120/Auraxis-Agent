@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sanitizeToolCallPairing } from '../agent-loop';
+import { sanitizeToolCallPairing } from '../../agent-runtime/agent-loop';
 
 const asst = (ids: string[], content: string | null = null) => ({
   role: 'assistant',

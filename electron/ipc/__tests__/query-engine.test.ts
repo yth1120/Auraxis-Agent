@@ -7,13 +7,13 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
  * are what gets measured.
  */
 
-vi.mock('../engine-events', () => ({
+vi.mock('../../agent-runtime/engine-events', () => ({
   makeTurnId: vi.fn(() => 'turn-1'),
 }));
-vi.mock('../tool-runner', () => ({
+vi.mock('../../agent-runtime/tool-runner', () => ({
   isDeniedError: vi.fn(() => false),
 }));
-vi.mock('../step-engine', () => ({
+vi.mock('../../agent-runtime/step-engine', () => ({
   runStep: vi.fn(async () => ({ status: 'stop' })),
   createStepState: vi.fn(() => ({ iteration: 0, messages: [], allText: '', toolCallCount: 0 })),
 }));
@@ -27,7 +27,7 @@ vi.mock('../stats-handlers', () => ({
   trackLinesGenerated: vi.fn(async () => {}),
   trackSession: vi.fn(async () => {}),
 }));
-vi.mock('../context-manager', () => ({
+vi.mock('../../agent-runtime/context-manager', () => ({
   STATIC_SYSTEM_PROMPT: 'SYS',
   WORK_GUIDE_MESSAGE: 'work guide',
   buildSessionPreamble: vi.fn(() => 'preamble'),
@@ -43,12 +43,17 @@ vi.mock('../query-context', () => ({
 }));
 
 import { runQuery } from '../query-engine';
-import { runStep, createStepState } from '../step-engine';
+import { runStep, createStepState } from '../../agent-runtime/step-engine';
 import { loadAgentInstructions } from '../../agent-instructions';
 import { trackTokens, trackToolCall, trackLinesGenerated, trackSession } from '../stats-handlers';
-import { isDeniedError } from '../tool-runner';
-import { prepareCacheAlignedMessages } from '../context-manager';
+import { isDeniedError } from '../../agent-runtime/tool-runner';
+import { prepareCacheAlignedMessages } from '../../agent-runtime/context-manager';
 import { loadLlmContext, saveLlmContext, tryReplayStoredContext } from '../query-context';
+
+import { installAgentRuntimePorts } from '../runtime-ports';
+
+// agent-runtime 通过端口注入宿主能力；测试沿用与生产相同的适配层装配。
+installAgentRuntimePorts();
 
 function makeReq(overrides: Record<string, unknown> = {}) {
   return {

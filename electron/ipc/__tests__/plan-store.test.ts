@@ -3,7 +3,7 @@ import { mkdtemp, readFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import path from 'path';
 import { savePlanMarkdown, listPlanFiles } from '../plan-store';
-import type { TaskPlan } from '../agent-loop';
+import type { TaskPlan } from '../../agent-runtime/agent-loop';
 
 function mkPlan(): TaskPlan {
   return {

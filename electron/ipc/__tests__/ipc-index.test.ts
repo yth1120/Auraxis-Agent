@@ -157,6 +157,11 @@ vi.mock('../tool-handlers', () => ({ getActiveWorktree: registerFns.getActiveWor
 
 import { registerIpcHandlers, markAcrylicWindowReady } from '../index';
 
+import { installAgentRuntimePorts } from '../runtime-ports';
+
+// agent-runtime 通过端口注入宿主能力；测试沿用与生产相同的适配层装配。
+installAgentRuntimePorts();
+
 type Handler = (event: any, ...args: any[]) => any;
 
 function handlers(): Map<string, Handler> {

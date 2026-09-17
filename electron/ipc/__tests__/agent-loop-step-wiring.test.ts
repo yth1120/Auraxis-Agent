@@ -5,7 +5,7 @@ import path from 'path';
 
 const capturedConfigs: any[] = [];
 
-vi.mock('../step-engine', () => ({
+vi.mock('../../agent-runtime/step-engine', () => ({
   runStep: vi.fn((cfg: any) => {
     capturedConfigs.push(cfg);
     return Promise.resolve({ status: 'stop', reason: 'test', isError: false, metrics: {} });
@@ -39,7 +39,12 @@ vi.mock('electron', () => ({
   },
 }));
 
-import { agentLoopRun } from '../agent-loop';
+import { agentLoopRun } from '../../agent-runtime/agent-loop';
+
+import { installAgentRuntimePorts } from '../runtime-ports';
+
+// agent-runtime 通过端口注入宿主能力；测试沿用与生产相同的适配层装配。
+installAgentRuntimePorts();
 
 const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'auraxis-loop-wiring-'));
 const observer = { emit: vi.fn(), onStateChange: vi.fn() };

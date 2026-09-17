@@ -5,7 +5,7 @@
  * 降级为纯规则结果，不影响写路径可用性。
  */
 
-import { llmClientInvoke } from './agent-loop';
+import { llmClientInvoke } from '../agent-runtime/agent-loop';
 import { signalId, type SignalRecord, type SignalType } from './memory-db';
 import type { SignalConfig } from './signal-rules';
 import { getDeepSeekBaseUrl } from '../api-config';

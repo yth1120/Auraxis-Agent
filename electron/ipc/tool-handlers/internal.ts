@@ -94,7 +94,7 @@ export async function runEnterPlanMode(
 ): Promise<ToolResult> {
   try {
     const { waitForPlanApproval } = await import('../plan-handlers');
-    const { llmClientInvoke } = await import('../llm-adapter');
+    const { llmClientInvoke } = await import('../../agent-runtime/llm-adapter');
     const { readSettings } = await import('../settings-store');
     const { resolveModelApiBase, resolveModelApiKey } = await import('../model-config');
 
@@ -134,7 +134,7 @@ ${params.context ? `上下文信息:\n${params.context}\n\n` : ''}
 
     if (!planResult?.rawText) return { output: null, error: '规划阶段未生成有效输出' };
 
-    const { parsePlanFromLLMText } = await import('../agent-loop-planner');
+    const { parsePlanFromLLMText } = await import('../../agent-runtime/agent-loop-planner');
     const plan = parsePlanFromLLMText(planResult.rawText);
 
     if (!plan || plan.tasks.length === 0) {

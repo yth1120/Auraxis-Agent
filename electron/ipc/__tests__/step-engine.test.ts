@@ -37,11 +37,16 @@ import {
   buildTmuxContextMessage,
   resolveTmuxLocation,
   resetTmuxLocationCache,
-} from '../step-engine';
-import type { StepEngineConfig } from '../step-engine';
-import { registerLlmAdapter } from '../llm-adapter';
-import type { EngineEvent } from '../engine-events';
+} from '../../agent-runtime/step-engine';
+import type { StepEngineConfig } from '../../agent-runtime/step-engine';
+import { registerLlmAdapter } from '../../agent-runtime/llm-adapter';
+import type { EngineEvent } from '../../agent-runtime/engine-events';
 import { setShellExecutor, nodeShellExecutor } from '../shell-executor';
+
+import { installAgentRuntimePorts } from '../runtime-ports';
+
+// agent-runtime 通过端口注入宿主能力；测试沿用与生产相同的适配层装配。
+installAgentRuntimePorts();
 
 let llmMock: any;
 

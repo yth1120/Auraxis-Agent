@@ -6,7 +6,7 @@ import { SAFE_EXTENSIONS, EXCLUDED_DIRS } from './shared';
 import { assertTrustedIpcSender } from './trust';
 import { resolveTrustedProjectRoot } from './project-access';
 import { resolveInsideRoot } from './path-security';
-import { compactHistory, estimateTokens } from './context-manager';
+import { compactHistory, estimateTokens } from '../agent-runtime/context-manager';
 import { readSettings } from './settings-store';
 import { resolveModelApiBase, resolveModelApiKey } from './model-config';
 

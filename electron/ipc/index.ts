@@ -57,6 +57,7 @@ import { readSettings, writeSettings, redactSettings } from './settings-store';
 import { getAllModels } from './model-config';
 import { resolveTrustedProjectRoot } from './project-access';
 import { getActiveWorktree } from './tool-handlers';
+import { installAgentRuntimePorts } from './runtime-ports';
 
 /** Windows 11 build 22000+ exposes the native Mica/Acrylic material API. */
 export function isWindows11(): boolean {
@@ -328,6 +329,9 @@ secureHandle('worktree:getStatus', (_event, sessionKey: string) => {
 }
 
 export function registerIpcHandlers() {
+  // agent-runtime 宿主端口必须在任何引擎调用之前装配（P2 依赖倒置）。
+  installAgentRuntimePorts();
+
   registerWindowHandlers();
 
   registerShellHandlers();

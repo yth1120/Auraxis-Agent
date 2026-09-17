@@ -2,7 +2,7 @@ import { errorText } from '../errors';
 import { BrowserWindow, app } from 'electron';
 import { secureHandle } from './trust';
 import { resolveTrustedProjectRoot } from './project-access';
-import type { TaskPlan } from './agent-loop-types';
+import type { TaskPlan } from '../agent-runtime/agent-loop-types';
 import { savePlanMarkdown, listPlanFiles } from './plan-store';
 
 // ─── Pending plan approvals ───────────────────────────

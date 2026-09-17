@@ -1,10 +1,10 @@
-import { compressHistorySteps } from '../step-compressor';
+import { compressHistorySteps } from './step-compressor';
 import { estimateTokensForMessages } from '../utils/token-counter';
 import { invokeLlm } from './llm-adapter';
 import type { ContextConfig, LLMSummaryConfig, LoopMessage, TaskPlan } from './agent-loop-types';
 import { Planner } from './agent-loop-planner';
 import { isRecord } from '../utils/guards';
-import { devLog } from './shared';
+import { devLog } from '../dev-log';
 
 // ─── ContextManager ──────────────────────────────────────
 // Sliding window + summary compression. When the conversation exceeds the

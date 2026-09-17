@@ -1,5 +1,5 @@
-import { runHooksFor } from '../hooks';
-import { devLog } from './shared';
+import { runtimePorts } from './ports';
+import { devLog } from '../dev-log';
 import { runStep, createStepState } from './step-engine';
 import type { StepEngineConfig } from './step-engine-contracts';
 import { makeTurnId } from './engine-events';
@@ -121,7 +121,7 @@ export async function agentLoopRun(config: AgentLoopConfig): Promise<AgentLoopRe
   const { approvedPlanSteps } = config;
   const prepared = await prepareLoopContext(config);
   const effectiveSystemPrompt = prepared.effectiveSystemPrompt;
-  void runHooksFor('SessionStart', { projectRoot, model }, projectRoot).catch(() => {});
+  void runtimePorts().runHooks('SessionStart', { projectRoot, model }, projectRoot).catch(() => {});
   const baseContextConfig =
     config.contextConfig ||
     (model.startsWith('deepseek-v4')
@@ -277,7 +277,7 @@ export async function agentLoopRun(config: AgentLoopConfig): Promise<AgentLoopRe
       // UserPromptSubmit 生命周期钩子。
       const lastUser = [...msgs].reverse().find((m) => m.role === 'user');
       if (lastUser) {
-        const hook = await runHooksFor(
+        const hook = await runtimePorts().runHooks(
           'UserPromptSubmit',
           { prompt: typeof lastUser.content === 'string' ? lastUser.content : JSON.stringify(lastUser.content) },
           projectRoot,
@@ -440,7 +440,7 @@ export async function agentLoopRun(config: AgentLoopConfig): Promise<AgentLoopRe
 
   observer.emit({ type: 'turn_end', turnId, reason: signal?.aborted ? 'aborted' : 'completed', timestamp: Date.now() });
   observer.emit({ type: 'done' });
-  void runHooksFor('Stop', { iterations: lastIteration, toolCallCount: state.toolCallCount }, projectRoot).catch(
+  void runtimePorts().runHooks('Stop', { iterations: lastIteration, toolCallCount: state.toolCallCount }, projectRoot).catch(
     () => {},
   );
   return {

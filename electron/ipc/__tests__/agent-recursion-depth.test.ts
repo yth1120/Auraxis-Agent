@@ -2,13 +2,24 @@ import { describe, it, expect } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 
+import { installAgentRuntimePorts } from '../runtime-ports';
+
+// agent-runtime 通过端口注入宿主能力；测试沿用与生产相同的适配层装配。
+installAgentRuntimePorts();
+
 // AG-1 regression: sub-agent recursion depth must actually be threaded through
 // the tool context so the `depth > 3` guard in runSubAgent can fire. Before the
 // fix, runAgentTool hard-coded `depth: 1` and ToolContext had no depth field, so
 // every nested Agent-tool call reset depth to 1 and the guard never triggered.
 
 const ipcDir = path.join(__dirname, '..');
-const read = (rel: string) => fs.readFileSync(path.join(ipcDir, rel), 'utf-8');
+const runtimeDir = path.join(__dirname, '..', '..', 'agent-runtime');
+/** 引擎文件已迁到 electron/agent-runtime/，宿主文件仍在 electron/ipc/。 */
+const read = (rel: string) => {
+  const runtimePath = path.join(runtimeDir, rel);
+  const hostPath = path.join(ipcDir, rel);
+  return fs.readFileSync(fs.existsSync(runtimePath) ? runtimePath : hostPath, 'utf-8');
+};
 
 describe('sub-agent recursion depth — counting logic', () => {
   // Mirror of the two pieces of logic the fix relies on.

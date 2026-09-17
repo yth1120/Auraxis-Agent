@@ -18,8 +18,13 @@ import {
   buildAnthropicFormatTools,
   isAnthropicFormatEndpoint,
   type LlmInvokeParams,
-} from '../llm-adapter';
+} from '../../agent-runtime/llm-adapter';
 import axios from 'axios';
+
+import { installAgentRuntimePorts } from '../runtime-ports';
+
+// agent-runtime 通过端口注入宿主能力；测试沿用与生产相同的适配层装配。
+installAgentRuntimePorts();
 
 const baseParams = (): LlmInvokeParams => ({
   model: 'deepseek-v4-pro',

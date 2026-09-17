@@ -1,3 +1,4 @@
+import type { ExecuteToolFn } from './ports';
 /**
  * tool-runner.ts — shared tool-batch executor (tool seam).
  *
@@ -15,9 +16,9 @@ import { errorText } from '../errors';
 import type { ApprovalPolicy } from '../types';
 import type { WorkAutonomyTier } from '../types';
 import type { SandboxMode } from '../sandbox-policy';
-import { splitIntoConcurrencyBatches, isToolConcurrencySafe } from '../tool-registry';
-import { executeToolCall } from './tool-handlers';
-import { toolInertia } from '../tool-inertia';
+import { runtimePorts } from './ports';
+
+
 
 export interface RunnerToolCall {
   /** Position in the original tool_calls array (used for order reassembly). */
@@ -91,7 +92,7 @@ export interface ToolRunContext {
   /** Groups tool calls from the same LLM turn (renderer tree grouping). */
   stepGroupId?: string;
   /** Test seam — defaults to the real tool dispatcher. */
-  executeTool?: typeof executeToolCall;
+  executeTool?: ExecuteToolFn;
   /**
    * Optional per-call interceptor (e.g. Replan handled by the loop driver).
    * When it returns a non-null result, the tool is NOT dispatched through
@@ -163,9 +164,9 @@ export async function runToolBatch(
     input: { ...tc.input },
     stepGroupId: ctx.stepGroupId,
   }));
-  const batches = splitIntoConcurrencyBatches(batchCalls);
+  const batches = runtimePorts().splitConcurrencyBatches(batchCalls);
   const resultMap = new Map<number, RunnerToolResult>();
-  const exec = ctx.executeTool ?? executeToolCall;
+  const exec = ctx.executeTool ?? runtimePorts().executeTool;
   const makeToolCallId = cb.makeToolCallId ?? ((tc: RunnerToolCall) => tc.id);
   for (const batchIndices of batches) {
     if (ctx.abortSignal?.aborted) break;
@@ -201,7 +202,7 @@ export async function runToolBatch(
 
     const isConcurrent =
       activeIndices.length > 1 ||
-      (activeIndices.length === 1 && isToolConcurrencySafe(batchCalls[activeIndices[0]].name));
+      (activeIndices.length === 1 && runtimePorts().isConcurrencySafe(batchCalls[activeIndices[0]].name));
 
     const runOne = async (idx: number): Promise<RunnerToolResult> => {
       const tc = batchCalls[idx];
@@ -351,7 +352,7 @@ export async function runToolBatch(
 
   // AutoTool：登记本批工具调用序列（跨批次衔接由惯性图内部处理）。
   try {
-    toolInertia.observeSequence(
+    runtimePorts().observeToolSequence(
       ctx.sessionId ?? ctx.requestId,
       calls.map((c) => c.name),
     );

@@ -1,5 +1,5 @@
 import { errorText } from '../errors';
-import { executeToolCall } from './tool-handlers';
+import { runtimePorts } from './ports';
 import { llmClientInvoke } from './llm-adapter';
 import type { ApprovalPolicy, WorkAutonomyTier } from '../types';
 import type { ToolCall, ToolResult, ToolResults } from './agent-loop-types';
@@ -81,7 +81,7 @@ export async function toolExecutorExecute(params: {
     let error: string | undefined;
 
     try {
-      const result = await executeToolCall(tc.name, tc.input, {
+      const result = await runtimePorts().executeTool(tc.name, tc.input, {
         projectRoot,
         requestId,
         checkPermission,

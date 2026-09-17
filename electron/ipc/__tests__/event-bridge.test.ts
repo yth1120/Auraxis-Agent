@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { toToolStreamEvent } from '../event-bridge';
-import type { EngineEvent } from '../engine-events';
+import type { EngineEvent } from '../../agent-runtime/engine-events';
 
 const RID = 'req-1';
 

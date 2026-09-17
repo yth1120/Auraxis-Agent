@@ -19,7 +19,12 @@ vi.mock('electron', () => ({
     isEncryptionAvailable: () => true,
   },
 }));
-import { runToolBatch, isDeniedError, type ToolRunCallbacks, type ToolRunContext } from '../tool-runner';
+import { runToolBatch, isDeniedError, type ToolRunCallbacks, type ToolRunContext } from '../../agent-runtime/tool-runner';
+
+import { installAgentRuntimePorts } from '../runtime-ports';
+
+// agent-runtime 通过端口注入宿主能力；测试沿用与生产相同的适配层装配。
+installAgentRuntimePorts();
 
 const mkCtx = (overrides: Partial<ToolRunContext> = {}): ToolRunContext => ({
   projectRoot: 'C:/proj',

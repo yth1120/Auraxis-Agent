@@ -1,5 +1,5 @@
 /** agent-scheduler-queue.ts — scheduler queue and instance construction helpers. */
-import type { AgentObserver } from './agent-loop-types';
+import type { AgentObserver } from '../agent-runtime/agent-loop-types';
 import type { AgentConfig, AgentInstance } from './agent-scheduler-types';
 import { PRIORITY_ORDER } from './agent-scheduler-support';
 

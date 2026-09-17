@@ -30,7 +30,7 @@ vi.mock('electron', () => ({
   },
 }));
 
-vi.mock('../agent-loop', () => ({
+vi.mock('../../agent-runtime/agent-loop', () => ({
   agentLoopRun: (opts: any) =>
     new Promise((resolve, reject) => {
       h.loops.push({ opts, resolve, reject });
@@ -87,6 +87,11 @@ import { appendAgentLog } from '../../session-log';
 import { readSettings } from '../settings-store';
 import { getSubAgentStates, getAgentDef } from '../agent-handlers';
 import { ptyRegistry } from '../pty-tool';
+
+import { installAgentRuntimePorts } from '../runtime-ports';
+
+// agent-runtime 通过端口注入宿主能力；测试沿用与生产相同的适配层装配。
+installAgentRuntimePorts();
 
 function makeCfg(overrides: Record<string, unknown> = {}) {
   return {

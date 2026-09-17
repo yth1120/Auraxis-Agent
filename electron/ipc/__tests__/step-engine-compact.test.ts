@@ -5,12 +5,12 @@ const h = vi.hoisted(() => ({
   shouldCompact: vi.fn(),
 }));
 
-vi.mock('../context-manager', () => ({
+vi.mock('../../agent-runtime/context-manager', () => ({
   compactHistory: h.compactHistory,
   shouldCompactByTokens: h.shouldCompact,
   estimateTokens: () => 100,
 }));
-vi.mock('../llm-adapter', () => ({
+vi.mock('../../agent-runtime/llm-adapter', () => ({
   invokeLlm: vi.fn(async () => ({
     contentTimeline: [{ type: 'text', text: 'thinking' }],
     toolCalls: [{ id: 'tc1', name: 'Read', input: { file_path: 'a.ts' } }],
@@ -23,7 +23,7 @@ vi.mock('../llm-adapter', () => ({
   buildToolResultText: vi.fn(() => 'result'),
   isDeepSeekVisionModel: vi.fn(() => false),
 }));
-vi.mock('../tool-runner', () => ({
+vi.mock('../../agent-runtime/tool-runner', () => ({
   runToolBatch: vi.fn(async () => [
     {
       index: 0,
@@ -55,7 +55,12 @@ vi.mock('electron', () => ({
   },
 }));
 
-import { runStep, createStepState } from '../step-engine';
+import { runStep, createStepState } from '../../agent-runtime/step-engine';
+
+import { installAgentRuntimePorts } from '../runtime-ports';
+
+// agent-runtime 通过端口注入宿主能力；测试沿用与生产相同的适配层装配。
+installAgentRuntimePorts();
 
 describe('runStep → context-manager 联动（压缩策略传递）', () => {
   beforeEach(() => {

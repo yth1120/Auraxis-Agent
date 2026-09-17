@@ -27,7 +27,7 @@ vi.mock('../model-config', () => ({
   resolveModelApiBase: vi.fn(async () => 'https://api.example/v1/chat/completions'),
   resolveModelApiKey: vi.fn(async () => undefined),
 }));
-vi.mock('../agent-loop', () => ({
+vi.mock('../../agent-runtime/agent-loop', () => ({
   agentLoopRun: (opts: any) =>
     new Promise((resolve, reject) => {
       h.loops.push({ opts, resolve, reject });
@@ -58,6 +58,11 @@ import {
 import { appendAgentLog } from '../../session-log';
 import { cacheTaskResult } from '../tool-handlers';
 import { waitForPlanApproval } from '../plan-handlers';
+
+import { installAgentRuntimePorts } from '../runtime-ports';
+
+// agent-runtime 通过端口注入宿主能力；测试沿用与生产相同的适配层装配。
+installAgentRuntimePorts();
 
 function baseParams(overrides: Record<string, unknown> = {}) {
   return {

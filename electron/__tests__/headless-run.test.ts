@@ -3,14 +3,19 @@ import { existsSync, mkdtempSync } from 'fs';
 import os from 'os';
 import path from 'path';
 import { app } from 'electron';
-import type { AgentLoopEvent, TaskPlan } from '../ipc/agent-loop';
+import type { AgentLoopEvent, TaskPlan } from '../agent-runtime/agent-loop';
 import { cliRunTask, runHeadlessTask } from '../headless-run';
-import { agentLoopRun } from '../ipc/agent-loop';
+import { agentLoopRun } from '../agent-runtime/agent-loop';
 import { readSettings } from '../ipc/settings-store';
 import { resolveCredential } from '../credentials';
 import { resolveModelApiBase, resolveModelApiKey } from '../ipc/model-config';
 import { getAllTools } from '../tool-registry';
 import { getAgentDef } from '../ipc/agent-handlers';
+
+import { installAgentRuntimePorts } from '../ipc/runtime-ports';
+
+// agent-runtime 通过端口注入宿主能力；测试沿用与生产相同的适配层装配。
+installAgentRuntimePorts();
 
 vi.mock('electron', () => ({
   app: {
@@ -19,7 +24,7 @@ vi.mock('electron', () => ({
   },
 }));
 
-vi.mock('../ipc/agent-loop', () => ({
+vi.mock('../agent-runtime/agent-loop', () => ({
   agentLoopRun: vi.fn(),
 }));
 

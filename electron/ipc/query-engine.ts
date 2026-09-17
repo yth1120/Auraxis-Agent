@@ -19,11 +19,11 @@ import { normalizeApprovalPolicy } from '../contracts/core';
 import type { ApprovalPolicy } from '../types';
 import type { SandboxMode } from '../sandbox-policy';
 import { errorRecord, errorText } from '../errors';
-import { makeTurnId, type EngineEvent } from './engine-events';
-import type { ContextConfig, LoopMessage } from './agent-loop-types';
-import { isDeniedError } from './tool-runner';
-import { runStep, createStepState } from './step-engine';
-import type { StepEngineConfig } from './step-engine-contracts';
+import { makeTurnId, type EngineEvent } from '../agent-runtime/engine-events';
+import type { ContextConfig, LoopMessage } from '../agent-runtime/agent-loop-types';
+import { isDeniedError } from '../agent-runtime/tool-runner';
+import { runStep, createStepState } from '../agent-runtime/step-engine';
+import type { StepEngineConfig } from '../agent-runtime/step-engine-contracts';
 import { loadAgentInstructions } from '../agent-instructions';
 import { appendWorkRules, type WorkSurface } from '../work-docs-policy';
 import { trackTokens, trackToolCall, trackLinesGenerated, trackSession } from './stats-handlers';
@@ -32,7 +32,7 @@ import {
   WORK_GUIDE_MESSAGE,
   buildSessionPreamble,
   prepareCacheAlignedMessages,
-} from './context-manager';
+} from '../agent-runtime/context-manager';
 import { buildModeHint, loadLlmContext, saveLlmContext, tryReplayStoredContext } from './query-context';
 
 // ─── Types ────────────────────────────────────────────────

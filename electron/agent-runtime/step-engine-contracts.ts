@@ -1,3 +1,4 @@
+import type { ExecuteToolFn } from './ports';
 /**
  * step-engine-contracts.ts — 步进引擎配置契约（叶子模块）。
  *
@@ -127,6 +128,6 @@ export interface StepEngineConfig {
   /** Per-result side effects (stats, sub-agent updates, deviance warnings). */
   onToolResult?: (result: RunnerToolResult, tc: RunnerToolCall, toolCallId: string) => void;
   /** Test seam — defaults to the real tool dispatcher. */
-  executeTool?: typeof import('./tool-handlers').executeToolCall;
+  executeTool?: ExecuteToolFn;
   emit: (event: EngineEvent) => void;
 }

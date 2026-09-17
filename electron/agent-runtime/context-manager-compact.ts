@@ -1,8 +1,8 @@
 /** context-manager-compact.ts — unified compaction pipeline and triggers. */
 import { estimateTokens } from './agent-loop-context';
 import type { LoopMessage, TaskPlan } from './agent-loop-types';
-import { pruneToolResults } from '../tool-result-prune';
-import { compressHistorySteps } from '../step-compressor';
+import { pruneToolResults } from './tool-result-prune';
+import { compressHistorySteps } from './step-compressor';
 import { countCompleteRounds } from './context-manager-utils';
 import { buildRuleBasedSummary, buildSummaryInjection, generateSummary } from './context-manager-summary';
 import { snipCompact, SNIP_COMPACT_TOKEN_BUDGET } from './context-manager-snapshot';

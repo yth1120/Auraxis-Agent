@@ -1,5 +1,5 @@
 /** step-engine-context.ts — per-step time/tmux context helpers. */
-import { getShellExecutor } from './shell-executor';
+import { runtimePorts } from './ports';
 
 export function buildTimeContextMessage(startedAt: number, now: number): { role: 'system'; content: string } {
   const elapsed = Math.max(0, Math.floor((now - startedAt) / 1000));
@@ -20,7 +20,7 @@ export async function resolveTmuxLocation(): Promise<string | null> {
   if (!process.env.TMUX) return null;
   if (cachedTmuxLocation !== undefined) return cachedTmuxLocation;
   try {
-    const result = await getShellExecutor().run({
+    const result = await runtimePorts().getShellExecutor().run({
       command: 'tmux',
       args: ['display-message', '-p', '#S:#W.#P'],
       shell: false,

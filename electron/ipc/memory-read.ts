@@ -24,7 +24,7 @@ import {
   type ReadResultRecord,
   type ReadRunRecord,
 } from './memory-db';
-import { estimateTokens } from './context-manager';
+import { estimateTokens } from '../agent-runtime/context-manager';
 
 export type ReadRouteName = 'keyword' | 'entity_time' | 'observations' | 'vector';
 

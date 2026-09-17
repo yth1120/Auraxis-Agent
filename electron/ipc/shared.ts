@@ -114,15 +114,9 @@ export const EXCLUDED_DIRS = new Set([
 // Verbose `[AURAXIS]` traces are helpful while developing but noisy in
 // packaged builds. Errors keep using console.error directly — only
 // success-path traces go through devLog.
-
-const isProd = process.env.NODE_ENV === 'production';
-// Headless CLI: engine debug logs would pollute the answer stream on stdout.
-// The env flag is read lazily (static imports evaluate before main.ts sets it).
-export const devLog: (...args: unknown[]) => void = isProd
-  ? () => {}
-  : (...args) => {
-      if (process.env.AURAXIS_HEADLESS !== '1') console.log(...args);
-    };
+// Re-exported from electron/dev-log.ts so the agent-runtime engine can use the
+// same implementation without importing the host IPC layer.
+export { devLog } from '../dev-log';
 
 // ─── IPC input guards ──────────────────────────────────
 // Lightweight runtime validation for the renderer→main trust boundary. On

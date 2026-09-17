@@ -1,7 +1,7 @@
 /** agent-subagent-registry.ts — sub-agent lifecycle registry and observer bridge. */
 import { BrowserWindow } from 'electron';
 import type { AgentInfo, AgentLogEntry } from '../advanced-defs';
-import type { AgentObserver, AgentStateSnapshot } from './agent-loop-types';
+import type { AgentObserver, AgentStateSnapshot } from '../agent-runtime/agent-loop-types';
 import { appendAgentLog } from '../session-log';
 
 const agents = new Map<string, AgentInfo>();

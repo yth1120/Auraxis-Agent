@@ -6,7 +6,7 @@ import {
   scoreStep,
   buildStepSummary,
   type StepGroup,
-} from '../step-compressor';
+} from '../agent-runtime/step-compressor';
 
 function anthropicStep(text: string, toolName: string, toolInput: any, resultText: string): any[] {
   return [

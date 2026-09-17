@@ -1,8 +1,8 @@
 /** llm-provider-openai.ts — OpenAI-compatible streaming implementation. */
 import axios from 'axios';
 import { createStreamFilter } from './text-filter';
-import { getDeepSeekUserId } from '../auth-store';
-import { readSettings, resolveMaxOutputTokens } from './settings-store';
+import { runtimePorts } from './ports';
+
 import type { LlmInvokeParams } from './llm-types';
 import type { AssistantMessage } from './agent-loop-types';
 import { buildOpenAIFormatTools, normalizeProviderContent, sanitizeToolCallPairing } from './llm-provider-format';
@@ -24,7 +24,7 @@ async function buildRequestBody(params: LlmInvokeParams, strictTools: boolean): 
 
   const body: Record<string, unknown> = {
     model,
-    max_tokens: resolveMaxOutputTokens(await readSettings().catch(() => null)),
+    max_tokens: await runtimePorts().maxOutputTokens(),
     messages: effectiveMessages,
     stream: true,
     // 官方用法：流式末尾额外返回 usage（含缓存命中与推理 tokens）。
@@ -41,7 +41,7 @@ async function buildRequestBody(params: LlmInvokeParams, strictTools: boolean): 
     body.reasoning_effort = params.reasoningEffort || 'high';
   }
   if (params.responseFormat === 'json_object') body.response_format = { type: 'json_object' };
-  const userId = await getDeepSeekUserId();
+  const userId = await runtimePorts().deepSeekUserId();
   if (userId) body.user_id = userId;
   return body;
 }

@@ -13,7 +13,12 @@ import {
   ContextConfig,
   LLMSummaryConfig,
   AssistantMessage,
-} from './agent-loop';
+} from '../agent-runtime/agent-loop';
+
+import { installAgentRuntimePorts } from './runtime-ports';
+
+// agent-runtime 通过端口注入宿主能力；测试沿用与生产相同的适配层装配。
+installAgentRuntimePorts();
 
 describe('restrictPlanToApproved — 部分批准只保留已批准步骤', () => {
   it('保留已批准任务，丢弃未批准任务', () => {
@@ -1057,14 +1062,14 @@ describe('Integration — Replan Flow', () => {
 // 15. Observer Decoupling — agentLoopRun structure verification
 // ══════════════════════════════════════════════════════════
 describe('Observer Decoupling — agentLoopRun structure', () => {
-  const sourcePath = resolve(__dirname, 'agent-loop.ts');
+  const sourcePath = resolve(__dirname, '..', 'agent-runtime', 'agent-loop.ts');
   let source: string;
 
   try {
     source = readFileSync(sourcePath, 'utf-8');
   } catch {
     // Test file runs from project root; try relative
-    source = readFileSync(resolve(process.cwd(), 'electron/ipc/agent-loop.ts'), 'utf-8');
+    source = readFileSync(resolve(process.cwd(), 'electron/agent-runtime/agent-loop.ts'), 'utf-8');
   }
 
   // Extract the agentLoopRun function body

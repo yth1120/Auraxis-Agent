@@ -5,6 +5,11 @@ import os from 'os';
 import path from 'path';
 import { runSandboxedCommand, sandboxScriptPath, sandboxBackend, isSandboxSupported } from '../../sandbox-runner';
 
+import { installAgentRuntimePorts } from '../runtime-ports';
+
+// agent-runtime 通过端口注入宿主能力；测试沿用与生产相同的适配层装配。
+installAgentRuntimePorts();
+
 const canRun = process.platform === 'win32' && sandboxScriptPath() !== null;
 const canRunAc = process.platform === 'win32' && sandboxScriptPath('appcontainer') !== null;
 // GitHub 托管 Windows Server 对受限令牌/AppContainer 的组查询与超时清理

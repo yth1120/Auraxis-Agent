@@ -22,7 +22,7 @@ vi.mock('axios', () => ({
   },
 }));
 
-vi.mock('../agent-loop', () => ({
+vi.mock('../../agent-runtime/agent-loop', () => ({
   readErrorBody: vi.fn(async () => '{}'),
 }));
 vi.mock('../query-engine', () => ({
@@ -66,7 +66,12 @@ import { executeToolCall } from '../tool-handlers';
 import { toToolStreamEvent } from '../event-bridge';
 import { clearLlmContext } from '../query-context';
 import { resolveCredential } from '../../credentials';
-import { readErrorBody } from '../agent-loop';
+import { readErrorBody } from '../../agent-runtime/agent-loop';
+
+import { installAgentRuntimePorts } from '../runtime-ports';
+
+// agent-runtime 通过端口注入宿主能力；测试沿用与生产相同的适配层装配。
+installAgentRuntimePorts();
 
 const handler = (ch: string) => h.handlers.get(ch)! as any;
 

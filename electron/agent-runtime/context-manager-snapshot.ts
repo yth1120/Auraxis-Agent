@@ -2,7 +2,7 @@
 import { matchesPlanTask, estimateTokens } from './agent-loop-context';
 import type { LoopMessage, TaskPlan } from './agent-loop-types';
 import { buildAtomicGroups, HEAD_LOCK_COUNT, TAIL_LOCK_COUNT } from './context-manager-utils';
-import { devLog } from './shared';
+import { devLog } from '../dev-log';
 import type { AtomicGroup } from './context-manager-types';
 import { toolCallFn, parsedToolArgs } from './context-manager-utils';
 

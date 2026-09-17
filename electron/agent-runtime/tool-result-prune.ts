@@ -7,7 +7,7 @@
  * (large file reads tied to a plan task) keep a larger capped excerpt.
  */
 
-import type { LoopMessage } from './ipc/agent-loop-types';
+import type { LoopMessage } from './agent-loop-types';
 
 export interface PruneConfig {
   pruneAboveChars?: number;

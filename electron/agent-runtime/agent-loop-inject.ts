@@ -1,6 +1,6 @@
 /** agent-loop-inject.ts — turn-boundary external/workspace injections. */
 import { markInjected } from './agent-loop-core';
-import { workspaceDrift, driftSummary } from '../workspace-drift';
+import { runtimePorts } from './ports';
 import type { AgentObserver, LoopMessage } from './agent-loop-types';
 
 export function injectExternalMessages(
@@ -32,9 +32,9 @@ export async function injectWorkspaceDrift(
 ): Promise<void> {
   if (!projectRoot) return;
   try {
-    const drifted = await workspaceDrift.takeDrift(projectRoot);
+    const drifted = await runtimePorts().takeWorkspaceDrift(projectRoot);
     if (drifted.length === 0) return;
-    const driftMsg = { role: 'user' as const, content: driftSummary(drifted) };
+    const driftMsg = { role: 'user' as const, content: runtimePorts().summarizeWorkspaceDrift(drifted) };
     markInjected(driftMsg);
     messages.push(driftMsg);
     observer.emit({

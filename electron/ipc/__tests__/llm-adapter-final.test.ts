@@ -1,12 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('axios', () => ({ default: { post: vi.fn(), get: vi.fn() } }));
-vi.mock('../text-filter', () => ({
+vi.mock('../../agent-runtime/text-filter', () => ({
   createStreamFilter: () => (text: string) => text,
 }));
 
 import axios from 'axios';
-import { llmClientInvoke } from '../llm-adapter';
+import { llmClientInvoke } from '../../agent-runtime/llm-adapter';
+
+import { installAgentRuntimePorts } from '../runtime-ports';
+
+// agent-runtime 通过端口注入宿主能力；测试沿用与生产相同的适配层装配。
+installAgentRuntimePorts();
 
 const base = () => ({
   model: 'deepseek-v4-pro',

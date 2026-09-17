@@ -1,6 +1,6 @@
 import { mkdir, readdir, stat, writeFile } from 'fs/promises';
 import path from 'path';
-import type { TaskPlan } from './agent-loop-types';
+import type { TaskPlan } from '../agent-runtime/agent-loop-types';
 
 /**
  * 计划 → Markdown 持久化。

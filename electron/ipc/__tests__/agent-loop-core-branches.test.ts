@@ -16,8 +16,13 @@ import {
   toolExecutorExecute,
   type LoopMessage,
   type TaskPlan,
-} from '../agent-loop-core';
+} from '../../agent-runtime/agent-loop-core';
 import { executeToolCall } from '../tool-handlers';
+
+import { installAgentRuntimePorts } from '../runtime-ports';
+
+// agent-runtime 通过端口注入宿主能力；测试沿用与生产相同的适配层装配。
+installAgentRuntimePorts();
 
 vi.mock('electron', () => ({
   app: { getPath: vi.fn(() => ''), getName: vi.fn(() => 'auraxis') },
@@ -31,7 +36,7 @@ vi.mock('../tool-handlers', () => ({
   executeToolCall: vi.fn(),
 }));
 
-vi.mock('../llm-adapter', () => ({
+vi.mock('../../agent-runtime/llm-adapter', () => ({
   invokeLlm: vi.fn(),
   llmClientInvoke: vi.fn(),
   registerLlmAdapter: vi.fn(),
@@ -42,7 +47,7 @@ vi.mock('../llm-adapter', () => ({
   buildAnthropicFormatTools: vi.fn(),
 }));
 
-vi.mock('../../step-compressor', () => ({
+vi.mock('../../agent-runtime/step-compressor', () => ({
   compressHistorySteps: vi.fn(),
 }));
 

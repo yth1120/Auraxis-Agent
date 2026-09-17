@@ -1,5 +1,5 @@
 /** step-engine-tool-results.ts — oversized/visual tool-result protocol helpers. */
-import { writeSpill } from '../spill';
+import { runtimePorts } from './ports';
 import type { LoopMessage } from './agent-loop-types';
 import { buildToolResultContent, buildToolResultText, isDeepSeekVisionModel } from './llm-adapter';
 
@@ -23,7 +23,7 @@ export async function appendToolResults(
     let content = raw;
     if (!tr.error && !isImageResult(tr.output) && raw.length > SPILL_ABOVE_CHARS) {
       try {
-        const ref = await writeSpill(raw, { sessionId, toolName: tr.toolName, toolCallId: tr.toolUseId });
+        const ref = await runtimePorts().writeSpill(raw, { sessionId, toolName: tr.toolName, toolCallId: tr.toolUseId });
         content = JSON.stringify({
           spill_path: ref.path,
           spill_bytes: ref.bytes,

@@ -9,7 +9,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { app } from 'electron';
 import type { AgentLogEntry } from './advanced-defs';
-import type { LoopMessage, TaskPlan } from './ipc/agent-loop-core';
+import type { LoopMessage, TaskPlan } from './agent-runtime/agent-loop-core';
 
 export type AgentSnapshotStatus = 'paused' | 'completed' | 'error' | 'stopped' | 'review';
 

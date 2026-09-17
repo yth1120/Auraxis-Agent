@@ -36,10 +36,15 @@ vi.mock('electron', () => ({
   },
 }));
 
-import { agentLoopRun, appendAssistantToHistory, readErrorBody } from '../agent-loop';
-import type { AgentLoopConfig, AgentLoopEvent, AssistantMessage, LoopMessage } from '../agent-loop';
-import { registerLlmAdapter } from '../llm-adapter';
-import type { LlmInvokeParams } from '../llm-adapter';
+import { agentLoopRun, appendAssistantToHistory, readErrorBody } from '../../agent-runtime/agent-loop';
+import type { AgentLoopConfig, AgentLoopEvent, AssistantMessage, LoopMessage } from '../../agent-runtime/agent-loop';
+import { registerLlmAdapter } from '../../agent-runtime/llm-adapter';
+import type { LlmInvokeParams } from '../../agent-runtime/llm-adapter';
+
+import { installAgentRuntimePorts } from '../runtime-ports';
+
+// agent-runtime 通过端口注入宿主能力；测试沿用与生产相同的适配层装配。
+installAgentRuntimePorts();
 
 const PLAN_JSON = JSON.stringify({
   tasks: [{ id: '1', description: '读取 a.ts 了解配置', dependencies: [] }],

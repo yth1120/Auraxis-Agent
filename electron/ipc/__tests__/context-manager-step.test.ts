@@ -19,7 +19,7 @@ vi.mock('electron', () => ({
   },
 }));
 
-import { compactHistory } from '../context-manager';
+import { compactHistory } from '../../agent-runtime/context-manager';
 
 function step(prefix: string, name: string, input: Record<string, unknown>, result: string): any[] {
   return [

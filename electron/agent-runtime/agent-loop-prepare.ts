@@ -1,8 +1,8 @@
 /** agent-loop-prepare.ts — context preparation for an agent run. */
 import { readdir } from 'fs/promises';
 import path from 'path';
-import { loadAgentInstructions } from '../agent-instructions';
-import { appendWorkRules } from '../work-docs-policy';
+import { runtimePorts } from './ports';
+
 import type { AgentLoopConfig } from './agent-loop-types';
 
 export interface PreparedLoopContext {
@@ -13,7 +13,7 @@ export interface PreparedLoopContext {
 export async function prepareLoopContext(config: AgentLoopConfig): Promise<PreparedLoopContext> {
   let effectiveSystemPrompt = config.systemPrompt;
   if (!config.resumeFrom) {
-    const instructions = await loadAgentInstructions(config.projectRoot);
+    const instructions = await runtimePorts().loadAgentInstructions(config.projectRoot);
     if (instructions.trim()) {
       effectiveSystemPrompt += `\n\n## 项目指令（AGENTS.md）\n${instructions.trim()}`;
       config.observer.emit({
@@ -29,11 +29,11 @@ export async function prepareLoopContext(config: AgentLoopConfig): Promise<Prepa
   }
   if (config.surface === 'work') {
     try {
-      const { readSettings } = await import('./settings-store');
-      const settings = await readSettings();
+      
+      const settings = await runtimePorts().readSettingsSnapshot();
       const before = effectiveSystemPrompt;
-      effectiveSystemPrompt = appendWorkRules(effectiveSystemPrompt, config.surface, {
-        clarify: settings.clarifyBeforeWork !== false,
+      effectiveSystemPrompt = runtimePorts().appendWorkRules(effectiveSystemPrompt, config.surface, {
+        clarify: settings?.clarifyBeforeWork !== false,
       });
       if (effectiveSystemPrompt !== before) {
         config.observer.emit({
@@ -45,7 +45,7 @@ export async function prepareLoopContext(config: AgentLoopConfig): Promise<Prepa
       }
     } catch {
       // Settings unavailable — still keep docs-only rule from the caller.
-      effectiveSystemPrompt = appendWorkRules(effectiveSystemPrompt, config.surface, { clarify: true });
+      effectiveSystemPrompt = runtimePorts().appendWorkRules(effectiveSystemPrompt, config.surface, { clarify: true });
     }
   }
 
