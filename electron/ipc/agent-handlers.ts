@@ -43,7 +43,7 @@ export {
 
 // ─── Core Agent Runner (exported for Agent tool) ─────
 
-export async function runSubAgent(params: {
+export interface SubAgentParams {
   description: string;
   prompt: string;
   subagentType: string;
@@ -61,10 +61,36 @@ export async function runSubAgent(params: {
   parentSignal?: AbortSignal;
   agentId?: string;
   background?: boolean;
-}): Promise<{ output: unknown; error?: string }> {
+}
+
+/** 子代理运行配置（settings + agent 定义解析结果）。 */
+interface SubAgentConfig {
+  tools: ReturnType<typeof getToolsForAgent>;
+  apiKey: string;
+  model: string;
+  planModel: string;
+  fallbackModel?: string;
+  apiBase: string;
+  maxIterations: number;
+  sandboxMode: SandboxMode;
+  timeContext: boolean;
+  systemPrompt: string;
+  mode: ApprovalPolicy;
+  depth: number;
+}
+
+function pickSandboxMode(candidate: unknown, fallback: SandboxMode): SandboxMode {
+  return candidate === 'read' || candidate === 'workspace-write' || candidate === 'full' ? candidate : fallback;
+}
+
+/** 解析 settings / agent 定义 / 模型配置；出错时返回可读错误。 */
+async function resolveSubAgentConfig(
+  params: SubAgentParams,
+): Promise<{ error: string } | { config: SubAgentConfig }> {
   const depth = params.depth ?? 0;
-  if (depth > 3)
-    return { output: null, error: '子 Agent 递归深度超过最大限制(3层)，请直接在父级 continuation 中完成任务' };
+  if (depth > 3) {
+    return { error: '子 Agent 递归深度超过最大限制(3层)，请直接在父级 continuation 中完成任务' };
+  }
   const { readSettings } = await import('./settings-store');
   const agentDef = getAgentDef(params.subagentType);
   const tools = getToolsForAgent(params.subagentType);
@@ -83,21 +109,13 @@ export async function runSubAgent(params: {
     typeof settings.agentMaxIterations === 'number' && settings.agentMaxIterations > 0
       ? settings.agentMaxIterations
       : 200;
-  const sandboxMode: SandboxMode =
-    params.sandboxMode === 'read' || params.sandboxMode === 'workspace-write' || params.sandboxMode === 'full'
-      ? params.sandboxMode
-      : settings.sandboxMode === 'read' || settings.sandboxMode === 'workspace-write' || settings.sandboxMode === 'full'
-        ? settings.sandboxMode
-        : 'workspace-write';
-  const timeContext = settings.timeContext !== false;
-
+  const sandboxMode = pickSandboxMode(params.sandboxMode, pickSandboxMode(settings.sandboxMode, 'workspace-write'));
   const apiKey =
     (await resolveModelApiKey(model)) ||
     (typeof settings.deepseekApiKey === 'string' ? settings.deepseekApiKey : '') ||
     process.env.DEEPSEEK_API_KEY ||
     '';
-
-  if (!apiKey) return { output: null, error: '未配置 DeepSeek API Key' };
+  if (!apiKey) return { error: '未配置 DeepSeek API Key' };
 
   const platform = process.platform === 'win32' ? 'Windows' : process.platform === 'darwin' ? 'macOS' : 'Linux';
   const shellHint =
@@ -106,7 +124,127 @@ export async function runSubAgent(params: {
       : 'Use standard Unix shell commands.';
   let systemPrompt = agentDef.getSystemPrompt(params.prompt, platform, shellHint, params.projectRoot);
   systemPrompt = appendWorkDocsSystemRule(systemPrompt, params.surface);
-  const mode = params.mode ?? ('ask' as const);
+
+  return {
+    config: {
+      tools,
+      apiKey,
+      model,
+      planModel,
+      fallbackModel,
+      apiBase,
+      maxIterations,
+      sandboxMode,
+      timeContext: settings.timeContext !== false,
+      systemPrompt,
+      mode: params.mode ?? ('ask' as const),
+      depth,
+    },
+  };
+}
+
+/** 子代理完成/失败时的统一收尾：状态、结束时间、注册表清理与广播。 */
+function settleSubAgent(
+  agent: AgentInfo,
+  agentId: string,
+  status: AgentInfo['status'],
+  patch: Partial<AgentInfo>,
+  broadcast: (a: AgentInfo) => void,
+): void {
+  agent.status = status;
+  agent.endTime = Date.now();
+  Object.assign(agent, patch);
+  deleteSubAgentController(agentId);
+  deleteSubAgentObserver(agentId);
+  setSubAgent(agent);
+  broadcast(agent);
+}
+
+interface SubAgentRun {
+  params: SubAgentParams;
+  agent: AgentInfo;
+  agentId: string;
+  controller: AbortController;
+  runLoop: () => Promise<AgentLoopResult>;
+  finishOk: (result: AgentLoopResult) => void;
+  finishErr: (err: unknown) => void;
+}
+
+/** 后台子代理：立即返回句柄，完成/失败后写入任务缓存。 */
+function startBackgroundSubAgent(run: SubAgentRun): { output: unknown; error?: string } {
+  const { params, agentId, controller } = run;
+  run
+    .runLoop()
+    .then(async (result) => {
+      run.finishOk(result);
+      const { cacheTaskResult } = await import('./tool-handlers');
+      cacheTaskResult(
+        agentId,
+        {
+          status: controller.signal.aborted ? 'stopped' : 'completed',
+          agentType: params.subagentType,
+          description: params.description,
+          result: result.allText || '任务完成',
+          toolCallCount: result.toolCallCount,
+          iterations: result.iterations,
+        },
+        controller.signal.aborted ? 'stopped' : 'completed',
+      );
+    })
+    .catch(async (err: unknown) => {
+      run.finishErr(err);
+      const { cacheTaskResult } = await import('./tool-handlers');
+      const isAbort = err instanceof Error && err.name === 'AbortError';
+      cacheTaskResult(
+        agentId,
+        {
+          status: isAbort ? 'stopped' : 'error',
+          agentType: params.subagentType,
+          description: params.description,
+          error: isAbort ? 'Agent 被取消' : err instanceof Error ? err.message : errorText(err),
+        },
+        isAbort ? 'stopped' : 'error',
+      );
+    });
+  return {
+    output: {
+      agentId,
+      background: true,
+      status: 'running',
+      description: params.description,
+      message:
+        '子代理已在后台启动。可用 ListAgents 查看状态、SendMessage 追加指令、InterruptAgent 打断，完成后用 TaskOutput 读取结果。',
+    },
+  };
+}
+
+/** 前台子代理：等待整轮结束并返回结果载荷。 */
+async function runSubAgentToCompletion(run: SubAgentRun): Promise<{ output: unknown; error?: string }> {
+  const { params, agent, controller } = run;
+  try {
+    const result = await run.runLoop();
+    run.finishOk(result);
+    if (controller.signal.aborted) return { output: null, error: 'Agent 被取消' };
+    return {
+      output: {
+        agentType: params.subagentType,
+        description: params.description,
+        result: result.allText || '任务完成',
+        toolCallCount: agent.toolCallCount,
+        iterations: agent.iterations,
+      },
+    };
+  } catch (err: unknown) {
+    run.finishErr(err);
+    if (errorRecord(err).name === 'AbortError') return { output: null, error: 'Agent 被取消' };
+    return { output: null, error: errorText(err) };
+  }
+}
+
+export async function runSubAgent(params: SubAgentParams): Promise<{ output: unknown; error?: string }> {
+  const resolved = await resolveSubAgentConfig(params);
+  if ('error' in resolved) return { output: null, error: resolved.error };
+  const cfg = resolved.config;
 
   const agentId = params.agentId || `sub-${genAgentId()}`;
   const agent: AgentInfo = {
@@ -121,19 +259,16 @@ export async function runSubAgent(params: {
     toolCallCount: 0,
     iterations: 0,
     messagesCount: 0,
-    model,
-    maxIterations,
+    model: cfg.model,
+    maxIterations: cfg.maxIterations,
     log: [],
   };
 
   const controller = new AbortController();
   // Propagate parent abort to child
   if (params.parentSignal) {
-    if (params.parentSignal.aborted) {
-      controller.abort();
-    } else {
-      params.parentSignal.addEventListener('abort', () => controller.abort(), { once: true });
-    }
+    if (params.parentSignal.aborted) controller.abort();
+    else params.parentSignal.addEventListener('abort', () => controller.abort(), { once: true });
   }
   registerSubAgent(agent, controller);
 
@@ -145,7 +280,6 @@ export async function runSubAgent(params: {
     setSubAgent(updated);
     if (win && !win.isDestroyed()) win.webContents.send('agent:updated', { ...updated });
   };
-
   const broadcast = (a: AgentInfo) => {
     if (win && !win.isDestroyed()) win.webContents.send('agent:updated', { ...a });
   };
@@ -154,14 +288,14 @@ export async function runSubAgent(params: {
     const observer = createSubAgentObserver(agent, win, onUpdate);
     setSubAgentObserver(agentId, observer);
     return agentLoopRun({
-      model,
-      apiKey,
-      apiBase,
-      fallbackModel,
-      systemPrompt,
+      model: cfg.model,
+      apiKey: cfg.apiKey,
+      apiBase: cfg.apiBase,
+      fallbackModel: cfg.fallbackModel,
+      systemPrompt: cfg.systemPrompt,
       projectRoot: params.projectRoot,
       agentName: agent.name,
-      tools,
+      tools: cfg.tools,
       signal: controller.signal,
       checkPermission: params.checkPermission,
       autoApprove: params.autoApprove,
@@ -171,15 +305,15 @@ export async function runSubAgent(params: {
       observer,
       isDeepThink: true,
       reasoningEffort: 'high',
-      mode,
-      maxIterations,
-      sandboxMode,
-      timeContext,
-      planModel,
+      mode: cfg.mode,
+      maxIterations: cfg.maxIterations,
+      sandboxMode: cfg.sandboxMode,
+      timeContext: cfg.timeContext,
+      planModel: cfg.planModel,
       sessionId: agentId,
       messageQueue: () => drainSubAgentInbox(agentId),
       onPlanGenerated: (plan) => waitForPlanApproval(plan, win, { projectRoot: params.projectRoot, title: agent.name }),
-      depth,
+      depth: cfg.depth,
       surface: params.surface,
     });
   };
@@ -187,97 +321,27 @@ export async function runSubAgent(params: {
   const finishOk = (result: AgentLoopResult) => {
     agent.toolCallCount = result.toolCallCount;
     agent.iterations = result.iterations;
-    const resultText = result.allText;
     if (controller.signal.aborted) {
-      agent.status = 'stopped';
-      agent.endTime = Date.now();
-      deleteSubAgentController(agentId);
-      deleteSubAgentObserver(agentId);
-      setSubAgent(agent);
-      broadcast(agent);
+      settleSubAgent(agent, agentId, 'stopped', {}, broadcast);
       return;
     }
-    agent.status = 'completed';
-    agent.endTime = Date.now();
-    agent.result = resultText || '任务完成';
-    deleteSubAgentController(agentId);
-    deleteSubAgentObserver(agentId);
-    setSubAgent(agent);
-    broadcast(agent);
+    settleSubAgent(agent, agentId, 'completed', { result: result.allText || '任务完成' }, broadcast);
   };
 
   const finishErr = (err: unknown) => {
     const isAbort = err instanceof Error && err.name === 'AbortError';
-    agent.status = isAbort ? 'stopped' : 'error';
-    agent.endTime = Date.now();
-    agent.error = isAbort ? undefined : err instanceof Error ? err.message : errorText(err);
-    deleteSubAgentController(agentId);
-    deleteSubAgentObserver(agentId);
-    setSubAgent(agent);
-    broadcast(agent);
+    settleSubAgent(
+      agent,
+      agentId,
+      isAbort ? 'stopped' : 'error',
+      { error: isAbort ? undefined : err instanceof Error ? err.message : errorText(err) },
+      broadcast,
+    );
   };
 
-  if (params.background) {
-    runLoop()
-      .then(async (result) => {
-        finishOk(result);
-        const { cacheTaskResult } = await import('./tool-handlers');
-        cacheTaskResult(
-          agentId,
-          {
-            status: controller.signal.aborted ? 'stopped' : 'completed',
-            agentType: params.subagentType,
-            description: params.description,
-            result: result.allText || '任务完成',
-            toolCallCount: result.toolCallCount,
-            iterations: result.iterations,
-          },
-          controller.signal.aborted ? 'stopped' : 'completed',
-        );
-      })
-      .catch(async (err: unknown) => {
-        finishErr(err);
-        const { cacheTaskResult } = await import('./tool-handlers');
-        const isAbort = err instanceof Error && err.name === 'AbortError';
-        cacheTaskResult(
-          agentId,
-          {
-            status: isAbort ? 'stopped' : 'error',
-            error: isAbort ? 'Agent 被取消' : err instanceof Error ? err.message : errorText(err),
-          },
-          isAbort ? 'stopped' : 'error',
-        );
-      });
-    return {
-      output: {
-        agentId,
-        background: true,
-        status: 'running',
-        description: params.description,
-        message:
-          '子代理已在后台启动。可用 ListAgents 查看状态、SendMessage 追加指令、InterruptAgent 打断，完成后用 TaskOutput 读取结果。',
-      },
-    };
-  }
-
-  try {
-    const result = await runLoop();
-    finishOk(result);
-    if (controller.signal.aborted) return { output: null, error: 'Agent 被取消' };
-    return {
-      output: {
-        agentType: params.subagentType,
-        description: params.description,
-        result: result.allText || '任务完成',
-        toolCallCount: agent.toolCallCount,
-        iterations: agent.iterations,
-      },
-    };
-  } catch (err: unknown) {
-    finishErr(err);
-    if (errorRecord(err).name === 'AbortError') return { output: null, error: 'Agent 被取消' };
-    return { output: null, error: errorText(err) };
-  }
+  const run: SubAgentRun = { params, agent, agentId, controller, runLoop, finishOk, finishErr };
+  if (params.background) return startBackgroundSubAgent(run);
+  return runSubAgentToCompletion(run);
 }
 
 // ─── IPC Registration ────────────────────────────────

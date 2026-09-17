@@ -57,7 +57,8 @@ describe('sub-agent recursion depth — wiring is in place', () => {
 
   it('agentLoopRun threads depth into the tool execution context', () => {
     const agentSrc = read('agent-loop-types.ts');
-    const runSrc = read('agent-loop.ts');
+    // 循环驱动器拆到 agent-loop-driver.ts（P2）：depth 透传断言随之迁移。
+    const runSrc = read('agent-loop-driver.ts');
     expect(runSrc).toContain('depth: config.depth');
     const cfgMatch = agentSrc.match(/export interface AgentLoopConfig\s*\{[\s\S]*?\n\}/);
     expect(cfgMatch![0]).toContain('depth?: number');
@@ -86,6 +87,6 @@ describe('sub-agent recursion depth — wiring is in place', () => {
     expect(guardIdx).toBeLessThan(importIdx);
     // depth is passed into the nested agentLoopRun call.
     const loopCall = src.match(/agentLoopRun\(\{[\s\S]*?\n {4}\}\)/);
-    expect(loopCall![0]).toContain('depth,');
+    expect(loopCall![0]).toContain('depth: cfg.depth');
   });
 });
