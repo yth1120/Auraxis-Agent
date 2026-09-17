@@ -153,11 +153,14 @@ console.log(
   `静态值循环: ${valueCycles.length} (budget ${maxCycles})｜运行时环(含动态 import): ${runtimeCycles.length} (budget ${maxRuntimeCycles})｜含类型导入: ${allCycles.length}`,
 );
 
-// --list：把每个运行时环的内部边打出来，方便按"最小切割点"逐个消环。
+// --list：把每个环的内部边打出来（运行时环 + 仅因 import type 成环的环），
+// 方便按"最小切割点"逐个消环。
 if (process.argv.includes('--list')) {
-  for (const group of runtimeCycles) {
+  const runtimeNodes = new Set(runtimeCycles.flat());
+  for (const group of allCycles) {
     const members = new Set(group);
-    console.log(`\n=== 运行时环：${group.length} 个模块 ===`);
+    const kind = group.every((file) => runtimeNodes.has(file)) ? '运行时环' : '类型环';
+    console.log(`\n=== ${kind}：${group.length} 个模块 ===`);
     for (const file of group) {
       for (const edge of runtimeEdgeDetails.get(file) ?? []) {
         if (!members.has(edge.target)) continue;

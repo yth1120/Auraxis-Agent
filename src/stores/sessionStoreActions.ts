@@ -1,7 +1,7 @@
 /** sessionStoreActions.ts — Session store actions and durable-log side effects. */
 import type { StoreApi } from 'zustand';
 import { getContentText } from '../types/chat';
-import type { Session, SessionStore } from './useSessionStore';
+import type { Session, SessionStore } from './sessionStoreTypes';
 import {
   backfillSession,
   generateTitle,

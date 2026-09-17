@@ -3,7 +3,7 @@ import { getContentText } from '../types/chat';
 import type { Message } from '../types/chat';
 import type { ToolName } from '../types/tools';
 import type { ChatLogEvent, ChatSessionMeta, ProjectedChatSession } from '../../electron/chat-log-types';
-import type { Session, SessionStore } from './useSessionStore';
+import type { Session, SessionStore } from './sessionStoreTypes';
 
 const deletedSessionIds = new Set<string>();
 
