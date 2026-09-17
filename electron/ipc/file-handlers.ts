@@ -90,7 +90,7 @@ export function registerFileHandlers() {
     }
   });
 
-  secureHandle('file:estimateTextTokens', async (event, files: string[], projectRoot?: string) => {
+  secureHandle('file:estimateTokens', async (event, files: string[], projectRoot?: string) => {
     assertTrustedIpcSender(event);
     try {
       if (!Array.isArray(files)) return { ok: false, error: 'files 必须是数组' };
