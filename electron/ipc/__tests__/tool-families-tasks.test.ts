@@ -44,7 +44,7 @@ vi.mock('../agent-scheduler', () => ({
     sendMessageToAgent: vi.fn(() => ({ ok: false, error: '未找到任务' })),
   },
 }));
-vi.mock('../agent-handlers', () => ({
+vi.mock('../agent-subagent-registry', () => ({
   runSubAgent: vi.fn(async () => ({ output: null, error: 'sub' })),
   getSubAgentStates: vi.fn(() => []),
   sendMessageToSubAgent: vi.fn(() => ({ ok: false, error: '子代理不存在' })),

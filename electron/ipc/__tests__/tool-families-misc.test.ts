@@ -67,7 +67,7 @@ vi.mock('../agent-scheduler', () => ({
     stopAgent: vi.fn(() => false),
   },
 }));
-vi.mock('../agent-handlers', () => ({
+vi.mock('../agent-subagent-registry', () => ({
   getSubAgentStates: vi.fn(() => []),
   sendMessageToSubAgent: vi.fn(() => ({ ok: false, error: 'nope' })),
   interruptSubAgent: vi.fn(() => false),
@@ -96,6 +96,9 @@ vi.mock('../../tool-registry', () => ({
 }));
 vi.mock('../agent-orchestration', () => ({
   orchestrateRunSubAgent: vi.fn(),
+  runSubAgentViaPort: vi.fn(async () => ({ output: null, error: 'mock' })),
+  // agent-handlers 在模块加载时会注册运行器端口（本文件间接加载它）。
+  setSubAgentRunner: vi.fn(),
 }));
 vi.mock('child_process', () => ({
   execSync: vi.fn(),

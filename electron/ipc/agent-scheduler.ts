@@ -75,7 +75,8 @@ export function registerSchedulerIpc() {
       assertString(message, 'message');
       const viaScheduler = scheduler.sendMessageToAgent(agentId, message);
       if (viaScheduler.ok) return { ok: true, data: { delivered: true, queued: true } };
-      const { sendMessageToSubAgent } = await import('./agent-handlers');
+      // 直连 registry：scheduler 依赖 handler 层会与 orchestration/运行时核心构成循环。
+      const { sendMessageToSubAgent } = await import('./agent-subagent-registry');
       const viaSub = sendMessageToSubAgent(agentId, message);
       if (viaSub.ok) return { ok: true, data: { delivered: true, queued: true } };
       return { ok: false, error: viaSub.error };

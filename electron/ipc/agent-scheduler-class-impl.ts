@@ -1,6 +1,8 @@
 import { BrowserWindow } from 'electron';
 import { type AgentLoopResult, type AgentStateSnapshot } from './agent-loop';
-import { getSubAgentStates } from './agent-handlers';
+// 子代理状态归 registry 所有；直接依赖它而不是穿透 handler 层，
+// 否则 scheduler → handler → agent-loop 会把编排层拉进循环依赖。
+import { getSubAgentStates } from './agent-subagent-registry';
 import { broadcast, notifyFrontend } from './agent-scheduler-support';
 import type { AgentConfig, AgentInstance, SchedulerAgentState, SchedulerQueueItem } from './agent-scheduler-types';
 export type {

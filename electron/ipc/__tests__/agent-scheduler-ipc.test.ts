@@ -50,7 +50,7 @@ vi.mock('../agent-scheduler-core', () => ({
   },
   createUnattendedPermissionChecker: vi.fn(() => () => Promise.resolve(true)),
 }));
-vi.mock('../agent-handlers', () => ({
+vi.mock('../agent-subagent-registry', () => ({
   sendMessageToSubAgent: vi.fn(() => ({ ok: false, error: 'sub-agent miss' })),
 }));
 

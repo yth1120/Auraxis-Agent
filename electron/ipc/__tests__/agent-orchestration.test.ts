@@ -1,18 +1,18 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-const agentHandlersMock = vi.hoisted(() => ({
-  runSubAgent: vi.fn(),
+const registryMock = vi.hoisted(() => ({
   getSubAgentStates: vi.fn(),
   sendMessageToSubAgent: vi.fn(),
   interruptSubAgent: vi.fn(),
 }));
+const runnerMock = vi.hoisted(() => vi.fn());
 const schedulerMock = vi.hoisted(() => ({
   getAgentInstances: vi.fn(),
   sendMessageToAgent: vi.fn(),
   stopAgent: vi.fn(),
 }));
 
-vi.mock('../agent-handlers', () => agentHandlersMock);
+vi.mock('../agent-subagent-registry', () => registryMock);
 vi.mock('../agent-scheduler', () => ({ scheduler: schedulerMock }));
 
 import {
@@ -22,6 +22,7 @@ import {
   orchestrateSendMessage,
   orchestrateInterruptAgent,
   createOrchestrationApi,
+  setSubAgentRunner,
   type OrchestrationCaller,
 } from '../agent-orchestration';
 
@@ -35,13 +36,19 @@ const caller: OrchestrationCaller = {
 describe('agent-orchestration — 脚本/插件使用的多 Agent 编排面', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(agentHandlersMock.runSubAgent).mockResolvedValue({ ok: true, output: 'done' });
-    vi.mocked(agentHandlersMock.getSubAgentStates).mockReturnValue([]);
-    vi.mocked(agentHandlersMock.sendMessageToSubAgent).mockResolvedValue({ ok: true });
-    vi.mocked(agentHandlersMock.interruptSubAgent).mockReturnValue(false);
+    runnerMock.mockResolvedValue({ output: 'done' });
+    setSubAgentRunner(runnerMock);
+    vi.mocked(registryMock.getSubAgentStates).mockReturnValue([]);
+    vi.mocked(registryMock.sendMessageToSubAgent).mockReturnValue({ ok: true });
+    vi.mocked(registryMock.interruptSubAgent).mockReturnValue(false);
     vi.mocked(schedulerMock.getAgentInstances).mockReturnValue([]);
     vi.mocked(schedulerMock.sendMessageToAgent).mockReturnValue({ ok: false });
     vi.mocked(schedulerMock.stopAgent).mockReturnValue(false);
+  });
+
+  afterEach(() => {
+    // 端口是模块级状态，用例结束后清掉，避免污染其它用例。
+    setSubAgentRunner(null);
   });
 
   it('runSubAgent 前台执行成功/失败/异常', async () => {
@@ -49,7 +56,7 @@ describe('agent-orchestration — 脚本/插件使用的多 Agent 编排面', ()
       ok: true,
       output: 'done',
     });
-    expect(agentHandlersMock.runSubAgent).toHaveBeenCalledWith(
+    expect(runnerMock).toHaveBeenCalledWith(
       expect.objectContaining({
         projectRoot: '/proj',
         requestId: 'r1',
@@ -59,7 +66,7 @@ describe('agent-orchestration — 脚本/插件使用的多 Agent 编排面', ()
       }),
     );
 
-    vi.mocked(agentHandlersMock.runSubAgent).mockResolvedValue({ ok: false, error: '权限拒绝' });
+    runnerMock.mockResolvedValue({ output: null, error: '权限拒绝' });
     await expect(
       orchestrateRunSubAgent(caller, { description: 'd', prompt: 'p', subagentType: 'Explore' }),
     ).resolves.toEqual({
@@ -67,7 +74,7 @@ describe('agent-orchestration — 脚本/插件使用的多 Agent 编排面', ()
       error: '权限拒绝',
     });
 
-    vi.mocked(agentHandlersMock.runSubAgent).mockRejectedValue(new Error('boom'));
+    runnerMock.mockRejectedValue(new Error('boom'));
     await expect(orchestrateRunSubAgent(caller, { description: 'd', prompt: 'p' })).resolves.toEqual({
       ok: false,
       error: '子代理启动失败: boom',
@@ -76,7 +83,7 @@ describe('agent-orchestration — 脚本/插件使用的多 Agent 编排面', ()
 
   it('startBackgroundSubAgent 传入 background 标记', async () => {
     await orchestrateStartBackgroundSubAgent(caller, { description: 'd', prompt: 'p' });
-    expect(agentHandlersMock.runSubAgent).toHaveBeenCalledWith(expect.objectContaining({ background: true }));
+    expect(runnerMock).toHaveBeenCalledWith(expect.objectContaining({ background: true }));
   });
 
   it('listAgents 合并调度器任务与子代理', async () => {
@@ -90,7 +97,7 @@ describe('agent-orchestration — 脚本/插件使用的多 Agent 编排面', ()
         endTime: null,
       },
     ]);
-    vi.mocked(agentHandlersMock.getSubAgentStates).mockReturnValue([
+    vi.mocked(registryMock.getSubAgentStates).mockReturnValue([
       {
         id: 's1',
         name: '子代理',
@@ -109,11 +116,11 @@ describe('agent-orchestration — 脚本/插件使用的多 Agent 编排面', ()
   it('sendMessage 优先调度器，失败回退子代理', async () => {
     vi.mocked(schedulerMock.sendMessageToAgent).mockReturnValue({ ok: true });
     await expect(orchestrateSendMessage('a1', '继续')).resolves.toEqual({ ok: true });
-    expect(agentHandlersMock.sendMessageToSubAgent).not.toHaveBeenCalled();
+    expect(registryMock.sendMessageToSubAgent).not.toHaveBeenCalled();
 
     vi.mocked(schedulerMock.sendMessageToAgent).mockReturnValue({ ok: false });
     await expect(orchestrateSendMessage('a1', '继续')).resolves.toEqual({ ok: true });
-    expect(agentHandlersMock.sendMessageToSubAgent).toHaveBeenCalledWith('a1', '继续');
+    expect(registryMock.sendMessageToSubAgent).toHaveBeenCalledWith('a1', '继续');
   });
 
   it('interruptAgent 命中调度器/子代理/未找到', async () => {
@@ -121,10 +128,10 @@ describe('agent-orchestration — 脚本/插件使用的多 Agent 编排面', ()
     await expect(orchestrateInterruptAgent('a1')).resolves.toEqual({ ok: true });
 
     vi.mocked(schedulerMock.stopAgent).mockReturnValue(false);
-    vi.mocked(agentHandlersMock.interruptSubAgent).mockReturnValue(true);
+    vi.mocked(registryMock.interruptSubAgent).mockReturnValue(true);
     await expect(orchestrateInterruptAgent('a1')).resolves.toEqual({ ok: true });
 
-    vi.mocked(agentHandlersMock.interruptSubAgent).mockReturnValue(false);
+    vi.mocked(registryMock.interruptSubAgent).mockReturnValue(false);
     await expect(orchestrateInterruptAgent('a1')).resolves.toEqual({ ok: false, error: '未找到运行中的 Agent a1' });
   });
 

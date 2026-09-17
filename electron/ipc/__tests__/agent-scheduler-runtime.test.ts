@@ -50,12 +50,14 @@ vi.mock('../permission-handlers', () => ({
 vi.mock('../plan-handlers', () => ({
   waitForPlanApproval: vi.fn(async () => []),
 }));
-vi.mock('../agent-handlers', () => ({
+vi.mock('../agent-subagent-registry', () => ({
   getSubAgentStates: vi.fn(() => []),
+  sendMessageToSubAgent: vi.fn(() => ({ ok: false, error: '子代理不存在' })),
+}));
+vi.mock('../agent-defs', () => ({
   getAgentDef: vi.fn(() => ({
     getSystemPrompt: (task: string) => `SYS:${task}`,
   })),
-  sendMessageToSubAgent: vi.fn(() => ({ ok: false, error: '子代理不存在' })),
 }));
 vi.mock('../../agent-snapshot', () => ({
   saveAgentSnapshot: vi.fn(async () => {}),

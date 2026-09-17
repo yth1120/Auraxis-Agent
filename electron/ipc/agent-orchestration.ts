@@ -7,9 +7,54 @@ import type { WorkAutonomyTier } from '../types';
  *
  * Used by the inline workflow sandbox and dynamic plugin handlers so scripts
  * and plugins can launch / steer / inspect agents with one consistent surface.
- * All electron-touching modules are lazy-imported to keep this file unit-test
- * friendly and to avoid import cycles.
+ *
+ * 依赖方向：本模块属于运行时核心，**不允许**再 import handler 层（那会形成
+ * handler → agent-loop → step-engine → tool-runner → orchestration → handler 的环）。
+ * 子代理启动通过 `setSubAgentRunner` 的端口注入；子代理状态/消息/中断直接走
+ * registry；electron 相关模块保持懒加载以维持单测友好。
  */
+
+/** 子代理启动请求（与 agent-handlers.runSubAgent 的入参结构保持一致）。 */
+export interface SubAgentRunRequest {
+  description: string;
+  prompt: string;
+  subagentType: string;
+  projectRoot: string;
+  requestId: string;
+  depth?: number;
+  surface?: 'chat' | 'work' | 'code';
+  checkPermission?: (toolName: string, input: Record<string, unknown>, toolCallId?: string) => Promise<boolean>;
+  autoApprove?: boolean;
+  sandboxMode?: SandboxMode;
+  workTier?: WorkAutonomyTier;
+  mode?: ApprovalPolicy;
+  parentSignal?: AbortSignal;
+  workspaceRoots?: string[];
+  writableRoots?: string[];
+  agentId?: string;
+  background?: boolean;
+}
+
+/** 子代理运行器端口：由 agent-handlers 在模块加载时注册实现。 */
+export type SubAgentRunner = (params: SubAgentRunRequest) => Promise<{ output: unknown; error?: string }>;
+
+let subAgentRunner: SubAgentRunner | null = null;
+
+export function setSubAgentRunner(runner: SubAgentRunner | null): void {
+  subAgentRunner = runner;
+}
+
+function requireSubAgentRunner(): SubAgentRunner {
+  if (!subAgentRunner) {
+    throw new Error('子代理运行器未注册：agent-handlers 初始化时应调用 setSubAgentRunner');
+  }
+  return subAgentRunner;
+}
+
+/** 工具层直接启动子代理（Agent 工具）时走同一端口，避免反向 import handler。 */
+export async function runSubAgentViaPort(request: SubAgentRunRequest): Promise<{ output: unknown; error?: string }> {
+  return requireSubAgentRunner()(request);
+}
 
 export interface OrchestrationCaller {
   projectRoot: string;
@@ -31,8 +76,7 @@ export async function orchestrateRunSubAgent(
   params: { description: string; prompt: string; subagentType?: string },
 ): Promise<{ ok: boolean; output?: unknown; error?: string }> {
   try {
-    const { runSubAgent } = await import('./agent-handlers');
-    const r = await runSubAgent({
+    const r = await requireSubAgentRunner()({
       description: params.description,
       prompt: params.prompt,
       subagentType: params.subagentType || 'general-purpose',
@@ -59,8 +103,7 @@ export async function orchestrateStartBackgroundSubAgent(
   params: { description: string; prompt: string; subagentType?: string },
 ): Promise<{ ok: boolean; output?: unknown; error?: string }> {
   try {
-    const { runSubAgent } = await import('./agent-handlers');
-    const r = await runSubAgent({
+    const r = await requireSubAgentRunner()({
       description: params.description,
       prompt: params.prompt,
       subagentType: params.subagentType || 'general-purpose',
@@ -85,7 +128,7 @@ export async function orchestrateStartBackgroundSubAgent(
 /** List scheduler tasks + sub-agents （子代理列表）. */
 export async function orchestrateListAgents(): Promise<Array<Record<string, unknown>>> {
   const { scheduler } = await import('./agent-scheduler');
-  const { getSubAgentStates } = await import('./agent-handlers');
+  const { getSubAgentStates } = await import('./agent-subagent-registry');
   const schedulerAgents = scheduler.getAgentInstances().map((a) => ({
     id: a.agentId,
     name: a.name,
@@ -119,14 +162,14 @@ export async function orchestrateSendMessage(
   const { scheduler } = await import('./agent-scheduler');
   const viaScheduler = scheduler.sendMessageToAgent(agentId, message);
   if (viaScheduler.ok) return { ok: true };
-  const { sendMessageToSubAgent } = await import('./agent-handlers');
+  const { sendMessageToSubAgent } = await import('./agent-subagent-registry');
   return sendMessageToSubAgent(agentId, message);
 }
 
 /** Interrupt a scheduler task or sub-agent. */
 export async function orchestrateInterruptAgent(agentId: string): Promise<{ ok: boolean; error?: string }> {
   const { scheduler } = await import('./agent-scheduler');
-  const { interruptSubAgent } = await import('./agent-handlers');
+  const { interruptSubAgent } = await import('./agent-subagent-registry');
   const viaScheduler = scheduler.stopAgent(agentId);
   const viaSub = interruptSubAgent(agentId);
   if (viaScheduler || viaSub) return { ok: true };

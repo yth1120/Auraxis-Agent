@@ -9,7 +9,7 @@ import type { ToolContext, ToolResult } from './path-utils';
 export async function runListAgents(_params: unknown, ctx: ToolContext): Promise<ToolResult> {
   try {
     const { scheduler } = await import('../agent-scheduler');
-    const { getSubAgentStates } = await import('../agent-handlers');
+    const { getSubAgentStates } = await import('../agent-subagent-registry');
     const schedulerAgents = scheduler.getAgentInstances().map((a) => ({
       id: a.agentId,
       name: a.name,
@@ -55,7 +55,7 @@ export async function runSendMessage(params: { agentId?: string; message?: strin
     if (viaScheduler.ok) {
       return { output: { delivered: true, agentId, queued: true, message: '指令已入队，将在该任务下一轮执行时注入' } };
     }
-    const { sendMessageToSubAgent } = await import('../agent-handlers');
+    const { sendMessageToSubAgent } = await import('../agent-subagent-registry');
     const viaSub = sendMessageToSubAgent(agentId, message);
     if (viaSub.ok) {
       return {
@@ -73,7 +73,7 @@ export async function runInterruptAgent(params: { agentId?: string; reason?: str
   if (!agentId) return { output: null, error: 'agentId 不能为空' };
   try {
     const { scheduler } = await import('../agent-scheduler');
-    const { interruptSubAgent } = await import('../agent-handlers');
+    const { interruptSubAgent } = await import('../agent-subagent-registry');
     const viaScheduler = scheduler.stopAgent(agentId);
     const viaSub = interruptSubAgent(agentId);
     if (!viaScheduler && !viaSub) {
@@ -100,7 +100,7 @@ export async function runReport(params: { content?: string }, ctx: ToolContext):
     return { output: null, error: 'Report 只能由子代理调用（当前不是子代理上下文）' };
   }
   try {
-    const { reportFromSubAgent } = await import('../agent-handlers');
+    const { reportFromSubAgent } = await import('../agent-subagent-registry');
     const result = reportFromSubAgent(sessionId, content);
     if (!result.ok) return { output: null, error: result.error };
     return { output: { delivered: true, reportId: result.report?.id, message: '汇报已发送给父任务' } };

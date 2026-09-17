@@ -61,8 +61,9 @@ export async function runAgentTool(
         },
       };
     }
-    const { runSubAgent } = await import('../agent-handlers');
-    const result = await runSubAgent({
+    // 走编排端口而不是反向 import handler 层（避免 handler ↔ 运行时核心成环）。
+    const { runSubAgentViaPort } = await import('../agent-orchestration');
+    const result = await runSubAgentViaPort({
       description: params.description,
       prompt: params.prompt,
       subagentType: params.subagent_type || 'general-purpose',

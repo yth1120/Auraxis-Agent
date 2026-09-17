@@ -1,7 +1,8 @@
 /** agent-scheduler-runtime.ts — scheduler run preparation and loop parameter builders. */
 import type { BrowserWindow } from 'electron';
 import { TOOL_DEFINITIONS } from '../tool-defs';
-import { getAgentDef } from './agent-handlers';
+// agent-handlers 只是再导出 agent-defs，直连可避免 scheduler → handler 的反向依赖。
+import { getAgentDef } from './agent-defs';
 import { appendWorkDocsSystemRule } from '../work-docs-policy';
 import { readSettings } from './settings-store';
 import { resolveModelApiBase, resolveModelApiKey } from './model-config';

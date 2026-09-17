@@ -49,7 +49,7 @@
 - Removed fixed-duration sleeps from `workflow-run` and `RollbackToMessage`
   tests (polling / shared teardown instead) to cut flake surface.
 - Coverage after the cleanup: 89.68% statements / 92.05% lines / 80.94%
-  branches / 88.27% functions (273 test files / 2,117 passing cases).
+  branches / 88.27% functions (274 test files / 2,122 passing cases).
 
 ### Fixed
 

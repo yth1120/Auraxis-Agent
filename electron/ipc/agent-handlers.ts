@@ -27,6 +27,7 @@ import {
   setSubAgent,
   setSubAgentObserver,
 } from './agent-subagent-registry';
+import { setSubAgentRunner } from './agent-orchestration';
 
 export { getAgentDef } from './agent-defs';
 export {
@@ -305,3 +306,7 @@ export function registerAgentHandlers() {
 }
 
 export type { WorkSurface };
+
+// 编排端口注册：脚本 / 插件经 agent-orchestration 启动子代理时不再反向 import
+// 本模块（那会构成 handler ↔ 运行时核心的循环依赖）。
+setSubAgentRunner(runSubAgent);

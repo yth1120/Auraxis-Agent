@@ -128,7 +128,7 @@ export async function runTaskStop(params: { taskId: string }): Promise<ToolResul
     /* agent abort is best-effort */
   }
   try {
-    const { interruptSubAgent } = await import('../agent-handlers');
+    const { interruptSubAgent } = await import('../agent-subagent-registry');
     agentAborted = interruptSubAgent(params.taskId) || agentAborted;
   } catch {
     /* sub-agent abort is best-effort */
@@ -143,7 +143,7 @@ export async function runTaskStop(params: { taskId: string }): Promise<ToolResul
 export async function runTaskList(_params: unknown): Promise<ToolResult> {
   const { listTasks } = await import('../task-monitor');
   const { scheduler } = await import('../agent-scheduler');
-  const { getSubAgentStates } = await import('../agent-handlers');
+  const { getSubAgentStates } = await import('../agent-subagent-registry');
   const backgroundTasks = listTasks().map((t) => ({
     id: t.id,
     kind: 'task',
