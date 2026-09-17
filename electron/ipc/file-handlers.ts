@@ -12,7 +12,7 @@ import {
   isSensitiveFilePath,
   assertString,
 } from './shared';
-import { estimateTokens } from './token-estimate';
+import { estimateTextTokens } from './token-estimate';
 import { assertTrustedIpcSender } from './trust';
 import { resolveTrustedProjectRoot } from './project-access';
 import { resolveInsideRoot } from './path-security';
@@ -90,7 +90,7 @@ export function registerFileHandlers() {
     }
   });
 
-  secureHandle('file:estimateTokens', async (event, files: string[], projectRoot?: string) => {
+  secureHandle('file:estimateTextTokens', async (event, files: string[], projectRoot?: string) => {
     assertTrustedIpcSender(event);
     try {
       if (!Array.isArray(files)) return { ok: false, error: 'files 必须是数组' };
@@ -112,7 +112,7 @@ export function registerFileHandlers() {
             results.push({ path: String(raw), bytes: st.size, tokens: null, skipped: 'binary' });
             continue;
           }
-          results.push({ path: String(raw), bytes: st.size, tokens: estimateTokens(text) });
+          results.push({ path: String(raw), bytes: st.size, tokens: estimateTextTokens(text) });
         } catch {
           /* missing/unreadable — skip */
         }

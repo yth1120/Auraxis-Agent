@@ -3,7 +3,7 @@
  * CJK characters ≈ 1 token each; ASCII ≈ 4 chars/token. Good enough to rank
  * "which files occupy the most context" — not a billing-grade count.
  */
-export function estimateTokens(text: string): number {
+export function estimateTextTokens(text: string): number {
   let cjk = 0;
   let other = 0;
   for (const ch of text) {
