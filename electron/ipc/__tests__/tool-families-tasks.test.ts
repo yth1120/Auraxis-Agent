@@ -64,8 +64,12 @@ vi.mock('../../schedule-store', () => ({
 vi.mock('../plan-handlers', () => ({
   waitForPlanApproval: vi.fn(async () => []),
 }));
-vi.mock('../agent-loop', () => ({
+vi.mock('../llm-adapter', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../llm-adapter')>()),
   llmClientInvoke: vi.fn(async () => ({ rawText: '{}' })),
+}));
+vi.mock('../agent-loop-planner', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../agent-loop-planner')>()),
   parsePlanFromLLMText: vi.fn(() => null),
 }));
 vi.mock('../settings-store', () => ({
@@ -84,7 +88,8 @@ import { getSubAgentStates, sendMessageToSubAgent, interruptSubAgent, reportFrom
 import { createCronJob, deleteCronJob, listCronJobs } from '../cron-handlers';
 import { createSchedule, deleteSchedule, listSchedules } from '../../schedule-store';
 import { waitForPlanApproval } from '../plan-handlers';
-import { llmClientInvoke, parsePlanFromLLMText } from '../agent-loop';
+import { llmClientInvoke } from '../llm-adapter';
+import { parsePlanFromLLMText } from '../agent-loop-planner';
 import { readSettings } from '../settings-store';
 
 function ctx(extra: Record<string, unknown> = {}) {
