@@ -1,3 +1,4 @@
 {
-  "maxCycles": 0
+  "maxCycles": 0,
+  "maxRuntimeCycles": 1
 }
