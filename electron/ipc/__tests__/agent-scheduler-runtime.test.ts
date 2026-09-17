@@ -373,6 +373,32 @@ describe('AgentScheduler — 暂停/恢复/续写', () => {
     expect(msgs.at(-1).content).toBe('继续');
   });
 
+  it('续写批出新迭代窗口：预算随累计迭代数一起抬升', async () => {
+    const id = scheduler.startAgent(makeCfg({ maxIterations: 3 }), projectRoot);
+    await vi.waitFor(() => expect(h.loops).toHaveLength(1));
+    h.loops[0].resolve({ ...settledLoop(), iterations: 3, toolCallCount: 6 });
+    await vi.waitFor(() => expect(scheduler.getAgentInstances()[0].status).toBe('completed'));
+
+    const r = await scheduler.continueAgent(id, '继续执行剩余工作');
+    expect(r).toEqual({ ok: true });
+    await vi.waitFor(() => expect(h.loops).toHaveLength(2));
+
+    // 不抬高预算的话，resumeFrom.iteration=3 → 首轮 iter=4 会立刻再次撞上限。
+    expect(h.loops[1].opts.maxIterations).toBe(6);
+    expect(h.loops[1].opts.resumeFrom.iteration).toBe(3);
+  });
+
+  it('续写窗口封顶在 500：顶到硬上限后不再叠加', async () => {
+    const id = scheduler.startAgent(makeCfg({ maxIterations: 500 }), projectRoot);
+    await vi.waitFor(() => expect(h.loops).toHaveLength(1));
+    h.loops[0].resolve({ ...settledLoop(), iterations: 500 });
+    await vi.waitFor(() => expect(scheduler.getAgentInstances()[0].status).toBe('completed'));
+
+    await expect(scheduler.continueAgent(id, '继续')).resolves.toEqual({ ok: true });
+    await vi.waitFor(() => expect(h.loops).toHaveLength(2));
+    expect(h.loops[1].opts.maxIterations).toBe(500);
+  });
+
   it('continueAgent 拒绝：不存在/状态不符/无历史/空指令', async () => {
     await expect(scheduler.continueAgent('nope', 'x')).resolves.toEqual({
       ok: false,

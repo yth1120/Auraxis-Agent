@@ -43,6 +43,7 @@ import {
   sortPending,
 } from './agent-scheduler-queue';
 import { pruneAgentInstances } from './agent-scheduler-cleanup';
+import { BUSINESS_ITERATION_DEFAULT, BUSINESS_ITERATION_MAX } from './agent-iteration-budget';
 export { createUnattendedPermissionChecker } from './agent-scheduler-permission';
 
 // ─── Singleton ──────────────────────────────────────────
@@ -405,6 +406,15 @@ class AgentScheduler {
       toolCallCount: inst.toolCallCount,
       allText: inst.result ?? '',
     };
+    // 每次续写都批一个新窗口：累计迭代数（savedState.iteration）会随
+    // resumeFrom 回到循环里，若预算不涨，第一条检查就会立刻再次命中上限。
+    // 硬上限 500 之外不再叠加，避免"继续"变成无限跑到天荒地老。
+    const window = inst.baseMaxIterations ?? inst.maxIterations ?? BUSINESS_ITERATION_DEFAULT;
+    const granted = Math.max(1, Math.min(window, BUSINESS_ITERATION_MAX - inst.maxIterations));
+    const nextMax = Math.min(BUSINESS_ITERATION_MAX, inst.maxIterations + granted);
+    inst.baseMaxIterations ??= inst.maxIterations;
+    inst.maxIterations = nextMax;
+    inst.config.maxIterations = nextMax;
     inst.pendingInstruction = (displayInstruction ?? '').trim() || text;
     // Keep lastMessages until the next run COMPLETES — if the continued run
     // errors, the original transcript survives so the user can retry.

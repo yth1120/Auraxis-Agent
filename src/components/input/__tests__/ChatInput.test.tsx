@@ -105,6 +105,50 @@ describe('ChatInput — 输入区核心交互', () => {
     expect(mockSendMessage).not.toHaveBeenCalled();
   });
 
+  it('打字"继续"即续跑撞了迭代上限的任务（无需额外按钮）', async () => {
+    const continueMock = vi.fn(async () => ({ ok: true, data: { continued: true } }));
+    (window as any).electronAPI.agent = { continue: continueMock };
+    useAppStore.setState({ sidebarMode: 'code' });
+    useChatStore.setState({ currentProjectPath: 'C:\\proj' });
+    useAgentStore.setState({
+      currentAgentId: 'a1',
+      agents: [
+        {
+          id: 'a1',
+          name: 'T1',
+          description: '创建四个文件',
+          type: 'general-purpose',
+          status: 'error',
+          startTime: Date.now(),
+          endTime: Date.now(),
+          iteration: 200,
+          maxIterations: 200,
+          toolCallCount: 42,
+          result: '已完成 3 个文件',
+          error: '已达到业务迭代上限 (200)，任务暂停收尾。已完成 42 次工具调用，如需继续可发送跟进任务。',
+          log: [],
+        },
+      ],
+    });
+
+    const { getByPlaceholderText } = await renderChatInput();
+    // 选中任务的输入框会明确提示"接着谁说话"，而不是泛泛的"描述你的任务…"。
+    const textarea = getByPlaceholderText('在「T1」基础上继续…') as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: '继续' } });
+    fireEvent.keyDown(textarea, { key: 'Enter' });
+
+    await waitFor(() => expect(continueMock).toHaveBeenCalledTimes(1));
+    const [agentId, finalInstruction, display] = continueMock.mock.calls[0] as unknown as [string, string, string];
+    // 同一个任务，不是新任务；且自动带上背景与进展，再叠加用户原话。
+    expect(agentId).toBe('a1');
+    expect(display).toBe('继续');
+    expect(finalInstruction).toContain('请继续当前任务');
+    expect(finalInstruction).toContain('创建四个文件');
+    expect(finalInstruction).toContain('已完成 3 个文件');
+    expect(finalInstruction).toContain('继续');
+    expect(useChatStore.getState().inputValue).toBe('');
+  });
+
   it('Chat 工具栏有思考开关，与联网搜索并排，点击切换 isDeepThink', async () => {
     useAppStore.setState({ sidebarMode: 'chat' });
     useChatStore.setState({ isDeepThink: false, reasoningEffort: 'high' });

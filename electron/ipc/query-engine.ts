@@ -34,6 +34,11 @@ import {
   prepareCacheAlignedMessages,
 } from '../agent-runtime/context-manager';
 import { buildModeHint, loadLlmContext, saveLlmContext, tryReplayStoredContext } from './query-context';
+import { readSettings } from './settings-store';
+import {
+  BUSINESS_ITERATION_MAX,
+  resolveIterationBudget,
+} from './agent-iteration-budget';
 
 // ─── Types ────────────────────────────────────────────────
 
@@ -78,7 +83,7 @@ type EventCallback = (event: EngineEvent) => void;
 // ─── Constants ─────────────────────────────────────────────
 
 /** 安全硬上限（强制终止）。业务上限由请求配置，默认 200。 */
-const SAFETY_MAX_ITERATIONS = 500;
+const SAFETY_MAX_ITERATIONS = BUSINESS_ITERATION_MAX;
 
 // ─── Permission interceptor (three-tier guard) ─────────────
 
@@ -202,7 +207,8 @@ async function runUnifiedLoop(req: QueryRequest, emit: EventCallback, signal: Ab
   // Shared StepEngine — runStep owns one full ReAct iteration (LLM + tools +
   // stop policy + compaction); this driver owns turn lifecycle + termination.
   const state = createStepState(messages);
-  const businessMax = Math.min(SAFETY_MAX_ITERATIONS, Math.max(1, req.maxIterations ?? 200));
+  // 渲染层只透传显式值；未显式指定时以设置面板的 agentMaxIterations 为准。
+  const businessMax = resolveIterationBudget(req.maxIterations, await readSettings().catch(() => null));
   const turnId = makeTurnId(req.requestId);
   emit({ type: 'turn_start', turnId, timestamp: Date.now() });
 

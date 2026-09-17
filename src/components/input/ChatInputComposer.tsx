@@ -15,6 +15,9 @@ import MentionDropdown from './MentionDropdown';
 import SkillMentionDropdown from './SkillMentionDropdown';
 import { ModePanelContent } from './ModeToggler';
 import { ChatInputToolbar, ChatInputWorkspaceStatus } from './ChatInputComposerParts';
+import { resolveFollowTarget } from '../../utils/followTarget';
+import { useAgentStore } from '../../stores/useAgentStore';
+import { useChatStore } from '../../stores/useChatStore';
 
 export interface ChatInputComposerProps {
   heroSizing: boolean;
@@ -154,6 +157,25 @@ export default function ChatInputComposer({
   closeModePanel,
 }: ChatInputComposerProps) {
   const t = useT();
+  // 输入框要像主流 Agent 工具那样说清"这条消息会接到哪个任务上"：
+  // 选中/最近结束的任务就是实际续写目标，这里用同一套判定（与发送路径
+  // 的 resolveLaunchTarget 对齐），避免提示与实际行为不一致。
+  const selectedAgent = useAgentStore((s) => s.agents.find((a) => a.id === s.currentAgentId) ?? null);
+  const allAgents = useAgentStore((s) => s.agents);
+  const pendingNewTask = useChatStore((s) => s.pendingNewTask);
+  const followName = resolveFollowTarget({
+    selected: selectedAgent,
+    agents: allAgents,
+    pendingNewTask,
+  })?.name;
+  const placeholder =
+    sidebarMode === 'chat'
+      ? t('composer.placeholder.chat')
+      : pendingPlanMode
+        ? t('composer.placeholder.plan')
+        : followName
+          ? t('composer.placeholder.followup', { name: followName })
+          : t('composer.placeholder.agent');
   return (
     <div className="relative w-full max-w-[var(--content-max-width)] z-10">
       <div className="flex flex-col items-start w-full max-w-[var(--content-max-width)] mx-auto">
@@ -222,13 +244,7 @@ export default function ChatInputComposer({
                     ? 'text-lg leading-[30px] max-h-[240px] px-1'
                     : 'text-lg leading-[30px] max-h-[160px] px-1',
                 )}
-                placeholder={
-                  sidebarMode === 'chat'
-                    ? t('composer.placeholder.chat')
-                    : pendingPlanMode
-                      ? t('composer.placeholder.plan')
-                      : t('composer.placeholder.agent')
-                }
+                placeholder={placeholder}
                 rows={1}
               />
               {commandOpen && (

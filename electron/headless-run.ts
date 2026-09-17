@@ -15,6 +15,7 @@ import type { AgentObserver, AgentLoopEvent, TaskPlan } from './agent-runtime/ag
 import { getAllTools } from './tool-registry';
 import { resolveModelApiBase, resolveModelApiKey } from './ipc/model-config';
 import { readSettings } from './ipc/settings-store';
+import { resolveIterationBudget } from './ipc/agent-iteration-budget';
 import { resolveCredential } from './credentials';
 import { getAgentDef } from './ipc/agent-handlers';
 import type { SandboxMode } from './sandbox-policy';
@@ -273,7 +274,8 @@ export async function runHeadlessTask(opts: HeadlessRunOptions): Promise<number>
       isDeepThink: opts.deepThink,
       reasoningEffort: opts.reasoningEffort || 'high',
       toolChoice: opts.toolChoice,
-      maxIterations: opts.maxIterations ?? 200,
+      // 未显式传 --max-iterations 时跟随设置面板的 agentMaxIterations。
+      maxIterations: resolveIterationBudget(opts.maxIterations, settings),
       sessionId: `cli-${Date.now()}`,
     });
 

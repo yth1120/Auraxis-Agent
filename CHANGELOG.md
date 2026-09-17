@@ -53,6 +53,22 @@
 
 ### Fixed
 
+- Agent iteration budgets now follow the configured value. The renderer used to send a
+  hard-coded `maxIterations: 200` with every task, silently overriding the
+  `agentMaxIterations` set in Settings → Agent runtime; the resolution now lives in
+  `electron/ipc/agent-iteration-budget.ts` (request → settings → default, clamped to
+  1–500) and covers the scheduler, sub-agent, unified-query and headless-CLI paths.
+- Continuing a task that hit its iteration budget no longer stops immediately. The
+  composer follow-up path already resumes the most recent task (including ones
+  that ended with `error`), but the replayed `resumeFrom.iteration` tripped the
+  same cap on the first step — typing "继续" appeared to do nothing. The scheduler
+  now grants a fresh window on continuation, bounded by the 500 hard cap, so the
+  existing follow-up flow works without a dedicated UI affordance.
+- The composer now tells you who a message continues: `composer.placeholder.followup`
+  ("在「任务名」基础上继续…" / "Continue on …") was defined in the i18n tables but never
+  wired up, so the input looked identical whether you were starting a task or
+  replying to one. The placeholder now resolves the same follow-up target the send
+  path uses.
 - `backupBeforeModify` required a non-existent module (`require('./undo-manager')`
   from the `tool-handlers/` directory), and the swallowed exception turned every
   pre-modification backup into a silent no-op — undo/rollback never recorded

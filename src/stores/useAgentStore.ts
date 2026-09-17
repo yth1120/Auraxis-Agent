@@ -71,7 +71,7 @@ export const useAgentStore = create<AgentStore>()(
                   startTime: patch.startTime ?? Date.now(),
                   endTime: patch.endTime,
                   iteration: patch.iteration ?? 0,
-                  maxIterations: patch.maxIterations ?? 200,
+                  maxIterations: patch.maxIterations ?? 0,
                   toolCallCount: patch.toolCallCount ?? 0,
                   messagesCount: patch.messagesCount ?? 0,
                   surface: patch.surface,

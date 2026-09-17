@@ -29,7 +29,8 @@ export function buildAgentRuntimeFields(models: ModelOption[], t: (key: I18nKey)
       description: t('settings.runtime.maxIterations.desc'),
       type: 'number',
       min: 10,
-      max: 1000,
+      // 上限与主进程的 fail-safe 硬上限一致，避免配置出永远到不了的值。
+      max: 500,
       step: 10,
       default: 200,
     },

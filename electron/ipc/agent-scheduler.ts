@@ -7,6 +7,8 @@ import { existsSync } from 'fs';
 import { assertObject, assertString } from './shared';
 import { requestPermission } from './permission-handlers';
 import { normalizeApprovalPolicy } from '../contracts/core';
+import { readSettings } from './settings-store';
+import { resolveIterationBudget } from './agent-iteration-budget';
 import {
   scheduler,
   createUnattendedPermissionChecker,
@@ -55,7 +57,14 @@ export function registerSchedulerIpc() {
               agentId,
             });
           };
-      const agentId = scheduler.startAgent(params.config, projectPath, checkPermission);
+      // 迭代预算：请求显式值 > 设置面板 agentMaxIterations > 默认 200。
+      // 渲染层不再自带默认值，否则会覆盖用户在设置里配置的上限。
+      const settings = await readSettings().catch(() => null);
+      const config: AgentConfig = {
+        ...params.config,
+        maxIterations: resolveIterationBudget(params.config.maxIterations, settings),
+      };
+      const agentId = scheduler.startAgent(config, projectPath, checkPermission);
       return { ok: true, data: { agentId } };
     } catch (error: unknown) {
       return { ok: false, error: errorText(error) };

@@ -169,7 +169,9 @@ function createAgentStartActions(
             reasoningEffort: request.reasoningEffort ?? 'high',
             toolChoice: request.toolChoice,
             priority: request.priority || 'normal',
-            maxIterations: request.maxIterations ?? 200,
+            // 只透传调用方的显式值；缺省由主进程按设置面板的
+            // agentMaxIterations 解析，渲染层不再自带 200 覆盖设置。
+            maxIterations: request.maxIterations,
             // Scheduler's AgentConfig names this `tools` — sending it as
             // `customTools` silently disabled every whitelist (plan mode's
             // read-only guarantee included).
@@ -209,7 +211,8 @@ function createAgentStartActions(
                   surface: useAppStore.getState().sidebarMode,
                   startTime: Date.now(),
                   iteration: 0,
-                  maxIterations: request.maxIterations ?? 200,
+                  // 占位值；真实预算由主进程在 agent:updated 快照里回填。
+                  maxIterations: request.maxIterations ?? 0,
                   toolCallCount: 0,
                   messagesCount: 0,
                   totalInputTokens: 0,
@@ -395,7 +398,7 @@ function createAgentControlActions(
                 startTime: patch.startTime ?? Date.now(),
                 endTime: patch.endTime,
                 iteration: patch.iteration ?? 0,
-                maxIterations: patch.maxIterations ?? 25,
+                maxIterations: patch.maxIterations ?? 0,
                 toolCallCount: patch.toolCallCount ?? 0,
                 messagesCount: patch.messagesCount ?? 0,
                 surface: patch.surface,

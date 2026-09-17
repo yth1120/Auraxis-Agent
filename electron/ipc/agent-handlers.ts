@@ -29,6 +29,7 @@ import {
   setSubAgentObserver,
 } from './agent-subagent-registry';
 import { setSubAgentRunner } from './agent-orchestration';
+import { resolveIterationBudget } from './agent-iteration-budget';
 
 export { getAgentDef } from './agent-defs';
 export {
@@ -105,10 +106,7 @@ async function resolveSubAgentConfig(
   const fallbackModel =
     typeof settings.fallbackModel === 'string' && settings.fallbackModel ? settings.fallbackModel : undefined;
   const apiBase = await resolveModelApiBase(model);
-  const maxIterations =
-    typeof settings.agentMaxIterations === 'number' && settings.agentMaxIterations > 0
-      ? settings.agentMaxIterations
-      : 200;
+  const maxIterations = resolveIterationBudget(undefined, settings);
   const sandboxMode = pickSandboxMode(params.sandboxMode, pickSandboxMode(settings.sandboxMode, 'workspace-write'));
   const apiKey =
     (await resolveModelApiKey(model)) ||

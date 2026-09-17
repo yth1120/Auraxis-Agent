@@ -122,6 +122,10 @@ export interface AgentInstance {
    *  from log.length (which only counts text chunks). */
   messagesCount: number;
   maxIterations: number;
+  /** 首次启动时的迭代预算（设置或请求解析结果）。续写时以此为"窗口大小"，
+   *  把 maxIterations 抬高一个窗口，否则 resumeFrom 带回的累计迭代数会立刻
+   *  再次撞上同一个上限。 */
+  baseMaxIterations?: number;
   checkPermission?: (
     toolName: string,
     input: Record<string, unknown>,

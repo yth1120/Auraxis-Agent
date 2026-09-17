@@ -2,6 +2,7 @@
 import type { AgentObserver } from '../agent-runtime/agent-loop-types';
 import type { AgentConfig, AgentInstance } from './agent-scheduler-types';
 import { PRIORITY_ORDER } from './agent-scheduler-support';
+import { BUSINESS_ITERATION_DEFAULT } from './agent-iteration-budget';
 
 export type SchedulerPermissionCheck = (
   toolName: string,
@@ -32,7 +33,9 @@ export function createQueuedInstance(
     messagesCount: 0,
     log: [],
     logBuffer: [],
-    maxIterations: config.maxIterations ?? 200,
+    maxIterations: config.maxIterations ?? BUSINESS_ITERATION_DEFAULT,
+    // 记录初始窗口，供续写时抬高上限（见 continueAgent）。
+    baseMaxIterations: config.maxIterations ?? BUSINESS_ITERATION_DEFAULT,
   };
 }
 
