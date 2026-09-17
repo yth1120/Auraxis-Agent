@@ -63,6 +63,27 @@ export default tseslint.config(
     files: ['**/*.test.{ts,tsx}', '**/__tests__/**/*.{ts,tsx}'],
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
+      // 测试文件是一段可读的叙事：长 describe + 长用例是常态，
+      // 规模阈值在这里只会逼出无意义的拆分（用例被切碎后更难读）。
+      'max-lines-per-function': 'off',
+      'max-lines': 'off',
+    },
+  },
+  {
+    // 渲染层组件：函数体主体是声明式 JSX 树，行数由布局复杂度决定，
+    // 拆分只能靠"为了行数而拆"的伪子组件；逻辑复杂度（complexity）
+    // 仍然全量生效，真实的分支债务不会被掩盖。
+    files: ['src/components/**/*.{ts,tsx}'],
+    rules: {
+      'max-lines-per-function': 'off',
+    },
+  },
+  {
+    // 纯数据 / 纯类型聚合文件：i18n 词表与 IPC 契约声明，
+    // 行数反映的是 key/接口数量而不是实现规模。
+    files: ['src/i18n/*.ts', 'src/types/electron-api.ts'],
+    rules: {
+      'max-lines': 'off',
     },
   },
 );

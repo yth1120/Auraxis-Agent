@@ -29,6 +29,34 @@ function greeting(): string {
   return t('greeting.evening');
 }
 
+/** 浮层头栏容器类名：分隔线开启时补下边框与更宽的下内边距。 */
+function chatAreaHeaderClass(showDivider: boolean): string {
+  const base = 'absolute inset-x-0 top-0 z-30 grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 pt-3 ';
+  return base + (showDivider ? 'pb-2 border-b border-[var(--color-border-dim)]' : 'pb-1');
+}
+
+/** 会话分隔线：会话视图激活时显示，最大化时隐藏。 */
+function computeShowChatDivider(
+  isAgentSurface: boolean,
+  hasMessages: boolean,
+  hasCurrentAgent: boolean,
+  isMaximized: boolean,
+): boolean {
+  const conversationActive = isAgentSurface ? hasCurrentAgent : hasMessages;
+  return conversationActive && !isMaximized;
+}
+
+/** 仅当有对话内容且不是 Work 首页时才渲染底部输入 Dock。 */
+function computeComposerBottom(
+  isAgentSurface: boolean,
+  hasMessages: boolean,
+  sidebarMode: string,
+  agentSurface: string | undefined,
+): boolean {
+  const workHome = sidebarMode === 'work' && agentSurface !== 'work';
+  return (isAgentSurface || hasMessages) && !workHome;
+}
+
 export default function ChatArea() {
   const tConv = useT();
   const accountName = useAuthStore((s) => s.name);
@@ -56,14 +84,13 @@ export default function ChatArea() {
   const sessionTitle = useSessionStore((s) => s.sessions.find((x) => x.id === s.currentSessionId)?.title ?? '');
   // Divider appears whenever a conversation view is active (chat has messages
   // or an Agent task is selected), and hides only when maximized.
-  const showChatDivider = ((!isAgentSurface && hasMessages) || (isAgentSurface && !!currentAgentId)) && !isMaximized;
+  const showChatDivider = computeShowChatDivider(isAgentSurface, hasMessages, Boolean(currentAgentId), isMaximized);
 
   // Composer floats over the full-height message area — track its real height
   // so the message list can reserve scroll room for the last message.
   // Work 首页只保留中央输入区：只要当前没有 Work 任务（含残留的 Code 任务
   // 或聊天会话），就绝不渲染底部 Dock，避免双输入框叠加。
-  const workHome = sidebarMode === 'work' && currentAgent?.surface !== 'work';
-  const composerBottom = (isAgentSurface || hasMessages) && !workHome;
+  const composerBottom = computeComposerBottom(isAgentSurface, hasMessages, sidebarMode, currentAgent?.surface);
   useEffect(() => {
     if (!composerBottom) return;
     const el = dockRef.current;
@@ -136,10 +163,7 @@ export default function ChatArea() {
           fade of messages scrolling underneath it. */}
       <div
         ref={headerRef}
-        className={
-          'absolute inset-x-0 top-0 z-30 grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 pt-3 ' +
-          (showChatDivider ? 'pb-2 border-b border-[var(--color-border-dim)]' : 'pb-1')
-        }
+        className={chatAreaHeaderClass(showChatDivider)}
         data-divider={showChatDivider ? 'on' : 'off'}
       >
         <div

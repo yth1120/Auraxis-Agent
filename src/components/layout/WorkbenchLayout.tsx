@@ -18,6 +18,13 @@ import { buildEditMenuItems, buildFileMenuItems, buildHelpMenuItems, buildViewMe
 import { useWorkbenchPaneResize, WORKBENCH_MAIN_MIN } from './useWorkbenchPaneResize';
 import { WorkbenchRightPanel, WorkbenchTabContent } from './WorkbenchContent';
 
+/** 玻璃化边框：关闭时无边框色；100% 全透明，其余按档位淡出。 */
+function glassBorderColor(glassOn: boolean, level: number): string | undefined {
+  if (!glassOn) return undefined;
+  if (level >= 100) return 'transparent';
+  return `color-mix(in srgb, var(--color-border-dim) ${Math.round(50 * (1 - level / 100))}%, transparent)`;
+}
+
 export default function WorkbenchLayout() {
   const t = useT();
 
@@ -81,11 +88,7 @@ export default function WorkbenchLayout() {
     ? `color-mix(in srgb, var(--color-glass-panel) ${Math.round(100 - Math.pow(sidebarGlass / 100, 0.75) * 88)}%, transparent)`
     : undefined;
   // 边框同样跟随玻璃化淡出：100% 时完全透明，避免深色主题下出现生硬的分隔线。
-  const sidebarBorderColor = sidebarGlassOn
-    ? sidebarGlass >= 100
-      ? 'transparent'
-      : `color-mix(in srgb, var(--color-border-dim) ${Math.round(50 * (1 - sidebarGlass / 100))}%, transparent)`
-    : undefined;
+  const sidebarBorderColor = glassBorderColor(sidebarGlassOn, sidebarGlass);
 
   // Track maximize state so the maximize button reflects 还原 vs 最大化.
   const [isMaximized, setIsMaximized] = useState(false);
