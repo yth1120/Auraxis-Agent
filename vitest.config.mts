@@ -14,6 +14,7 @@ export default defineConfig({
       'node_modules/**',
       // 用 Auraxis 生成/演练的临时项目（含各自的 .test.js）不参与本项目单测。
       'test1/**',
+      'demo-*/**',
     ],
     coverage: {
       provider: 'v8',

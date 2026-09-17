@@ -60,3 +60,4 @@ __pycache__/
 
 # 用 Auraxis 演练生成的临时项目（不参与构建与单测）
 /test1/
+/demo-*/
