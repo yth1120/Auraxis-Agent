@@ -65,6 +65,8 @@ const files = [...sourceFiles(path.join(root, 'electron')), ...sourceFiles(path.
 const graph = new Map();
 const typeGraph = new Map();
 const dynamicGraph = new Map();
+/** 运行时边的明细（值/动态），供 --list 打印可操作的切割清单。 */
+const runtimeEdgeDetails = new Map();
 for (const file of files) {
   const targets = new Set();
   const typeTargets = new Set();
@@ -77,6 +79,17 @@ for (const file of files) {
   }
   graph.set(file, [...targets]);
   typeGraph.set(file, [...typeTargets]);
+  const details = [];
+  for (const match of text.matchAll(STATIC_IMPORT_RE)) {
+    if (match[1]) continue; // 类型导入不参与运行时环
+    const target = resolveImport(file, match[2]);
+    if (target) details.push({ kind: 'value', target, line: text.slice(0, match.index).split('\n').length });
+  }
+  for (const match of text.matchAll(DYNAMIC_IMPORT_RE)) {
+    const target = resolveImport(file, match[1]);
+    if (target) details.push({ kind: 'dynamic', target, line: text.slice(0, match.index).split('\n').length });
+  }
+  runtimeEdgeDetails.set(file, details);
   const dynamicTargets = new Set();
   for (const match of text.matchAll(DYNAMIC_IMPORT_RE)) {
     const resolved = resolveImport(file, match[1]);
@@ -139,6 +152,20 @@ const relative = (file) => path.relative(root, file).replace(/\\/g, '/');
 console.log(
   `静态值循环: ${valueCycles.length} (budget ${maxCycles})｜运行时环(含动态 import): ${runtimeCycles.length} (budget ${maxRuntimeCycles})｜含类型导入: ${allCycles.length}`,
 );
+
+// --list：把每个运行时环的内部边打出来，方便按"最小切割点"逐个消环。
+if (process.argv.includes('--list')) {
+  for (const group of runtimeCycles) {
+    const members = new Set(group);
+    console.log(`\n=== 运行时环：${group.length} 个模块 ===`);
+    for (const file of group) {
+      for (const edge of runtimeEdgeDetails.get(file) ?? []) {
+        if (!members.has(edge.target)) continue;
+        console.log(`  [${edge.kind}] ${relative(file)}:${edge.line} → ${relative(edge.target)}`);
+      }
+    }
+  }
+}
 
 if (valueCycles.length > maxCycles || runtimeCycles.length > maxRuntimeCycles) {
   console.error('静态循环超出预算，新增的静态环会导致模块初始化顺序问题：');
