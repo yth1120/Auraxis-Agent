@@ -146,6 +146,66 @@ function isDeepSeekHarnessMcp(config: MCPServerConfig): boolean {
   return label.includes('deepseek-harness') || label.includes('deepseek harness');
 }
 
+function strOr(value: unknown, fallback: string): string {
+  return (typeof value === 'string' && value.trim()) || fallback;
+}
+
+/** 飞书/Lark 官方 MCP 通过 APP_ID / APP_SECRET 环境变量读取凭据。 */
+function applyLarkEnv(childEnv: Record<string, string | undefined>, settings: Record<string, unknown>): void {
+  childEnv.APP_ID = strOr(settings.larkAppId, '');
+  childEnv.APP_SECRET = strOr(settings.larkAppSecret, '');
+  childEnv.LARK_DOMAIN = strOr(settings.larkDomain, 'https://open.feishu.cn');
+  childEnv.LARK_TOOLS = strOr(settings.larkTools, 'preset.light');
+  childEnv.LARK_TOKEN_MODE = 'tenant_access_token';
+}
+
+/**
+ * deepseek-harness-mcp runs npx.cmd internally on Windows; Node cannot spawn
+ * that shim directly, so load a small command-shim bridge in the child.
+ */
+function applyHarnessPreload(childEnv: Record<string, string | undefined>, config: MCPServerConfig): void {
+  if (process.platform !== 'win32' || !isDeepSeekHarnessMcp(config)) return;
+  const options = childEnv.NODE_OPTIONS ? `${childEnv.NODE_OPTIONS} ` : '';
+  const preloadPath = getMcpPreloadPath().replace(/\\/g, '/');
+  childEnv.NODE_OPTIONS = `${options}--require="${preloadPath}"`;
+}
+
+function spawnMcpChild(
+  conn: MCPConnection,
+  childEnv: Record<string, string | undefined>,
+): ReturnType<typeof spawn> {
+  const child = spawn(conn.config.command, conn.config.args, {
+    env: childEnv,
+    stdio: ['pipe', 'pipe', 'pipe'],
+    shell: false,
+    windowsHide: true,
+    windowsVerbatimArguments: process.platform === 'win32',
+  });
+
+  conn.process = child;
+  conn.buffer = '';
+  // The server can exit between writes; async EPIPE on stdin must not
+  // escape as an uncaught exception.
+  child.stdin?.on?.('error', () => {});
+  child.stdout?.on('data', (data: Buffer) => handleMcpData(conn, data.toString()));
+  child.stderr?.on('data', (data: Buffer) => {
+    // Some MCP servers use stderr for logging
+    console.error(`[MCP ${conn.config.name}] ${data.toString().trim()}`);
+  });
+  child.on('close', (code) => {
+    conn.connected = false;
+    conn.tools = [];
+    conn.pending.forEach((p) => p.reject(new Error(`MCP 进程退出 (code ${code})`)));
+    conn.pending.clear();
+  });
+  child.on('error', (err) => {
+    conn.connected = false;
+    conn.pending.forEach((p) => p.reject(err));
+    conn.pending.clear();
+  });
+  return child;
+}
+
 async function connectServer(serverId: string): Promise<MCPStatus> {
   const conn = connections.get(serverId);
   if (!conn) {
@@ -195,64 +255,12 @@ async function connectServer(serverId: string): Promise<MCPStatus> {
     // 自动注入密钥，避免把凭据泄露给任意第三方子进程。
     if (conn.config.useAuraxisDeepSeekKey && !childEnv.DEEPSEEK_API_KEY) {
       const credential = await resolveCredential('DEEPSEEK_API_KEY').catch(() => undefined);
-      if (credential?.value) {
-        childEnv.DEEPSEEK_API_KEY = credential.value;
-      }
+      if (credential?.value) childEnv.DEEPSEEK_API_KEY = credential.value;
     }
-
-    // 飞书/Lark 官方 MCP 通过 APP_ID / APP_SECRET 环境变量读取凭据。
     // 密钥始终留在主进程加密设置中，不被写入 MCP 配置或命令行参数。
-    if (larkSettings) {
-      childEnv.APP_ID = larkSettings.larkAppId ? String(larkSettings.larkAppId).trim() : '';
-      childEnv.APP_SECRET = larkSettings.larkAppSecret ? String(larkSettings.larkAppSecret).trim() : '';
-      childEnv.LARK_DOMAIN =
-        (typeof larkSettings.larkDomain === 'string' && larkSettings.larkDomain.trim()) || 'https://open.feishu.cn';
-      childEnv.LARK_TOOLS =
-        (typeof larkSettings.larkTools === 'string' && larkSettings.larkTools.trim()) || 'preset.light';
-      childEnv.LARK_TOKEN_MODE = 'tenant_access_token';
-    }
-
-    // deepseek-harness-mcp runs npx.cmd internally on Windows; Node cannot
-    // spawn that shim directly, so load a small command-shim bridge in the child.
-    if (process.platform === 'win32' && isDeepSeekHarnessMcp(conn.config)) {
-      const options = childEnv.NODE_OPTIONS ? `${childEnv.NODE_OPTIONS} ` : '';
-      const preloadPath = getMcpPreloadPath().replace(/\\/g, '/');
-      childEnv.NODE_OPTIONS = `${options}--require="${preloadPath}"`;
-    }
-
-    const child = spawn(conn.config.command, conn.config.args, {
-      env: childEnv,
-      stdio: ['pipe', 'pipe', 'pipe'],
-      shell: false,
-      windowsHide: true,
-      windowsVerbatimArguments: process.platform === 'win32',
-    });
-
-    conn.process = child;
-    conn.buffer = '';
-    // The server can exit between writes; async EPIPE on stdin must not
-    // escape as an uncaught exception.
-    child.stdin?.on?.('error', () => {});
-
-    child.stdout?.on('data', (data: Buffer) => handleMcpData(conn, data.toString()));
-    child.stderr?.on('data', (data: Buffer) => {
-      // Some MCP servers use stderr for logging
-      console.error(`[MCP ${conn.config.name}] ${data.toString().trim()}`);
-    });
-
-    child.on('close', (code) => {
-      conn.connected = false;
-      conn.tools = [];
-      // Reject all pending
-      conn.pending.forEach((p) => p.reject(new Error(`MCP 进程退出 (code ${code})`)));
-      conn.pending.clear();
-    });
-
-    child.on('error', (err) => {
-      conn.connected = false;
-      conn.pending.forEach((p) => p.reject(err));
-      conn.pending.clear();
-    });
+    if (larkSettings) applyLarkEnv(childEnv, larkSettings);
+    applyHarnessPreload(childEnv, conn.config);
+    conn.process = spawnMcpChild(conn, childEnv);
 
     // Initialize handshake
     await sendJsonRpc(
