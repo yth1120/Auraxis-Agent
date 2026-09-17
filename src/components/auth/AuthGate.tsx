@@ -1,7 +1,7 @@
 import { errorText } from '../../../electron/errors';
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Button, Checkbox, Input } from 'antd';
+import { Button, Checkbox, Input, Modal } from 'antd';
 import { CircleNotch } from '@/components/common/icons';
 import { useT } from '../../i18n';
 import { useAuthStore } from '../../stores/useAuthStore';
@@ -238,6 +238,30 @@ function LoginScreen() {
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const resetAccount = useAuthStore((s) => s.resetAccount);
+  // 预加载脚本没加载（构建不完整）时，所有 IPC 都会失败：
+  // 明确告诉用户原因，而不是让人以为是密码错误。
+  const bridgeMissing = typeof window !== 'undefined' && !window.electronAPI;
+
+  const confirmReset = () => {
+    Modal.confirm({
+      title: t('auth.resetTitle'),
+      content: t('auth.resetBody'),
+      okText: t('auth.resetConfirm'),
+      cancelText: t('common.cancel'),
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        setResetting(true);
+        try {
+          const res = await resetAccount();
+          if (!res.ok) setError(res.error || t('auth.failed'));
+        } finally {
+          setResetting(false);
+        }
+      },
+    });
+  };
 
   const submit = async () => {
     setError('');
@@ -249,7 +273,7 @@ function LoginScreen() {
     const res = await login({ email, password, rememberMe });
     setSubmitting(false);
     if (!res.ok) {
-      if (res.error?.includes('尚未创建账户')) {
+      if (res.code === 'no_account' || res.error?.includes('尚未创建账户')) {
         switchToSetup();
         return;
       }
@@ -267,6 +291,7 @@ function LoginScreen() {
         }}
       >
         {notice === 'created' && <div className="text-xs leading-[18px] text-success">{t('auth.createdNotice')}</div>}
+        {bridgeMissing && <div className="text-xs leading-[18px] text-danger">{t('auth.bridgeMissing')}</div>}
         <Field label={t('auth.email')}>
           <Input
             value={email}
@@ -303,6 +328,14 @@ function LoginScreen() {
           }}
         >
           {t('auth.noAccount')}
+        </button>
+        <button
+          type="button"
+          className="self-center border-none bg-transparent text-2xs text-text-faint cursor-pointer hover:text-text-secondary disabled:opacity-40"
+          disabled={resetting}
+          onClick={confirmReset}
+        >
+          {t('auth.forgotPassword')}
         </button>
       </form>
     </AuthShell>

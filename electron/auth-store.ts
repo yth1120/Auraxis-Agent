@@ -8,9 +8,10 @@
  * and headless runs can isolate it (same convention as settings-store).
  */
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'crypto';
-import { readFile, writeFile, mkdir } from 'fs/promises';
+import { readFile, writeFile, mkdir, rm } from 'fs/promises';
 import path from 'path';
 import { app } from 'electron';
+import { errorText } from './errors';
 import type {
   AuthChangeNameParams,
   AuthChangePasswordParams,
@@ -18,6 +19,9 @@ import type {
   AuthSetupParams,
   AuthStatus,
 } from './contracts/auth';
+
+/** 登录失败的可判定原因（渲染层据此决定跳注册还是提示重置）。 */
+export type AuthErrorCode = 'no_account' | 'account_corrupt' | 'throttled' | 'bad_credentials';
 
 interface StoredAccount {
   version: 1;
@@ -96,17 +100,33 @@ function authPath(): string {
   return path.join(dir, 'auraxis-auth.json');
 }
 
-async function readAccount(): Promise<StoredAccount | null> {
+/** 账户文件状态：missing = 从未创建；corrupt = 存在但无法解析（旧版本/被截断）。 */
+type AccountState =
+  | { status: 'ok'; account: StoredAccount }
+  | { status: 'missing' }
+  | { status: 'corrupt' };
+
+async function readAccountState(): Promise<AccountState> {
+  let raw: string;
   try {
-    const raw = await readFile(authPath(), 'utf-8');
+    raw = await readFile(authPath(), 'utf-8');
+  } catch {
+    return { status: 'missing' };
+  }
+  try {
     const data = JSON.parse(raw) as Partial<StoredAccount>;
     if (!data || typeof data !== 'object' || typeof data.hash !== 'string' || typeof data.salt !== 'string') {
-      return null;
+      return { status: 'corrupt' };
     }
-    return data as StoredAccount;
+    return { status: 'ok', account: data as StoredAccount };
   } catch {
-    return null;
+    return { status: 'corrupt' };
   }
+}
+
+async function readAccount(): Promise<StoredAccount | null> {
+  const state = await readAccountState();
+  return state.status === 'ok' ? state.account : null;
 }
 
 async function writeAccount(account: StoredAccount): Promise<void> {
@@ -189,11 +209,13 @@ export async function setupAccount(params: AuthSetupParams): Promise<{ ok: boole
   return { ok: true };
 }
 
-export function loginAccount(params: AuthLoginParams): Promise<{ ok: boolean; error?: string }> {
+export function loginAccount(
+  params: AuthLoginParams,
+): Promise<{ ok: boolean; error?: string; code?: AuthErrorCode }> {
   return withThrottleLock(() => loginAccountInner(params));
 }
 
-async function loginAccountInner(params: AuthLoginParams): Promise<{ ok: boolean; error?: string }> {
+async function loginAccountInner(params: AuthLoginParams): Promise<{ ok: boolean; error?: string; code?: AuthErrorCode }> {
   const now = Date.now();
   const attempts = await readThrottle();
   if (now - attempts.windowStart > 60_000) {
@@ -201,15 +223,26 @@ async function loginAccountInner(params: AuthLoginParams): Promise<{ ok: boolean
     attempts.windowStart = now;
     await writeThrottle(attempts);
   }
-  if (attempts.count >= 5) return { ok: false, error: '尝试次数过多，请 60 秒后再试' };
+  if (attempts.count >= 5) {
+    return { ok: false, code: 'throttled', error: '尝试次数过多，请 60 秒后再试' };
+  }
 
-  const account = await readAccount();
-  if (!account) return { ok: false, error: '尚未创建账户' };
+  const state = await readAccountState();
+  if (state.status === 'corrupt') {
+    // 旧版本账户文件 / 被截断的文件：无法校验密码。给出明确出路（登录页提供重置）。
+    return {
+      ok: false,
+      code: 'account_corrupt',
+      error: '本机账户文件已损坏或来自旧版本，无法校验密码。请在登录页选择「重置本地账户」后重新创建。',
+    };
+  }
+  if (state.status === 'missing') return { ok: false, code: 'no_account', error: '尚未创建账户' };
+  const account = state.account;
   const email = params.email.trim().toLowerCase();
   if (email !== account.email || !verify(params.password, account)) {
     attempts.count += 1;
     await writeThrottle(attempts);
-    return { ok: false, error: '邮箱或密码错误' };
+    return { ok: false, code: 'bad_credentials', error: '邮箱或密码错误' };
   }
 
   await writeThrottle({ count: 0, windowStart: now });
@@ -217,6 +250,21 @@ async function loginAccountInner(params: AuthLoginParams): Promise<{ ok: boolean
   account.rememberMe = !!params.rememberMe;
   await writeAccount(account);
   return { ok: true };
+}
+
+/**
+ * 重置本地账户：删除账户文件与限流记录，回到"未创建"状态。
+ * 本地账户没有服务端可找回密码，这是忘记密码 / 文件损坏时唯一的自救路径。
+ */
+export async function resetLocalAccount(): Promise<{ ok: boolean; error?: string }> {
+  try {
+    await rm(authPath(), { force: true });
+    await rm(throttlePath(), { force: true });
+    unlocked = false;
+    return { ok: true };
+  } catch (error: unknown) {
+    return { ok: false, error: errorText(error) };
+  }
 }
 
 export async function logoutAccount(): Promise<void> {

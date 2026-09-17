@@ -29,6 +29,7 @@ export function createPlatformApi() {
         invoke('auth:changePassword', params),
       setAvatar: (avatar: string) => invoke('auth:setAvatar', avatar),
       changeName: (name: string) => invoke('auth:changeName', { name }),
+      reset: () => invoke('auth:reset'),
     },
 
     file: {

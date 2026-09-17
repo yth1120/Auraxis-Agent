@@ -117,11 +117,14 @@ export interface ElectronAPI {
   auth: {
     status: () => Promise<{ ok: boolean; data?: AuthStatus; error?: string }>;
     setup: (params: AuthSetupParams) => Promise<{ ok: boolean; error?: string }>;
-    login: (params: AuthLoginParams) => Promise<{ ok: boolean; error?: string }>;
+    /** code 用于渲染层判定失败原因（no_account 跳注册，account_corrupt 提示重置）。 */
+    login: (params: AuthLoginParams) => Promise<{ ok: boolean; error?: string; code?: string }>;
     logout: () => Promise<{ ok: boolean; error?: string }>;
     changePassword: (params: AuthChangePasswordParams) => Promise<{ ok: boolean; error?: string }>;
     setAvatar: (avatar: string) => Promise<{ ok: boolean; error?: string }>;
     changeName: (name: string) => Promise<{ ok: boolean; error?: string }>;
+    /** 删除本地账户文件（忘记密码 / 文件损坏时的自救入口）。 */
+    reset: () => Promise<{ ok: boolean; error?: string }>;
   };
   minimize: () => Promise<void>;
   maximize: () => Promise<void>;

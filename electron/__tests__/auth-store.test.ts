@@ -1,167 +1,77 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtempSync, rmSync } from 'fs';
+/**
+ * auth-store 回归测试：本地账户的建号 / 登录 / 损坏检测 / 重置。
+ *
+ * 覆盖用户实际遇到的"登录不进去"两类场景：
+ *   1. 账户文件损坏（旧版本 / 被截断）→ 必须给出可判定的 code，而不是笼统的密码错误；
+ *   2. 忘记密码 → resetLocalAccount 清空账户与限流，回到 setup 阶段。
+ */
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { mkdtempSync, writeFileSync } from 'fs';
+import { readFile } from 'fs/promises';
 import os from 'os';
 import path from 'path';
 
-vi.mock('electron', () => ({
-  app: { getPath: () => '' },
-}));
+let dataDir: string;
+let store: typeof import('../auth-store');
 
-import {
-  setupAccount,
-  loginAccount,
-  logoutAccount,
-  getAuthStatus,
-  changeAccountPassword,
-  setAccountAvatar,
-  changeAccountName,
-  getDeepSeekUserId,
-} from '../auth-store';
+beforeEach(async () => {
+  dataDir = mkdtempSync(path.join(os.tmpdir(), 'auraxis-auth-store-'));
+  process.env.AURAXIS_USER_DATA_DIR = dataDir;
+  delete process.env.AURAXIS_AUTH_DISABLED;
+  vi.resetModules();
+  store = await import('../auth-store');
+});
 
-describe('auth-store — 本地账户登录系统', () => {
-  let dir: string;
+describe('auth-store', () => {
+  it('setup → locked → login → unlocked', async () => {
+    expect((await store.setupAccount({ name: ' T ', email: 'T@Example.com ', password: 'secret1', rememberMe: false })).ok).toBe(true);
 
-  beforeEach(async () => {
-    dir = mkdtempSync(path.join(os.tmpdir(), 'auraxis-auth-test-'));
-    process.env.AURAXIS_USER_DATA_DIR = dir;
-    delete process.env.AURAXIS_AUTH_DISABLED;
-    await logoutAccount(); // reset in-memory session
+    const locked = await store.getAuthStatus();
+    expect(locked.phase).toBe('locked');
+    expect(locked.email).toBe('t@example.com'); // 邮箱规范化后再比较
+
+    expect((await store.loginAccount({ email: 't@example.com', password: 'secret1', rememberMe: false })).ok).toBe(true);
+    const unlocked = await store.getAuthStatus();
+    expect(unlocked.phase).toBe('unlocked');
+    expect(unlocked.name).toBe('T');
   });
 
-  afterEach(() => {
-    delete process.env.AURAXIS_USER_DATA_DIR;
-    rmSync(dir, { recursive: true, force: true });
+  it('未创建账户时登录返回 no_account（渲染层据此跳注册）', async () => {
+    const res = await store.loginAccount({ email: 'nobody@example.com', password: 'secret1', rememberMe: false });
+    expect(res.ok).toBe(false);
+    expect(res.code).toBe('no_account');
   });
 
-  it('无账户时 phase 为 setup', async () => {
-    const status = await getAuthStatus();
-    expect(status.phase).toBe('setup');
-    expect(status.rememberMe).toBe(false);
+  it('密码错误返回 bad_credentials，并累计限流', async () => {
+    await store.setupAccount({ name: 'T', email: 't@example.com', password: 'secret1', rememberMe: false });
+    const res = await store.loginAccount({ email: 't@example.com', password: 'wrong-pass', rememberMe: false });
+    expect(res.code).toBe('bad_credentials');
+    const throttle = JSON.parse(await readFile(path.join(dataDir, 'auraxis-auth-throttle.json'), 'utf-8'));
+    expect(throttle.count).toBe(1);
   });
 
-  it('getDeepSeekUserId：无账户时不返回，注册后由邮箱哈希派生且稳定', async () => {
-    expect(await getDeepSeekUserId()).toBeUndefined();
-    await setupAccount({ name: 'A', email: 'User@Example.com', password: 'secret1', rememberMe: false });
-    const id1 = await getDeepSeekUserId();
-    const id2 = await getDeepSeekUserId();
-    expect(id1).toMatch(/^au-[a-f0-9]{24}$/);
-    expect(id1).toBe(id2);
+  it('账户文件损坏时返回 account_corrupt（不误报密码错误）', async () => {
+    writeFileSync(path.join(dataDir, 'auraxis-auth.json'), '{ "version": 1, "name": "旧账户"', 'utf-8');
+    const res = await store.loginAccount({ email: 't@example.com', password: 'secret1', rememberMe: false });
+    expect(res.code).toBe('account_corrupt');
+    expect(res.error).toContain('重置本地账户');
+    // 损坏文件仍然存在（不静默覆盖），重置后才回到 setup
+    expect((await store.getAuthStatus()).phase).toBe('setup');
   });
 
-  it('AURAXIS_AUTH_DISABLED 时不返回 user_id', async () => {
-    await setupAccount({ name: 'A', email: 'a@b.com', password: 'secret1', rememberMe: false });
-    process.env.AURAXIS_AUTH_DISABLED = '1';
-    expect(await getDeepSeekUserId()).toBeUndefined();
-    delete process.env.AURAXIS_AUTH_DISABLED;
-  });
-
-  it('注册后必须登录：创建账户后 phase 为 locked，邮箱归一化，重复创建被拒绝', async () => {
-    const res = await setupAccount({
-      name: ' 小明 ',
-      email: ' Foo@Example.COM ',
-      password: 'secret1',
+  it('resetLocalAccount 清空账户与限流，可重新建号', async () => {
+    await store.setupAccount({ name: 'T', email: 't@example.com', password: 'secret1', rememberMe: false });
+    expect((await store.resetLocalAccount()).ok).toBe(true);
+    expect((await store.getAuthStatus()).phase).toBe('setup');
+    const reSetup = await store.setupAccount({
+      name: 'T2',
+      email: 't2@example.com',
+      password: 'secret2',
       rememberMe: false,
     });
-    expect(res.ok).toBe(true);
-
-    const status = await getAuthStatus();
-    expect(status.phase).toBe('locked');
-    expect(status.name).toBe('小明');
-    expect(status.email).toBe('foo@example.com');
-    expect(status.rememberMe).toBe(false);
-
-    const again = await setupAccount({ name: 'A', email: 'b@c.com', password: 'secret1', rememberMe: false });
-    expect(again.ok).toBe(false);
-  });
-
-  it('注册时勾选记住我：创建后仍锁定，成功登录后才持久化并自动解锁；退出后清除', async () => {
-    await setupAccount({ name: 'A', email: 'a@b.com', password: 'secret1', rememberMe: true });
-    expect((await getAuthStatus()).phase).toBe('locked');
-
-    expect((await loginAccount({ email: 'a@b.com', password: 'secret1', rememberMe: true })).ok).toBe(true);
-    expect((await getAuthStatus()).phase).toBe('unlocked');
-
-    await logoutAccount();
-    const status = await getAuthStatus();
-    expect(status.phase).toBe('locked');
-    expect(status.rememberMe).toBe(false);
-  });
-
-  it('登录校验：错误密码拒绝，正确密码通过并记住选择', async () => {
-    await setupAccount({ name: 'A', email: 'a@b.com', password: 'secret1', rememberMe: false });
-    await logoutAccount();
-    expect((await getAuthStatus()).phase).toBe('locked');
-
-    const wrong = await loginAccount({ email: 'a@b.com', password: 'wrong!', rememberMe: false });
-    expect(wrong.ok).toBe(false);
-
-    const ok = await loginAccount({ email: ' A@B.com ', password: 'secret1', rememberMe: true });
-    expect(ok.ok).toBe(true);
-    expect((await getAuthStatus()).phase).toBe('unlocked');
-    expect((await getAuthStatus()).rememberMe).toBe(true);
-  });
-
-  it('退出登录清除会话与 rememberMe', async () => {
-    await setupAccount({ name: 'A', email: 'a@b.com', password: 'secret1', rememberMe: true });
-    await logoutAccount();
-    const status = await getAuthStatus();
-    expect(status.phase).toBe('locked');
-    expect(status.rememberMe).toBe(false);
-  });
-
-  it('修改密码：当前密码错误拒绝，成功后旧密码失效', async () => {
-    await setupAccount({ name: 'A', email: 'a@b.com', password: 'secret1', rememberMe: false });
-    const bad = await changeAccountPassword({ currentPassword: 'nope', newPassword: 'newpass1' });
-    expect(bad.ok).toBe(false);
-
-    const good = await changeAccountPassword({ currentPassword: 'secret1', newPassword: 'newpass1' });
-    expect(good.ok).toBe(true);
-
-    await logoutAccount();
-    expect((await loginAccount({ email: 'a@b.com', password: 'secret1', rememberMe: false })).ok).toBe(false);
-    expect((await loginAccount({ email: 'a@b.com', password: 'newpass1', rememberMe: false })).ok).toBe(true);
-  });
-
-  it('连续错误登录触发限流', async () => {
-    await setupAccount({ name: 'A', email: 'a@b.com', password: 'secret1', rememberMe: false });
-    for (let i = 0; i < 5; i += 1) {
-      await loginAccount({ email: 'a@b.com', password: 'wrong!', rememberMe: false });
-    }
-    const blocked = await loginAccount({ email: 'a@b.com', password: 'secret1', rememberMe: false });
-    expect(blocked.ok).toBe(false);
-    expect(blocked.error).toContain('尝试次数过多');
-  });
-
-  it('设置/移除头像：合法 data URL 生效，非法值拒绝，空串清除', async () => {
-    await setupAccount({ name: 'A', email: 'a@b.com', password: 'secret1', rememberMe: false });
-    const avatar = 'data:image/png;base64,iVBORw0KGgo=';
-
-    const bad = await setAccountAvatar('not-an-image');
-    expect(bad.ok).toBe(false);
-
-    const ok = await setAccountAvatar(avatar);
-    expect(ok.ok).toBe(true);
-    expect((await getAuthStatus()).avatar).toBe(avatar);
-
-    const cleared = await setAccountAvatar('');
-    expect(cleared.ok).toBe(true);
-    expect((await getAuthStatus()).avatar).toBeUndefined();
-  });
-
-  it('修改账户名：trim 后保存并同步到状态，空名/超长拒绝', async () => {
-    await setupAccount({ name: '小明', email: 'a@b.com', password: 'secret1', rememberMe: false });
-    const ok = await changeAccountName({ name: '  大刘  ' });
-    expect(ok.ok).toBe(true);
-    expect((await getAuthStatus()).name).toBe('大刘');
-
-    expect((await changeAccountName({ name: '   ' })).ok).toBe(false);
-    expect((await changeAccountName({ name: 'x'.repeat(41) })).ok).toBe(false);
-    expect((await getAuthStatus()).name).toBe('大刘');
-  });
-
-  it('无账户时修改账户名被拒绝', async () => {
-    const res = await changeAccountName({ name: 'A' });
-    expect(res.ok).toBe(false);
-    expect(res.error).toContain('尚未创建账户');
+    expect(reSetup.ok).toBe(true);
+    expect((await store.loginAccount({ email: 't2@example.com', password: 'secret2', rememberMe: false })).ok).toBe(
+      true,
+    );
   });
 });

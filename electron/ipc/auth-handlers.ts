@@ -8,6 +8,7 @@ import {
   changeAccountPassword,
   setAccountAvatar,
   changeAccountName,
+  resetLocalAccount,
   isUnlocked,
 } from '../auth-store';
 import type {
@@ -73,6 +74,15 @@ export function registerAuthHandlers(): void {
     if (!isUnlocked()) return { ok: false, error: '请先登录' };
     try {
       return await changeAccountName(params ?? {});
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
+    }
+  });
+
+  // 本地账户没有服务端可找回密码：文件损坏或忘记密码时，这是唯一的自救入口。
+  secureHandle('auth:reset', async () => {
+    try {
+      return await resetLocalAccount();
     } catch (error: unknown) {
       return { ok: false, error: errorText(error) };
     }

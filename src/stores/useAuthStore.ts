@@ -15,7 +15,9 @@ interface AuthStore {
 
   hydrate: () => Promise<void>;
   setup: (params: AuthSetupParams) => Promise<{ ok: boolean; error?: string }>;
-  login: (params: AuthLoginParams) => Promise<{ ok: boolean; error?: string }>;
+  login: (params: AuthLoginParams) => Promise<{ ok: boolean; error?: string; code?: string }>;
+  /** 删除本地账户（忘记密码 / 账户文件损坏）。 */
+  resetAccount: () => Promise<{ ok: boolean; error?: string }>;
   logout: () => Promise<void>;
   switchToSetup: () => void;
   switchToLogin: () => void;
@@ -85,8 +87,21 @@ export const useAuthStore = create<AuthStore>((set) => ({
           rememberMe: !!params.rememberMe,
           notice: '',
         });
+      } else if (res?.code === 'no_account') {
+        // 账户文件不存在：直接引导去注册，而不是把用户卡在登录页。
+        set({ phase: 'setup', notice: '' });
       }
       return res ?? { ok: false, error: '认证服务不可用' };
+    } catch (error: unknown) {
+      return { ok: false, error: errorText(error) };
+    }
+  },
+
+  resetAccount: async () => {
+    try {
+      const res = (await window.electronAPI?.auth?.reset()) ?? { ok: false, error: '认证服务不可用' };
+      if (res.ok) set({ phase: 'setup', notice: '', rememberMe: false });
+      return res;
     } catch (error: unknown) {
       return { ok: false, error: errorText(error) };
     }
