@@ -86,27 +86,273 @@ function EventLine({ entry }: { entry: AgentLogEntry }) {
   return null;
 }
 
+/** 优先级徽章：点击在 high → normal → low → high 之间循环。 */
+function PriorityBadge({
+  priority,
+  onCycle,
+  t,
+}: {
+  priority: 'high' | 'normal' | 'low' | string;
+  onCycle: () => void;
+  t: ReturnType<typeof useT>;
+}) {
+  const cls =
+    priority === 'high'
+      ? 'bg-[var(--color-danger-soft)] text-[var(--color-danger)] border-[var(--color-danger-border)] hover:bg-[var(--color-danger-border)]'
+      : priority === 'normal'
+        ? 'bg-[var(--color-primary-soft)] text-[var(--color-primary)] border-[var(--color-primary-border)] hover:bg-[var(--color-primary-strong)]'
+        : 'bg-[var(--color-bg-secondary)] text-text-secondary border-[var(--color-border-dim)] hover:bg-[var(--color-hover)]';
+  const label =
+    priority === 'high'
+      ? t('dashboard.priorityHigh')
+      : priority === 'normal'
+        ? t('dashboard.priorityMedium')
+        : t('dashboard.priorityLow');
+  return (
+    <button
+      type="button"
+      onClick={onCycle}
+      className={clsx(
+        'inline-flex items-center rounded-full h-5 px-1.5 text-2xs font-medium leading-none cursor-pointer border transition-colors duration-150',
+        cls,
+      )}
+    >
+      {label}
+    </button>
+  );
+}
+
+/** 卡片右上角动作：查看详情 +（运行中）暂停/停止 +（暂停中）恢复。 */
+function CardActions({
+  status,
+  id,
+  t,
+  onToggleExpand,
+}: {
+  status: string;
+  id: string;
+  t: ReturnType<typeof useT>;
+  onToggleExpand: () => void;
+}) {
+  const pauseAgent = useAgentStore((s) => s.pauseAgent);
+  const resumeAgent = useAgentStore((s) => s.resumeAgent);
+  const stopAgent = useAgentStore((s) => s.stopAgent);
+  return (
+    <Space size={2}>
+      <Tooltip title={t('dashboard.viewDetails')}>
+        <Button type="text" size="small" icon={<ArrowsOut />} onClick={onToggleExpand} />
+      </Tooltip>
+      {status === 'running' && (
+        <>
+          <Tooltip title={t('dashboard.pause')}>
+            <Button
+              type="text"
+              size="small"
+              icon={<PauseCircle />}
+              onClick={() => pauseAgent(id)}
+              aria-label={t('dashboard.pauseAgent')}
+            />
+          </Tooltip>
+          <Tooltip title={t('dashboard.stop')}>
+            <Button
+              type="text"
+              size="small"
+              danger
+              icon={<Stop />}
+              onClick={() => stopAgent(id)}
+              aria-label={t('dashboard.stopAgent')}
+            />
+          </Tooltip>
+        </>
+      )}
+      {status === 'paused' && (
+        <Tooltip title={t('dashboard.resume')}>
+          <Button
+            type="text"
+            size="small"
+            icon={<PlayCircle />}
+            onClick={() => resumeAgent(id)}
+            aria-label={t('dashboard.resumeAgent')}
+          />
+        </Tooltip>
+      )}
+    </Space>
+  );
+}
+
+/** 展开后的 todo 明细列表。 */
+function TodoList({
+  todos,
+}: {
+  todos: Array<{ status?: string; content?: string }>;
+}) {
+  return (
+    <div className="mt-1 pt-2 border-t border-[var(--color-border-dim)] flex flex-col gap-1">
+      {todos.map((todo, index) => (
+        <div
+          key={index}
+          className={clsx(
+            'flex items-start gap-2 text-xs',
+            todo?.status === 'pending' && 'text-[var(--color-text-muted)]',
+            todo?.status === 'completed' && 'text-[var(--color-text-secondary)] line-through',
+            todo?.status === 'in_progress' && 'text-[var(--color-text-primary)]',
+          )}
+        >
+          <span
+            className={clsx(
+              'shrink-0 mt-1 text-xs',
+              todo?.status === 'pending' && 'text-[var(--color-text-muted)]',
+              todo?.status === 'completed' && 'text-text-secondary',
+              todo?.status === 'in_progress' && 'text-text-primary',
+            )}
+          >
+            {todo?.status === 'completed' ? (
+              <CheckCircle />
+            ) : todo?.status === 'in_progress' ? (
+              <ExecutingIndicator size={14} />
+            ) : (
+              <Clock />
+            )}
+          </span>
+          <span>{todo?.content ?? '-'}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** 计划进度条 + 完成计数。 */
+function PlanProgressLine({
+  todos,
+  doneCount,
+  planPct,
+  running,
+}: {
+  todos: unknown[];
+  doneCount: number;
+  planPct: number;
+  running: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <Progress percent={planPct} size="small" showInfo={false} status={running ? 'active' : 'normal'} />
+      <span className="text-xs text-[var(--color-text-muted)] font-mono whitespace-nowrap">
+        {doneCount}/{todos.length}
+      </span>
+    </div>
+  );
+}
+
+/** 当前进行中的任务行。 */
+function ActiveTaskLine({ task }: { task: { activeForm?: string; content?: string } }) {
+  return (
+    <div className="text-xs text-text-secondary flex items-center overflow-hidden text-ellipsis whitespace-nowrap">
+      <ExecutingIndicator size={14} className="mr-1" />
+      {task.activeForm || task.content}
+    </div>
+  );
+}
+
+/** 运行时长 / 工具数 / 轮次 / token / 事件台开关。 */
+function AgentStatsRow({
+  elapsed,
+  toolCallCount,
+  iteration,
+  maxIterations,
+  totalIn,
+  totalOut,
+  hasEvents,
+  showConsole,
+  onToggleConsole,
+  t,
+}: {
+  elapsed: number;
+  toolCallCount: number;
+  iteration: number;
+  maxIterations: number;
+  totalIn: number;
+  totalOut: number;
+  hasEvents: boolean;
+  showConsole: boolean;
+  onToggleConsole: () => void;
+  t: ReturnType<typeof useT>;
+}) {
+  return (
+    <div className="flex gap-3 text-xs text-[var(--color-text-secondary)]">
+      <Tooltip title={t('dashboard.runtime')}>
+        <span className="inline-flex items-center gap-1">
+          <Clock /> {elapsed.toFixed(1)}s
+        </span>
+      </Tooltip>
+      <Tooltip title={t('dashboard.tools')}>
+        <span className="inline-flex items-center gap-1">
+          <Lightning /> {toolCallCount}
+        </span>
+      </Tooltip>
+      <span className="inline-flex items-center gap-1">
+        {t('dashboard.rounds', { current: iteration, max: maxIterations })}
+      </span>
+      {(totalIn > 0 || totalOut > 0) && (
+        <Tooltip title={t('dashboard.tokens', { in: totalIn.toLocaleString(), out: totalOut.toLocaleString() })}>
+          <span className="font-mono text-2xs text-[var(--color-text-muted)] bg-[var(--color-bg-elevated)] px-1 py-px rounded-[5px]">
+            {formatTokens(totalIn + totalOut)} tok
+          </span>
+        </Tooltip>
+      )}
+      {hasEvents && (
+        <Tooltip title={showConsole ? t('dashboard.collapseEvents') : t('dashboard.expandEvents')}>
+          <button
+            className="border-none bg-transparent cursor-pointer inline-flex items-center text-2xs text-[var(--color-text-muted)] p-[1px_3px] rounded-[5px] transition-colors duration-fast ease-out hover:text-accent hover:bg-[var(--color-bg-elevated)]"
+            onClick={onToggleConsole}
+            aria-label={t('dashboard.eventsConsole')}
+          >
+            <Code />
+          </button>
+        </Tooltip>
+      )}
+    </div>
+  );
+}
+
+/** 卡片展示数据（把 ?? 兜底集中在一处，避免组件本身复杂度膨胀）。 */
+function agentCardData(agent: AgentInfo) {
+  return {
+    id: agent?.id ?? '',
+    name: agent?.name ?? '-',
+    status: agent?.status ?? 'idle',
+    priority: agent?.priority ?? 'normal',
+    startTime: agent?.startTime ?? Date.now(),
+    endTime: agent?.endTime,
+    toolCallCount: agent?.toolCallCount ?? 0,
+    iteration: agent?.iteration ?? 0,
+    maxIterations: agent?.maxIterations ?? 0,
+    error: agent?.error ?? '',
+    todos: agent?.plan?.todos || [],
+    totalIn: agent?.totalInputTokens ?? 0,
+    totalOut: agent?.totalOutputTokens ?? 0,
+  };
+}
+
 export default function AgentCard({ agent }: { agent: AgentInfo }) {
   const t = useT();
   const [expanded, setExpanded] = useState(false);
-  const stopAgent = useAgentStore((s) => s.stopAgent);
-  const pauseAgent = useAgentStore((s) => s.pauseAgent);
-  const resumeAgent = useAgentStore((s) => s.resumeAgent);
   const setAgentPriority = useAgentStore((s) => s.setAgentPriority);
 
-  const id = agent?.id ?? '';
-  const name = agent?.name ?? '-';
-  const status = agent?.status ?? 'idle';
-  const priority = agent?.priority ?? 'normal';
-  const startTime = agent?.startTime ?? Date.now();
-  const endTime = agent?.endTime;
-  const toolCallCount = agent?.toolCallCount ?? 0;
-  const iteration = agent?.iteration ?? 0;
-  const maxIterations = agent?.maxIterations ?? 0;
-  const error = agent?.error ?? '';
-  const todos = agent?.plan?.todos || [];
-  const totalIn = agent?.totalInputTokens ?? 0;
-  const totalOut = agent?.totalOutputTokens ?? 0;
+  const {
+    id,
+    name,
+    status,
+    priority,
+    startTime,
+    endTime,
+    toolCallCount,
+    iteration,
+    maxIterations,
+    error,
+    todos,
+    totalIn,
+    totalOut,
+  } = agentCardData(agent);
   const [showConsole, setShowConsole] = useState(false);
 
   const recentEvents = useMemo(() => {
@@ -142,120 +388,40 @@ export default function AgentCard({ agent }: { agent: AgentInfo }) {
       }
       extra={
         <Space size={2}>
-          <button
-            type="button"
-            onClick={() => {
+          <PriorityBadge
+            priority={priority}
+            onCycle={() => {
               const next = priority === 'high' ? 'normal' : priority === 'normal' ? 'low' : 'high';
               setAgentPriority(id, next);
             }}
-            className={clsx(
-              'inline-flex items-center rounded-full h-5 px-1.5 text-2xs font-medium leading-none cursor-pointer border transition-colors duration-150',
-              priority === 'high'
-                ? 'bg-[var(--color-danger-soft)] text-[var(--color-danger)] border-[var(--color-danger-border)] hover:bg-[var(--color-danger-border)]'
-                : priority === 'normal'
-                  ? 'bg-[var(--color-primary-soft)] text-[var(--color-primary)] border-[var(--color-primary-border)] hover:bg-[var(--color-primary-strong)]'
-                  : 'bg-[var(--color-bg-secondary)] text-text-secondary border-[var(--color-border-dim)] hover:bg-[var(--color-hover)]',
-            )}
-          >
-            {priority === 'high'
-              ? t('dashboard.priorityHigh')
-              : priority === 'normal'
-                ? t('dashboard.priorityMedium')
-                : t('dashboard.priorityLow')}
-          </button>
-          <Tooltip title={t('dashboard.viewDetails')}>
-            <Button type="text" size="small" icon={<ArrowsOut />} onClick={() => setExpanded(!expanded)} />
-          </Tooltip>
-          {status === 'running' && (
-            <>
-              <Tooltip title={t('dashboard.pause')}>
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<PauseCircle />}
-                  onClick={() => pauseAgent(id)}
-                  aria-label={t('dashboard.pauseAgent')}
-                />
-              </Tooltip>
-              <Tooltip title={t('dashboard.stop')}>
-                <Button
-                  type="text"
-                  size="small"
-                  danger
-                  icon={<Stop />}
-                  onClick={() => stopAgent(id)}
-                  aria-label={t('dashboard.stopAgent')}
-                />
-              </Tooltip>
-            </>
-          )}
-          {status === 'paused' && (
-            <Tooltip title={t('dashboard.resume')}>
-              <Button
-                type="text"
-                size="small"
-                icon={<PlayCircle />}
-                onClick={() => resumeAgent(id)}
-                aria-label={t('dashboard.resumeAgent')}
-              />
-            </Tooltip>
-          )}
+            t={t}
+          />
+          <CardActions
+            status={status}
+            id={id}
+            t={t}
+            onToggleExpand={() => setExpanded(!expanded)}
+          />
         </Space>
       }
     >
       <div className="flex flex-col gap-2">
         {todos.length > 0 && (
-          <div className="flex items-center gap-2">
-            <Progress
-              percent={planPct}
-              size="small"
-              showInfo={false}
-              status={status === 'running' ? 'active' : 'normal'}
-            />
-            <span className="text-xs text-[var(--color-text-muted)] font-mono whitespace-nowrap">
-              {doneCount}/{todos.length}
-            </span>
-          </div>
+          <PlanProgressLine todos={todos} doneCount={doneCount} planPct={planPct} running={status === 'running'} />
         )}
-        {activeTask && (
-          <div className="text-xs text-text-secondary flex items-center overflow-hidden text-ellipsis whitespace-nowrap">
-            <ExecutingIndicator size={14} className="mr-1" />
-            {activeTask.activeForm || activeTask.content}
-          </div>
-        )}
-        <div className="flex gap-3 text-xs text-[var(--color-text-secondary)]">
-          <Tooltip title={t('dashboard.runtime')}>
-            <span className="inline-flex items-center gap-1">
-              <Clock /> {elapsed.toFixed(1)}s
-            </span>
-          </Tooltip>
-          <Tooltip title={t('dashboard.tools')}>
-            <span className="inline-flex items-center gap-1">
-              <Lightning /> {toolCallCount}
-            </span>
-          </Tooltip>
-          <span className="inline-flex items-center gap-1">
-            {t('dashboard.rounds', { current: iteration, max: maxIterations })}
-          </span>
-          {(totalIn > 0 || totalOut > 0) && (
-            <Tooltip title={t('dashboard.tokens', { in: totalIn.toLocaleString(), out: totalOut.toLocaleString() })}>
-              <span className="font-mono text-2xs text-[var(--color-text-muted)] bg-[var(--color-bg-elevated)] px-1 py-px rounded-[5px]">
-                {formatTokens(totalIn + totalOut)} tok
-              </span>
-            </Tooltip>
-          )}
-          {recentEvents.length > 0 && (
-            <Tooltip title={showConsole ? t('dashboard.collapseEvents') : t('dashboard.expandEvents')}>
-              <button
-                className="border-none bg-transparent cursor-pointer inline-flex items-center text-2xs text-[var(--color-text-muted)] p-[1px_3px] rounded-[5px] transition-colors duration-fast ease-out hover:text-accent hover:bg-[var(--color-bg-elevated)]"
-                onClick={() => setShowConsole(!showConsole)}
-                aria-label={t('dashboard.eventsConsole')}
-              >
-                <Code />
-              </button>
-            </Tooltip>
-          )}
-        </div>
+        {activeTask && <ActiveTaskLine task={activeTask} />}
+        <AgentStatsRow
+          elapsed={elapsed}
+          toolCallCount={toolCallCount}
+          iteration={iteration}
+          maxIterations={maxIterations}
+          totalIn={totalIn}
+          totalOut={totalOut}
+          hasEvents={recentEvents.length > 0}
+          showConsole={showConsole}
+          onToggleConsole={() => setShowConsole(!showConsole)}
+          t={t}
+        />
         {showConsole && recentEvents.length > 0 && (
           <div className="mt-1 px-2 py-1 bg-[var(--color-bg-elevated)] rounded-md border border-[var(--color-border-dim)] max-h-[100px] overflow-y-auto flex flex-col gap-0.5">
             {recentEvents.map((entry, index) => (
@@ -268,39 +434,7 @@ export default function AgentCard({ agent }: { agent: AgentInfo }) {
             {error.slice(0, 80)}
           </div>
         )}
-        {expanded && todos.length > 0 && (
-          <div className="mt-1 pt-2 border-t border-[var(--color-border-dim)] flex flex-col gap-1">
-            {todos.map((todo, index) => (
-              <div
-                key={index}
-                className={clsx(
-                  'flex items-start gap-2 text-xs',
-                  todo?.status === 'pending' && 'text-[var(--color-text-muted)]',
-                  todo?.status === 'completed' && 'text-[var(--color-text-secondary)] line-through',
-                  todo?.status === 'in_progress' && 'text-[var(--color-text-primary)]',
-                )}
-              >
-                <span
-                  className={clsx(
-                    'shrink-0 mt-1 text-xs',
-                    todo?.status === 'pending' && 'text-[var(--color-text-muted)]',
-                    todo?.status === 'completed' && 'text-text-secondary',
-                    todo?.status === 'in_progress' && 'text-text-primary',
-                  )}
-                >
-                  {todo?.status === 'completed' ? (
-                    <CheckCircle />
-                  ) : todo?.status === 'in_progress' ? (
-                    <ExecutingIndicator size={14} />
-                  ) : (
-                    <Clock />
-                  )}
-                </span>
-                <span>{todo?.content ?? '-'}</span>
-              </div>
-            ))}
-          </div>
-        )}
+        {expanded && todos.length > 0 && <TodoList todos={todos} />}
       </div>
     </Card>
   );
