@@ -1,4 +1,4 @@
-import type { AgentInfo } from '../../types/agent';
+import type { AgentInfo, AgentLogEntry } from '../../types/agent';
 import type { I18nKey } from '../../i18n';
 
 /** Plan checklist (todos) for a work item. */
@@ -77,145 +77,164 @@ export interface WorkTurn {
  * Work-specific counterpart of Code mode's turn grouping — one source so the
  * view stays testable without React.
  */
-export function workTurns(agent: AgentInfo): WorkTurn[] {
-  const turns: WorkTurn[] = [];
-  // Holder object keeps `current` from being narrowed to `null` inside the
-  // closures below (assignments happen via startTurn / pushTool).
-  const ctx: { current: WorkTurn | null } = { current: null };
-  const toolMap = new Map<string, WorkToolRow>();
-  let noteBuf = '';
-  let noteThinking = false;
-  let noteTs = 0;
+interface WorkTurnsState {
+  turns: WorkTurn[];
+  current: WorkTurn | null;
+  toolMap: Map<string, WorkToolRow>;
+  noteBuf: string;
+  noteThinking: boolean;
+  noteTs: number;
+}
 
-  const flushNote = () => {
-    const text = noteBuf.trim();
-    if (text && ctx.current) {
-      ctx.current.items.push({ kind: 'note', text, thinking: noteThinking, ts: noteTs });
-    }
-    noteBuf = '';
-  };
-
-  const startTurn = (iteration: number, ts: number) => {
-    flushNote();
-    ctx.current = {
-      id: `turn-${iteration}-${ts}`,
-      iteration,
-      startTs: ts,
-      items: [],
-      toolCount: 0,
-      errorCount: 0,
-    };
-    turns.push(ctx.current);
-  };
-
-  const pushTool = (row: WorkToolRow) => {
-    if (!ctx.current) startTurn(turns.length, row.startTs);
-    toolMap.set(row.key, row);
-    ctx.current!.toolCount += 1;
-    ctx.current!.items.push({ kind: 'tool', row });
-  };
-
-  for (const e of agent.log ?? []) {
-    switch (e.type) {
-      case 'iteration_start':
-        startTurn(e.iteration ?? turns.length, e.timestamp);
-        break;
-      case 'iteration_end':
-        flushNote();
-        if (ctx.current) ctx.current.endTs = e.timestamp;
-        break;
-      case 'text':
-      case 'thinking': {
-        const thinking = e.type === 'thinking';
-        if (!noteBuf) {
-          noteTs = e.timestamp;
-          noteThinking = thinking;
-        } else if (noteThinking !== thinking) {
-          flushNote();
-          noteTs = e.timestamp;
-          noteThinking = thinking;
-        }
-        noteBuf += e.text ?? '';
-        break;
-      }
-      case 'tool_start': {
-        flushNote();
-        const key = e.toolCallId ?? `t-${e.timestamp}-${e.toolName ?? 'tool'}`;
-        pushTool({
-          key,
-          toolName: e.toolName ?? 'Tool',
-          input: (e.input ?? {}) as Record<string, unknown>,
-          startTs: e.timestamp,
-          progress: '',
-          running: true,
-        });
-        break;
-      }
-      case 'progress': {
-        const row = toolMap.get(e.toolCallId ?? '');
-        if (row) row.progress += e.text ?? '';
-        break;
-      }
-      case 'tool_end': {
-        const row = toolMap.get(e.toolCallId ?? '');
-        if (row) {
-          row.output = e.output;
-          row.durationMs = e.durationMs;
-          row.endTs = e.timestamp;
-          row.running = false;
-        }
-        break;
-      }
-      case 'tool_error': {
-        flushNote();
-        const row = toolMap.get(e.toolCallId ?? '');
-        if (row) {
-          row.error = e.error;
-          row.endTs = e.timestamp;
-          row.running = false;
-          if (ctx.current) ctx.current.errorCount += 1;
-        } else {
-          const synthetic: WorkToolRow = {
-            key: `err-${e.toolCallId ?? e.timestamp}`,
-            toolName: e.toolName ?? 'Tool',
-            input: (e.input ?? {}) as Record<string, unknown>,
-            startTs: e.timestamp,
-            progress: '',
-            running: false,
-            error: e.error,
-          };
-          pushTool(synthetic);
-          if (ctx.current) ctx.current.errorCount += 1;
-        }
-        break;
-      }
-      case 'plan':
-        flushNote();
-        if (ctx.current) ctx.current.items.push({ kind: 'plan', ts: e.timestamp });
-        break;
-      case 'warning':
-      case 'error':
-        flushNote();
-        if (ctx.current) {
-          const text = e.text || e.error || '';
-          if (text) {
-            ctx.current.items.push({ kind: 'warning', text, ts: e.timestamp });
-            ctx.current.errorCount += 1;
-          }
-        }
-        break;
-      case 'context':
-        flushNote();
-        if (ctx.current && e.disclosure?.detail) {
-          ctx.current.items.push({ kind: 'context', text: e.disclosure.detail, ts: e.timestamp });
-        }
-        break;
-      default:
-        break;
-    }
+function flushNote(state: WorkTurnsState): void {
+  const text = state.noteBuf.trim();
+  if (text && state.current) {
+    state.current.items.push({ kind: 'note', text, thinking: state.noteThinking, ts: state.noteTs });
   }
-  flushNote();
-  return turns.filter((turn) => turn.items.length > 0 || turn.endTs != null);
+  state.noteBuf = '';
+}
+
+function startTurn(state: WorkTurnsState, iteration: number, ts: number): void {
+  flushNote(state);
+  state.current = {
+    id: `turn-${iteration}-${ts}`,
+    iteration,
+    startTs: ts,
+    items: [],
+    toolCount: 0,
+    errorCount: 0,
+  };
+  state.turns.push(state.current);
+}
+
+function pushTool(state: WorkTurnsState, row: WorkToolRow): void {
+  if (!state.current) startTurn(state, state.turns.length, row.startTs);
+  state.toolMap.set(row.key, row);
+  state.current!.toolCount += 1;
+  state.current!.items.push({ kind: 'tool', row });
+}
+
+function appendNote(state: WorkTurnsState, e: AgentLogEntry, thinking: boolean): void {
+  if (!state.noteBuf) {
+    state.noteTs = e.timestamp;
+    state.noteThinking = thinking;
+  } else if (state.noteThinking !== thinking) {
+    flushNote(state);
+    state.noteTs = e.timestamp;
+    state.noteThinking = thinking;
+  }
+  state.noteBuf += e.text ?? '';
+}
+
+function handleToolStartEvent(state: WorkTurnsState, e: AgentLogEntry): void {
+  flushNote(state);
+  const key = e.toolCallId ?? `t-${e.timestamp}-${e.toolName ?? 'tool'}`;
+  pushTool(state, {
+    key,
+    toolName: e.toolName ?? 'Tool',
+    input: (e.input ?? {}) as Record<string, unknown>,
+    startTs: e.timestamp,
+    progress: '',
+    running: true,
+  });
+}
+
+function handleToolEndEvent(state: WorkTurnsState, e: AgentLogEntry): void {
+  const row = state.toolMap.get(e.toolCallId ?? '');
+  if (!row) return;
+  row.output = e.output;
+  row.durationMs = e.durationMs;
+  row.endTs = e.timestamp;
+  row.running = false;
+}
+
+function handleToolErrorEvent(state: WorkTurnsState, e: AgentLogEntry): void {
+  flushNote(state);
+  const row = state.toolMap.get(e.toolCallId ?? '');
+  if (!row) {
+    const synthetic: WorkToolRow = {
+      key: `err-${e.toolCallId ?? e.timestamp}`,
+      toolName: e.toolName ?? 'Tool',
+      input: (e.input ?? {}) as Record<string, unknown>,
+      startTs: e.timestamp,
+      progress: '',
+      running: false,
+      error: e.error,
+    };
+    pushTool(state, synthetic);
+  } else {
+    row.error = e.error;
+    row.endTs = e.timestamp;
+    row.running = false;
+  }
+  if (state.current) state.current.errorCount += 1;
+}
+
+/** 把单条日志事件并入 Work 回合结构（不处理注记缓冲之外的时序）。 */
+function applyWorkEvent(state: WorkTurnsState, e: AgentLogEntry): void {
+  switch (e.type) {
+    case 'iteration_start':
+      startTurn(state, e.iteration ?? state.turns.length, e.timestamp);
+      return;
+    case 'iteration_end':
+      flushNote(state);
+      if (state.current) state.current.endTs = e.timestamp;
+      return;
+    case 'text':
+    case 'thinking':
+      appendNote(state, e, e.type === 'thinking');
+      return;
+    case 'tool_start':
+      handleToolStartEvent(state, e);
+      return;
+    case 'progress': {
+      const row = state.toolMap.get(e.toolCallId ?? '');
+      if (row) row.progress += e.text ?? '';
+      return;
+    }
+    case 'tool_end':
+      handleToolEndEvent(state, e);
+      return;
+    case 'tool_error':
+      handleToolErrorEvent(state, e);
+      return;
+    case 'plan':
+      flushNote(state);
+      if (state.current) state.current.items.push({ kind: 'plan', ts: e.timestamp });
+      return;
+    case 'warning':
+    case 'error': {
+      flushNote(state);
+      const text = e.text || e.error || '';
+      if (state.current && text) {
+        state.current.items.push({ kind: 'warning', text, ts: e.timestamp });
+        state.current.errorCount += 1;
+      }
+      return;
+    }
+    case 'context':
+      flushNote(state);
+      if (state.current && e.disclosure?.detail) {
+        state.current.items.push({ kind: 'context', text: e.disclosure.detail, ts: e.timestamp });
+      }
+      return;
+    default:
+      return;
+  }
+}
+
+export function workTurns(agent: AgentInfo): WorkTurn[] {
+  const state: WorkTurnsState = {
+    turns: [],
+    current: null,
+    toolMap: new Map(),
+    noteBuf: '',
+    noteThinking: false,
+    noteTs: 0,
+  };
+  for (const e of agent.log ?? []) applyWorkEvent(state, e);
+  flushNote(state);
+  return state.turns.filter((turn) => turn.items.length > 0 || turn.endTs != null);
 }
 
 export function workStatusLabelKey(status: AgentInfo['status']): I18nKey {
