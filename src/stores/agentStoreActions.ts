@@ -34,7 +34,13 @@ export function clearAgentTombstones(): void {
   removedAgentIds.clear();
 }
 
-export function createAgentStoreActions(set: SetState, get: GetState): AgentStoreActions {
+type AgentCoreKeys = 'setCurrentAgent' | 'setPlanFile' | 'addAgentPermission' | 'removeAgentPermission' | 'addAgent' | 'updateAgent' | 'removeAgent' | 'appendAgentLog';
+
+/** 注册表/权限/日志等核心 action。 */
+function createAgentCoreActions(
+  set: SetState,
+  _get: GetState,
+): Pick<AgentStoreActions, AgentCoreKeys> {
   return {
     setCurrentAgent: (id) => {
       set({ currentAgentId: id });
@@ -121,7 +127,28 @@ export function createAgentStoreActions(set: SetState, get: GetState): AgentStor
           return { ...a, log: merged.slice(-500) };
         }),
       })),
+  };
+}
 
+type AgentStartKeys = 'startAgent';
+type AgentControlKeys =
+  | 'stopAgent'
+  | 'stopAllAgents'
+  | 'pauseAgent'
+  | 'resumeAgent'
+  | 'continueAgent'
+  | 'approveDelivery'
+  | 'setAgentPriority'
+  | 'setMaxConcurrent'
+  | 'refreshStates'
+  | 'clearAgents';
+
+/** 启动 agent（调度器 + 首条指令）。 */
+function createAgentStartActions(
+  set: SetState,
+  _get: GetState,
+): Pick<AgentStoreActions, AgentStartKeys> {
+  return {
     startAgent: async (request, projectPath) => {
       const api = agentIpc();
       if (!api?.start) return null;
@@ -203,7 +230,15 @@ export function createAgentStoreActions(set: SetState, get: GetState): AgentStor
         throw e instanceof Error ? e : new Error(String(e));
       }
     },
+  };
+}
 
+/** 停止/暂停/恢复/优先级/状态刷新等控制 action。 */
+function createAgentControlActions(
+  set: SetState,
+  get: GetState,
+): Pick<AgentStoreActions, AgentControlKeys> {
+  return {
     stopAgent: async (agentId) => {
       const api = agentIpc();
       if (!api?.schedulerStop) return;
@@ -413,5 +448,13 @@ export function createAgentStoreActions(set: SetState, get: GetState): AgentStor
       clearAgentTombstones();
       set({ agents: [], currentAgentId: null, agentPermissions: {} });
     },
+  };
+}
+
+export function createAgentStoreActions(set: SetState, get: GetState): AgentStoreActions {
+  return {
+    ...createAgentCoreActions(set, get),
+    ...createAgentStartActions(set, get),
+    ...createAgentControlActions(set, get),
   };
 }
