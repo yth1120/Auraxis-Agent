@@ -29,6 +29,44 @@ import {
 } from './WorkspaceInspectorSections';
 import { AGENT_STATUS_META, basename, latestAgentTodos } from './WorkspaceInspectorUtils';
 
+/** 无内容时的空态：有任务时只显示任务卡，否则显示空态说明 + 快照卡。 */
+function InspectorEmptyState({
+  showAgentTasks,
+  sidebarMode,
+  projectRoot,
+  now,
+  tPanel,
+}: {
+  showAgentTasks: boolean;
+  sidebarMode: string;
+  projectRoot: string | null | undefined;
+  now: number;
+  tPanel: ReturnType<typeof useT>;
+}) {
+  if (showAgentTasks) {
+    return (
+      <div className="h-full overflow-y-auto px-3 pb-6 pt-3">
+        <AgentTasksCard now={now} />
+        <SnapshotCard projectRoot={projectRoot ?? null} now={now} />
+      </div>
+    );
+  }
+  const emptyText =
+    sidebarMode === 'work' ? tPanel('inspector.emptyWork') : tPanel('inspector.emptyCode');
+  return (
+    <div className="h-full overflow-y-auto px-3 pb-6 pt-3">
+      <div className="bg-[var(--color-bg-secondary)] rounded-xl p-6 flex flex-col items-center text-center gap-2">
+        <ApartmentOutlined className="text-2xl text-[var(--color-text-faint)]" />
+        <p className="text-sm font-semibold text-[var(--color-text-secondary)] m-0">
+          {tPanel('inspector.emptyTitle')}
+        </p>
+        <p className="text-2xs text-[var(--color-text-muted)] m-0 leading-relaxed">{emptyText}</p>
+      </div>
+      <SnapshotCard projectRoot={projectRoot ?? null} now={now} />
+    </div>
+  );
+}
+
 export default function WorkspaceInspector() {
   const tPanel = useT();
   const [now, setNow] = useState(Date.now());
@@ -253,31 +291,14 @@ export default function WorkspaceInspector() {
   };
 
   if (!hasContent) {
-    if (isCode && agents.length > 0) {
-      return (
-        <div className="h-full overflow-y-auto px-3 pb-6 pt-3">
-          <AgentTasksCard now={now} />
-          <SnapshotCard projectRoot={projectRoot} now={now} />
-        </div>
-      );
-    }
     return (
-      <div className="h-full overflow-y-auto px-3 pb-6 pt-3">
-        <div className="bg-[var(--color-bg-secondary)] rounded-xl p-6 flex flex-col items-center text-center gap-2">
-          <ApartmentOutlined className="text-2xl text-[var(--color-text-faint)]" />
-          <p className="text-sm font-semibold text-[var(--color-text-secondary)] m-0">
-            {tPanel('inspector.emptyTitle')}
-          </p>
-          <p className="text-2xs text-[var(--color-text-muted)] m-0 leading-relaxed">
-            {isCode
-              ? sidebarMode === 'work'
-                ? tPanel('inspector.emptyWork')
-                : tPanel('inspector.emptyCode')
-              : tPanel('inspector.emptyChat')}
-          </p>
-        </div>
-        <SnapshotCard projectRoot={projectRoot} now={now} />
-      </div>
+      <InspectorEmptyState
+        showAgentTasks={isCode && agents.length > 0}
+        sidebarMode={sidebarMode}
+        projectRoot={projectRoot ?? undefined}
+        now={now}
+        tPanel={tPanel}
+      />
     );
   }
 
