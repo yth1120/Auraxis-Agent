@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import clsx from 'clsx';
-import { parseAnsiLines } from '../../utils/ansi';
+import { parseAnsiLines, type AnsiLine } from '../../utils/ansi';
 import { Check, Copy } from './icons';
 import ExecutingIndicator from './ExecutingIndicator';
 import StateDot from './StateDot';
@@ -30,6 +30,35 @@ interface TerminalBlockProps {
   durationMs?: number;
   maxLines?: number;
   className?: string;
+}
+
+/** 状态胶囊文案：signal → 非零退出码 → failed，其余不显示。 */
+function terminalStatusText(
+  t: ReturnType<typeof useT>,
+  signal: string | undefined,
+  exitCode: number | undefined,
+  failed: boolean,
+): string {
+  if (signal) return t('terminal.signal', { signal });
+  if (exitCode !== undefined && exitCode !== 0) return t('msg.exitCode', { n: exitCode });
+  return failed ? t('tl.failed') : '';
+}
+
+/** 已解析的 ANSI 行 → 逐行 span。 */
+function AnsiLineRows({ lines }: { lines: AnsiLine[] }) {
+  return (
+    <>
+      {lines.map((line, i) => (
+        <div key={i} className="terminal-block-line">
+          {line.map((span, j) => (
+            <span key={j} style={span.style}>
+              {span.text}
+            </span>
+          ))}
+        </div>
+      ))}
+    </>
+  );
 }
 
 /**
@@ -77,13 +106,7 @@ export default function TerminalBlock({
   const settledFailure = !running && (signal !== undefined || (exitCode !== undefined && exitCode !== 0));
   // 状态胶囊只呈现异常结束 — a clean exit and a running
   // command draw no pill (the run-state dot and row sweep carry those).
-  const statusText = signal
-    ? t('terminal.signal', { signal })
-    : exitCode !== undefined && exitCode !== 0
-      ? t('msg.exitCode', { n: exitCode })
-      : failed
-        ? t('tl.failed')
-        : '';
+  const statusText = terminalStatusText(t, signal, exitCode, failed);
 
   const copyOutput = async () => {
     try {
@@ -137,15 +160,7 @@ export default function TerminalBlock({
       {!running &&
         (visible ? (
           <div className="terminal-block-output" ref={bodyRef}>
-            {head.map((line, i) => (
-              <div key={i} className="terminal-block-line">
-                {line.map((span, j) => (
-                  <span key={j} style={span.style}>
-                    {span.text}
-                  </span>
-                ))}
-              </div>
-            ))}
+            <AnsiLineRows lines={head} />
             {hidden > 0 && !expanded && (
               <button type="button" className="terminal-block-expand" onClick={() => setExpanded(true)}>
                 {t('terminal.expand', { n: hidden })}
@@ -153,15 +168,7 @@ export default function TerminalBlock({
             )}
             {hidden > 0 && expanded && (
               <>
-                {tail.map((line, i) => (
-                  <div key={i} className="terminal-block-line">
-                    {line.map((span, j) => (
-                      <span key={j} style={span.style}>
-                        {span.text}
-                      </span>
-                    ))}
-                  </div>
-                ))}
+                <AnsiLineRows lines={tail} />
                 <button type="button" className="terminal-block-expand" onClick={() => setExpanded(false)}>
                   {t('terminal.collapse')}
                 </button>

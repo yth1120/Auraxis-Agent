@@ -125,110 +125,170 @@ function toolSummary(row: WorkToolRow): string {
   }
 }
 
+type ParsedToolOutput = {
+  stdout?: string;
+  stderr?: string;
+  exitCode?: number;
+  sources?: { url: string; title?: string; snippet?: string }[];
+} | null;
+
+function ToolErrorBody({ error }: { error?: string }) {
+  return (
+    <div className="flex items-start gap-2 rounded-lg bg-danger-soft border border-danger/25 px-2.5 py-2">
+      <XCircle size={13} className="mt-[2px] shrink-0 text-danger" />
+      <span className="min-w-0 text-2xs leading-[1.55] text-danger whitespace-pre-wrap break-words">{error}</span>
+    </div>
+  );
+}
+
+function BashToolBody({
+  input,
+  output,
+  parsed,
+  t,
+}: {
+  input: Record<string, unknown>;
+  output: unknown;
+  parsed: ParsedToolOutput;
+  t: ReturnType<typeof useT>;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <CodeBlock text={truncate(typeof input.command === 'string' ? input.command : '')} label="bash" />
+      {parsed?.stdout != null && <CodeBlock text={truncate(parsed.stdout)} label={t('work.stdout')} />}
+      {parsed?.stderr != null && parsed.stderr.trim() && (
+        <CodeBlock text={truncate(parsed.stderr)} label={t('work.stderr')} />
+      )}
+      {typeof parsed?.exitCode === 'number' && (
+        <div className={clsx('text-2xs font-mono', parsed.exitCode === 0 ? 'text-success' : 'text-danger')}>
+          {t('work.exitCode', { code: String(parsed.exitCode) })}
+        </div>
+      )}
+      {!parsed?.stdout && !parsed?.stderr && output != null && <CodeBlock text={truncate(outputText(output))} />}
+    </div>
+  );
+}
+
+function ReadToolBody({ input, output }: { input: Record<string, unknown>; output: unknown }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      {typeof input.file_path === 'string' && (
+        <div className="flex items-center gap-1.5 text-2xs text-text-muted">
+          <FileText size={12} className="shrink-0" />
+          <span className="min-w-0 truncate">{input.file_path}</span>
+        </div>
+      )}
+      {output != null && <CodeBlock text={truncate(outputText(output))} />}
+    </div>
+  );
+}
+
+function WriteToolBody({
+  input,
+  toolName,
+  t,
+}: {
+  input: Record<string, unknown>;
+  toolName: string;
+  t: ReturnType<typeof useT>;
+}) {
+  const content = typeof input.content === 'string' ? input.content : '';
+  return (
+    <div className="flex flex-col gap-1.5">
+      {typeof input.file_path === 'string' && (
+        <div className="flex items-center gap-1.5 text-2xs text-text-muted">
+          <PencilSimple size={12} className="shrink-0" />
+          <span className="min-w-0 truncate">{input.file_path}</span>
+        </div>
+      )}
+      {content ? (
+        <CodeBlock text={truncate(content)} label={toolName} />
+      ) : (
+        <span className="text-2xs text-text-muted">{t('work.noOutput')}</span>
+      )}
+    </div>
+  );
+}
+
+function WebToolBody({
+  sources,
+  output,
+  t,
+}: {
+  sources: { url: string; title?: string; snippet?: string }[];
+  output: unknown;
+  t: ReturnType<typeof useT>;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      {sources.length > 0 ? (
+        <div className="flex flex-col gap-1">
+          {sources.slice(0, 12).map((source, index) => (
+            <div key={index} className="flex items-start gap-1.5 text-2xs leading-[1.55]">
+              <Globe size={12} className="mt-[3px] shrink-0 text-text-muted" />
+              <span className="min-w-0">
+                <span className="text-text-secondary">{source.title || source.url}</span>
+                {source.snippet && <span className="text-text-muted"> — {source.snippet}</span>}
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : output != null ? (
+        <CodeBlock text={truncate(outputText(output))} />
+      ) : (
+        <span className="text-2xs text-text-muted">{t('work.noOutput')}</span>
+      )}
+    </div>
+  );
+}
+
+function PlainToolBody({ text, t }: { text: string; t: ReturnType<typeof useT> }) {
+  return text.trim() ? (
+    <CodeBlock text={truncate(text)} />
+  ) : (
+    <span className="text-2xs text-text-muted">{t('work.noOutput')}</span>
+  );
+}
+
+function toolBody(
+  row: WorkToolRow,
+  input: Record<string, unknown>,
+  output: unknown,
+  parsed: ParsedToolOutput,
+  sources: { url: string; title?: string; snippet?: string }[],
+  t: ReturnType<typeof useT>,
+): ReactNode {
+  if (row.error) return <ToolErrorBody error={row.error} />;
+  switch (row.toolName) {
+    case 'Bash':
+      return <BashToolBody input={input} output={output} parsed={parsed} t={t} />;
+    case 'Read':
+      return <ReadToolBody input={input} output={output} />;
+    case 'Write':
+    case 'Edit':
+    case 'NotebookEdit':
+      return <WriteToolBody input={input} toolName={row.toolName} t={t} />;
+    case 'WebSearch':
+    case 'WebFetch':
+      return <WebToolBody sources={sources} output={output} t={t} />;
+    case 'Grep':
+    case 'Glob': {
+      const lines = Array.isArray(output)
+        ? output.map((item) => (typeof item === 'string' ? item : JSON.stringify(item))).join('\n')
+        : outputText(output);
+      return <PlainToolBody text={lines} t={t} />;
+    }
+    default:
+      return <PlainToolBody text={outputText(output)} t={t} />;
+  }
+}
+
 function ToolDetail({ row }: { row: WorkToolRow }) {
   const t = useT();
   const input = row.input ?? {};
   const output = row.output;
-  const parsed = (output && typeof output === 'object' ? output : null) as {
-    stdout?: string;
-    stderr?: string;
-    exitCode?: number;
-    sources?: { url: string; title?: string; snippet?: string }[];
-  } | null;
+  const parsed = (output && typeof output === 'object' ? output : null) as ParsedToolOutput;
   const sources = Array.isArray(parsed?.sources) ? parsed!.sources! : [];
-
-  let body: ReactNode = null;
-  if (row.error) {
-    body = (
-      <div className="flex items-start gap-2 rounded-lg bg-danger-soft border border-danger/25 px-2.5 py-2">
-        <XCircle size={13} className="mt-[2px] shrink-0 text-danger" />
-        <span className="min-w-0 text-2xs leading-[1.55] text-danger whitespace-pre-wrap break-words">{row.error}</span>
-      </div>
-    );
-  } else if (row.toolName === 'Bash') {
-    body = (
-      <div className="flex flex-col gap-1.5">
-        <CodeBlock text={truncate(typeof input.command === 'string' ? input.command : '')} label="bash" />
-        {parsed?.stdout != null && <CodeBlock text={truncate(parsed.stdout)} label={t('work.stdout')} />}
-        {parsed?.stderr != null && parsed.stderr.trim() && (
-          <CodeBlock text={truncate(parsed.stderr)} label={t('work.stderr')} />
-        )}
-        {typeof parsed?.exitCode === 'number' && (
-          <div className={clsx('text-2xs font-mono', parsed.exitCode === 0 ? 'text-success' : 'text-danger')}>
-            {t('work.exitCode', { code: String(parsed.exitCode) })}
-          </div>
-        )}
-        {!parsed?.stdout && !parsed?.stderr && output != null && <CodeBlock text={truncate(outputText(output))} />}
-      </div>
-    );
-  } else if (row.toolName === 'Read') {
-    body = (
-      <div className="flex flex-col gap-1.5">
-        {typeof input.file_path === 'string' && (
-          <div className="flex items-center gap-1.5 text-2xs text-text-muted">
-            <FileText size={12} className="shrink-0" />
-            <span className="min-w-0 truncate">{input.file_path}</span>
-          </div>
-        )}
-        {output != null && <CodeBlock text={truncate(outputText(output))} />}
-      </div>
-    );
-  } else if (row.toolName === 'Write' || row.toolName === 'Edit' || row.toolName === 'NotebookEdit') {
-    const content = typeof input.content === 'string' ? input.content : '';
-    body = (
-      <div className="flex flex-col gap-1.5">
-        {typeof input.file_path === 'string' && (
-          <div className="flex items-center gap-1.5 text-2xs text-text-muted">
-            <PencilSimple size={12} className="shrink-0" />
-            <span className="min-w-0 truncate">{input.file_path}</span>
-          </div>
-        )}
-        {content ? (
-          <CodeBlock text={truncate(content)} label={row.toolName} />
-        ) : (
-          <span className="text-2xs text-text-muted">{t('work.noOutput')}</span>
-        )}
-      </div>
-    );
-  } else if (row.toolName === 'WebSearch' || row.toolName === 'WebFetch') {
-    body = (
-      <div className="flex flex-col gap-1.5">
-        {sources.length > 0 ? (
-          <div className="flex flex-col gap-1">
-            {sources.slice(0, 12).map((source, index) => (
-              <div key={index} className="flex items-start gap-1.5 text-2xs leading-[1.55]">
-                <Globe size={12} className="mt-[3px] shrink-0 text-text-muted" />
-                <span className="min-w-0">
-                  <span className="text-text-secondary">{source.title || source.url}</span>
-                  {source.snippet && <span className="text-text-muted"> — {source.snippet}</span>}
-                </span>
-              </div>
-            ))}
-          </div>
-        ) : output != null ? (
-          <CodeBlock text={truncate(outputText(output))} />
-        ) : (
-          <span className="text-2xs text-text-muted">{t('work.noOutput')}</span>
-        )}
-      </div>
-    );
-  } else if (row.toolName === 'Grep' || row.toolName === 'Glob') {
-    const lines = Array.isArray(output)
-      ? output.map((item) => (typeof item === 'string' ? item : JSON.stringify(item))).join('\n')
-      : outputText(output);
-    body = lines.trim() ? (
-      <CodeBlock text={truncate(lines)} />
-    ) : (
-      <span className="text-2xs text-text-muted">{t('work.noOutput')}</span>
-    );
-  } else {
-    const text = outputText(output);
-    body = text.trim() ? (
-      <CodeBlock text={truncate(text)} />
-    ) : (
-      <span className="text-2xs text-text-muted">{t('work.noOutput')}</span>
-    );
-  }
 
   return (
     <div className="flex flex-col gap-1.5">
@@ -238,7 +298,7 @@ function ToolDetail({ row }: { row: WorkToolRow }) {
           <span className="min-w-0">{row.progress}</span>
         </div>
       )}
-      {body}
+      {toolBody(row, input, output, parsed, sources, t)}
       <div className="flex items-center justify-end gap-2">
         <CopyButton text={outputText(output) || row.error || ''} />
         {row.durationMs != null && (
