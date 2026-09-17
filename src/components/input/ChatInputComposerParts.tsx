@@ -114,6 +114,60 @@ export interface ChatInputToolbarProps {
   toggleModePanel: (event: React.MouseEvent) => void;
 }
 
+/** 发送/停止按钮：标题、aria 与图标都由「运行态 + 是否有输入 + 是否任务面」推导。 */
+function ComposerSendButton({
+  isStreaming,
+  currentAgentRunning,
+  hasInput,
+  isAgentSurface,
+  onClick,
+  t,
+}: {
+  isStreaming: boolean;
+  currentAgentRunning: boolean;
+  hasInput: boolean;
+  isAgentSurface: boolean;
+  onClick: () => void;
+  t: ReturnType<typeof useT>;
+}) {
+  const busy = isStreaming || currentAgentRunning;
+  const label = currentAgentRunning
+    ? hasInput
+      ? t('composer.queueSend')
+      : t('composer.stopTask')
+    : isStreaming
+      ? hasInput
+        ? t('composer.sendAfterStop')
+        : t('composer.stopGenerate')
+      : isAgentSurface
+        ? t('composer.startTask')
+        : t('composer.send');
+  return (
+    <button
+      type="button"
+      className={clsx('ax-send-button', busy && 'send-btn-stop')}
+      onClick={onClick}
+      disabled={!hasInput && !busy}
+      title={label}
+      aria-label={label}
+    >
+      {busy ? (
+        hasInput ? (
+          <ArrowUp size={16} weight="bold" />
+        ) : (
+          <span className="inline-flex items-center justify-center w-5 h-5">
+            <span className="inline-block w-[10px] h-[10px] bg-current rounded-md" />
+          </span>
+        )
+      ) : isAgentSurface ? (
+        <Play size={16} weight="fill" />
+      ) : (
+        <ArrowUp size={16} weight="bold" />
+      )}
+    </button>
+  );
+}
+
 export function ChatInputToolbar({
   isAgentSurface,
   sidebarMode,
@@ -289,52 +343,14 @@ export function ChatInputToolbar({
             </button>
           </Tooltip>
         )}
-        <button
-          type="button"
-          className={clsx('ax-send-button', (isStreaming || currentAgentRunning) && 'send-btn-stop')}
+        <ComposerSendButton
+          isStreaming={isStreaming}
+          currentAgentRunning={currentAgentRunning}
+          hasInput={hasInput}
+          isAgentSurface={isAgentSurface}
           onClick={handleSend}
-          disabled={!hasInput && !isStreaming && !currentAgentRunning}
-          title={
-            currentAgentRunning
-              ? hasInput
-                ? t('composer.queueSend')
-                : t('composer.stopTask')
-              : isStreaming
-                ? hasInput
-                  ? t('composer.sendAfterStop')
-                  : t('composer.stopGenerate')
-                : isAgentSurface
-                  ? t('composer.startTask')
-                  : t('composer.send')
-          }
-          aria-label={
-            currentAgentRunning
-              ? hasInput
-                ? t('composer.queueSend')
-                : t('composer.stopTask')
-              : isStreaming
-                ? hasInput
-                  ? t('composer.sendAfterStop')
-                  : t('composer.stopGenerate')
-                : isAgentSurface
-                  ? t('composer.startTask')
-                  : t('composer.send')
-          }
-        >
-          {isStreaming || currentAgentRunning ? (
-            hasInput ? (
-              <ArrowUp size={16} weight="bold" />
-            ) : (
-              <span className="inline-flex items-center justify-center w-5 h-5">
-                <span className="inline-block w-[10px] h-[10px] bg-current rounded-md" />
-              </span>
-            )
-          ) : isAgentSurface ? (
-            <Play size={16} weight="fill" />
-          ) : (
-            <ArrowUp size={16} weight="bold" />
-          )}
-        </button>
+          t={t}
+        />
       </div>
     </div>
   );
