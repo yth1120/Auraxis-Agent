@@ -1216,7 +1216,9 @@ describe('LLM Summary — degradation and fallback', () => {
     const llmCfg: LLMSummaryConfig = {
       model: 'deepseek-v4-pro',
       apiKey: 'fake-key-for-test',
-      apiBase: 'https://api.anthropic.com/v1/messages',
+      // 指向本地必然拒绝连接的端口：测试要的是"LLM 调用失败 → 优雅降级"，
+      // 不应该依赖真实外网（此前打 api.anthropic.com，网络一慢就 20s 超时）。
+      apiBase: 'http://127.0.0.1:1/v1/messages',
     };
     const result = await ContextManager.compressHistory(messages, null, config, llmCfg);
 
