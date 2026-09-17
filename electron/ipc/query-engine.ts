@@ -23,7 +23,7 @@ import { makeTurnId, type EngineEvent } from './engine-events';
 import type { ContextConfig, LoopMessage } from './agent-loop';
 import { isDeniedError } from './tool-runner';
 import { runStep, createStepState } from './step-engine';
-import type { StepEngineConfig } from './step-engine';
+import type { StepEngineConfig } from './step-engine-contracts';
 import { loadAgentInstructions } from '../agent-instructions';
 import { appendWorkRules, type WorkSurface } from '../work-docs-policy';
 import { trackTokens, trackToolCall, trackLinesGenerated, trackSession } from './stats-handlers';

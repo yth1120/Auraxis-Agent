@@ -4,7 +4,7 @@ import { invokeLlm } from './llm-adapter';
 import { PLANNING_SYSTEM_PROMPT, runPlanningPhase } from './agent-loop-planning';
 import { Planner, markInjected, parsePlanFromLLMText, restrictPlanToApproved } from './agent-loop-core';
 import type { AgentLoopConfig, AgentObserver, LoopMessage, TaskPlan } from './agent-loop-types';
-import type { StepEngineConfig } from './step-engine';
+import type { StepEngineConfig } from './step-engine-contracts';
 import type { RunnerToolCall } from './tool-runner';
 import type { ApprovalPolicy } from '../contracts/core';
 

@@ -1,7 +1,7 @@
 import { runHooksFor } from '../hooks';
 import { devLog } from './shared';
 import { runStep, createStepState } from './step-engine';
-import type { StepEngineConfig } from './step-engine';
+import type { StepEngineConfig } from './step-engine-contracts';
 import { makeTurnId } from './engine-events';
 import { runPlanningPhase, setupInitialMessages } from './agent-loop-planning';
 import { prepareLoopContext } from './agent-loop-prepare';
