@@ -177,19 +177,32 @@ test('Code 模式右侧工作台面板可进入每个功能并返回清单', asy
   await page.getByRole('button', { name: '工作台面板' }).click();
 });
 
-test('右侧面板：每个功能都能新建，分栏是左右并排', async () => {
+test('右侧面板：清单一次列全，模块「+」与分栏各司其职', async () => {
   await page.getByRole('radio', { name: 'Code' }).click();
   await page.getByRole('button', { name: '工作台面板' }).click();
 
   const panelMenu = page.getByRole('navigation', { name: '工作台面板' });
-  // 已接入真实后端的每个功能都带「新建」；缺 runtime 的两个是锁定态（无新建）。
-  await expect(panelMenu.getByRole('button', { name: /在新的一栏打开/ })).toHaveCount(8);
-  await expect(panelMenu.getByRole('button', { name: 'Computer Use', exact: true })).toBeDisabled();
-  await expect(panelMenu.getByRole('button', { name: 'Pull Request', exact: true })).toBeDisabled();
+  // 一次列全、自上而下一行一个（不折叠），共 7 项。
+  await expect(panelMenu.getByRole('button')).toHaveCount(7);
+  // 缺 runtime 的两项**不占位**：不留永远灰着的行。
+  await expect(panelMenu.getByRole('button', { name: 'Computer Use', exact: true })).toHaveCount(0);
+  await expect(panelMenu.getByRole('button', { name: 'Pull Request', exact: true })).toHaveCount(0);
+  // 每一行都带快捷键提示，且提示与全局绑定表由单测交叉守卫。
+  await expect(panelMenu.getByText('Ctrl+Shift+5')).toBeVisible();
+  await expect(panelMenu.getByText('Ctrl+Shift+7')).toBeVisible();
 
-  await panelMenu.getByRole('button', { name: '在新的一栏打开「文件」' }).click();
-
+  await panelMenu.getByRole('button', { name: '执行详情', exact: true }).click();
   const pane1 = page.locator('#root [data-pane="1"]');
+  await expect(pane1).toBeVisible();
+  // 「+」是"给**这个模块**新增条目"：执行详情没有可新增的实体，就不画按钮。
+  await expect(pane1.getByRole('button', { name: '新建文件', exact: true })).toHaveCount(0);
+  // 回到清单进「文件」：E2E 未开项目，`+` 同样不该出现（无处可建）。
+  await pane1.getByRole('button', { name: '返回' }).click();
+  await pane1.getByRole('button', { name: '文件', exact: true }).click();
+  await expect(pane1.getByRole('button', { name: '新建文件', exact: true })).toHaveCount(0);
+
+  // 分栏由**详情头**的按钮开（不是每行的 `+`，两者是两件事）。
+  await pane1.getByRole('button', { name: '分栏' }).click();
   const pane2 = page.locator('#root [data-pane="2"]');
   await expect(pane2).toBeVisible();
   // 面板宽度有 300ms 过渡：等它停下来再量几何，避免量到动画中间帧。
@@ -201,9 +214,9 @@ test('右侧面板：每个功能都能新建，分栏是左右并排', async ()
   expect(box1 && box2).toBeTruthy();
   expect(Math.abs((box2?.y ?? 0) - (box1?.y ?? 0))).toBeLessThan(8);
   expect(box2?.x ?? 0).toBeGreaterThanOrEqual((box1?.x ?? 0) + (box1?.width ?? 0) - 1);
+  // 第二栏头部只提供「关闭分栏」，全屏与分栏由第一栏统一控制。
+  await expect(pane2.getByRole('button', { name: '关闭分栏' })).toBeVisible();
 
-  // 详情头部同样有「新建」：再开一栏时替换第二栏内容
-  await expect(page.locator('[data-pane="1"]')).toBeVisible();
   await page.getByRole('button', { name: '工作台面板' }).click();
 });
 

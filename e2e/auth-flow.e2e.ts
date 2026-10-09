@@ -38,7 +38,10 @@ test('auth flow: register, login, and remember-me persistence', async () => {
     await passwords.nth(1).fill('secret1');
     await page.getByRole('button', { name: '创建账户' }).click();
 
-    const loginButton = page.locator('button').filter({ hasText: '登' }).first();
+    // 用 role 而不是 `locator('button')`：登录页顶部的「登录」页签也是个 <button> 元素
+    // （role=radio），按文本取的 `.first()` 会命中它 —— 点下去是空操作，登录永远不发生。
+    // 另外 antd 会在两个汉字之间插空格（"登 录"），所以用正则而不是精确串。
+    const loginButton = page.getByRole('button', { name: /^登\s*录$/ });
     await expect(loginButton).toBeVisible({ timeout: 10_000 });
     await page.locator('input[type="email"]').fill('user@example.com');
     await page.locator('input[type="password"]').fill('secret1');
