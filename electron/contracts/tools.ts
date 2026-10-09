@@ -89,8 +89,7 @@ export type BuiltInToolName =
   | 'JobKill'
   | 'BrowserOpen'
   | 'BrowserRead'
-  | 'BrowserScreenshot'
-;
+  | 'BrowserScreenshot';
 
 /** Any tool name — built-in, MCP (mcp__ prefix), or plugin-provided. */
 export type ToolName = BuiltInToolName | (string & {});

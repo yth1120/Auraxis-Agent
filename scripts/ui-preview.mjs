@@ -386,12 +386,18 @@ async function inspectStyles(page, spec) {
     'animationDuration',
     'animationPlayState',
   ];
-  for (const sel of spec.split(',').map((s) => s.trim()).filter(Boolean)) {
+  for (const sel of spec
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)) {
     // `var:--x` → 读根元素上该变量的**解析后**取值。用于验证令牌真的定义了
     // （未定义时这里会是空串，而用在 `var()` 里会静默回落到 initial）。
     if (sel.startsWith('var:')) {
       const name = sel.slice(4);
-      const value = await page.evaluate((n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim(), name);
+      const value = await page.evaluate(
+        (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim(),
+        name,
+      );
       console.log(`\n[变量] ${name} = ${value || '（未定义！）'}`);
       continue;
     }

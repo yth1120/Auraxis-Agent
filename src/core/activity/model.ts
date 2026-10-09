@@ -365,4 +365,3 @@ function runStatus(input: BuildRunInput, items: readonly ActivityItem[], runLive
 export function selectRootItems(run: ActivityRun | undefined): ActivityItem[] {
   return run ? run.items.filter((it) => it.parentId === null) : [];
 }
-

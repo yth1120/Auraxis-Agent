@@ -174,14 +174,19 @@ export default function DiffView({
       {/* ── Header: filename + mode toggle ── */}
       <div className="flex items-center justify-between pl-3 pr-2 py-1.5 bg-bg-tertiary border-b border-border-dim gap-2">
         <span className="font-mono text-2xs text-text-muted truncate">{fileName || 'diff'}</span>
-        <div className="inline-flex shrink-0 bg-bg-inset border border-border-dim rounded-md overflow-hidden" role="tablist">
+        <div
+          className="inline-flex shrink-0 bg-bg-inset border border-border-dim rounded-md overflow-hidden"
+          role="tablist"
+        >
           <button
             type="button"
             role="tab"
             aria-selected={mode === 'split'}
             className={clsx(
               'border-none bg-transparent text-2xs px-2 py-0.5 cursor-pointer transition-colors duration-150 ease-out',
-              mode === 'split' ? 'bg-primary-soft text-primary' : 'text-text-muted hover:bg-[var(--color-hover)] hover:text-primary',
+              mode === 'split'
+                ? 'bg-primary-soft text-primary'
+                : 'text-text-muted hover:bg-[var(--color-hover)] hover:text-primary',
             )}
             onClick={() => setMode('split')}
           >
@@ -193,7 +198,9 @@ export default function DiffView({
             aria-selected={mode === 'unified'}
             className={clsx(
               'border-none bg-transparent text-2xs px-2 py-0.5 cursor-pointer transition-colors duration-150 ease-out',
-              mode === 'unified' ? 'bg-primary-soft text-primary' : 'text-text-muted hover:bg-[var(--color-hover)] hover:text-primary',
+              mode === 'unified'
+                ? 'bg-primary-soft text-primary'
+                : 'text-text-muted hover:bg-[var(--color-hover)] hover:text-primary',
             )}
             onClick={() => setMode('unified')}
           >
@@ -213,7 +220,8 @@ export default function DiffView({
           <div className="flex flex-col">
             {splitRows.map((row, i) => {
               const sideClass = (side: 'left' | 'right') => {
-                if (row.type === 'ellipsis') return clsx(cellBase, 'bg-bg-inset justify-center text-text-faint italic py-0.5');
+                if (row.type === 'ellipsis')
+                  return clsx(cellBase, 'bg-bg-inset justify-center text-text-faint italic py-0.5');
                 const cell = side === 'left' ? row.left : row.right;
                 if (!cell) return clsx(cellBase, 'bg-bg-tertiary');
                 if (row.type === 'modify')
@@ -281,8 +289,12 @@ export default function DiffView({
             const isEllipsis = line.content === '...';
             return (
               <div key={i} className={lineCls}>
-                <span className="w-9 text-right pr-2 text-text-faint shrink-0 select-none">{padNum(line.oldLineNum)}</span>
-                <span className="w-9 text-right pr-2 text-text-faint shrink-0 select-none">{padNum(line.newLineNum)}</span>
+                <span className="w-9 text-right pr-2 text-text-faint shrink-0 select-none">
+                  {padNum(line.oldLineNum)}
+                </span>
+                <span className="w-9 text-right pr-2 text-text-faint shrink-0 select-none">
+                  {padNum(line.newLineNum)}
+                </span>
                 <span className={isEllipsis ? 'text-text-faint italic' : 'w-3 shrink-0 font-semibold text-center'}>
                   {prefix}
                 </span>

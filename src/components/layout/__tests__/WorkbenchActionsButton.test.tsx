@@ -25,7 +25,6 @@ describe('WorkbenchActionsButton — 右侧面板开关', () => {
     expect(useAppStore.getState().rightPanelView).toBe('file-tree');
   });
 
-
   it('hides the panel when already open', () => {
     useAppStore.setState({ showRightPanel: true, rightPanelView: 'inspector' });
     const { getByRole } = render(<WorkbenchActionsButton />);

@@ -207,13 +207,7 @@ function PanelRow({
  *    不进清单——留两个永远灰着的行既没功能，又让清单显得比实际长。
  *    runtime 接上后它们会自动回来。
  */
-export function RightPanelMenu({
-  onSelect,
-  pane = 1,
-}: {
-  onSelect: (key: RightPanelTabKey) => void;
-  pane?: 1 | 2;
-}) {
+export function RightPanelMenu({ onSelect, pane = 1 }: { onSelect: (key: RightPanelTabKey) => void; pane?: 1 | 2 }) {
   const t = useT();
   const ctx = useWorkbenchContext();
   const available = COCKPIT_TABS.filter((tab) => panelState(tab, ctx) !== 'locked');
@@ -251,11 +245,7 @@ function RightPanelPane({
         <RightPanelDetailHeader view={view} compact={compact} pane={pane} onBack={onBack} />
       )}
       <div className="ax-right-panel-content flex-1 overflow-y-auto min-h-0">
-        {isMenu ? (
-          <RightPanelMenu onSelect={onSelect} pane={pane} />
-        ) : (
-          <WorkbenchRightPanel rightPanelView={view} />
-        )}
+        {isMenu ? <RightPanelMenu onSelect={onSelect} pane={pane} /> : <WorkbenchRightPanel rightPanelView={view} />}
       </div>
     </div>
   );

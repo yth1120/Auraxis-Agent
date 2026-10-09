@@ -194,8 +194,7 @@ function createGeneralActions(set: StoreSet, _get: StoreGet): AppActions {
 
     incrementFileTreeVersion: () => set((s) => ({ fileTreeVersion: s.fileTreeVersion + 1 })),
 
-    requestOpenFile: (path, target = 'file-tree') =>
-      set({ openFileRequest: { path, requestId: Date.now(), target } }),
+    requestOpenFile: (path, target = 'file-tree') => set({ openFileRequest: { path, requestId: Date.now(), target } }),
 
     clearOpenFileRequest: () => set({ openFileRequest: null }),
 

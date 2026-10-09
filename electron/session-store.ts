@@ -150,9 +150,7 @@ function applyToolEvent(state: ProjectionState, e: SessionEvent, data: Record<st
     input,
     ...(typeof data.stepGroupId === 'string' ? { stepGroupId: data.stepGroupId } : {}),
     ...(typeof data.durationMs === 'number' ? { durationMs: data.durationMs } : {}),
-    ...(data.summary && typeof data.summary === 'object'
-      ? { summary: data.summary as Record<string, unknown> }
-      : {}),
+    ...(data.summary && typeof data.summary === 'object' ? { summary: data.summary as Record<string, unknown> } : {}),
     output: action === 'end' ? data.output : undefined,
     error: action === 'end' ? undefined : String(data.error ?? ''),
   });

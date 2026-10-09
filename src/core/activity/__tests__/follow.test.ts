@@ -27,7 +27,14 @@ describe('streamActivityKey', () => {
     const after = streamActivityKey([msg({ toolCalls: [{ id: 'c1', status: 'done' }] })], 1);
     expect(before).not.toBe(after);
     const more = streamActivityKey(
-      [msg({ toolCalls: [{ id: 'c1', status: 'done' }, { id: 'c2', status: 'running' }] })],
+      [
+        msg({
+          toolCalls: [
+            { id: 'c1', status: 'done' },
+            { id: 'c2', status: 'running' },
+          ],
+        }),
+      ],
       1,
     );
     expect(after).not.toBe(more);

@@ -82,10 +82,16 @@ function freezeReport() {
     return 1;
   }
   fs.mkdirSync(path.dirname(dst), { recursive: true });
-  fs.writeFileSync(dst, `${JSON.stringify(projectForBaseline(report), null, 2)}
-`);
-  fs.writeFileSync(HASH_FILE, `${currentToolSchemaHash()}
-`);
+  fs.writeFileSync(
+    dst,
+    `${JSON.stringify(projectForBaseline(report), null, 2)}
+`,
+  );
+  fs.writeFileSync(
+    HASH_FILE,
+    `${currentToolSchemaHash()}
+`,
+  );
   console.log(`已冻结基线: ${path.relative(root, dst)}（${report.cases.length} 个用例，工具 schema 指纹已同步）`);
   return 0;
 }

@@ -665,9 +665,9 @@ Work/Code 统一引擎（`electron/ipc/query-engine.ts` → `electron/agent-runt
 | 联网搜索                     | Chat 有独立联网按钮；Work/Code 不显示开关，任务中由模型自主调用 WebSearch/WebFetch；默认 DeepSeek 官方原生搜索，失败降级 DuckDuckGo | ChatInput / tool-handlers                           |
 | 每模式状态快照               | 思考开关 / 强度 / 联网状态按模式保存（modeThinkingPrefs），切回时还原                                                               | useChatStore                                        |
 | 溯源记忆                     | 证据先于信念、确定性读路径、证据链 UI、五层失败归因                                                                                 | memory-* / MemoryPanel                              |
-| Agent 执行活动视图           | 一轮执行 = 一个 Run 头 + 一份有序 Activity 列表，直接由真实引擎事件派生                                                               | core/activity / components/activity / AgentRun      |
+| Agent 执行活动视图           | 一轮执行 = 一个 Run 头 + 一份有序 Activity 列表，直接由真实引擎事件派生                                                             | core/activity / components/activity / AgentRun      |
 | 会话事件时间轴               | 右侧时间轴展示会话事件与工具调用，支持追溯 / 重放                                                                                   | TimelineRows / session-log                          |
-| 浏览器工具                   | Agent 驱动用户已打开的预览面板（打开 / 读文本 / 截图）；仅 http(s)，绝不悄悄换目标                                                   | browser-target / tool-defs/browser / PreviewBrowser |
+| 浏览器工具                   | Agent 驱动用户已打开的预览面板（打开 / 读文本 / 截图）；仅 http(s)，绝不悄悄换目标                                                  | browser-target / tool-defs/browser / PreviewBrowser |
 | 实时 diff 与变更回滚         | 右舱「变更」视图按会话查看文件变更并回滚                                                                                            | undo-manager / undo:getSessionDiffs                 |
 | 测试覆盖率面板               | 设置面板实时读取 coverage-summary.json 展示行 / 分支 / 函数覆盖率                                                                   | coverage-handlers / settings                        |
 

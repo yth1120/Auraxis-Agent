@@ -19,7 +19,15 @@ vi.mock('electron', () => ({
   webContents: { fromId: (id: number) => h.fromId(id) },
 }));
 
-import { registerBrowserTarget, resetBrowserTargets, unregisterBrowserTarget, browserOpen, browserRead, browserScreenshot, hasBrowserTarget } from '../browser-target';
+import {
+  registerBrowserTarget,
+  resetBrowserTargets,
+  unregisterBrowserTarget,
+  browserOpen,
+  browserRead,
+  browserScreenshot,
+  hasBrowserTarget,
+} from '../browser-target';
 import { assertNavigableUrl, MAX_PAGE_TEXT_CHARS } from '../contracts/browser';
 
 function fakeWc(over: Record<string, unknown> = {}) {
@@ -40,7 +48,10 @@ function fakeWc(over: Record<string, unknown> = {}) {
       listeners.set(event, arr);
     },
     off: (event: string, cb: Function) => {
-      listeners.set(event, (listeners.get(event) ?? []).filter((f) => f !== cb));
+      listeners.set(
+        event,
+        (listeners.get(event) ?? []).filter((f) => f !== cb),
+      );
     },
     fire: (event: string, ...args: unknown[]) => {
       for (const cb of listeners.get(event) ?? []) cb(...args);
@@ -127,7 +138,11 @@ describe('目标注册', () => {
 describe('读取与截图', () => {
   it('读页面文本，超长时截断并如实标记', async () => {
     const wc = fakeWc({
-      executeJavaScript: vi.fn(async () => ({ url: 'https://a.com', title: 'T', text: 'x'.repeat(MAX_PAGE_TEXT_CHARS + 10) })),
+      executeJavaScript: vi.fn(async () => ({
+        url: 'https://a.com',
+        title: 'T',
+        text: 'x'.repeat(MAX_PAGE_TEXT_CHARS + 10),
+      })),
     });
     h.targets.set(1, wc);
     registerBrowserTarget(1);

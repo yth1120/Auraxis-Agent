@@ -460,9 +460,11 @@ export function createSendMessageAction(deps: ChatSendMessageDeps) {
     const userMessage: Message = {
       id: `user-${Date.now()}`,
       role: 'user',
-      content: annotationBlock ? `${annotationBlock}
+      content: annotationBlock
+        ? `${annotationBlock}
 
-${content}` : content,
+${content}`
+        : content,
       timestamp: Date.now(),
       ...(pendingAnnotations.length > 0 ? { annotations: pendingAnnotations } : {}),
     };

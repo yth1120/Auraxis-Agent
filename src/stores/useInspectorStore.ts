@@ -67,7 +67,6 @@ export const useInspectorStore = create<InspectorStore>()((set) => ({
   activeToolCount: 0,
   lastToolActivity: 0,
 
-
   addPlan: (plan) =>
     set((s) => ({
       plans: [...s.plans.filter((p) => p.planId !== plan.planId), plan],

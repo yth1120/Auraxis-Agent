@@ -177,7 +177,9 @@ export default function InlinePermissionCard({ request, onResolved }: InlinePerm
       {/* ── Body: tool-aware summary ── */}
       {showDiff ? (
         <>
-          <div className="mt-2 font-mono text-2xs text-text-secondary truncate">{String(request.input.file_path ?? '')}</div>
+          <div className="mt-2 font-mono text-2xs text-text-secondary truncate">
+            {String(request.input.file_path ?? '')}
+          </div>
           <div className="mt-1.5 max-h-[220px] overflow-y-auto border border-border-dim rounded-md">
             <DiffView
               oldContent={request.oldContent!}

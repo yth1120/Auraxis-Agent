@@ -77,8 +77,7 @@ function worstByCase(cases: readonly EvalCaseRecord[]): Map<string, EvalCaseReco
       continue;
     }
     const better = (a: EvalCaseRecord, b: EvalCaseRecord) =>
-      Number(a.passed) > Number(b.passed) ||
-      (a.passed === b.passed && (a.score ?? 0) > (b.score ?? 0));
+      Number(a.passed) > Number(b.passed) || (a.passed === b.passed && (a.score ?? 0) > (b.score ?? 0));
     if (better(prev, c)) worst.set(c.id, c);
   }
   return worst;
@@ -176,7 +175,10 @@ function assertComparable(baseline: EvalReport, current: EvalReport): void {
 }
 
 /** 单个用例的逐项对比。 */
-function compareCase(b: EvalCaseRecord, c: EvalCaseRecord): { regressions: RegressionFinding[]; improvements: RegressionFinding[] } {
+function compareCase(
+  b: EvalCaseRecord,
+  c: EvalCaseRecord,
+): { regressions: RegressionFinding[]; improvements: RegressionFinding[] } {
   const regressions: RegressionFinding[] = [];
   const improvements: RegressionFinding[] = [];
   const id = c.id;
@@ -259,9 +261,15 @@ function compareAggregates(
       improvements.push({ kind: 'tokens_increased', caseId: '*', detail: `输入 token ${bTokens} → ${cTokens}` });
     }
   }
-  return { regressions, improvements, bTokens, cTokens, tokensCompared, ...(tokensSkippedReason ? { tokensSkippedReason } : {}) };
+  return {
+    regressions,
+    improvements,
+    bTokens,
+    cTokens,
+    tokensCompared,
+    ...(tokensSkippedReason ? { tokensSkippedReason } : {}),
+  };
 }
-
 
 /**
  * 内置工具 schema 的指纹。
@@ -270,7 +278,9 @@ function compareAggregates(
  * 基线里的 token 数字就不再可比。指纹只取会进请求的三样：名字、描述、input_schema，
  * 且按给定顺序（顺序也进前缀）。
  */
-export function toolSchemaHash(defs: readonly { name: string; description?: string; input_schema?: unknown }[]): string {
+export function toolSchemaHash(
+  defs: readonly { name: string; description?: string; input_schema?: unknown }[],
+): string {
   const canonical = defs.map((d) => JSON.stringify([d.name, d.description ?? '', d.input_schema ?? null])).join('\n');
   return createHash('sha256').update(canonical).digest('hex').slice(0, 16);
 }

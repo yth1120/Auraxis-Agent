@@ -28,13 +28,7 @@ import { foldActivityStatus } from '../../types/activity';
  * 单位不同的东西合并到一起，计数就没有意义了。
  */
 export type AggregateClass =
-  | 'read_file'
-  | 'search_matches'
-  | 'search_paths'
-  | 'terminal'
-  | 'test'
-  | 'build'
-  | 'inspect';
+  'read_file' | 'search_matches' | 'search_paths' | 'terminal' | 'test' | 'build' | 'inspect';
 
 /** 少于这个数量就不值得聚合（两行比一行 + 一个折叠头更好读）。 */
 export const MIN_AGGREGATE = 3;
@@ -108,7 +102,12 @@ function segmentOf(items: ActivityItem[], kind: ActivitySegment['kind'], klass?:
 }
 
 /** 同一类才能并进同一个段；inspect 还要求工具名相同。 */
-function breaksRun(klass: AggregateClass, item: ActivityItem, runClass: AggregateClass | null, runTool?: string): boolean {
+function breaksRun(
+  klass: AggregateClass,
+  item: ActivityItem,
+  runClass: AggregateClass | null,
+  runTool?: string,
+): boolean {
   if (runClass === null || klass !== runClass) return true;
   return klass === 'inspect' && item.toolName !== runTool;
 }

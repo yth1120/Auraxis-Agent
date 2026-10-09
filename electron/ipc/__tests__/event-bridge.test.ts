@@ -108,7 +108,15 @@ describe('event-bridge → ToolStreamEvent', () => {
     expect(withSummary).toMatchObject({ summary: { filePath: 'x.ts', lines: 3, size: 5 } });
     // 没有摘要时不要凭空造一个空对象（会让下游以为"摘要存在但为空"）。
     const withoutSummary = toToolStreamEvent(
-      { type: 'tool_end', toolCallId: 'tc-8', toolName: 'Bash', output: '', durationMs: 1, stepGroupId: 'g2', input: {} },
+      {
+        type: 'tool_end',
+        toolCallId: 'tc-8',
+        toolName: 'Bash',
+        output: '',
+        durationMs: 1,
+        stepGroupId: 'g2',
+        input: {},
+      },
       RID,
     );
     expect(withoutSummary && 'summary' in withoutSummary).toBe(false);

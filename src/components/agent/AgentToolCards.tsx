@@ -335,9 +335,7 @@ export function AgentPlanCard({ steps, done, total, hiddenSteps }: PlanCardModel
           </span>
         </div>
       ))}
-      {hiddenSteps > 0 && (
-        <div className="text-2xs text-text-faint">{t('activity.plan.more', { n: hiddenSteps })}</div>
-      )}
+      {hiddenSteps > 0 && <div className="text-2xs text-text-faint">{t('activity.plan.more', { n: hiddenSteps })}</div>}
     </div>
   );
 }

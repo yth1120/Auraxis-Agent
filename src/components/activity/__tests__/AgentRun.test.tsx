@@ -80,7 +80,13 @@ describe('权限审批行', () => {
       timestamp: Date.now(),
       mode: 'ask',
     };
-    return { id: 'perm-msg-1', role: 'system', content: '', timestamp: Date.now(), permissionRequest: request } as Message;
+    return {
+      id: 'perm-msg-1',
+      role: 'system',
+      content: '',
+      timestamp: Date.now(),
+      permissionRequest: request,
+    } as Message;
   }
 
   it('审批按钮就在 Run 内（不必展开，等待确认属于自动展开状态）', () => {
@@ -496,7 +502,12 @@ describe('行级动作', () => {
   });
 
   afterEach(() => {
-    useAppStore.setState({ sidebarMode: 'chat', openFileRequest: null, activeToolView: 'none', rightPanelView: 'none' });
+    useAppStore.setState({
+      sidebarMode: 'chat',
+      openFileRequest: null,
+      activeToolView: 'none',
+      rightPanelView: 'none',
+    });
     Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true });
   });
 

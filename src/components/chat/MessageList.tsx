@@ -322,9 +322,7 @@ export default function MessageList({
                 projectRoot={settingsProjectPath || currentProjectPath || ''}
                 followers={segments.followersByOwner.get(index)}
                 absorbed={segments.absorbed.has(index)}
-                annotations={
-                  msg.role === 'assistant' ? nearestPrecedingAnnotations(messages, index) : undefined
-                }
+                annotations={msg.role === 'assistant' ? nearestPrecedingAnnotations(messages, index) : undefined}
               />
             )}
             components={{ Header, Footer }}

@@ -473,7 +473,9 @@ export default function PreviewBrowser({ tabId }: PreviewBrowserProps) {
 
       {pendingAnnotations.length > 0 && (
         <div className="flex flex-col gap-0.5 px-2 py-1.5 border-b border-border-dim" data-pending-annotations>
-          <span className="text-2xs text-text-muted">{t('pb.pendingAnnotations', { n: pendingAnnotations.length })}</span>
+          <span className="text-2xs text-text-muted">
+            {t('pb.pendingAnnotations', { n: pendingAnnotations.length })}
+          </span>
           {pendingAnnotations.map((a) => (
             <div key={a.id} className="flex items-center gap-1.5 text-2xs text-text-secondary min-w-0">
               <span className="truncate">

@@ -1,11 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type {
-  PermissionRequest,
-  PermissionRule,
-  MCPServerConfig,
-  MCPStatus,
-} from '../types/advanced';
+import type { PermissionRequest, PermissionRule, MCPServerConfig, MCPStatus } from '../types/advanced';
 import type { PermissionBridgeStatus } from '../services/replBridge';
 
 export interface AdvancedStore {
@@ -26,7 +21,6 @@ export interface AdvancedStore {
   mcpStatuses: MCPStatus[];
   setMcpServers: (servers: MCPServerConfig[]) => void;
   updateMcpStatus: (status: MCPStatus) => void;
-
 }
 
 export const useAdvancedStore = create<AdvancedStore>()(
@@ -89,7 +83,6 @@ export const useAdvancedStore = create<AdvancedStore>()(
         set((s) => ({
           mcpStatuses: [...s.mcpStatuses.filter((st) => st.serverId !== status.serverId), status],
         })),
-
     }),
     {
       name: 'auraxis-advanced-storage',

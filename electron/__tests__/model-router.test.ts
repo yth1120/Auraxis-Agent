@@ -24,7 +24,6 @@ describe('难度路由', () => {
   // 生产调用点也没有失败计数可传。已连同参数一起删除 —— 测一条线上不可达的分支
   // 只会给出"这个能力存在"的错觉。开跑后的失败由 step-engine 的 fallbackModel 兜底。
 
-
   it('用户显式指定的模型永远优先；没有强模型配置时不猜模型名', () => {
     expect(routeModel('重构架构', config, { explicitModel: 'user-picked' })).toMatchObject({
       model: 'user-picked',

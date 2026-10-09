@@ -119,7 +119,6 @@ export default function WorkspaceInspector() {
   const codeAgent = pickCodeAgent(isCode, agent);
   const { statusMeta, statusLabel } = inspectorStatus(agent, tPanel);
 
-
   const { elapsed, totalTokens } = inspectorMetrics(agent, now);
 
   const qualityRuns = useMemo(() => (agent ? collectQualityRuns(agent.log ?? []) : []), [agent]);
@@ -251,7 +250,6 @@ export default function WorkspaceInspector() {
   // ── Named snapshots (project-scoped, chat + code modes) ──
   const projectRoot = useSettingsStore((s) => s.projectPath);
 
-
   // 任务清单两种模式都以**真实的 TodoWrite** 为源：Code 模式读 agent 轨迹，
   // 对话模式读聊天消息里的工具调用。从前对话模式读的是一个从未被写入的状态，永远是空的。
   const tasks = useMemo(() => {
@@ -288,12 +286,7 @@ export default function WorkspaceInspector() {
 
   if (!hasContent) {
     return (
-      <InspectorEmptyState
-        sidebarMode={sidebarMode}
-        projectRoot={projectRoot ?? undefined}
-        now={now}
-        tPanel={tPanel}
-      />
+      <InspectorEmptyState sidebarMode={sidebarMode} projectRoot={projectRoot ?? undefined} now={now} tPanel={tPanel} />
     );
   }
 
@@ -343,7 +336,6 @@ export default function WorkspaceInspector() {
       <SnapshotCard projectRoot={projectRoot} now={now} />
 
       {sysMessages.length > 0 && <SystemMessagesList messages={sysMessages} />}
-
     </div>
   );
 }

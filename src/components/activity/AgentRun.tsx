@@ -58,7 +58,12 @@ export default memo(function AgentRun({ message, followers, annotations }: Agent
   // 不参与状态推导，因此不该出现在依赖里（放进去反而会每帧重算整棵 Run）。
   const run = useMemo(
     () =>
-      messageToActivityRun(runMessage, runFollowers, { runTerminal, approvals, ...(annotations ? { annotations } : {}) }, Date.now()),
+      messageToActivityRun(
+        runMessage,
+        runFollowers,
+        { runTerminal, approvals, ...(annotations ? { annotations } : {}) },
+        Date.now(),
+      ),
     [runMessage, runFollowers, runTerminal, approvals, annotations],
   );
 

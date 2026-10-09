@@ -265,9 +265,13 @@ export default function DiffPanel({ tabId: _tabId }: DiffPanelProps) {
       </div>
 
       {!currentAgentId && sessionScoped ? (
-        <div className="flex-1 flex items-center justify-center p-8 px-4 text-xs text-text-muted">{t('diff.empty')}</div>
+        <div className="flex-1 flex items-center justify-center p-8 px-4 text-xs text-text-muted">
+          {t('diff.empty')}
+        </div>
       ) : !projectPath ? (
-        <div className="flex-1 flex items-center justify-center p-8 px-4 text-xs text-text-muted">{t('diff.empty')}</div>
+        <div className="flex-1 flex items-center justify-center p-8 px-4 text-xs text-text-muted">
+          {t('diff.empty')}
+        </div>
       ) : scopeError ? (
         <div className="flex-1 flex items-center justify-center p-8 px-4 text-xs text-text-muted text-center">
           {scopeError}

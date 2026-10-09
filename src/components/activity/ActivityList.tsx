@@ -130,7 +130,9 @@ export default memo(function ActivityList({ run, permissions }: ActivityListProp
     return (
       <div key={seg.key} data-segment={seg.key}>
         <SegmentHeader
-          icon={<ToolIcon toolName={seg.items[0]?.toolName as never} className={failed ? 'text-danger' : 'text-success'} />}
+          icon={
+            <ToolIcon toolName={seg.items[0]?.toolName as never} className={failed ? 'text-danger' : 'text-success'} />
+          }
           title={title}
           summary={summary}
           status={seg.status}

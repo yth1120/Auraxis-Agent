@@ -53,7 +53,6 @@ describe('useAdvancedStore — advanced state actions', () => {
     await vi.waitFor(() => expect(useAdvancedStore.getState().permissionRules).toEqual([{ id: 'r2' }]));
   });
 
-
   it('handles removeRule rejection and missing API', async () => {
     useAdvancedStore.setState({ permissionRules: [rule as any] });
     api.removeRule.mockResolvedValueOnce({ ok: false, error: 'down' } as any);

@@ -105,18 +105,14 @@ describe('右侧栏详情头部', () => {
   });
 
   it('没有可新增实体的模块不画 `+`（不放点了没反应的按钮）', () => {
-    const { queryByLabelText } = render(
-      <RightPanelDetailHeader view="diff" compact={false} onBack={() => {}} />,
-    );
+    const { queryByLabelText } = render(<RightPanelDetailHeader view="diff" compact={false} onBack={() => {}} />);
 
     expect(queryByLabelText('新建文件')).toBeNull();
   });
 
   it('没打开项目时也不画 `+`（新建文件无处可建）', () => {
     useSettingsStore.setState({ projectPath: '' });
-    const { queryByLabelText } = render(
-      <RightPanelDetailHeader view="file-tree" compact={false} onBack={() => {}} />,
-    );
+    const { queryByLabelText } = render(<RightPanelDetailHeader view="file-tree" compact={false} onBack={() => {}} />);
 
     expect(queryByLabelText('新建文件')).toBeNull();
   });

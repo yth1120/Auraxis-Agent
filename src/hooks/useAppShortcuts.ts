@@ -23,7 +23,9 @@ function focusPane(name: string): void {
 }
 
 /** 打开右侧面板的某个视图（Chat 模式下不生效）。 */
-function openRightPanelView(view: 'inspector' | 'diff' | 'preview' | 'timeline' | 'summary' | 'plan' | 'file-tree'): void {
+function openRightPanelView(
+  view: 'inspector' | 'diff' | 'preview' | 'timeline' | 'summary' | 'plan' | 'file-tree',
+): void {
   if (useAppStore.getState().sidebarMode === 'chat') return;
   const app = useAppStore.getState();
   app.setRightPanelView(view);

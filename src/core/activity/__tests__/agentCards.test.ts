@@ -357,7 +357,10 @@ describe('planCardModel', () => {
   });
 
   it('status 映射到三种渲染态，未知值按 pending', () => {
-    const model = planCardModel({ toolName: 'TodoWrite', input: { todos: [...todos, { content: 'x', status: 'bogus' }] } });
+    const model = planCardModel({
+      toolName: 'TodoWrite',
+      input: { todos: [...todos, { content: 'x', status: 'bogus' }] },
+    });
     expect(model!.steps.map((s) => s.status)).toEqual(['done', 'running', 'pending', 'pending', 'pending']);
   });
 

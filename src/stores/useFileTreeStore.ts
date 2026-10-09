@@ -93,8 +93,7 @@ export const useFileTreeStore = create<FileTreeStore>()((set) => ({
       return { expandedPaths: next };
     }),
 
-  clear: () =>
-    set({ tree: null, loading: false, error: null, expandedPaths: new Set(), projectRoot: null }),
+  clear: () => set({ tree: null, loading: false, error: null, expandedPaths: new Set(), projectRoot: null }),
 }));
 
 // ── Auto-refetch when fileTreeVersion changes ──────────────

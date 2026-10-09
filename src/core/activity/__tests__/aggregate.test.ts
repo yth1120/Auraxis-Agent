@@ -112,14 +112,7 @@ describe('aggregateActivities', () => {
   });
 
   it('正在跑的那一条留在顶层，且把两侧的聚合断开', () => {
-    const segs = aggregateActivities([
-      item(),
-      item(),
-      item({ status: 'running' }),
-      item(),
-      item(),
-      item(),
-    ]);
+    const segs = aggregateActivities([item(), item(), item({ status: 'running' }), item(), item(), item()]);
     // 左 2 条不够门槛 → 还原单行；右侧 3 条成段
     expect(segs.map((s) => s.kind)).toEqual(['single', 'single', 'single', 'aggregate']);
     expect(segs[2].status).toBe('running');
@@ -193,7 +186,9 @@ describe('aggregateCounts', () => {
 describe('foldLongHistory', () => {
   // 用不可聚合的类型造段：连续 Read 会被合成一段，那测的就不是"段数"了。
   const many = (n: number) =>
-    aggregateActivities(Array.from({ length: n }, (_, i) => item({ id: `x${i}`, type: 'edit_file', toolName: 'Edit' })));
+    aggregateActivities(
+      Array.from({ length: n }, (_, i) => item({ id: `x${i}`, type: 'edit_file', toolName: 'Edit' })),
+    );
 
   it('段数不超过门槛 → 不折叠（null）', () => {
     expect(foldLongHistory(many(FOLD_THRESHOLD))).toBeNull();

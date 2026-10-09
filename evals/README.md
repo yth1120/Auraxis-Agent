@@ -29,12 +29,12 @@ npm run eval:memory:dry     # 记忆召回的 hash 臂（不需要 Key）
 
 ## 口径（跨阶段只认这几个数）
 
-| 数 | 来源 | 用途 |
-|---|---|---|
-| `passed/total` | 报告 `cases[].passed` | 质量 |
-| `sum(cases[].tokensIn)` | 无头 CLI 的 `[用量] in=` | 成本 |
+| 数                            | 来源                       | 用途                         |
+| ----------------------------- | -------------------------- | ---------------------------- |
+| `passed/total`                | 报告 `cases[].passed`      | 质量                         |
+| `sum(cases[].tokensIn)`       | 无头 CLI 的 `[用量] in=`   | 成本                         |
 | `toolCount` / `toolTableHash` | CLI 的 `[工具集] n= hash=` | 注入了多少工具、前缀有没有换 |
-| `verification.status` | `agent-eval/verifier.ts` | 任务级结论 |
+| `verification.status`         | `agent-eval/verifier.ts`   | 任务级结论                   |
 
 **token 只在工具 schema 指纹一致时可比**：schema 是缓存前缀的一部分，变了就意味着
 两次运行的输入量不是同一个东西。`eval-diff` 会在不可比时**跳过并说明原因**，

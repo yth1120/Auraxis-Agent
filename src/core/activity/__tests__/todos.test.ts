@@ -14,7 +14,12 @@ describe('latestChatTodos', () => {
     const messages = [
       msg([{ toolName: 'TodoWrite', input: { todos: [{ content: '旧任务', status: 'completed' }] } }]),
       msg([{ toolName: 'Read', input: { file_path: 'a.ts' } }]),
-      msg([{ toolName: 'TodoWrite', input: { todos: [{ content: '新任务', status: 'in_progress', activeForm: '正在做' }] } }]),
+      msg([
+        {
+          toolName: 'TodoWrite',
+          input: { todos: [{ content: '新任务', status: 'in_progress', activeForm: '正在做' }] },
+        },
+      ]),
     ];
     expect(latestChatTodos(messages)).toEqual([{ content: '新任务', status: 'in_progress', activeForm: '正在做' }]);
   });
@@ -33,7 +38,9 @@ describe('latestChatTodos', () => {
   });
 
   it('入参为空时退回输出', () => {
-    const messages = [msg([{ toolName: 'TodoWrite', input: {}, output: { todos: [{ content: '回执', status: 'done' }] } }])];
+    const messages = [
+      msg([{ toolName: 'TodoWrite', input: {}, output: { todos: [{ content: '回执', status: 'done' }] } }]),
+    ];
     expect(latestChatTodos(messages)?.[0].content).toBe('回执');
   });
 
