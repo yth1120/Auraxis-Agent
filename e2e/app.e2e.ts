@@ -214,7 +214,10 @@ test('右侧面板：清单一次列全，模块「+」与分栏各司其职', a
   expect(box1 && box2).toBeTruthy();
   expect(Math.abs((box2?.y ?? 0) - (box1?.y ?? 0))).toBeLessThan(8);
   expect(box2?.x ?? 0).toBeGreaterThanOrEqual((box1?.x ?? 0) + (box1?.width ?? 0) - 1);
-  // 第二栏头部只提供「关闭分栏」，全屏与分栏由第一栏统一控制。
+  // 第二栏**初始停在清单态**（`rightPanelView2` 默认 'menu'），可以独立选一个功能 ——
+  // 选完才有详情头，头里才有「关闭分栏」（全屏与分栏由第一栏统一控制）。
+  await expect(pane2.getByRole('navigation', { name: '工作台面板' })).toBeVisible();
+  await pane2.getByRole('button', { name: '时间线', exact: true }).click();
   await expect(pane2.getByRole('button', { name: '关闭分栏' })).toBeVisible();
 
   await page.getByRole('button', { name: '工作台面板' }).click();
