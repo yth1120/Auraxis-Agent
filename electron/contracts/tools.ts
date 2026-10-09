@@ -5,6 +5,15 @@
  */
 
 /** Built-in tool names. The union is kept for type-narrowing in tool handlers. */
+/**
+ * 内置工具名。
+ *
+ * ⚠️ 这张清单是**工具身份的唯一事实源**，必须与 `electron/tool-defs/` +
+ * `ipc/tool-handlers/registry.ts` 保持一致。它曾经漏掉 17 个真实存在的工具
+ * （Delete / ReadImage / GitCommit / Terminal* / Schedule* / Job* …），后果不是编译失败，
+ * 而是 UI 侧按 `Record<BuiltInToolName, X>` 建的映射表**静默漏掉它们**，
+ * 这些步骤在界面上退化成兜底分类。新增工具时**必须**同时加在这里。
+ */
 export type BuiltInToolName =
   | 'Bash'
   | 'Read'
@@ -60,7 +69,28 @@ export type BuiltInToolName =
   | 'SessionEventSearch'
   | 'SessionEventRead'
   | 'SessionTrace'
-  | 'TaskList';
+  | 'TaskList'
+  | 'ReadImage'
+  | 'StrReplaceEditor'
+  | 'Delete'
+  | 'IngestDocument'
+  | 'GitCommit'
+  | 'TerminalOpen'
+  | 'TerminalList'
+  | 'TerminalRead'
+  | 'TerminalSend'
+  | 'TerminalSignal'
+  | 'TerminalClose'
+  | 'ScheduleCreate'
+  | 'ScheduleDelete'
+  | 'ScheduleList'
+  | 'JobList'
+  | 'JobOutput'
+  | 'JobKill'
+  | 'BrowserOpen'
+  | 'BrowserRead'
+  | 'BrowserScreenshot'
+;
 
 /** Any tool name — built-in, MCP (mcp__ prefix), or plugin-provided. */
 export type ToolName = BuiltInToolName | (string & {});
@@ -92,8 +122,17 @@ export type ToolStreamEvent =
       output?: unknown;
       durationMs?: number;
       error?: string;
+      /**
+       * 引擎算好的结构化摘要事实（`buildToolSummary`：行数 / 字节数 / 退出码 / 命中数）。
+       * 语言无关，由渲染层翻成一行字 —— 不要在引擎里拼展示文案。
+       */
+      summary?: Record<string, unknown>;
     }
-  | { type: 'iteration'; requestId: string; iteration: number; maxIterations: number }
+  /**
+   * 迭代进度。`maxIterations` 来自本次请求真实解析出的预算（见 resolveIterationBudget）；
+   * 拿不到时**省略而不是编一个数** —— 从前这里硬编码 25，界面上会把真实预算显示错。
+   */
+  | { type: 'iteration'; requestId: string; iteration: number; maxIterations?: number }
   | {
       type: 'context_compressed';
       requestId: string;

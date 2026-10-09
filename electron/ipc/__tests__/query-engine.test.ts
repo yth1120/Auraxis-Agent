@@ -32,6 +32,8 @@ vi.mock('../../agent-runtime/context-manager', () => ({
   WORK_GUIDE_MESSAGE: 'work guide',
   buildSessionPreamble: vi.fn(() => 'preamble'),
   prepareCacheAlignedMessages: vi.fn(({ chatMessages }: any) => chatMessages),
+  // 提示词变体开关：测试里保持关闭（mock 缺这个导出会让 replay 判定直接抛错）。
+  resolvePromptVariant: vi.fn(() => null),
 }));
 vi.mock('../query-context', () => ({
   loadLlmContext: vi.fn(async () => null),

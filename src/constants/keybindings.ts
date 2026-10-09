@@ -87,7 +87,7 @@ export const KEY_BINDINGS: KeyBinding[] = [
     key: '3',
     ctrl: true,
     shift: true,
-    description: '右侧面板：审查',
+    description: '右侧面板：变更',
     category: 'navigation',
   },
   {
@@ -139,6 +139,30 @@ export const KEY_BINDINGS: KeyBinding[] = [
     key: 'Escape',
     description: '停止生成 / 关闭面板',
     category: 'system',
+  },
+  // ── Right-panel tab switching（续）──
+  // 追加在**数组末尾**而不是紧挨上面的 1–4：用户的换绑按数组下标持久化
+  // （`useKeybindingsStore` 的 overrides），在中间插入会让已保存的自定义键整体错位。
+  {
+    key: '5',
+    ctrl: true,
+    shift: true,
+    description: '右侧面板：概览',
+    category: 'navigation',
+  },
+  {
+    key: '6',
+    ctrl: true,
+    shift: true,
+    description: '右侧面板：计划',
+    category: 'navigation',
+  },
+  {
+    key: '7',
+    ctrl: true,
+    shift: true,
+    description: '右侧面板：文件',
+    category: 'navigation',
   },
 ];
 

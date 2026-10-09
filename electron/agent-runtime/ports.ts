@@ -11,6 +11,7 @@
  *   类型导入（`import type`）可以存在，用于复用管线契约类型。
  */
 import type { ToolDef } from '../tool-defs';
+import type { ModelProtocol } from '../contracts/core';
 import type { ToolContext, ToolResult as ExecutorResult } from '../ipc/tool-handlers/path-utils';
 
 /** 一次工具调用的宿主执行函数（权限/沙箱/Hook/冲突锁都在宿主管线内完成）。 */
@@ -80,6 +81,11 @@ export interface RuntimePorts {
   // ── 模型/provider 辅助 ────────────────────────────────
   /** 设置里的最大输出 token（已做上下限收敛）。 */
   maxOutputTokens(): Promise<number>;
+  /**
+   * 模型**显式声明**的协议（设置或 AURAXIS_MODELS 里的自定义模型可写 `protocol`）。
+   * 未声明或宿主未实现时返回 undefined，由 `resolveModelProtocol()` 按端点兜底。
+   */
+  modelProtocol?(modelId: string): Promise<ModelProtocol | undefined>;
   /** 账号级 user id（未登录/绕过时 undefined）。 */
   deepSeekUserId(): Promise<string | undefined>;
 

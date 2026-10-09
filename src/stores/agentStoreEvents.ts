@@ -2,7 +2,7 @@ import type { AgentInfo, AgentStore } from '../types/agent';
 import type { AgentRuntimeEvent } from '../types/tools';
 import { useAppStore } from './useAppStore';
 import type { AgentStoreBuffers } from './agentStoreBuffers';
-import { agentIpc, isRecord, logEntryFromEvent, normalizeTodos } from './agentStoreHelpers';
+import { agentIpc, logEntryFromEvent } from './agentStoreHelpers';
 
 export interface AgentEventRuntimeDeps {
   getState: () => AgentStore;
@@ -18,7 +18,7 @@ function handleChunkEvent(event: AgentRuntimeEvent, id: string, deps: AgentEvent
     return true;
   }
   if (event.type === 'thinking_chunk') {
-    deps.buffers.queueChunk(id, event.chunk || event.text || '', 'thinking');
+    deps.buffers.queueChunk(id, event.chunk || '', 'thinking');
     return true;
   }
   if (event.type !== 'tool_progress') return false;
@@ -34,22 +34,22 @@ function handleChunkEvent(event: AgentRuntimeEvent, id: string, deps: AgentEvent
   return true;
 }
 
-/** Scheduler-path plan lifecycle：TaskPlan({tasks}) → {todos} 渲染形状。 */
+/**
+ * 计划生命周期：引擎的 `TaskPlan({tasks})` → 界面用的 `{todos}`。
+ *
+ * 子代理注册表会在通道上直接发**已翻译好**的 `{type:'plan', todos}`（那条路径由
+ * `miscEventEntry` 转成日志行），这里负责调度器原样转发的 `plan_created/updated`。
+ */
 function handlePlanEvent(event: AgentRuntimeEvent, id: string, deps: AgentEventRuntimeDeps): boolean {
   if (event.type !== 'plan_created' && event.type !== 'plan_updated') return false;
-  const raw = event.plan;
-  if (raw) {
-    const taskTodos = (raw.tasks ?? [])
-      .filter(
-        (t): t is { description: string; status: string } =>
-          isRecord(t) && typeof t.description === 'string' && typeof t.status === 'string',
-      )
-      .map((t) => ({ content: t.description, status: t.status, activeForm: `执行: ${t.description}` }));
-    const todos = normalizeTodos(raw.todos) ?? (taskTodos.length > 0 ? taskTodos : undefined);
-    if (todos) {
-      const plan: AgentInfo['plan'] = { todos };
-      deps.setState((s) => ({ agents: s.agents.map((a) => (a.id === id ? { ...a, plan } : a)) }));
-    }
+  const todos = (event.plan.tasks ?? []).map((t) => ({
+    content: t.description,
+    status: t.status,
+    activeForm: `执行: ${t.description}`,
+  }));
+  if (todos.length > 0) {
+    const plan: AgentInfo['plan'] = { todos };
+    deps.setState((s) => ({ agents: s.agents.map((a) => (a.id === id ? { ...a, plan } : a)) }));
   }
   return true;
 }

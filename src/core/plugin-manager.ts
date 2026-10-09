@@ -8,9 +8,7 @@
  */
 
 import type { Plugin, InstalledPlugin, CommandDefinition } from '../types/plugin';
-import type { ToolDef } from '../types/tools';
 import { usePluginStore } from '../stores/usePluginStore';
-import { registerTools, unregisterTools } from './tool-registry';
 import { registerCommands, unregisterCommands } from './command-registry';
 import { loadPlugin, scanForRisks, validatePlugin, getCapabilitySummary } from './plugin-loader';
 import { isRecord } from '../../electron/utils/guards';
@@ -100,7 +98,6 @@ class PluginManager {
   uninstall(id: string) {
     const store = usePluginStore.getState();
     store.uninstallPlugin(id);
-    unregisterTools(id);
     unregisterCommands(id);
   }
 
@@ -114,7 +111,6 @@ class PluginManager {
   /** Disable a plugin (keeps it installed) */
   disable(id: string) {
     usePluginStore.getState().disablePlugin(id);
-    unregisterTools(id);
     unregisterCommands(id);
   }
 
@@ -147,10 +143,6 @@ class PluginManager {
     return this.getEnabledPlugins().flatMap((p) => p.commands || []);
   }
 
-  getTools(): ToolDef[] {
-    return this.getEnabledPlugins().flatMap((p) => p.tools || []);
-  }
-
   executeHook<K extends keyof NonNullable<Plugin['hooks']>>(
     hook: K,
     ...args: Parameters<NonNullable<NonNullable<Plugin['hooks']>[K]>>
@@ -168,7 +160,8 @@ class PluginManager {
   }
 
   private activatePlugin(plugin: Plugin) {
-    if (plugin.tools) registerTools(plugin.id, plugin.tools);
+    // 渲染层插件没有工具扩展点：工具须经主进程管线（权限 / 沙箱 / 审批），
+    // 由动态插件（MountPlugin）或 MCP 提供。
     if (plugin.commands) registerCommands(plugin.id, plugin.commands);
     if (plugin.hooks) extraHooks.push(plugin.hooks);
   }

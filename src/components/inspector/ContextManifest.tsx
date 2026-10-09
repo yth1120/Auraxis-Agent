@@ -19,9 +19,14 @@ interface ContextManifestProps {
 }
 
 /**
- * Context transparency: a glanceable manifest of what the agent mounted this
- * turn — files touched, searches, commands, network calls. Presentational;
- * WorkspaceInspector aggregates the data from the latest assistant turn.
+ * Context transparency: a glanceable manifest of what the agent pulled in —
+ * files touched, searches, commands, network calls. Presentational; the data
+ * comes from `collectContextGroups` in WorkspaceInspectorData.
+ *
+ * **Scope differs by mode, so the title does not claim a scope**: Agent 模式下是
+ * **整条 agent 日志**的全部 tool_start（本次任务累计），对话模式下是**最后一条**
+ * 带工具调用的 assistant 消息（最近一轮）。标题从前写「本轮上下文」，对两种口径
+ * 都不成立 —— 它既是错的说明，也让人以为面板刚好只有一步那么长。
  */
 export default function ContextManifest({ groups, fileTokens, maxFileTokens }: ContextManifestProps) {
   const t = useT();
@@ -33,12 +38,12 @@ export default function ContextManifest({ groups, fileTokens, maxFileTokens }: C
   return (
     <section className="px-4 py-3 mb-3 rounded-xl bg-[var(--color-bg-secondary)]" aria-label={t('ctx.title')}>
       <header className="flex items-center justify-between mb-2">
-        <span className="text-2xs font-semibold text-muted tracking-wide">{t('ctx.title')}</span>
+        <span className="text-2xs font-semibold text-text-muted tracking-wide">{t('ctx.title')}</span>
         <span className="flex gap-[6px]">
           {nonEmpty.map((g) => (
             <span
               key={g.key}
-              className="inline-flex items-center gap-[3px] text-2xs tabular-nums px-[6px] py-[1px] rounded-full bg-[var(--color-bg-inset)] text-secondary"
+              className="inline-flex items-center gap-[3px] text-2xs tabular-nums px-[6px] py-[1px] rounded-full bg-[var(--color-bg-inset)] text-text-secondary"
               title={`${g.label} · ${g.items.length}`}
             >
               <span className="text-2xs">{g.icon}</span>
@@ -53,7 +58,7 @@ export default function ContextManifest({ groups, fileTokens, maxFileTokens }: C
             <summary className="flex items-center gap-[6px] px-2 py-[5px] rounded-md cursor-pointer text-xs text-primary [&::-webkit-details-marker]:hidden hover:bg-[var(--color-hover)]">
               <span className="text-xs">{g.icon}</span>
               <span className="flex-1">{g.label}</span>
-              <span className="text-2xs tabular-nums text-muted">{g.items.length}</span>
+              <span className="text-2xs tabular-nums text-text-muted">{g.items.length}</span>
             </summary>
             <ul className="list-none m-0 p-[2px_0_4px_26px] flex flex-col gap-[2px]">
               {g.items.slice(0, 50).map((it, i) => {
@@ -64,7 +69,7 @@ export default function ContextManifest({ groups, fileTokens, maxFileTokens }: C
                     {isFile ? (
                       <button
                         type="button"
-                        className="flex-1 min-w-0 text-left text-xs font-mono text-muted whitespace-nowrap overflow-hidden text-ellipsis rounded-md px-1 -mx-1 border-none bg-transparent cursor-pointer transition-colors duration-150 hover:bg-[var(--color-hover)] hover:text-text-primary"
+                        className="flex-1 min-w-0 text-left text-xs font-mono text-text-muted whitespace-nowrap overflow-hidden text-ellipsis rounded-md px-1 -mx-1 border-none bg-transparent cursor-pointer transition-colors duration-150 hover:bg-[var(--color-hover)] hover:text-text-primary"
                         title={t('ctx.openInPanel', { path: it })}
                         onClick={() => useAppStore.getState().requestOpenFile(it)}
                       >
@@ -72,7 +77,7 @@ export default function ContextManifest({ groups, fileTokens, maxFileTokens }: C
                       </button>
                     ) : (
                       <span
-                        className="flex-1 min-w-0 text-xs font-mono text-muted whitespace-nowrap overflow-hidden text-ellipsis"
+                        className="flex-1 min-w-0 text-xs font-mono text-text-muted whitespace-nowrap overflow-hidden text-ellipsis"
                         title={it}
                       >
                         {it}

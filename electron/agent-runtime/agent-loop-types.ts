@@ -6,6 +6,7 @@ import type { AgentLogEntry } from '../advanced-defs';
 import type { ApprovalPolicy, WorkAutonomyTier } from '../types';
 import type { SandboxMode } from '../sandbox-policy';
 import type { ToolContext } from '../ipc/tool-handlers/path-utils';
+import type { LoopPhase } from './agent-loop-phases';
 
 export interface ContentBlock {
   type: 'text';
@@ -171,7 +172,16 @@ export type AgentLoopEvent =
       stepGroupId: string;
       input?: Record<string, unknown>;
     }
-  | { type: 'iteration_start'; iteration: number; timestamp?: number }
+  | {
+      type: 'iteration_start';
+      iteration: number;
+      /**
+       * 本次运行的迭代预算，供界面如实显示"第 N/M 轮"。宿主解析不出来时**省略**
+       * —— 不要在这里补一个默认值，那会让界面显示一个假上限。
+       */
+      maxIterations?: number;
+      timestamp?: number;
+    }
   | {
       type: 'iteration_end';
       iteration: number;
@@ -231,6 +241,8 @@ export interface AgentLoopResult {
   log: AgentLogEntry[];
   plan: TaskPlan | null;
   messages: LoopMessage[];
+  /** 循环阶段轨迹（含起点），供排障与回放核对；见 agent-loop-phases.ts。 */
+  phases?: LoopPhase[];
 }
 
 export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'blocked';

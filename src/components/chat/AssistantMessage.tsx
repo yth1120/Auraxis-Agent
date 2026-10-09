@@ -19,14 +19,20 @@ import { formatTime } from '../../utils/time';
 import MarkdownRenderer from './MarkdownRenderer';
 import StreamRenderer from './StreamRenderer';
 import ThinkingBlock from './ThinkingBlock';
-import ToolCallTimeline from './ToolCallTimeline';
+import AgentRun from '../activity/AgentRun';
+import type { RunMessage } from '../../core/activity/model';
+import type { BrowserAnnotation } from '../../types/browser';
 import ImageGallery from './ImageGallery';
 
 interface AssistantMessageProps {
   message: Message;
+  /** 紧随其后、归属本轮的合成消息（注入 / 压缩 / 权限），由 MessageList 统一分段。 */
+  followers?: RunMessage[];
+  /** 上一条用户消息带来的页面标注 —— 本轮的输入之一。 */
+  annotations?: readonly BrowserAnnotation[];
 }
 
-export default memo(function AssistantMessage({ message }: AssistantMessageProps) {
+export default memo(function AssistantMessage({ message, followers, annotations }: AssistantMessageProps) {
   const t = useT();
   const contentText = getContentText(message.content);
   const { cleanedText, thinkingBlocks: extractedBlocks } = useMemo(
@@ -71,8 +77,9 @@ export default memo(function AssistantMessage({ message }: AssistantMessageProps
 
         {thinkingBlocks.length > 0 && <ThinkingBlock blocks={thinkingBlocks} isStreaming={message.isStreaming} />}
 
-        {/* Tool execution timeline — rendered BEFORE text content to match "act first, then conclude" chronology */}
-        {message.toolCalls && message.toolCalls.length > 0 && <ToolCallTimeline toolCalls={message.toolCalls} />}
+        {/* 执行视图：Run 头 + 有序步骤。渲染在文本之前，对应"先做后说"的时间顺序。
+            这一轮的计划 / 上下文注入 / 权限请求由 followers 收进来，不再是旁边的独立消息。 */}
+        <AgentRun message={message} followers={followers} annotations={annotations} />
 
         <div>
           {message.isStreaming ? (

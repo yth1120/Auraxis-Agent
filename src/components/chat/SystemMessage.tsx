@@ -19,7 +19,7 @@ export default memo(function SystemMessage({ message }: SystemMessageProps) {
     <div
       className={clsx(
         'flex items-start gap-2 px-6 py-2 text-xs max-w-[600px] mx-auto',
-        isWarning ? 'text-accent' : 'text-muted',
+        isWarning ? 'text-accent' : 'text-text-muted',
         isInjected && 'opacity-80 italic',
       )}
     >

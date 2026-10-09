@@ -206,6 +206,7 @@ describe('index — registerIpcHandlers 总注册与窗口/shell/设置处理器
       'window:setBackgroundMaterial',
       'window:backgroundMaterialSupported',
       'window:glassState',
+      'git:diffScope',
       'shell:openExternal',
       'shell:openPath',
       'shell:openInVSCode',
@@ -225,6 +226,22 @@ describe('index — registerIpcHandlers 总注册与窗口/shell/设置处理器
     expect(registerFns.registerSshHandlers).toHaveBeenCalled();
     expect(registerFns.setScheduleFireHandler).toHaveBeenCalled();
     expect(electronMock.app.on).toHaveBeenCalledWith('before-quit', expect.any(Function));
+  });
+
+  it('git:diffScope 校验入参（范围 / 项目路径），不合法时返回错误而非抛异常', async () => {
+    registerIpcHandlers();
+    const h = handlers();
+    const handler = h.get('git:diffScope')!;
+    expect(handler).toBeTruthy();
+
+    await expect(handler({}, { scope: 'nope', projectRoot: '/proj' })).resolves.toEqual({
+      ok: false,
+      error: expect.stringContaining('不支持的比较范围'),
+    });
+    await expect(handler({}, { scope: 'uncommitted', projectRoot: '' })).resolves.toEqual({
+      ok: false,
+      error: '缺少项目路径',
+    });
   });
 
   it('window 控制：minimize/maximize/close/isMaximized/zoom', () => {
@@ -253,7 +270,7 @@ describe('index — registerIpcHandlers 总注册与窗口/shell/设置处理器
     expect(h.get('window:zoom')!({ sender }, null)).toBe(0);
   });
 
-  it('window:setBackgroundMaterial 开启时切透明底色 + acrylic，关闭时恢复', () => {
+  it('window:setBackgroundMaterial 开启时切透明底色 + acrylic，关闭时只去材质、底色保持透明', () => {
     const win = fakeWin() as any;
     win.setBackgroundColor = vi.fn();
     win.setBackgroundMaterial = vi.fn();
@@ -268,7 +285,9 @@ describe('index — registerIpcHandlers 总注册与窗口/shell/设置处理器
     expect(win.setBackgroundMaterial).toHaveBeenCalledWith('acrylic');
 
     h.get('window:setBackgroundMaterial')!({ sender: {} }, false);
-    expect(win.setBackgroundColor).toHaveBeenCalledWith('#0a0202');
+    // 关闭时不能设成不透明底色：那会在页面圆角外露出一圈方角矩形，
+    // 窗口四角永远是直的。页面自身铺不透明底，所以底色保持透明即可。
+    expect(win.setBackgroundColor).toHaveBeenLastCalledWith('#00000000');
     expect(win.setBackgroundMaterial).toHaveBeenCalledWith('none');
     releaseSpy.mockRestore();
     platformSpy.mockRestore();

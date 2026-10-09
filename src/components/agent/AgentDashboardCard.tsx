@@ -298,7 +298,7 @@ function AgentStatsRow({
       {hasEvents && (
         <Tooltip title={showConsole ? t('dashboard.collapseEvents') : t('dashboard.expandEvents')}>
           <button
-            className="border-none bg-transparent cursor-pointer inline-flex items-center text-2xs text-[var(--color-text-muted)] p-[1px_3px] rounded-[5px] transition-colors duration-fast ease-out hover:text-accent hover:bg-[var(--color-bg-elevated)]"
+            className="border-none bg-transparent cursor-pointer inline-flex items-center text-2xs text-[var(--color-text-muted)] p-[1px_3px] rounded-[5px] transition-colors duration-150 ease-out hover:text-accent hover:bg-[var(--color-bg-elevated)]"
             onClick={onToggleConsole}
             aria-label={t('dashboard.eventsConsole')}
           >

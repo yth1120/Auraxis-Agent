@@ -47,7 +47,7 @@ export default function GoalBar() {
   return (
     <>
       <div className="flex items-center gap-[6px] w-full max-w-[var(--content-max-width)] mx-auto h-9 px-3 rounded-full bg-primary-soft border border-primary/15 mb-2">
-        <span className="relative flex items-center justify-center w-6 h-6 rounded-full bg-elevated text-primary shrink-0">
+        <span className="relative flex items-center justify-center w-6 h-6 rounded-full bg-bg-elevated text-primary shrink-0">
           <Target size={14} weight="fill" />
           {running && <span className="absolute -right-[2px] -top-[2px] h-[7px] w-[7px] rounded-full bg-primary" />}
         </span>

@@ -12,6 +12,7 @@ import { setMainWindowRef, clearMainWindowRef } from './ipc/window-ref';
 import { sessionQuerySearch } from './fts';
 import { seedAuthorizedProjectRoots } from './ipc/project-access';
 import { buildConnectSrc, buildFrameSrc } from './network-policy';
+import { applyWindows11RoundedCorners } from './window-corners';
 import { errorText } from './errors';
 import type { CliArgs } from './cli-args';
 
@@ -113,7 +114,12 @@ function createWindow(useAcrylic = false) {
           backgroundMaterial: 'acrylic' as const,
           show: false,
         }
-      : { backgroundColor: '#0a0202' }),
+      : {
+          // 无 Acrylic 的机器同样以透明创建：窗口四角由页面自绘圆角
+          // （不透明 backgroundColor 会在圆角外露出方角矩形）。
+          transparent: true,
+          backgroundColor: '#00000000',
+        }),
     // 品牌 logo 作为开发态窗口/任务栏图标；打包后由 exe/app 图标接管。
     ...(existsSync(path.join(__dirname, '../build/icon.png'))
       ? { icon: path.join(__dirname, '../build/icon.png') }
@@ -135,6 +141,10 @@ function createWindow(useAcrylic = false) {
   });
 
   setMainWindowRef(mainWindow);
+  // Windows 11 的 transparent 窗口拿不到 Electron 的原生圆角，Acrylic 背板会
+  // 铺满四角（Aqua 模式下页面本身透明，露出来的就是方形亚克力板）。补一次
+  // DWM 圆角偏好让系统连背板一起裁圆；失败时静默保持现状。
+  if (isWindows11()) applyWindows11RoundedCorners(mainWindow);
 
   if (useAcrylic) {
     markAcrylicWindowReady();

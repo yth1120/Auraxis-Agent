@@ -81,7 +81,7 @@ describe('tool-registry — registry and batch branches', () => {
   it('dispatches MCP tools by server and falls back to the qualified name', async () => {
     expect(await executeMcpTool('Read', {})).toMatchObject({ error: expect.stringContaining('非 MCP') });
     expect(await executeMcpTool('mcp__server-a__search', { q: 'x' })).toMatchObject({ output: { results: [] } });
-    expect(callMcpToolMock).toHaveBeenCalledWith('server-a', 'search', { q: 'x' });
+    expect(callMcpToolMock).toHaveBeenCalledWith('server-a', 'search', { q: 'x' }, undefined);
 
     getAllMcpToolsMock.mockReturnValue([{ ...mcpTool, name: 'search' }]);
     expect(await executeMcpTool('mcp__server-a__other', {})).toMatchObject({
@@ -92,6 +92,31 @@ describe('tool-registry — registry and batch branches', () => {
     callMcpToolMock.mockRejectedValueOnce(new Error('rpc down'));
     expect(await executeMcpTool('mcp__server-a__search', {})).toMatchObject({
       error: expect.stringContaining('执行失败'),
+    });
+  });
+
+  // 取消传播回归：宿主的中止信号必须穿透到 MCP 桥，且已中止时要在触达桥之前短路；
+  // 中止引发的在途失败按「取消」上报，不伪装成 MCP 服务端故障。
+  it('threads the abort signal into the MCP bridge and reports cancellations as such', async () => {
+    const live = new AbortController();
+    await executeMcpTool('mcp__server-a__search', { q: 'x' }, live.signal);
+    expect(callMcpToolMock).toHaveBeenCalledWith('server-a', 'search', { q: 'x' }, live.signal);
+
+    const alreadyAborted = new AbortController();
+    alreadyAborted.abort();
+    callMcpToolMock.mockClear();
+    expect(await executeMcpTool('mcp__server-a__search', { q: 'x' }, alreadyAborted.signal)).toMatchObject({
+      error: '操作已取消',
+    });
+    expect(callMcpToolMock).not.toHaveBeenCalled();
+
+    const abortMidFlight = new AbortController();
+    callMcpToolMock.mockImplementationOnce(async () => {
+      abortMidFlight.abort();
+      throw new Error('This operation was aborted');
+    });
+    expect(await executeMcpTool('mcp__server-a__search', { q: 'x' }, abortMidFlight.signal)).toMatchObject({
+      error: '操作已取消',
     });
   });
 

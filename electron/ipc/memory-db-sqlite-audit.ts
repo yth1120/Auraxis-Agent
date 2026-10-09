@@ -2,6 +2,7 @@
 import type { SqliteLike } from '../session-projection-cache';
 import { newId, type EraseAuditRecord, type ReadResultRecord, type ReadRunRecord } from './memory-db-types';
 import { rowToEraseAudit, rowToReadRun } from './memory-db-sqlite-rows';
+import { clearScopeVectors } from './memory-vectors';
 
 export function addReadRun(db: SqliteLike, r: ReadRunRecord): void {
   db.prepare(
@@ -68,6 +69,8 @@ export function eraseScope(db: SqliteLike, scope: string, opts?: { actor?: strin
     db.prepare(`DELETE FROM beliefs WHERE id IN (${ph})`).run(...belIds);
   }
   db.prepare('DELETE FROM belief_rejections WHERE scope = ?').run(scope);
+  // 向量缓存也在擦除范围内 —— 它是信念文本的派生物，留下就等于「擦除没有真做完」。
+  clearScopeVectors(db, scope);
   if (runIds.length > 0) {
     const ph = runIds.map(() => '?').join(',');
     db.prepare(`DELETE FROM read_results WHERE read_run_id IN (${ph})`).run(...runIds);

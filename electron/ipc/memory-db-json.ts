@@ -401,6 +401,33 @@ export class JsonBackend implements MemoryBackend {
       .slice(0, limit);
   }
 
+  // 向量缓存只落在 SQLite（BLOB 列）。JSON 后端没有向量存储，调用方每次重算 ——
+  // 结果与命中缓存时完全一致，区别只是没有省下重算。**不做 JSON 版向量缓存**：
+  // 那会把整个 JSON 文件撑大，而它的定位本就是「没有 SQLite 时的兜底」。
+  vectorsAvailable(): boolean {
+    return false;
+  }
+
+  loadVectors(): Map<string, number[]> {
+    return new Map();
+  }
+
+  saveVectors(): void {}
+
+  clearScopeVectors(): void {}
+
+  hardDeleteBeliefs(ids: string[]): number {
+    const drop = new Set(ids.filter(Boolean));
+    if (drop.size === 0) return 0;
+    const before = this.beliefs.length;
+    this.beliefs = this.beliefs.filter((b) => !drop.has(b.id));
+    this.beliefEvidence = this.beliefEvidence.filter((l) => !drop.has(l.belief_id));
+    this.revisions = this.revisions.filter((r) => !drop.has(r.belief_id));
+    const removed = before - this.beliefs.length;
+    if (removed > 0) this.save();
+    return removed;
+  }
+
   addReadRun(r: ReadRunRecord): void {
     this.readRuns.push(r);
     this.save();

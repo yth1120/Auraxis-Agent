@@ -1,4 +1,5 @@
 import { createHash } from 'crypto';
+import type { EmbeddingIdentity } from './embedding-provider';
 // ─── Types ─────────────────────────────────────────────
 
 export interface MemoryRecord {
@@ -190,11 +191,29 @@ export interface MemoryBackend {
   updateBeliefStatus(id: string, nextStatus: BeliefStatus, reason?: string, actor?: string): boolean;
   archiveBelief(id: string): void;
   deleteBelief(id: string): void;
+  /**
+   * 硬删除信念（连带 belief_evidence / belief_revisions 级联与向量缓存），返回删除条数。
+   *
+   * **只给「替换机器生成的派生内容」用**（例：文档重新入库时清掉旧分块）。用户可见的
+   * 删除一律走 `deleteBelief`（软删 + revision 审计）或 `eraseScope`（带审计记录），
+   * 否则会绕过审计线索 —— 这是本方法刻意不做成通用能力的理由。
+   */
+  hardDeleteBeliefs(ids: string[]): number;
   addBeliefEvidence(link: BeliefEvidenceLink): void;
   listBeliefEvidence(beliefId?: string): BeliefEvidenceLink[];
   listBeliefRevisions(beliefId?: string): BeliefRevision[];
   addBeliefRejection(r: BeliefRejectionInput): void;
   listBeliefRejections(scope: string, limit?: number): BeliefRejection[];
+
+  // belief 向量缓存（R4 用；实现见 memory-vectors.ts）
+  /** 本后端是否有向量存储。JSON 后端为 false —— 调用方每次重算，结果相同，只是没有缓存。 */
+  vectorsAvailable(): boolean;
+  /** 取身份匹配的向量；身份不符的行不返回（视同缺失，由下一次 save 覆盖）。 */
+  loadVectors(scope: string, identity: EmbeddingIdentity): Map<string, number[]>;
+  /** 原地覆盖写入，整批一个事务。 */
+  saveVectors(scope: string, identity: EmbeddingIdentity, entries: Array<{ beliefId: string; vector: number[] }>): void;
+  /** 级联擦除的一部分：删掉该 scope 的全部向量。 */
+  clearScopeVectors(scope: string): void;
 
   // read runs
   addReadRun(r: ReadRunRecord): void;

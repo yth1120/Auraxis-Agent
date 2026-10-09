@@ -223,7 +223,7 @@ export function SiderCodeProjectRow({
         )}
       </div>
       {expanded && (
-        <div className="px-0 pb-1 mt-1 flex flex-col gap-1 sider-children opacity-0 animate-[projectExpandIn_0.18s_ease-out_forwards]">
+        <div className="px-0 pb-1 mt-1 flex flex-col gap-1 sider-children animate-[projectExpandIn_0.18s_ease-out_forwards]">
           {projectSessions.length === 0 ? (
             <div className="pl-[10px] pr-[18px] py-2 text-2xs text-text-faint">{t('sidebar.noProjectSessions')}</div>
           ) : (

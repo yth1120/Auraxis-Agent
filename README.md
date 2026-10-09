@@ -24,7 +24,7 @@ Auraxis 是一个基于 Electron + React 19 + TypeScript 的桌面端 AI 智能�
 
 ## 环境要求
 
-- Node.js `>=22.12`
+- Node.js `>=24`（与 Electron 44 内置的 Node 24 对齐）
 - npm `>=10`
 - Python `>=3.9`（仅使用 Python SDK 时需要；Windows 可用 `winget install Python.Python.3.10`）
 
@@ -42,17 +42,18 @@ npm run electron:dev
 
 ## 常用命令
 
-| 命令                       | 作用                                   |
-| -------------------------- | -------------------------------------- |
-| `npm run electron:dev`     | 启动 Electron 开发环境                 |
-| `npm run electron:compile` | 编译主进程                             |
-| `npm run sdk:build`        | 编译 TypeScript SDK                    |
-| `npm run sdk:test`         | 运行 TypeScript SDK 单元测试           |
-| `npm run sdk:test:py`      | 运行 Python SDK 单元测试               |
-| `npm run sdk:smoke`        | 启动真实无头 runtime 并验证 SDK 连通性 |
-| `npm run test`             | 运行全量单元测试                       |
-| `npm run check`            | Lint、编译、类型检查和全量测试         |
-| `npm run build`            | 全量构建并打包                         |
+| 命令                       | 作用                                     |
+| -------------------------- | ---------------------------------------- |
+| `npm run electron:dev`     | 启动 Electron 开发环境                   |
+| `npm run electron:compile` | 编译主进程                               |
+| `npm run sdk:build`        | 编译 TypeScript SDK                      |
+| `npm run sdk:test`         | 运行 TypeScript SDK 单元测试             |
+| `npm run sdk:test:py`      | 运行 Python SDK 单元测试                 |
+| `npm run sdk:check:py`     | Python SDK 全检（ruff + pyright + 测试） |
+| `npm run sdk:smoke`        | 启动真实无头 runtime 并验证 SDK 连通性   |
+| `npm run test`             | 运行全量单元测试                         |
+| `npm run check`            | Lint、编译、类型检查和全量测试           |
+| `npm run build`            | 全量构建并打包                           |
 
 ## SDK
 

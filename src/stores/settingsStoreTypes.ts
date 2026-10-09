@@ -11,6 +11,10 @@ export interface SettingsStore {
   deepseekApiKeyConfigured: boolean;
   defaultModel: string;
   fallbackModel: string;
+  /** 轻任务档位（难度路由：low → 该模型；空 = 沿用主模型）。 */
+  fastModel: string;
+  /** 强任务档位（难度路由：high / 连续失败 → 该模型；空 = 沿用规划模型）。 */
+  strongModel: string;
   projectPath: string | null;
   notifyOnAgentComplete: boolean;
   notificationMode: 'never' | 'background' | 'always';
@@ -35,6 +39,10 @@ export interface SettingsStore {
   setApiKey: (key: string) => void;
   setDefaultModel: (model: string) => void;
   setFallbackModel: (model: string) => void;
+  /** 轻任务档位（难度路由）。 */
+  setFastModel: (model: string) => void;
+  /** 强任务档位（难度路由）。 */
+  setStrongModel: (model: string) => void;
   setProjectPath: (path: string | null) => void;
   setNotifyOnAgentComplete: (enabled: boolean) => void;
   setNotificationMode: (mode: 'never' | 'background' | 'always') => void;

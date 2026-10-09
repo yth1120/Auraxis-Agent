@@ -4,6 +4,12 @@
  *   2. MCP server tools (prefixed mcp__ to avoid collisions)
  *   3. Plugin tools (loaded from plugin system)
  *
+ * The three sources are registered as ToolProviders on the registry in
+ * tool-provider.ts; the historical public API below stays available as thin
+ * wrappers over that registry, so existing callers (step-engine, tool pipeline,
+ * headless CLI, runtime inspection) keep working without knowing where a tool
+ * comes from.
+ *
  * All callers that need the full tool list for LLM injection should use
  * toolRegistry.getAllTools() instead of referencing TOOL_DEFINITIONS directly.
  */
@@ -13,12 +19,19 @@ import { TOOL_DEFINITIONS } from './tool-defs';
 import type { ToolDef } from './tool-defs';
 import { getAllMcpTools, callMcpTool } from './ipc/mcp-handlers';
 import { getCachedMcpTools, setCachedMcpTools } from './ipc/mcp-tool-cache';
+import {
+  isExternalSourceTool,
+  listAllToolDefs,
+  listToolProviders,
+  registerToolProvider,
+  type ToolExecutionResult,
+  type ToolProvider,
+} from './tool-provider';
 
 // 兼容既有调用方：失效逻辑已移到中立缓存模块。
 export { invalidateMcpToolCache } from './ipc/mcp-tool-cache';
 
 const MCP_PREFIX = 'mcp__';
-const MAX_TOTAL_TOOLS = 96;
 
 function getMcpToolDefs(): ToolDef[] {
   const cachedMcpTools = getCachedMcpTools();
@@ -55,15 +68,67 @@ export function removePluginTools(toolNames: string[]): void {
   pluginToolDefs = pluginToolDefs.filter((t) => !drop.has(t.name));
 }
 
+// ─── Tool providers ────────────────────────────────────────
+// 三个来源在共享注册表里按 内置 → MCP → 插件 的顺序注册，工具清单的拼接顺序即
+// 注册顺序。执行侧：MCP 直接由 mcp provider 执行；内置与插件工具的执行留在宿主
+// 管线（pipeline.ts 需要 ToolContext 才能过权限 / 沙箱 / 审批门），因此它们的
+// execute 返回 undefined，由注册表继续尝试下一个 provider。
+
+const builtinProvider: ToolProvider = {
+  id: 'builtin',
+  listTools: () => TOOL_DEFINITIONS,
+  owns: (toolName) => TOOL_DEFINITIONS.some((t) => t.name === toolName),
+  capabilities: () => ({ semanticsKnown: true }),
+  execute: () => Promise.resolve(undefined),
+};
+
+const mcpProvider: ToolProvider = {
+  id: 'mcp',
+  listTools: () => getMcpToolDefs(),
+  owns: (toolName) => isMcpTool(toolName),
+  // 远端服务器的工具语义不可验证。
+  capabilities: () => ({ semanticsKnown: false }),
+  execute: (toolName, input) => (isMcpTool(toolName) ? runMcpTool(toolName, input) : Promise.resolve(undefined)),
+};
+
+const pluginProvider: ToolProvider = {
+  id: 'plugin',
+  listTools: () => pluginToolDefs,
+  owns: (toolName) => pluginToolDefs.some((t) => t.name === toolName),
+  // 动态插件是运行期注入的任意代码，语义同样不可验证。
+  capabilities: () => ({ semanticsKnown: false }),
+  execute: () => Promise.resolve(undefined),
+};
+
+registerToolProvider(builtinProvider);
+registerToolProvider(mcpProvider);
+registerToolProvider(pluginProvider);
+
+/** 经注册表读取某个来源当前提供的工具（id 即 provider 的稳定标识）。 */
+function toolsOf(providerId: string): ToolDef[] {
+  return (
+    listToolProviders()
+      .find((provider) => provider.id === providerId)
+      ?.listTools() ?? []
+  );
+}
+
 // ─── MCP tool execution dispatch ───────────────────────────
 
-export async function executeMcpTool(
+/**
+ * MCP 工具实现：把 mcp__<serverId>__<toolName> 解析到具体 server/tool 后调用。
+ *
+ * `signal` 是宿主侧的取消信号（`ToolContext.abortSignal`）。它必须一路传到
+ * `client.callTool` 的请求选项：MCP SDK 会在该 signal 中止时替我们上发
+ * `notifications/cancelled` 并让在途请求立刻返回，否则长跑 MCP 工具只能干等
+ * `MCP_REQUEST_TIMEOUT_MS`（30s）——用户点了停止却仍被卡住。
+ */
+async function runMcpTool(
   fullName: string,
   input: Record<string, unknown>,
-): Promise<{ output: unknown; error?: string }> {
-  if (!fullName.startsWith(MCP_PREFIX)) {
-    return { output: null, error: `非 MCP 工具: ${fullName}` };
-  }
+  signal?: AbortSignal,
+): Promise<ToolExecutionResult> {
+  if (signal?.aborted) return { output: null, error: '操作已取消' };
 
   const qualifiedName = fullName.slice(MCP_PREFIX.length);
   const separator = qualifiedName.indexOf('__');
@@ -88,52 +153,51 @@ export async function executeMcpTool(
   }
 
   try {
-    const result = await callMcpTool(tool.serverId, tool.name, input);
+    const result = await callMcpTool(tool.serverId, tool.name, input, signal);
     return { output: result };
   } catch (err: unknown) {
+    // 中止引发的失败按「取消」上报，与内置工具（file-tools 的「操作已取消」）同口径，
+    // 不要把用户主动停止显示成 MCP 服务端故障。
+    if (signal?.aborted) return { output: null, error: '操作已取消' };
     return { output: null, error: `MCP 工具执行失败: ${errorText(err)}` };
   }
 }
 
+export async function executeMcpTool(
+  fullName: string,
+  input: Record<string, unknown>,
+  signal?: AbortSignal,
+): Promise<ToolExecutionResult> {
+  if (!isMcpTool(fullName)) {
+    return { output: null, error: `非 MCP 工具: ${fullName}` };
+  }
+  return runMcpTool(fullName, input, signal);
+}
+
 // ─── Unified tool list ─────────────────────────────────────
 
+/** 全量工具清单：内置 → MCP → 插件，超过上限时截断并告警（见 tool-provider.ts）。 */
 export function getAllTools(): ToolDef[] {
-  const builtIn = TOOL_DEFINITIONS;
-  const mcp = getMcpToolDefs();
-  const plugins = pluginToolDefs;
-
-  const all = [...builtIn, ...mcp, ...plugins];
-
-  if (all.length > MAX_TOTAL_TOOLS) {
-    console.warn(
-      `[ToolRegistry] Tool count ${all.length} exceeds limit ${MAX_TOTAL_TOOLS}. ` +
-        `Truncating to ${MAX_TOTAL_TOOLS}. Consider reducing MCP servers or disabling unused plugins.`,
-    );
-    return all.slice(0, MAX_TOTAL_TOOLS);
-  }
-
-  return all;
+  return listAllToolDefs();
 }
 
 export function getBuiltInTools(): ToolDef[] {
-  return TOOL_DEFINITIONS;
+  return toolsOf('builtin');
 }
 
 export function getMcpTools(): ToolDef[] {
-  return getMcpToolDefs();
+  return toolsOf('mcp');
 }
 
 export function getPluginTools(): ToolDef[] {
-  return pluginToolDefs;
+  return toolsOf('plugin');
 }
 
 export function getToolCount(): { builtIn: number; mcp: number; plugins: number; total: number } {
-  return {
-    builtIn: TOOL_DEFINITIONS.length,
-    mcp: getMcpToolDefs().length,
-    plugins: pluginToolDefs.length,
-    total: TOOL_DEFINITIONS.length + getMcpToolDefs().length + pluginToolDefs.length,
-  };
+  const builtIn = toolsOf('builtin').length;
+  const mcp = toolsOf('mcp').length;
+  const plugins = toolsOf('plugin').length;
+  return { builtIn, mcp, plugins, total: builtIn + mcp + plugins };
 }
 
 /** Check if a tool name is an MCP tool (prefixed with mcp__). */
@@ -150,8 +214,8 @@ export function stripMcpPrefix(toolName: string): string {
 
 /** Fast lookup: is this tool safe to run concurrently with other safe tools? */
 export function isToolConcurrencySafe(toolName: string): boolean {
-  // MCP tools are never concurrency-safe (we can't know their side effects)
-  if (toolName.startsWith(MCP_PREFIX)) return false;
+  // 外部来源（MCP / 插件）不信任工具定义里的并发安全声明：副作用不可知。
+  if (isExternalSourceTool(toolName)) return false;
 
   const all = getAllTools();
   const def = all.find((t) => t.name === toolName);

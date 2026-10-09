@@ -73,6 +73,12 @@ const WORK_ALLOWED = [
   'ReadSpill',
   'AskUser',
   'ReadDocument',
+  // 文档入库：读文档、写记忆，不碰代码文件 —— Work 的硬边界（不写代码）并未放宽。
+  'IngestDocument',
+  // 预览浏览器：只读网页、一个文件都不碰。联网与审批门禁照走（见 tool-capability 的 DANGEROUS_TOOLS）。
+  'BrowserOpen',
+  'BrowserRead',
+  'BrowserScreenshot',
   'SlackListChannels',
   'SlackPostMessage',
   'DriveList',

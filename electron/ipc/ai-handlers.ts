@@ -1,4 +1,5 @@
 import { BrowserWindow, type IpcMainInvokeEvent } from 'electron';
+import { createElectronSchedulerNotifier } from './agent-scheduler-notifier';
 import { secureHandle } from './trust';
 import { resolveTrustedProjectRoot } from './project-access';
 import axios from 'axios';
@@ -312,7 +313,7 @@ const handleSendQuery = async (event: IpcMainInvokeEvent, payload: QueryPayload)
     const checkPermission = effectiveAutoApprove
       ? () => Promise.resolve(true)
       : (toolName: string, input: Record<string, unknown>, toolCallId?: string) =>
-          requestPermission(toolName, input, win, toolCallId, {
+          requestPermission(toolName, input, createElectronSchedulerNotifier(win), toolCallId, {
             mode: approval,
             approvedPlanSteps,
             projectRoot: trustedProjectRoot,
@@ -350,7 +351,7 @@ const handleSendQuery = async (event: IpcMainInvokeEvent, payload: QueryPayload)
       (event: EngineEvent) => {
         // Engine emits the unified EngineEvent contract; the bridge is the
         // only place that maps it to the renderer ToolStreamEvent shape.
-        const streamEvent = toToolStreamEvent(event, requestId);
+        const streamEvent = toToolStreamEvent(event, requestId, maxIterations);
         if (!streamEvent) return; // engine-internal lifecycle event
         try {
           win.webContents.send(`ai:queryEvent:${requestId}`, streamEvent);

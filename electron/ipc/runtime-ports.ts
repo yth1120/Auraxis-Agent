@@ -6,6 +6,7 @@
  * `RuntimePorts` 注入进去。桌面启动、无头 CLI、SDK/ACP 与测试共用这一份装配。
  */
 import { configureAgentRuntime, type RuntimePorts } from '../agent-runtime/ports';
+import { isModelProtocol } from '../contracts/core';
 import type { HookEvent } from '../hooks';
 import type { WorkSurface } from '../work-docs-policy';
 import { executeToolCall } from './tool-handlers';
@@ -16,6 +17,7 @@ import { workspaceDrift, driftSummary } from '../workspace-drift';
 import { loadAgentInstructions } from '../agent-instructions';
 import { appendWorkRules } from '../work-docs-policy';
 import { readSettings, resolveMaxOutputTokens } from './settings-store';
+import { getAllModels } from './model-config';
 import { getDeepSeekUserId } from '../auth-store';
 import { writeSpill } from '../spill';
 import { getShellExecutor } from './shell-executor';
@@ -44,6 +46,12 @@ export function createRuntimePorts(): RuntimePorts {
     appendWorkRules: (prompt, surface, opts) => appendWorkRules(prompt, surface as WorkSurface | undefined, opts),
     readSettingsSnapshot: async () => (await readSettings().catch(() => null)) as Record<string, unknown> | null,
     maxOutputTokens: async () => resolveMaxOutputTokens(await readSettings().catch(() => null)),
+    modelProtocol: async (modelId: string) => {
+      const models = await getAllModels().catch(() => []);
+      const declared = models.find((m) => m.id === modelId)?.protocol;
+      // 非法取值一律当作未声明，交回 resolveModelProtocol() 按端点推断。
+      return isModelProtocol(declared) ? declared : undefined;
+    },
     deepSeekUserId: () => getDeepSeekUserId(),
     writeSpill: (content, meta) => writeSpill(content, meta),
     getShellExecutor: () => getShellExecutor(),

@@ -22,11 +22,14 @@ export interface SessionCacheRow {
   projectRoot?: string;
   mode?: 'chat' | 'work' | 'code';
   pinned?: boolean;
+  archived?: boolean;
   branchedFrom?: { sessionId: string; messageId: string; title: string } | null;
   messageCount: number;
   eventCount: number;
   /** Tail seq of the JSONL log this row was built from. */
   lastSeq: number;
+  /** 生成该行时的投影形状版本（见 PROJECTION_VERSION）；不匹配即视为未命中。 */
+  projVersion: number;
   /** Full message projection — present only after project() warmed it. */
   payload?: ProjectedSession | null;
 }
@@ -114,6 +117,13 @@ export function sqliteAvailable(): boolean {
   return loadSqliteModule() !== null;
 }
 
+/**
+ * 打开一个 SQLite 连接；不可用时返回 null（调用方各自回退）。
+ *
+ * ⚠️ 加载扩展（`sqlite-vec` 之类）需要**在建库时**传 `{ allowExtension: true }` ——
+ * 事后调用 `enableLoadExtension` 不够。目前没有调用方需要扩展，所以这里不传；
+ * 真要用扩展时必须改成按需传参，**不要**图省事给所有连接都打开扩展加载。
+ */
 export function openSqlite(dbPath: string): SqliteLike | null {
   const mod = loadSqliteModule();
   if (!mod) return null;

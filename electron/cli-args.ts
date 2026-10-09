@@ -46,6 +46,10 @@ export interface CliArgs {
   autoApprove?: boolean;
   /** Auto-approve generated plans in plan mode. */
   approvePlan?: boolean;
+  /** `--trace-out <path>` — 运行结束导出结构化轨迹 JSON（评测 / 回放用）。 */
+  traceOut?: string;
+  /** `--tools=Read,Grep,…` — 只注入这些工具（缺省按任务动态预选）。 */
+  tools?: string[];
 }
 
 function valueOf(argv: string[], flag: string): string | undefined {
@@ -57,6 +61,14 @@ function valueOf(argv: string[], flag: string): string | undefined {
 
 function has(argv: string[], flag: string): boolean {
   return argv.includes(flag);
+}
+
+/** `--tools=Read,Grep,…` → 工具名数组（空串 = 未指定）。 */
+function parseToolList(argv: string[]): string[] {
+  return (valueOf(argv, '--tools') || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 export function parseCliArgs(argv: string[]): CliArgs {
@@ -102,6 +114,8 @@ export function parseCliArgs(argv: string[]): CliArgs {
   out.json = has(argv, '--json');
   out.verbose = has(argv, '--verbose');
   out.autoApprove = has(argv, '--auto-approve');
+  out.traceOut = valueOf(argv, '--trace-out');
+  out.tools = parseToolList(argv);
   out.approvePlan = has(argv, '--approve-plan');
   const surface = valueOf(argv, '--surface');
   if (surface === 'chat' || surface === 'work' || surface === 'code') out.surface = surface;

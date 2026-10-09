@@ -81,6 +81,18 @@ export function useChatInputModePanel({
     };
   }, [modePanelOpen, recalcModePanelPos]);
 
+  /**
+   * 切换模式时收起模型面板。
+   *
+   * 注意：这个 effect **必须声明在**下面「响应显式打开请求」的 effect 之前。
+   * 顶部信息区点模型名时会先切回 Chat、再发一次打开请求，两件事落在同一次
+   * commit 里；effect 按声明顺序执行，若本 effect 在后，就会把刚打开的面板
+   * 立刻关掉——表现就是「第一次点没反应，第二次才弹出」。
+   */
+  useEffect(() => {
+    setModePanelOpen(false);
+  }, [sidebarMode]);
+
   useEffect(() => {
     if (modelPanelRequest > 0) {
       setModePanelOpen(true);
@@ -90,16 +102,16 @@ export function useChatInputModePanel({
   }, [modelPanelRequest, recalcModePanelPos]);
 
   useEffect(() => {
-    setModePanelOpen(false);
-  }, [sidebarMode]);
-
-  useEffect(() => {
     const onMouseDown = (event: MouseEvent) => {
       const target = event.target as Node;
+      // 模型面板：只有面板本身与触发按钮算「内部」——点输入框其他任何地方
+      // （文本框、工具条、消息区）都收起，与 antd Dropdown / Popover 一致。
+      if (!modeTriggerRef.current?.contains(target) && !modePanelRef.current?.contains(target)) {
+        setModePanelOpen(false);
+      }
+      // 输入框之外：顺带收起附件面板与技能提及列表（文本驱动的 @/$ 列表由 blur 收）。
       if (containerRef.current?.contains(target)) return;
-      if (modePanelRef.current?.contains(target)) return;
       if (smartMorePanelRef.current?.contains(target)) return;
-      setModePanelOpen(false);
       smartMoreClose();
       setDollarOpen(false);
     };

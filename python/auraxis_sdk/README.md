@@ -64,3 +64,26 @@ python -m unittest discover -s tests -t .
 ```
 
 或在仓库根目录运行：`npm run sdk:test:py`
+
+## 开发工具链
+
+静态检查与类型检查与测试一起构成发布前全检（CI 在三个平台上都跑）：
+
+```sh
+# 安装钉死版本的开发依赖（ruff / pytest）
+python -m pip install -e ".[dev]"
+
+cd python/auraxis_sdk
+python -m ruff check .          # 静态检查
+npx pyright --project .         # 类型检查（走 Node，本机首次运行会下载）
+```
+
+仓库根目录的 `npm run sdk:check:py` 一次跑完三者。规则与目标 Python 版本定义在
+`pyproject.toml` 的 `[tool.ruff]` / `[tool.pyright]` 段：按 `requires-python >= 3.9`
+判定可用语法，行宽 120 与仓库 Prettier 对齐。
+
+## 发布
+
+`.github/workflows/publish-pypi.yml` 在 `v*` 标签上构建 sdist/wheel 并上传 PyPI
+（需要仓库 secret `PYPI_API_TOKEN`；未配置时只构建不发布）。发布前会校验本文件的
+`pyproject.toml` 版本与根 `package.json` 一致。

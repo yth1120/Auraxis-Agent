@@ -171,7 +171,7 @@ export default function MemoryPanel() {
           <button
             key={key}
             className={clsx(
-              'px-2.5 py-1 rounded-md text-xs border border-dim bg-transparent text-secondary cursor-pointer transition-colors duration-150 hover:text-text-primary',
+              'px-2.5 py-1 rounded-md text-xs border border-border-dim bg-transparent text-text-secondary cursor-pointer transition-colors duration-150 hover:text-text-primary',
               tab === key && 'bg-accent-soft border-primary text-text-primary font-semibold',
             )}
             onClick={() => setTab(key)}
@@ -185,7 +185,7 @@ export default function MemoryPanel() {
         <>
           <div className="px-3 py-2 shrink-0">
             <Input
-              prefix={<SearchOutlined className="text-muted" />}
+              prefix={<SearchOutlined className="text-text-muted" />}
               placeholder={t('mem.searchPlaceholder')}
               value={searchText}
               onChange={(e) => handleSearch(e.target.value)}
@@ -199,7 +199,7 @@ export default function MemoryPanel() {
               <button
                 key={key}
                 className={clsx(
-                  'px-2 py-1 border border-dim rounded-full bg-transparent text-secondary text-xs cursor-pointer transition-colors duration-150 hover:border-primary hover:text-text-primary',
+                  'px-2 py-1 border border-border-dim rounded-full bg-transparent text-text-secondary text-xs cursor-pointer transition-colors duration-150 hover:border-primary hover:text-text-primary',
                   filter === key && 'bg-accent-soft border-primary text-text-primary font-semibold',
                 )}
                 onClick={() => setFilter(key)}

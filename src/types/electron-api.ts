@@ -500,6 +500,14 @@ export interface ElectronAPI {
     ) => Promise<{ ok: boolean; data?: { reverted: number }; error?: string }>;
   };
 
+  /** 变更审阅的比较范围：未提交 / 整分支（「本次任务」走 undo.getSessionDiffs）。 */
+  git: {
+    diffScope: (
+      scope: 'uncommitted' | 'branch',
+      projectRoot: string,
+    ) => Promise<{ ok: boolean; data?: WorkspaceFileDiff[]; error?: string }>;
+  };
+
   snapshot: {
     create: (projectRoot: string, name: string) => Promise<{ ok: boolean; data?: NamedSnapshot; error?: string }>;
     list: (projectRoot: string) => Promise<{ ok: boolean; data?: NamedSnapshot[]; error?: string }>;
@@ -812,6 +820,12 @@ export interface ElectronAPI {
       error?: string;
     }>;
   };
+  browser: {
+    register: (webContentsId: number) => Promise<{ ok: boolean; error?: string }>;
+    unregister: (webContentsId: number) => Promise<{ ok: boolean; error?: string }>;
+    onOpenRequest: (callback: (payload: { url: string }) => void) => () => void;
+  };
+
   sessionTitle: {
     generate: (messages: { content: string }[]) => Promise<{ ok: boolean; data?: { title: string }; error?: string }>;
   };
@@ -843,10 +857,6 @@ export interface ElectronAPI {
 
   coverage: {
     get: () => Promise<{ ok: boolean; data?: unknown; error?: string }>;
-  };
-
-  browser?: {
-    onRefresh?: (callback: (data: unknown) => void) => () => void;
   };
 
   app?: {

@@ -2,6 +2,7 @@ import type { AgentLogEntry } from '../../types/agent';
 import type { PermissionRequest } from '../../types/advanced';
 import { t } from '../../i18n';
 import { basename } from '../../utils/paths';
+import { summaryFromInput } from '../../core/activity/presentation';
 
 export const NO_PERMS: PermissionRequest[] = [];
 
@@ -37,47 +38,13 @@ export function runDurationLabel(ms: number): string {
 
 export { basename };
 
+/**
+ * 工具入参的一行摘要 —— 调展示层（`core/activity/presentation.ts:summaryFromInput`），
+ * 不再维护自己的第 3 张映射表。旧的本地版本与展示层有细微措辞差异（引号 / hostname 缩写），
+ * 统一后以展示层为准 —— 同一个工具在 Agent 会话与 Activity 视图里必须是同一句话。
+ */
 export function summarizeInput(toolName: string | undefined, input: Record<string, unknown> | undefined): string {
-  if (!input) return '';
-  switch (toolName) {
-    case 'Read':
-    case 'Write':
-    case 'Edit':
-    case 'NotebookEdit':
-    case 'ReadDocument':
-    case 'WriteDocument':
-      return basename(input.file_path);
-    case 'Bash': {
-      const c = typeof input.command === 'string' ? input.command.replace(/\s+/g, ' ').trim() : '';
-      return c.length > 64 ? c.slice(0, 64) + '…' : c;
-    }
-    case 'Grep':
-    case 'Glob':
-      return typeof input.pattern === 'string' ? `"${input.pattern}"` : '';
-    case 'WebFetch': {
-      try {
-        return new URL(String(input.url)).hostname;
-      } catch {
-        return String(input.url || '');
-      }
-    }
-    case 'WebSearch':
-      return typeof input.query === 'string' ? `"${input.query}"` : '';
-    case 'Agent':
-      return typeof input.description === 'string' ? input.description : '';
-    case 'AskUser':
-      return typeof input.question === 'string'
-        ? input.question.length > 48
-          ? input.question.slice(0, 48) + '…'
-          : input.question
-        : '';
-    case 'TodoWrite':
-      return t('conv.updateTodos');
-    default: {
-      const first = Object.values(input).find((v) => typeof v === 'string') as string | undefined;
-      return first ? (first.length > 48 ? first.slice(0, 48) + '…' : first) : '';
-    }
-  }
+  return summaryFromInput(toolName, input);
 }
 
 export function outputText(toolName: string | undefined, output: unknown): string {

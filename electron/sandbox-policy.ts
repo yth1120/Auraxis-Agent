@@ -23,6 +23,7 @@ import {
   UNSUPPORTED_CONFINED_TOOLS,
   isUnsupportedConfinementTool,
 } from './tool-capability';
+import { isExternalSourceTool } from './tool-provider';
 
 export const MUTATION_TOOLS = new Set([
   ...FILE_WRITE_TOOLS,
@@ -82,8 +83,8 @@ export function enforceSandbox(args: { sandboxMode: SandboxMode; toolName: strin
       reason: `受控沙箱（${args.sandboxMode}）不支持 ${args.toolName}，已拒绝执行`,
     };
   }
-  if (args.toolName.startsWith('mcp__')) {
-    return { allowed: false, reason: '受控沙箱不允许调用 MCP 工具（无法验证其读写边界）' };
+  if (isExternalSourceTool(args.toolName)) {
+    return { allowed: false, reason: '受控沙箱不允许调用外部来源工具（无法验证其读写边界）' };
   }
 
   if (args.sandboxMode === 'read') {

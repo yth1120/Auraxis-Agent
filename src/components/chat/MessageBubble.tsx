@@ -7,17 +7,24 @@ import type { Message } from '../../types/chat';
 import { useChatStore } from '../../stores/useChatStore';
 import { useSessionStore } from '../../stores/useSessionStore';
 import { useAdvancedStore } from '../../stores/useAdvancedStore';
+import { useActivityStore } from '../../stores/useActivityStore';
 import { permissionBridge } from '../../services/replBridge';
 import UserMessage from './UserMessage';
 import AssistantMessage from './AssistantMessage';
+import type { RunMessage } from '../../core/activity/model';
+import type { BrowserAnnotation } from '../../types/browser';
 import SystemMessage from './SystemMessage';
 import InlinePermissionCard from '../permissions/InlinePermissionCard';
 
 interface MessageBubbleProps {
   message: Message;
+  /** 归属本轮的合成消息（由 MessageList 分段后传入，交给执行视图内联）。 */
+  followers?: RunMessage[];
+  /** 上一条用户消息带来的页面标注。 */
+  annotations?: readonly BrowserAnnotation[];
 }
 
-export default memo(function MessageBubble({ message }: MessageBubbleProps) {
+export default memo(function MessageBubble({ message, followers, annotations }: MessageBubbleProps) {
   const t = useT();
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
 
@@ -56,20 +63,29 @@ export default memo(function MessageBubble({ message }: MessageBubbleProps) {
     setCtxMenu(null);
   }, [message.id, t]);
 
-  // ── Inline permission resolution — remove card and dequeue ──
-  const handlePermissionResolved = useCallback(() => {
-    if (!message.permissionRequest) return;
-    const reqId = message.permissionRequest.requestId;
-    useAdvancedStore.getState().dequeuePermission(reqId);
-    const queue = useAdvancedStore.getState().permissionQueue;
-    if (queue.length === 0) {
-      permissionBridge._setStatus('idle');
-    }
-    // Remove the permission message from the chat stream
-    useChatStore.setState((s) => ({
-      messages: s.messages.filter((m) => m.id !== message.id),
-    }));
-  }, [message.id, message.permissionRequest]);
+  // ── Inline permission resolution — record, dequeue ──
+  const handlePermissionResolved = useCallback(
+    (decision: 'granted' | 'denied') => {
+      if (!message.permissionRequest) return;
+      const reqId = message.permissionRequest.requestId;
+      // 记下决策：执行流程视图里那一行据此原地从"等待确认"变成"已授权/已拒绝"。
+      useActivityStore.getState().recordApproval(reqId, decision);
+      useAdvancedStore.getState().dequeuePermission(reqId);
+      if (useAdvancedStore.getState().permissionQueue.length === 0) {
+        permissionBridge._setStatus('idle');
+      }
+      // **不再把消息从流里删掉**：删了之后派生的 Activity 项会整条消失（用户看到的是
+      // "步骤凭空没了"），而保留它才能原地转移状态。已决策的卡片由下面这行判断不再渲染。
+    },
+    [message.permissionRequest],
+  );
+
+  // 已经决策过的权限消息不再画卡片（消息本身留着，供执行视图那行显示结果）。
+  // 选择器只取这一个 requestId 的值（返回 string|undefined），别的事件不会让它重渲染。
+  const permissionRequestId = message.permissionRequest?.requestId;
+  const permissionDecision = useActivityStore((s) =>
+    permissionRequestId ? s.approvals[permissionRequestId] : undefined,
+  );
 
   return (
     <div
@@ -78,11 +94,13 @@ export default memo(function MessageBubble({ message }: MessageBubbleProps) {
       style={{ contain: 'content' }}
     >
       {/* Inline permission card — renders in place of a system message */}
-      {message.permissionRequest && (
+      {message.permissionRequest && !permissionDecision && (
         <InlinePermissionCard request={message.permissionRequest} onResolved={handlePermissionResolved} />
       )}
       {!message.permissionRequest && message.role === 'user' && <UserMessage message={message} />}
-      {!message.permissionRequest && message.role === 'assistant' && <AssistantMessage message={message} />}
+      {!message.permissionRequest && message.role === 'assistant' && (
+        <AssistantMessage message={message} followers={followers} annotations={annotations} />
+      )}
       {!message.permissionRequest && message.role === 'system' && <SystemMessage message={message} />}
 
       {ctxMenu &&

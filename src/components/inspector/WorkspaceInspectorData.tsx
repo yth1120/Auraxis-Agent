@@ -8,23 +8,6 @@ import { agentToolInvocations, latestChatToolInvocations, type ToolInvocation } 
 type Translate = (key: I18nKey, vars?: Record<string, string | number>) => string;
 type ChatMessages = ReturnType<typeof useChatStore.getState>['messages'];
 
-export function collectDeliverables(agent: AgentInfo | undefined): string[] {
-  const seen = new Set<string>();
-  const output: string[] = [];
-  for (const entry of agent?.log ?? []) {
-    if (entry.type === 'tool_start' || entry.type === 'tool_end') {
-      if (entry.toolName === 'Write' || entry.toolName === 'Edit' || entry.toolName === 'NotebookEdit') {
-        const path = entry.input?.file_path;
-        if (typeof path === 'string' && path.trim() && !seen.has(path)) {
-          seen.add(path);
-          output.push(path);
-        }
-      }
-    }
-  }
-  return output;
-}
-
 export function collectFilePaths({
   isCode,
   agent,

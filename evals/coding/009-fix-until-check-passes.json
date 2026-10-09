@@ -1,0 +1,17 @@
+{
+  "id": "coding-009-fix-until-check-passes",
+  "category": "coding",
+  "task": "把 src/config.ts 的 apiTimeoutMs 改成 60000、retryCount 改成 5，然后运行 node check.mjs 直到它通过。只改 src/config.ts。",
+  "fixture": "basic-project",
+  "checks": [
+    { "id": "timeout-updated", "kind": "file_contains", "path": "src/config.ts", "needle": "apiTimeoutMs = 60000" },
+    { "id": "retry-updated", "kind": "file_contains", "path": "src/config.ts", "needle": "retryCount = 5" },
+    { "id": "scope", "kind": "no_unexpected_changes", "allow": ["src/config.ts"] }
+  ],
+  "tools": {
+    "expect": ["Read", "Edit", "Bash"],
+    "forbid": ["Delete"],
+    "requireArgs": { "Edit": ["file_path"], "Bash": ["command"] }
+  },
+  "process": { "maxFailedToolCalls": 2, "maxIterations": 12, "requireVerifiedAfterEdit": true }
+}

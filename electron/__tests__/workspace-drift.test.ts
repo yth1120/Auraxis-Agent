@@ -32,6 +32,11 @@ describe('WorkspaceDriftTracker', () => {
     expect(await workspaceDrift.detectDrift('proj')).toHaveLength(0);
 
     fs.writeFileSync(fileA, 'const b = 1;', 'utf-8'); // 同长度内容变化 → content 漂移
+    // 检测器按设计先比 size/mtime，只有 mtime 变了才比对哈希。紧跟 observe 的写入
+    // 可能落在同一个 mtime tick 上（Windows 上实测会偶发），于是被判为未漂移。
+    // 这里显式把 mtime 推后，消除时序不确定性；产品侧的优化保持不变。
+    const later = new Date(Date.now() + 5000);
+    fs.utimesSync(fileA, later, later);
     const drifted = await workspaceDrift.detectDrift('proj');
     expect(drifted).toHaveLength(1);
     expect(drifted[0].filePath).toBe(path.resolve(fileA));

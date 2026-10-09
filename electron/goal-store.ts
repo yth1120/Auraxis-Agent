@@ -5,10 +5,16 @@
  * Lifecycle: create → active; edit / pause / resume / complete / block /
  * clear; roundsStarted advances on goal-sourced turns and is bounded by
  * maxRounds. Replay is the only authority — no mutable snapshot on disk.
+ *
+ * 事件格式**不使用私有约定**：每条记录都是 `contracts/session-types.ts` 里的
+ * `SessionEvent`，`type: 'system'`，判别式与种类放在 `data.event` / `data.goalType`
+ * （见 `GOAL_EVENT`）。因此本文件与其它会话日志共用同一套解析规则（含「遇到不认识
+ * 的事件就跳过」），将来若把 goal 流并入会话主日志，只是换存储位置，格式不用动。
  */
 import { promises as fs } from 'fs';
 import path from 'path';
 import { app } from 'electron';
+import { GOAL_EVENT, isGoalEventData, type GoalEventType, type SessionEvent } from './contracts/session-types';
 
 export type GoalPhase = 'active' | 'paused' | 'completed' | 'blocked' | 'cleared';
 
@@ -25,13 +31,6 @@ export interface GoalState {
   updatedAt: number;
 }
 
-interface GoalEvent {
-  seq: number;
-  type: string;
-  ts: number;
-  data: Record<string, unknown>;
-}
-
 function goalDir(): string {
   if (process.env.AURAXIS_GOALS_DIR) return process.env.AURAXIS_GOALS_DIR;
   return path.join(app.getPath('userData'), 'goals');
@@ -42,15 +41,17 @@ function goalFile(sessionId: string): string {
   return path.join(goalDir(), `${safe}.jsonl`);
 }
 
-async function loadEvents(sessionId: string): Promise<GoalEvent[]> {
+async function loadEvents(sessionId: string): Promise<SessionEvent[]> {
   try {
     const raw = await fs.readFile(goalFile(sessionId), 'utf8');
-    const events: GoalEvent[] = [];
+    const events: SessionEvent[] = [];
     for (const line of raw.split('\n')) {
       if (!line.trim()) continue;
       try {
-        const e = JSON.parse(line) as GoalEvent;
-        if (e && typeof e.seq === 'number') events.push(e);
+        const e = JSON.parse(line) as SessionEvent;
+        // 与其它会话日志同样的规则：形状不对或不是 goal 事件就跳过，
+        // 这样即使 goal 流与别的会话事件混在一起也不会误读。
+        if (e && typeof e.seq === 'number' && e.type === 'system' && isGoalEventData(e.data)) events.push(e);
       } catch {
         // Skip corrupt lines; strict replay would stop here.
       }
@@ -61,10 +62,10 @@ async function loadEvents(sessionId: string): Promise<GoalEvent[]> {
   }
 }
 
-function replay(sessionId: string, events: GoalEvent[]): GoalState | null {
+function replay(sessionId: string, events: SessionEvent[]): GoalState | null {
   let state: GoalState | null = null;
   for (const e of events) {
-    if (e.type === 'create') {
+    if (e.data.goalType === 'create') {
       state = {
         id: String(e.data.id || `goal-${sessionId}`),
         sessionId,
@@ -77,7 +78,7 @@ function replay(sessionId: string, events: GoalEvent[]): GoalState | null {
         updatedAt: e.ts,
       };
     } else if (state) {
-      switch (e.type) {
+      switch (e.data.goalType) {
         case 'edit':
           state.text = String(e.data.text ?? state.text);
           if (e.data.maxRounds != null) state.maxRounds = Number(e.data.maxRounds);
@@ -110,10 +111,20 @@ function replay(sessionId: string, events: GoalEvent[]): GoalState | null {
   return state;
 }
 
-async function appendEvent(sessionId: string, type: string, data: Record<string, unknown>): Promise<GoalState | null> {
+async function appendEvent(
+  sessionId: string,
+  goalType: GoalEventType,
+  data: Record<string, unknown>,
+): Promise<GoalState | null> {
   const events = await loadEvents(sessionId);
   const seq = events.length > 0 ? events[events.length - 1].seq + 1 : 1;
-  const event: GoalEvent = { seq, type, ts: Date.now(), data };
+  // 与其它会话日志同形：system 事件 + data.event 判别式 + data.goalType 种类。
+  const event: SessionEvent = {
+    seq,
+    type: 'system',
+    ts: Date.now(),
+    data: { event: GOAL_EVENT, goalType, ...data },
+  };
   await fs.mkdir(goalDir(), { recursive: true });
   await fs.appendFile(goalFile(sessionId), `${JSON.stringify(event)}\n`, 'utf8');
   return replay(sessionId, [...events, event]);

@@ -18,8 +18,8 @@ export default function InlineEmpty({ description, icon, compact = false, classN
         className,
       )}
     >
-      <span className="text-faint [&_svg]:w-5 [&_svg]:h-5">{icon ?? <Tray size={20} />}</span>
-      {description ? <p className="m-0 text-xs leading-[1.6] text-muted max-w-72">{description}</p> : null}
+      <span className="text-text-faint [&_svg]:w-5 [&_svg]:h-5">{icon ?? <Tray size={20} />}</span>
+      {description ? <p className="m-0 text-xs leading-[1.6] text-text-muted max-w-72">{description}</p> : null}
     </div>
   );
 }

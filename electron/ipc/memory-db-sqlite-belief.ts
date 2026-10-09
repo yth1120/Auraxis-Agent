@@ -11,6 +11,8 @@ import {
   type BeliefStatus,
 } from './memory-db-types';
 import { rowToBelief } from './memory-db-sqlite-rows';
+import { searchBeliefIdsFts, shouldUseBeliefFts } from './memory-fts';
+import { clearVectorsForBeliefs } from './memory-vectors';
 
 export function addBelief(db: SqliteLike, b: BeliefInput): BeliefRecord {
   const now = Date.now();
@@ -71,6 +73,19 @@ export function getBeliefsByScope(
 }
 
 export function searchBeliefs(db: SqliteLike, scope: string, query: string, limit = 50): BeliefRecord[] {
+  if (shouldUseBeliefFts(db, query)) {
+    const ids = searchBeliefIdsFts(db, scope, query, limit);
+    if (ids.length === 0) {
+      // FTS 可用且 ≥3 字符时与子串语义一致 —— 这里返回空就代表确实没有命中，
+      // 再退回 LIKE 只会把「确实没有」变成一次全表扫。
+      return [];
+    }
+    const rows = db.prepare(`SELECT * FROM beliefs WHERE id IN (${ids.map(() => '?').join(',')})`).all(...ids);
+    const byId = new Map(rows.map((row) => [String((row as { id?: unknown }).id ?? ''), rowToBelief(row)]));
+    // IN 查询不保序：按 FTS 给出的 bm25 顺序重排。
+    return ids.map((id) => byId.get(id)).filter((b): b is BeliefRecord => !!b);
+  }
+  // 回退：短查询（trigram 要求 ≥3 字符）或索引不可用时，维持原有 LIKE 语义。
   const like = `%${query}%`;
   return db
     .prepare(
@@ -125,6 +140,20 @@ export function deleteBelief(db: SqliteLike, id: string): void {
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `,
   ).run(newId('rev'), id, existing.status, 'deleted', '用户删除', 'user', Date.now());
+}
+
+/**
+ * 硬删除信念。`belief_evidence` / `belief_revisions` 由外键级联清掉（连接已开
+ * `PRAGMA foreign_keys = ON`），向量缓存没有外键，必须显式清 —— 见 memory-vectors.ts。
+ */
+export function hardDeleteBeliefs(db: SqliteLike, ids: string[]): number {
+  const unique = [...new Set(ids.filter(Boolean))];
+  if (unique.length === 0) return 0;
+  clearVectorsForBeliefs(db, unique);
+  const ph = unique.map(() => '?').join(',');
+  const result = db.prepare(`DELETE FROM beliefs WHERE id IN (${ph})`).run(...unique) as
+    { changes?: number } | undefined;
+  return typeof result?.changes === 'number' ? result.changes : 0;
 }
 
 export function addBeliefEvidence(db: SqliteLike, link: BeliefEvidenceLink): void {

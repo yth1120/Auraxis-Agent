@@ -80,6 +80,7 @@ export async function backfillSession(session: Session) {
       mode: session.mode,
       messageCount: session.messages.length,
       pinned: session.pinned,
+      archived: session.archived,
       branchedFrom: session.branchedFrom,
     });
   } catch {
@@ -115,6 +116,7 @@ export function projectedToSession(p: ProjectedChatSession): Session {
     projectRoot: p.projectRoot,
     mode: p.mode,
     pinned: p.pinned,
+    archived: p.archived,
     branchedFrom: p.branchedFrom,
   };
 }

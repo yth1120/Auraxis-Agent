@@ -368,6 +368,17 @@ body {
   color: var(--color-text-secondary);
 }
 
+/* 运行中的输出区比读完的日志矮一档：它在聊天流里滚动，不该越长越高把回答推走。 */
+.terminal-block[data-running] .terminal-block-output {
+  max-height: 240px;
+}
+
+/* "前 N 行已省略"——如实说明截断，而不是假装这就是全部输出。 */
+.terminal-block-stream-note {
+  margin-bottom: 6px;
+  color: var(--color-text-faint);
+}
+
 /* ── Sidebar ───────────────────────────────────────────── */
 .ax-sidebar {
   display: flex;
@@ -614,8 +625,11 @@ body {
 .ax-composer-toolbar {
   display: flex;
   align-items: center;
-  /* 右侧面板拉宽导致主区变窄时保持单行：按钮不换行，
-     内部横向滚动而不是撑大 composer / 溢出输入框。 */
+  /* **必须单行**：折行会让按钮组分成两排（"+ 权限"一行、模型与发送另一行），
+     看起来像坏掉。窄宽度下由**内部收缩**承担 —— 右侧簇允许收缩、只有模型名
+     截断，图标按钮与发送键都是 `flex: none`，所以发送键永远留在这一行上。
+     （早先的写法把右簇 `shrink-0` + 溢出滚动配隐藏滚动条，结果是发送键被
+     推出视口且毫无提示 —— 两头都不能要。） */
   flex-wrap: nowrap;
   overflow-x: auto;
   scrollbar-width: none;
@@ -1283,6 +1297,152 @@ body {
     display: none;
   }
   .ax-effort-fill {
+    transition: none;
+  }
+}
+
+/* ── 认证页（注册 / 登录 / 启动） ─────────────────────────────────────
+   品牌底图 + 玻璃表单卡。颜色一律用 color-mix 从 tokens.css 派生，
+   不新增调色板；这一层永远在 `.dark` 作用域内（AuthGate 负责加类）。 */
+
+.ax-auth-bg {
+  position: absolute;
+  inset: 0;
+  background-repeat: no-repeat;
+  /* 靠左：底图左侧是品牌标记与字标，居中裁切会把标记切掉。 */
+  background-position: left center;
+  background-size: cover;
+}
+
+/* 右侧压暗给表单让出干净的阅读面；上下各收一道渐隐，避免边缘生硬。 */
+.ax-auth-scrim {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--color-bg-primary) 6%, transparent) 0%,
+      color-mix(in srgb, var(--color-bg-primary) 38%, transparent) 40%,
+      color-mix(in srgb, var(--color-bg-primary) 90%, transparent) 62%,
+      /* 到 86% 就压满：底图里的 "Auraxis" 字标一直拖到画面最右，
+         留一点透明度就会在卡片右侧露出半截字母。 */
+      color-mix(in srgb, var(--color-bg-primary) 100%, transparent) 86%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--color-bg-primary) 50%, transparent) 0%,
+      transparent 24%,
+      transparent 62%,
+      color-mix(in srgb, var(--color-bg-primary) 78%, transparent) 100%
+    );
+}
+
+.ax-auth-card {
+  /* 88% 而不是更透：底图的 "Auraxis" 字标正好落在卡片后面，太透会从玻璃里
+     透出幽灵字（实测截图可见）。留一点透光保住玻璃感即可。 */
+  background: color-mix(in srgb, var(--color-bg-elevated) 88%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-text-primary) 12%, transparent);
+  box-shadow:
+    inset 0 1px 0 0 color-mix(in srgb, var(--color-text-primary) 6%, transparent),
+    0 30px 80px -34px rgba(0, 0, 0, 0.85);
+}
+
+/* 卡片上沿的一道光痕 —— 呼应品牌标记的轨道「巡行」，全屏唯一的活动元素。 */
+.ax-auth-card::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: 16%;
+  right: 16%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--color-primary), transparent);
+  animation: axAuthTrace 7s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes axAuthTrace {
+  0%,
+  100% {
+    opacity: 0.22;
+    transform: translateX(-5%);
+  }
+  50% {
+    opacity: 0.8;
+    transform: translateX(5%);
+  }
+}
+
+.ax-auth-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 9999px;
+  background: var(--color-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 14%, transparent);
+}
+
+.ax-auth-tabs {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  height: 36px;
+  padding: 2px;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--color-text-primary) 7%, transparent);
+}
+
+/* 选中态由滑块承载：全局规则不允许自定义按钮自带底色。 */
+.ax-auth-thumb {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 2px;
+  width: calc(50% - 2px);
+  border-radius: 9999px;
+  background: var(--color-primary);
+  transition: transform 200ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.ax-auth-thumb[data-pos='1'] {
+  transform: translateX(100%);
+}
+
+.ax-auth-tab {
+  position: relative;
+  z-index: 1;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 150ms ease-out;
+}
+
+.ax-auth-tab:hover {
+  color: var(--color-text-secondary);
+}
+
+/* 滑块的底色是象牙白，所以选中项的文字用页面底色（深色）。 */
+.ax-auth-tab-active,
+.ax-auth-tab-active:hover {
+  color: var(--color-bg-primary);
+  font-weight: 600;
+}
+
+/* 窗口不高时先让位给表单：底图与卡片本身已经交代了品牌。 */
+@media (max-height: 660px) {
+  .ax-auth-brand {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ax-auth-card::before {
+    animation: none;
+    opacity: 0.4;
+  }
+  .ax-auth-thumb {
     transition: none;
   }
 }

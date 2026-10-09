@@ -1,7 +1,6 @@
 import { errorText } from '../../electron/errors';
 import { create } from 'zustand';
 import type { DirectoryEntry } from '../../electron/types';
-import type { FileActivity } from '../types/chat';
 
 export interface FileTreeStore {
   /** The fully expanded file tree root node (null when not loaded) */
@@ -14,14 +13,22 @@ export interface FileTreeStore {
   expandedPaths: Set<string>;
   /** The project root path this tree was fetched for */
   projectRoot: string | null;
-  /** Per-file agent activity → state-aware tree badges (keyed by absolute path). */
-  fileStatus: Record<string, FileActivity>;
+
+  /**
+   * 「新建文件 / 新建文件夹」的**外部请求**：由右栏头部的 `+` 发起，`FileTree` 消费后清空。
+   *
+   * 为什么走 store 而不是回调：右栏与文件树是两棵子树，而且用户在**别的模块**上点 `+`
+   * 时文件树可能根本没挂载 —— 请求必须活到它挂载之后才被消费。
+   */
+  pendingCreate: { parentPath: string; type: 'createFile' | 'createFolder' } | null;
 
   fetchTree: (projectRoot: string) => Promise<void>;
   toggleExpand: (dirPath: string) => void;
   expandToPath: (filePath: string) => void;
-  setFileStatus: (filePath: string, activity: FileActivity) => void;
-  clearFileStatus: (filePath: string) => void;
+  /** 请求在某个目录下新建条目（右栏 `+` 调用）。 */
+  requestCreate: (parentPath: string, type: 'createFile' | 'createFolder') => void;
+  /** 文件树接管请求后清空，避免重复触发。 */
+  consumeCreate: () => void;
   clear: () => void;
 }
 
@@ -31,17 +38,10 @@ export const useFileTreeStore = create<FileTreeStore>()((set) => ({
   error: null,
   expandedPaths: new Set(),
   projectRoot: null,
-  fileStatus: {},
+  pendingCreate: null,
 
-  setFileStatus: (filePath, activity) => set((s) => ({ fileStatus: { ...s.fileStatus, [filePath]: activity } })),
-
-  clearFileStatus: (filePath) =>
-    set((s) => {
-      if (!(filePath in s.fileStatus)) return s;
-      const next = { ...s.fileStatus };
-      delete next[filePath];
-      return { fileStatus: next };
-    }),
+  requestCreate: (parentPath, type) => set({ pendingCreate: { parentPath, type } }),
+  consumeCreate: () => set({ pendingCreate: null }),
 
   fetchTree: async (projectRoot: string) => {
     if (!projectRoot) return;
@@ -94,7 +94,7 @@ export const useFileTreeStore = create<FileTreeStore>()((set) => ({
     }),
 
   clear: () =>
-    set({ tree: null, loading: false, error: null, expandedPaths: new Set(), projectRoot: null, fileStatus: {} }),
+    set({ tree: null, loading: false, error: null, expandedPaths: new Set(), projectRoot: null }),
 }));
 
 // ── Auto-refetch when fileTreeVersion changes ──────────────

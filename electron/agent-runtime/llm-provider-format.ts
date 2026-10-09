@@ -86,9 +86,8 @@ export function buildAnthropicFormatTools(tools: ToolDef[]) {
   return tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.input_schema }));
 }
 
-export function isAnthropicFormatEndpoint(apiBase: string): boolean {
-  return apiBase.includes('/messages') || apiBase.includes('/anthropic/');
-}
+// 端点判定统一放在 contracts/core.ts（单一实现），此处仅保持历史导入路径可用。
+export { isAnthropicFormatEndpoint } from '../contracts/core';
 
 /**
  * Self-heal tool_calls pairing before every OpenAI-format request.

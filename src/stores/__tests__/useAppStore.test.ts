@@ -77,6 +77,30 @@ describe('useAppStore — theme & sidebar', () => {
     expect(useAppStore.getState().rightPanelWidth).toBe(600);
   });
 
+  it('开启左右分栏时把面板加宽到能放下两栏', () => {
+    useAppStore.setState({ rightPanelSplit: false, rightPanelWidth: 320 });
+    useAppStore.getState().toggleRightPanelSplit();
+    expect(useAppStore.getState().rightPanelSplit).toBe(true);
+    expect(useAppStore.getState().rightPanelWidth).toBeGreaterThanOrEqual(640);
+
+    // 已经够宽时不动用户手动调过的宽度；关闭分栏也不回缩。
+    useAppStore.setState({ rightPanelSplit: false, rightPanelWidth: 900 });
+    useAppStore.getState().toggleRightPanelSplit();
+    expect(useAppStore.getState().rightPanelWidth).toBe(900);
+    useAppStore.getState().toggleRightPanelSplit();
+    expect(useAppStore.getState().rightPanelSplit).toBe(false);
+    expect(useAppStore.getState().rightPanelWidth).toBe(900);
+  });
+
+  it('openRightPanelInNewPane 在新一栏打开功能并开启分栏', () => {
+    useAppStore.setState({ rightPanelSplit: false, rightPanelWidth: 320, rightPanelView2: 'menu' });
+    useAppStore.getState().openRightPanelInNewPane('preview');
+    const s = useAppStore.getState();
+    expect(s.rightPanelView2).toBe('preview');
+    expect(s.rightPanelSplit).toBe(true);
+    expect(s.rightPanelWidth).toBeGreaterThanOrEqual(640);
+  });
+
   it('setActiveLeftPanel 切换面板', () => {
     useAppStore.getState().setActiveLeftPanel('sessions');
     expect(useAppStore.getState().activeLeftPanel).toBe('sessions');

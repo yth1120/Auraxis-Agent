@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Tooltip, Popconfirm, Input } from 'antd';
 import {
   CaretRight as RightOutlined,
@@ -17,33 +17,10 @@ import {
 } from '@/components/common/icons';
 import LoadingState from '../common/LoadingState';
 import type { DirectoryEntry } from '../../types/electron-api';
-import type { FileActivity } from '../../types/chat';
 import { useFileTreeStore } from '../../stores/useFileTreeStore';
 import { useSettingsStore } from '../../stores/useSettingsStore';
-import { useT, type I18nKey } from '../../i18n';
+import { useT } from '../../i18n';
 import { useFileTreeActions } from './useFileTreeActions';
-
-/* ── Agent activity badges (state-aware tree) ─────────── */
-const STATUS_BADGE: Record<FileActivity, { textKey: I18nKey; color: string }> = {
-  reading: { textKey: 'ft.read', color: '#111418' },
-  editing: { textKey: 'ft.edit', color: '#f59e0b' },
-  modified: { textKey: 'ft.modified', color: '#10b981' },
-  created: { textKey: 'ft.created', color: '#10b981' },
-  deleted: { textKey: 'ft.deleted', color: '#ef4444' },
-};
-
-function StatusBadge({ activity }: { activity: FileActivity }) {
-  const t = useT();
-  const cfg = STATUS_BADGE[activity];
-  return (
-    <span
-      className="ml-[6px] text-2xs leading-[14px] px-[5px] rounded-full font-semibold text-white shrink-0"
-      style={{ background: cfg.color }}
-    >
-      {t(cfg.textKey)}
-    </span>
-  );
-}
 
 /* ── File icon mapping ───────────────────────────────── */
 
@@ -69,11 +46,11 @@ const DOC_EXTS = new Set(['.md', '.txt', '.mdx', '.rst']);
 function fileIcon(name: string, isDir: boolean) {
   if (isDir) return null;
   const ext = name.slice(name.lastIndexOf('.')).toLowerCase();
-  if (CODE_EXTS.has(ext)) return <CodeOutlined className="text-2xs text-faint" />;
-  if (CONFIG_EXTS.has(ext)) return <SettingOutlined className="text-2xs text-faint" />;
-  if (IMAGE_EXTS.has(ext)) return <FileImageOutlined className="text-2xs text-faint" />;
-  if (DOC_EXTS.has(ext)) return <FileTextOutlined className="text-2xs text-faint" />;
-  return <FileOutlined className="text-2xs text-faint" />;
+  if (CODE_EXTS.has(ext)) return <CodeOutlined className="text-2xs text-text-faint" />;
+  if (CONFIG_EXTS.has(ext)) return <SettingOutlined className="text-2xs text-text-faint" />;
+  if (IMAGE_EXTS.has(ext)) return <FileImageOutlined className="text-2xs text-text-faint" />;
+  if (DOC_EXTS.has(ext)) return <FileTextOutlined className="text-2xs text-text-faint" />;
+  return <FileOutlined className="text-2xs text-text-faint" />;
 }
 
 /* ── FileTree root ────────────────────────────────────── */
@@ -89,7 +66,8 @@ export default function FileTree({ onFileSelect }: FileTreeProps) {
   const error = useFileTreeStore((s) => s.error);
   const expandedPaths = useFileTreeStore((s) => s.expandedPaths);
   const toggleExpand = useFileTreeStore((s) => s.toggleExpand);
-  const fileStatus = useFileTreeStore((s) => s.fileStatus);
+  const pendingCreate = useFileTreeStore((s) => s.pendingCreate);
+  const consumeCreate = useFileTreeStore((s) => s.consumeCreate);
   const projectRoot = useSettingsStore((s) => s.projectPath);
   const {
     tree,
@@ -105,19 +83,40 @@ export default function FileTree({ onFileSelect }: FileTreeProps) {
     handleFinishOp,
     handleKeyDown,
   } = useFileTreeActions(t);
+  /**
+   * 行内操作按钮平时只在 hover 时出现，但**确认气泡打开时必须钉住**。
+   *
+   * 原因：`Popconfirm` 的气泡是挂在 body 上的 portal，位置在行**外面**。鼠标要从行里
+   * 走向「确认删除」，必然先离开行 → 行的 onMouseLeave 清掉 hoveredPath →
+   * `renderActions` 返回 null → 触发按钮被**卸载** → 挂在它上面的 Popconfirm 跟着关掉。
+   * 表现就是"手还没点到，删除面板就没了"。
+   *
+   * 钉住而不是改成常驻：常驻会让每一行都挂着五个按钮，密而吵；hover + 打开期间锁住，
+   * 既保持清单干净，又让鼠标走得到气泡。
+   */
+  const [pinnedPath, setPinnedPath] = useState<string | null>(null);
+
+  // 右栏头部 `+` 发起的「新建」请求：消费一次即清空，避免重复触发。
+  // 请求可能早于组件挂载（用户在别的模块上点的），所以它存在 store 里。
+  useEffect(() => {
+    if (!pendingCreate) return;
+    handleStartCreate(pendingCreate.parentPath, pendingCreate.type);
+    consumeCreate();
+  }, [pendingCreate, handleStartCreate, consumeCreate]);
 
   /* ── Render helpers ────────────────────────────────── */
 
   const renderActions = useCallback(
     (entryPath: string, entryName: string, isDir: boolean) => {
-      if (hoveredPath !== entryPath || activeOp) return null;
+      if ((hoveredPath !== entryPath && pinnedPath !== entryPath) || activeOp) return null;
       return (
         <span className="flex items-center gap-1.5 shrink-0 ml-auto">
           {isDir && (
             <>
               <Tooltip title={t('ft.newFile')} placement="top">
                 <button
-                  className="flex items-center justify-center w-5 h-5 border-none bg-transparent text-faint rounded-md cursor-pointer transition-colors duration-150 ease-out hover:bg-[var(--color-hover)] hover:text-text-primary"
+                  aria-label={t('ft.newFile')}
+                  className="flex items-center justify-center w-5 h-5 border-none bg-transparent text-text-faint rounded-md cursor-pointer transition-colors duration-150 ease-out hover:bg-[var(--color-hover)] hover:text-text-primary"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleStartCreate(entryPath, 'createFile');
@@ -128,7 +127,8 @@ export default function FileTree({ onFileSelect }: FileTreeProps) {
               </Tooltip>
               <Tooltip title={t('ft.newFolder')} placement="top">
                 <button
-                  className="flex items-center justify-center w-5 h-5 border-none bg-transparent text-faint rounded-md cursor-pointer transition-colors duration-150 ease-out hover:bg-[var(--color-hover)] hover:text-text-primary"
+                  aria-label={t('ft.newFolder')}
+                  className="flex items-center justify-center w-5 h-5 border-none bg-transparent text-text-faint rounded-md cursor-pointer transition-colors duration-150 ease-out hover:bg-[var(--color-hover)] hover:text-text-primary"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleStartCreate(entryPath, 'createFolder');
@@ -141,7 +141,8 @@ export default function FileTree({ onFileSelect }: FileTreeProps) {
           )}
           <Tooltip title={t('ft.rename')} placement="top">
             <button
-              className="flex items-center justify-center w-5 h-5 border-none bg-transparent text-faint rounded-md cursor-pointer transition-colors duration-150 ease-out hover:bg-[var(--color-hover)] hover:text-text-primary"
+              aria-label={t('ft.rename')}
+              className="flex items-center justify-center w-5 h-5 border-none bg-transparent text-text-faint rounded-md cursor-pointer transition-colors duration-150 ease-out hover:bg-[var(--color-hover)] hover:text-text-primary"
               onClick={(e) => {
                 e.stopPropagation();
                 handleStartRename(entryPath, entryName);
@@ -152,6 +153,8 @@ export default function FileTree({ onFileSelect }: FileTreeProps) {
           </Tooltip>
           <Popconfirm
             title={isDir ? t('ft.deleteDirTitle') : t('ft.deleteFileTitle')}
+            // 气泡打开期间钉住本行按钮，鼠标才能从行里走到气泡上（见 pinnedPath 说明）。
+            onOpenChange={(open) => setPinnedPath(open ? entryPath : null)}
             onConfirm={(e) => {
               e?.stopPropagation();
               handleDelete(entryPath);
@@ -168,7 +171,8 @@ export default function FileTree({ onFileSelect }: FileTreeProps) {
             }}
           >
             <button
-              className="flex items-center justify-center w-5 h-5 border-none bg-transparent text-faint rounded-md cursor-pointer transition-colors duration-150 ease-out hover:bg-[var(--color-hover)] hover:text-text-primary"
+              aria-label={t('ft.delete')}
+              className="flex items-center justify-center w-5 h-5 border-none bg-transparent text-text-faint rounded-md cursor-pointer transition-colors duration-150 ease-out hover:bg-[var(--color-hover)] hover:text-text-primary"
               onClick={(e) => e.stopPropagation()}
             >
               <DeleteOutlined style={{ fontSize: 10 }} />
@@ -177,7 +181,7 @@ export default function FileTree({ onFileSelect }: FileTreeProps) {
         </span>
       );
     },
-    [hoveredPath, activeOp, handleStartCreate, handleStartRename, handleDelete, t],
+    [hoveredPath, pinnedPath, activeOp, handleStartCreate, handleStartRename, handleDelete, t],
   );
 
   /* ── Recursive tree node ───────────────────────────── */
@@ -196,7 +200,7 @@ export default function FileTree({ onFileSelect }: FileTreeProps) {
       const isRenaming = activeOp?.type === 'rename' && activeOp?.parentPath === entry.path;
 
       const nodeBaseClasses =
-        'flex items-center gap-0.5 w-full py-[3px] px-2 border-none bg-transparent text-secondary text-xs cursor-pointer text-left transition-colors duration-150 ease-out leading-[1.6] min-h-6 overflow-hidden relative hover:bg-[var(--color-hover)]';
+        'flex items-center gap-0.5 w-full py-[3px] px-2 border-none bg-transparent text-text-secondary text-xs cursor-pointer text-left transition-colors duration-150 ease-out leading-[1.6] min-h-6 overflow-hidden relative hover:bg-[var(--color-hover)]';
 
       if (entry.isDirectory) {
         return (
@@ -209,11 +213,11 @@ export default function FileTree({ onFileSelect }: FileTreeProps) {
               onClick={() => toggleExpand(entry.path)}
             >
               <span
-                className={`inline-flex shrink-0 items-center justify-center w-3 h-3 text-2xs text-faint transition-transform duration-normal ease-out ${isExpanded ? 'rotate-90' : ''}`}
+                className={`inline-flex shrink-0 items-center justify-center w-3 h-3 text-2xs text-text-faint transition-transform duration-200 ease-out ${isExpanded ? 'rotate-90' : ''}`}
               >
                 <RightOutlined />
               </span>
-              <span className="text-xs w-4 shrink-0 inline-flex items-center justify-center text-faint">
+              <span className="text-xs w-4 shrink-0 inline-flex items-center justify-center text-text-faint">
                 {isExpanded ? <FolderOpenOutlined /> : <FolderOutlined />}
               </span>
               {isRenaming ? (
@@ -238,7 +242,7 @@ export default function FileTree({ onFileSelect }: FileTreeProps) {
                   activeOp.parentPath === entry.path &&
                   (activeOp.type === 'createFile' || activeOp.type === 'createFolder') && (
                     <div className={nodeBaseClasses} style={{ paddingLeft: 8 + indent + 12 }}>
-                      <span className="text-xs w-4 shrink-0 inline-flex items-center justify-center text-faint">
+                      <span className="text-xs w-4 shrink-0 inline-flex items-center justify-center text-text-faint">
                         {activeOp.type === 'createFolder' ? (
                           <FolderOutlined />
                         ) : (
@@ -276,7 +280,7 @@ export default function FileTree({ onFileSelect }: FileTreeProps) {
           }}
           title={entry.path}
         >
-          <span className="text-xs w-4 shrink-0 inline-flex items-center justify-center text-faint">
+          <span className="text-xs w-4 shrink-0 inline-flex items-center justify-center text-text-faint">
             {fileIcon(entry.name, false)}
           </span>
           {isRenaming ? (
@@ -295,7 +299,6 @@ export default function FileTree({ onFileSelect }: FileTreeProps) {
               <span className="overflow-hidden text-ellipsis whitespace-nowrap flex-1">{entry.name}</span>
             </Tooltip>
           )}
-          {fileStatus[entry.path] && <StatusBadge activity={fileStatus[entry.path]} />}
           {renderActions(entry.path, entry.name, false)}
         </div>
       );
@@ -305,7 +308,6 @@ export default function FileTree({ onFileSelect }: FileTreeProps) {
       toggleExpand,
       activeOp,
       inputValue,
-      fileStatus,
       handleFinishOp,
       handleKeyDown,
       onFileSelect,
@@ -322,14 +324,14 @@ export default function FileTree({ onFileSelect }: FileTreeProps) {
     'inline-flex items-center gap-1 mt-2 px-3.5 py-1.5 text-xs rounded-md cursor-pointer transition-colors duration-150 ease-out';
   const selectBtn = `${btnBase} border border-primary-border bg-transparent text-text-primary hover:bg-primary-soft`;
   const refreshBtn =
-    'flex items-center justify-center w-[22px] h-[22px] border-none bg-transparent text-muted rounded-md cursor-pointer text-xs shrink-0 transition-colors duration-150 ease-out hover:bg-primary-soft hover:text-primary';
+    'flex items-center justify-center w-[22px] h-[22px] border-none bg-transparent text-text-muted rounded-md cursor-pointer text-xs shrink-0 transition-colors duration-150 ease-out hover:bg-primary-soft hover:text-primary';
 
   if (!projectRoot) {
     return (
       <div className="flex flex-col items-center justify-center p-8 px-4 text-center h-full gap-1.5">
-        <FolderAddOutlined className="text-3xl text-faint mb-1" />
-        <p className="text-sm font-normal text-secondary m-0">{t('ft.noProject')}</p>
-        <p className="text-2xs text-muted m-0">{t('ft.noProjectHint')}</p>
+        <FolderAddOutlined className="text-3xl text-text-faint mb-1" />
+        <p className="text-sm font-normal text-text-secondary m-0">{t('ft.noProject')}</p>
+        <p className="text-2xs text-text-muted m-0">{t('ft.noProjectHint')}</p>
       </div>
     );
   }
@@ -352,7 +354,7 @@ export default function FileTree({ onFileSelect }: FileTreeProps) {
   if (!tree || !tree.children || tree.children.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center p-8 px-4 text-center h-full gap-1.5">
-        <p className="text-2xs text-muted m-0">{t('ft.empty')}</p>
+        <p className="text-2xs text-text-muted m-0">{t('ft.empty')}</p>
         <div className="flex items-center gap-2 mt-1">
           <button className={selectBtn} onClick={refresh}>
             <ReloadOutlined /> {t('ft.refresh')}
@@ -365,7 +367,7 @@ export default function FileTree({ onFileSelect }: FileTreeProps) {
   return (
     <div className="file-tree flex flex-col h-full overflow-hidden">
       <div className="flex items-center justify-between px-3 py-1.5 shrink-0">
-        <span className="text-2xs font-semibold text-muted uppercase tracking-[0.05em] overflow-hidden text-ellipsis whitespace-nowrap flex-1">
+        <span className="text-2xs font-semibold text-text-muted uppercase tracking-[0.05em] overflow-hidden text-ellipsis whitespace-nowrap flex-1">
           {tree.name}
         </span>
         <span className="flex items-center gap-1.5 shrink-0">

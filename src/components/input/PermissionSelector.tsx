@@ -96,7 +96,6 @@ export default function PermissionSelector({ preset, onChangePreset, popDirectio
       title={t('access.title')}
       current={profileName ?? undefined}
       subtitle={t('access.subtitle')}
-      popDirection={popDirection}
       footer={
         <>
           <button
@@ -139,8 +138,12 @@ export default function PermissionSelector({ preset, onChangePreset, popDirectio
       }}
       menu={{ items: [] }}
       popupRender={() => panel}
+      // 直接弹出：连 Dropdown 外层的 slide 入场也一并关掉（见 overrides.css）
+      classNames={{ root: 'ax-composer-popup' }}
       trigger={['click']}
       placement={popDirection === 'down' ? 'bottomLeft' : 'topLeft'}
+      // 向上弹出时再抬高一点，避免贴着输入框
+      align={{ offset: popDirection === 'down' ? [0, 6] : [0, -6] }}
     >
       <button
         type="button"

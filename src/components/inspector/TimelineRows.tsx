@@ -5,123 +5,21 @@ import { useAppStore } from '@/stores/useAppStore';
 import type { AgentLogEntry } from '@/types/agent';
 import ExecutingIndicator from '../common/ExecutingIndicator';
 import StateDot from '../common/StateDot';
-import TerminalBlock from '../common/TerminalBlock';
-import { AgentReadCard, AgentRunCodeCard, AgentSearchCard, AgentWebCard } from '../agent/AgentToolCards';
+import ToolOutputCard from '../agent/ToolOutputCard';
 import { ROW_H, basename, fmtDuration, fmtTime, jsonPreview, toolSummary } from './TimelineUtils';
 
-function BashDetail({ entry }: { entry: AgentLogEntry }) {
-  const o = (entry.output ?? {}) as { stdout?: string; stderr?: string; exitCode?: number };
-  const content = entry.streamOutput ? entry.streamOutput : [o.stdout, o.stderr].filter(Boolean).join('\n');
-  const command = typeof entry.input?.command === 'string' ? entry.input.command : '';
-  const cwd = typeof entry.input?.workdir === 'string' ? entry.input.workdir : undefined;
+/** 专用卡片（Read/Grep/Glob/Web/RunCode/文件改动/Bash 以外的终端）统一走共享渲染件。 */
+function CardDetail({ entry }: { entry: AgentLogEntry }) {
   return (
-    <TerminalBlock
-      command={command}
-      cwd={cwd}
-      home={window.electronAPI?.homePath || ''}
-      output={content}
+    <ToolOutputCard
+      toolName={entry.toolName}
+      input={entry.input}
+      output={entry.output}
       running={entry.type === 'tool_start'}
       failed={entry.type === 'tool_error'}
-      exitCode={o.exitCode}
-      durationMs={entry.durationMs}
-    />
-  );
-}
-
-function ReadDetail({ entry }: { entry: AgentLogEntry }) {
-  const o = (entry.output ?? {}) as Record<string, unknown>;
-  return (
-    <AgentReadCard
-      label={typeof o.file_path === 'string' ? o.file_path : undefined}
-      content={typeof o.content === 'string' ? o.content : ''}
-      startLine={typeof o.start_line === 'number' ? o.start_line : 1}
-      totalLines={typeof o.total_lines === 'number' ? o.total_lines : undefined}
-    />
-  );
-}
-
-function GlobDetail({ entry }: { entry: AgentLogEntry }) {
-  const o = (entry.output ?? {}) as Record<string, unknown>;
-  const paths = Array.isArray(o.paths) ? (o.paths as string[]) : [];
-  return <AgentSearchCard kind="paths" paths={paths} total={paths.length} />;
-}
-
-function GrepDetail({ entry }: { entry: AgentLogEntry }) {
-  const o = (entry.output ?? {}) as Record<string, unknown>;
-  const results = (Array.isArray(o.results) ? o.results : []) as { file?: string; line?: number; content?: string }[];
-  const byFile = new Map<string, { path: string; matches: { lineNumber: number; line: string }[] }>();
-  for (const r of results) {
-    const path = typeof r.file === 'string' ? r.file : '';
-    if (!path) continue;
-    let group = byFile.get(path);
-    if (!group) {
-      group = { path, matches: [] };
-      byFile.set(path, group);
-    }
-    group.matches.push({
-      lineNumber: typeof r.line === 'number' ? r.line : 0,
-      line: typeof r.content === 'string' ? r.content : '',
-    });
-  }
-  return (
-    <AgentSearchCard
-      kind="matches"
-      files={[...byFile.values()]}
-      total={results.length}
-      truncated={o.truncated === true}
-    />
-  );
-}
-
-function SearchDetail({ entry }: { entry: AgentLogEntry }) {
-  return entry.toolName === 'Glob' ? <GlobDetail entry={entry} /> : <GrepDetail entry={entry} />;
-}
-
-function WebSearchDetail({ entry }: { entry: AgentLogEntry }) {
-  const o = (entry.output ?? {}) as Record<string, unknown>;
-  const results = (Array.isArray(o.results) ? o.results : []) as {
-    url?: string;
-    title?: string;
-    snippet?: string;
-  }[];
-  return (
-    <AgentWebCard
-      kind="search"
-      sources={results.map((r) => ({ url: r.url ?? '', title: r.title, snippet: r.snippet }))}
-    />
-  );
-}
-
-function WebFetchDetail({ entry }: { entry: AgentLogEntry }) {
-  const o = (entry.output ?? {}) as Record<string, unknown>;
-  return (
-    <AgentWebCard
-      kind="fetch"
-      url={typeof o.url === 'string' ? o.url : ''}
-      statusCode={typeof o.status_code === 'number' ? o.status_code : undefined}
-    />
-  );
-}
-
-function WebDetail({ entry }: { entry: AgentLogEntry }) {
-  return entry.toolName === 'WebSearch' ? <WebSearchDetail entry={entry} /> : <WebFetchDetail entry={entry} />;
-}
-
-function RunCodeDetail({ entry }: { entry: AgentLogEntry }) {
-  const o = (entry.output ?? {}) as {
-    stdout?: string;
-    stderr?: string;
-    exitCode?: number | null;
-    timedOut?: boolean;
-  };
-  return (
-    <AgentRunCodeCard
-      code={typeof entry.input?.code === 'string' ? entry.input.code : ''}
-      language={typeof entry.input?.language === 'string' ? entry.input.language : undefined}
-      stdout={o.stdout}
-      stderr={o.stderr}
-      exitCode={o.exitCode}
-      timedOut={o.timedOut}
+      liveOutput={entry.streamOutput}
+      error={entry.error}
+      fallback={() => <GenericDetail entry={entry} />}
     />
   );
 }
@@ -136,22 +34,7 @@ function GenericDetail({ entry }: { entry: AgentLogEntry }) {
 }
 
 export function ToolDetail({ entry }: { entry: AgentLogEntry }) {
-  switch (entry.toolName) {
-    case 'Bash':
-      return <BashDetail entry={entry} />;
-    case 'Read':
-      return <ReadDetail entry={entry} />;
-    case 'Grep':
-    case 'Glob':
-      return <SearchDetail entry={entry} />;
-    case 'WebFetch':
-    case 'WebSearch':
-      return <WebDetail entry={entry} />;
-    case 'RunCode':
-      return <RunCodeDetail entry={entry} />;
-    default:
-      return <GenericDetail entry={entry} />;
-  }
+  return <CardDetail entry={entry} />;
 }
 
 export function TrajectoryToolRow({
@@ -210,7 +93,8 @@ export function TrajectoryToolRow({
                   : 'text-success bg-success-soft',
             )}
           >
-            {running && <ExecutingIndicator size={10} />}
+            {/* 12 —— AGENTS.md 的图标档位只有 12/14/16/20，原来的 10 是越界值 */}
+            {running && <ExecutingIndicator size={12} />}
             {entry.toolName}
           </span>
         </td>

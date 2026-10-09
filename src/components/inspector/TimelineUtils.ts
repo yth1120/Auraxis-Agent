@@ -1,6 +1,7 @@
 import type { AgentLogEntry } from '@/types/agent';
 import { t } from '../../i18n';
 import { basename } from '../../utils/paths';
+import { summaryFromInput } from '../../core/activity/presentation';
 
 export interface Turn {
   iteration: number;
@@ -14,28 +15,13 @@ export const OVERSCAN = 12;
 
 export { basename };
 
+/**
+ * 轨迹行的一行摘要 —— **不再自带一张表**，直接调展示层
+ * （`core/activity/presentation.ts:summaryFromInput`，与 Activity 视图同源）。
+ * 这张表此前是仓库里的第 4 份副本，同一个工具在四个视图里显示成不同措辞。
+ */
 export function toolSummary(e: AgentLogEntry): string {
-  const input = e.input ?? {};
-  switch (e.toolName) {
-    case 'Read':
-    case 'Write':
-    case 'Edit':
-    case 'NotebookEdit':
-      return basename(input.file_path);
-    case 'Bash':
-      return String(input.command ?? '')
-        .replace(/\s+/g, ' ')
-        .trim();
-    case 'Grep':
-    case 'Glob':
-      return String(input.pattern ?? '');
-    case 'WebFetch':
-      return String(input.url ?? '');
-    case 'WebSearch':
-      return String(input.query ?? '');
-    default:
-      return '';
-  }
+  return summaryFromInput(e.toolName, e.input);
 }
 
 export function turnStats(end?: AgentLogEntry): string {

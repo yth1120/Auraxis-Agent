@@ -14,6 +14,19 @@ import { useChatStore } from '../../stores/useChatStore';
 import { getContentText } from '../../types/chat';
 import type { Message } from '../../types/chat';
 import MessageBubble from './MessageBubble';
+import { segmentRuns } from '../../core/activity/segments';
+import { changedFilesOfMessage } from '../../core/activity/model';
+import { streamActivityKey } from '../../core/activity/follow';
+import type { BrowserAnnotation } from '../../types/browser';
+
+/** 找最近一条用户消息带来的页面标注（本轮的输入）。找不到就返回 undefined，不返回空数组。 */
+function nearestPrecedingAnnotations(messages: Message[], index: number): BrowserAnnotation[] | undefined {
+  for (let i = index - 1; i >= 0; i -= 1) {
+    if (messages[i].role === 'user') return messages[i].annotations?.length ? messages[i].annotations : undefined;
+  }
+  return undefined;
+}
+import type { RunMessage } from '../../core/activity/model';
 import ThinkingIndicator from './ThinkingIndicator';
 import CompactionRow from '../common/CompactionRow';
 import DisclosureRow from '../common/DisclosureRow';
@@ -30,22 +43,30 @@ function MessageRow({
   index,
   messages,
   projectRoot,
+  followers,
+  absorbed,
+  annotations,
 }: {
   msg: Message;
   index: number;
   messages: Message[];
   projectRoot: string;
+  /** 归属本轮的合成消息（注入 / 压缩 / 权限），交给执行视图内联展示。 */
+  followers?: RunMessage[];
+  /** 已被上一轮执行视图吸收 —— 不再单独成行，否则一轮执行又被切碎。 */
+  absorbed?: boolean;
+  /** 上一条用户消息带来的页面标注（本轮输入）。 */
+  annotations?: readonly BrowserAnnotation[];
 }) {
+  if (absorbed) return null;
   if (msg.compaction) {
     return <CompactionRow data={msg.compaction} />;
   }
   if (msg.disclosure) {
     return <DisclosureRow data={msg.disclosure} />;
   }
-  const files = (msg.toolCalls ?? [])
-    .filter((tc) => tc.toolName === 'Write' || tc.toolName === 'Edit' || tc.toolName === 'NotebookEdit')
-    .map((tc) => String((tc.input as { file_path?: unknown })?.file_path ?? ''))
-    .filter(Boolean);
+  // 产物清单：改动了哪些文件由 Activity 模型统一判定（不要再手写工具名白名单）。
+  const files = changedFilesOfMessage(msg as unknown as RunMessage);
   const laterSessionIds = messages
     .slice(index + 1)
     .flatMap((m) => (m.toolCalls ?? []).map((tc) => tc.requestId))
@@ -53,7 +74,7 @@ function MessageRow({
 
   return (
     <div className="max-w-[var(--content-max-width,880px)] mx-auto w-full">
-      <MessageBubble message={msg} />
+      <MessageBubble message={msg} followers={followers} annotations={annotations} />
       {files.length > 0 && <DeliverablesRow files={files} />}
       {laterSessionIds.length > 0 && projectRoot && (
         <div className="flex justify-end pr-2 -mt-0.5">
@@ -99,7 +120,12 @@ export default function MessageList({
 }) {
   const t = useT();
   const messages = useChatStore((s) => s.messages);
+  // 一轮执行 = 一条 assistant 消息 + 紧随其后的合成消息（注入 / 压缩 / 权限）。
+  // 分段是纯函数，只在 messages 引用变化时重算。
+  const segments = useMemo(() => segmentRuns(messages as unknown as RunMessage[]), [messages]);
   const isStreaming = useChatStore((s) => s.isStreaming);
+  // 轮次只参与"活动指纹"（新一轮开始即算新活动），没在跑时是 null。
+  const currentIteration = useChatStore((s) => (s.isStreaming ? s.currentIteration : null));
   const currentProjectPath = useChatStore((s) => s.currentProjectPath);
   const settingsProjectPath = useSettingsStore((s) => s.projectPath);
   const currentSessionId = useSessionStore((s) => s.currentSessionId);
@@ -107,6 +133,8 @@ export default function MessageList({
 
   const [searchOpen, setSearchOpen] = useState(false);
   const [isAtBottom, setIsAtBottom] = useState(true);
+  /** 用户不在底部时，期间是否真的发生了新活动（只有这时才提示"↓ 有新活动"）。 */
+  const [hasNewActivity, setHasNewActivity] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [matchIndex, setMatchIndex] = useState(0);
   const inputRef = useRef<InputRef>(null);
@@ -124,6 +152,24 @@ export default function MessageList({
   }, [messages, searchQuery]);
 
   const totalMatches = matchMsgIndices.length;
+
+  /**
+   * "有新活动"：只有**真的发生了新事**才亮。
+   *
+   * 逐 token 判定会让提示每 16ms 闪一次（用户会把它当噪声），所以指纹按"消息数 / 工具
+   * 调用与状态 / 正文按 400 字符分桶 / 轮次"取粗粒度（见 core/activity/follow.ts）。
+   * 判据依赖当前是否在底部，用 ref 读取以免把它写进依赖、每次滚动都重算。
+   */
+  const activityKey = streamActivityKey(messages as never, currentIteration);
+  const atBottomRef = useRef(isAtBottom);
+  atBottomRef.current = isAtBottom;
+  useEffect(() => {
+    if (atBottomRef.current) {
+      setHasNewActivity(false);
+      return;
+    }
+    setHasNewActivity(true);
+  }, [activityKey]);
 
   useEffect(() => {
     if (searchOpen && inputRef.current) {
@@ -268,12 +314,17 @@ export default function MessageList({
             followOutput="auto"
             increaseViewportBy={{ top: 400, bottom: 600 }}
             atBottomStateChange={setIsAtBottom}
-            itemContent={(_index, msg) => (
+            itemContent={(index, msg) => (
               <MessageRow
                 msg={msg}
-                index={_index}
+                index={index}
                 messages={messages}
                 projectRoot={settingsProjectPath || currentProjectPath || ''}
+                followers={segments.followersByOwner.get(index)}
+                absorbed={segments.absorbed.has(index)}
+                annotations={
+                  msg.role === 'assistant' ? nearestPrecedingAnnotations(messages, index) : undefined
+                }
               />
             )}
             components={{ Header, Footer }}
@@ -289,11 +340,15 @@ export default function MessageList({
           />
         </div>
       </div>
-      {!isAtBottom && messages.length > 0 && (
+      {!isAtBottom && hasNewActivity && messages.length > 0 && (
         <ScrollToBottomButton
           bottomInset={bottomInset}
-          label={t('msglist.scrollBottom')}
-          onClick={() => virtuosoRef.current?.scrollToIndex({ index: messages.length - 1, behavior: 'smooth' })}
+          label={hasNewActivity ? t('msglist.newActivity') : t('msglist.scrollBottom')}
+          onClick={() => {
+            // 提示不由点击清除，而由**真的到底了**清除（`atBottomStateChange`）：
+            // 万一同步滚动没成功，按钮还在，用户不会被困在历史里。
+            virtuosoRef.current?.scrollToIndex({ index: messages.length - 1, behavior: 'smooth' });
+          }}
         />
       )}
     </div>

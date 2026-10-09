@@ -8,14 +8,17 @@
 /* ── Global Ant Design: borderless, shadow-based elevation ── */
 /* Replace all hard-line borders on popups/modals with layered shadows. */
 
-.ant-modal-content {
+/* antd 6 把面板根类名从 `-content` 改成了 `-container`（见 `@rc-component/dialog` 的
+   `Panel.js`，以及 `Modal.js` 里 "Select `ant-modal-container` by `panelRef`" 的注释）。
+   写错类名的后果是**静默失效**：规则还在、谁也不生效。 */
+.ant-modal-container {
   border: none !important;
   box-shadow:
     0 0 0 1px rgba(0, 0, 0, 0.08),
     0 4px 16px rgba(0, 0, 0, 0.1),
     0 12px 36px rgba(0, 0, 0, 0.14) !important;
 }
-.dark .ant-modal-content {
+.dark .ant-modal-container {
   box-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.08),
     0 4px 16px rgba(0, 0, 0, 0.35),
@@ -110,36 +113,25 @@
   margin: 1px 0;
 }
 
-.ant-popover-inner,
-.ant-popconfirm .ant-popover-inner {
-  border: none !important;
-  border-radius: 12px !important;
-  box-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.08),
-    0 4px 12px rgba(0, 0, 0, 0.1),
-    0 8px 24px rgba(0, 0, 0, 0.14) !important;
-}
-.dark .ant-popover-inner,
-.dark .ant-popconfirm .ant-popover-inner {
-  box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.08),
-    0 4px 12px rgba(0, 0, 0, 0.35),
-    0 8px 24px rgba(0, 0, 0, 0.5) !important;
-}
+/* ── Popover：原 `.ant-popover-inner` 覆盖已删除 ──
+ *
+ * 这一组**从未生效**：antd 6 里 `-inner` 只残留在自身样式表的 `genColorStyle` 预设色
+ * 分支中，DOM 上真正带类名的是 `-container`（背景/圆角/内边距都由它持有，见
+ * `antd/es/popover/style/index.js` 的 `${componentCls}-container`）。
+ *
+ * 没有移植过来，是因为**移植会变差**：`.ant-popover` 根节点已经带
+ * `filter: var(--ant-drop-shadow-popover)`，再加一层 box-shadow 会叠成双层阴影。
+ * 边无框 + 分层阴影 + 12px 圆角这套意图，antd 6 自身的 container 样式加 `theme.ts`
+ * 的 `Popover.borderRadiusLG` 已经满足。
+ *
+ * 同理，`.ant-tooltip-inner`（圆角 8）也已删除：`@rc-component/tooltip` 的 Popup
+ * 只渲染 `${prefixCls}-container`，全链路没有 `-inner` 元素；圆角由 `theme.ts` 的
+ * `Tooltip.borderRadius: 6` 统一决定，原规则的 8px 反而与之冲突。 */
 
 .ant-popconfirm .ant-btn {
   border-radius: 999px !important;
   font-size: 13px;
   font-weight: 500;
-}
-
-.ant-tooltip-inner {
-  border: none !important;
-  border-radius: 8px !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18) !important;
-}
-.dark .ant-tooltip-inner {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.55) !important;
 }
 
 .ant-card {
@@ -163,27 +155,34 @@
     0 12px 28px rgba(0, 0, 0, 0.14) !important;
 }
 
-.ant-message .ant-message-notice-content {
+/* antd 6 的消息气泡是 `.ant-message-notice`（`.ant-message-notice-content` 已不存在，
+   见 `antd/es/message/style/index.js` 只构造 `${componentCls}-notice`）。 */
+.ant-message .ant-message-notice {
   border-radius: 12px !important;
   box-shadow:
     0 0 0 1px rgba(0, 0, 0, 0.06),
     0 4px 12px rgba(0, 0, 0, 0.1) !important;
 }
 
-.dark .ant-message .ant-message-notice-content {
+.dark .ant-message .ant-message-notice {
   box-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.08),
     0 4px 12px rgba(0, 0, 0, 0.35) !important;
 }
 
-/* ── Input focus/hover: quiet hover, primary activation ring ── */
+/* ── Input focus/hover: quiet hover, primary activation ring ──
+ *
+ * antd 6 的 Select 不再有 `.ant-select-selector`：边框、背景与聚焦光晕都挂在**根**
+ * `.ant-select` 上（见 `antd/dist/antd.css` 的 `.ant-select{…border-color…outline:0}`
+ * 与 `.ant-select-focused{box-shadow:…}`）。Select 内部的内容壳叫 `.ant-select-content`。
+ * 原来的 `-selector` 写法一条都不生效 —— 也就是"静默输入"的设计在 Select 上一直是漏的。
+ * 顺带删掉 `.ant-cascader-picker`：全仓库没有使用 Cascader。 */
 .ant-input,
 .ant-input-affix-wrapper,
 .ant-input-number,
 .ant-picker,
-.ant-select-selector,
+.ant-select,
 .ant-mentions,
-.ant-cascader-picker,
 .ant-input-group-addon {
   outline: none !important;
   box-shadow: none !important;
@@ -193,7 +192,7 @@
 .ant-input-affix-wrapper:hover,
 .ant-input-number:hover,
 .ant-picker:hover,
-.ant-select-selector:hover,
+.ant-select:hover,
 .ant-mentions:hover,
 textarea:hover,
 select:hover {
@@ -211,7 +210,7 @@ select:hover {
 .ant-input-number:focus,
 .ant-input-number-focused,
 .ant-picker-focused,
-.ant-select-focused .ant-select-selector,
+.ant-select-focused,
 .ant-mentions-focused,
 textarea:focus,
 select:focus {
@@ -251,14 +250,20 @@ select:focus:not(:focus-visible),
 
 /* ── Flat controls: every custom button / icon rests on a transparent
    background. Hover and selected states stay as interaction feedback;
-   antd dialog buttons keep their fills so modal actions remain usable. ── */
-button:not(.ant-btn),
-[role='button'] {
+   antd dialog buttons keep their fills so modal actions remain usable. ──
+ *
+ * `data-filled` 是给**主行动按钮**与"背景即内容"的按钮（时间线分段条）留的出口：
+ * 这条全局规则带 `!important`（为了压掉浏览器默认按钮外观），所以任何写在
+ * className 里的 `bg-primary` / `bg-accent` / `bg-danger` 都会被它吃掉 ——
+ * 配 `text-white` / `text-text-on-accent` 的按钮就变成**白底白字**，
+ * 而纯色条的按钮会**整条消失**。不带这个属性 = 保持扁平（默认）。 */
+button:not(.ant-btn):not([data-filled]),
+[role='button']:not([data-filled]) {
   background-color: transparent !important;
 }
 
-button:not(.ant-btn):hover:not(:disabled),
-[role='button']:hover {
+button:not(.ant-btn):not([data-filled]):hover:not(:disabled),
+[role='button']:not([data-filled]):hover {
   background-color: var(--color-hover) !important;
 }
 
@@ -294,9 +299,30 @@ button:not(.ant-btn)[aria-pressed='true'],
   color: var(--color-text-primary) !important;
 }
 
-/* Account menu floats a bit higher above the sidebar footer. */
+/* Account menu floats higher above the sidebar footer. */
 .account-popup {
-  transform: translateY(-8px) !important;
+  transform: translateY(-14px) !important;
+}
+
+/* Composer preset popups (运行权限 / 执行挡位) — 视觉上「直接弹出」，但**不能禁用动画**。
+ *
+ * 坑：rc-motion 靠 animationend 判断入场/离场结束。若用 `animation: none`，
+ * 离场动画永不结束 → 弹层不会被卸载（点外部也关不掉），且残留状态会吃掉下一次
+ * 点击。正确做法是把时长压到 0.01ms：动画照跑、事件照发，肉眼是瞬间完成。 */
+.ax-composer-popup,
+.ax-composer-popup.ant-slide-up-enter,
+.ax-composer-popup.ant-slide-up-appear,
+.ax-composer-popup.ant-slide-up-enter-active,
+.ax-composer-popup.ant-slide-up-appear-active,
+.ax-composer-popup.ant-slide-up-leave,
+.ax-composer-popup.ant-slide-up-leave-active,
+.ax-composer-popup.ant-slide-down-enter,
+.ax-composer-popup.ant-slide-down-appear,
+.ax-composer-popup.ant-slide-down-enter-active,
+.ax-composer-popup.ant-slide-down-appear-active,
+.ax-composer-popup.ant-slide-down-leave,
+.ax-composer-popup.ant-slide-down-leave-active {
+  animation-duration: 0.01ms !important;
 }
 
 /* ── FileTree ──────────────────────────────────────────── */
@@ -311,17 +337,18 @@ button:not(.ant-btn)[aria-pressed='true'],
   border-radius: 2px;
 }
 
-/* ── TabBar ────────────────────────────────────────────── */
-.tab-bar .ant-tabs-nav {
-  margin: 0;
-  padding: 0;
-  border-bottom: none;
-}
-.tab-bar .ant-tabs-tab {
-  border-radius: 6px 6px 0 0 !important;
-  margin: 4px 2px 0 0 !important;
-  padding: 6px 12px !important;
-  font-size: 13px;
+/* ── 右侧栏全屏 ─────────────────────────────────────────
+   面板铺满主界面（盖住左侧栏与主内容），但**让开顶部栏**：top 取
+   --ax-main-top（由 useMainAreaTopVar 实测 body 行距窗口顶部的距离），
+   所以菜单栏与窗口按钮始终可见。
+   宽度由 Allotment 的内联样式控制，这里用 !important 覆盖。 */
+aside[data-pane='right'][data-fullscreen] {
+  position: fixed;
+  inset: var(--ax-main-top, 40px) 0 0 0;
+  z-index: 60;
+  width: 100% !important;
+  max-width: 100% !important;
+  border-left: none;
 }
 
 /* ── WorkbenchLayout ──────────────────────────────────── */
@@ -329,7 +356,9 @@ button:not(.ant-btn)[aria-pressed='true'],
   -webkit-app-region: no-drag;
 }
 
-/* Top menu dropdowns (文件/编辑/视图/帮助) — no popup motion */
+/* Top menu dropdowns (文件/编辑/视图/帮助) — 视觉上无入场动效。
+ * 同样**不能**用 `animation: none`：rc-motion 收不到 animationend 会导致弹层
+ * 关不掉（离场卡住）。压到 0.01ms 既瞬间完成、又保留事件。 */
 .ax-top-menu-popup,
 .ax-top-menu-popup.ant-slide-up-enter,
 .ax-top-menu-popup.ant-slide-up-appear,
@@ -337,7 +366,7 @@ button:not(.ant-btn)[aria-pressed='true'],
 .ax-top-menu-popup.ant-slide-up-appear-active,
 .ax-top-menu-popup.ant-slide-up-leave,
 .ax-top-menu-popup.ant-slide-up-leave-active {
-  animation: none !important;
+  animation-duration: 0.01ms !important;
 }
 
 /* Brand wordmark — solid ink, premium monochrome */
@@ -398,7 +427,7 @@ button:not(.ant-btn)[aria-pressed='true'],
 }
 
 /* ── SettingsModal ────────────────────────────────────── */
-.settings-modal .ant-modal-content {
+.settings-modal .ant-modal-container {
   background: var(--color-bg-primary);
   border: none;
   border-radius: 14px;

@@ -197,7 +197,8 @@ function cmdReview(trimmedArgs: string, ctx: CommandContext): boolean {
     if (id) {
       useAgentStore.getState().setCurrentAgent(id);
       useAppStore.getState().setSidebarMode('code');
-      useAppStore.getState().setRightPanelView('review');
+      // 审查与变更已合并为同一个 diff 面板。
+      useAppStore.getState().setRightPanelView('diff');
       if (!useAppStore.getState().showRightPanel) useAppStore.getState().toggleRightPanel();
       ctx.setInputValue('');
       message.success(t('cmd.msg.reviewStarted'));

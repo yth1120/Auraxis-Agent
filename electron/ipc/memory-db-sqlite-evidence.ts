@@ -9,6 +9,7 @@ import {
   type SignalRecord,
 } from './memory-db-types';
 import { rowToEvidence } from './memory-db-sqlite-rows';
+import { searchEvidenceIdsFts, shouldUseEvidenceFts } from './memory-fts';
 
 export function addEvidence(db: SqliteLike, e: EvidenceInput): void {
   db.prepare(
@@ -59,6 +60,17 @@ export function deleteEvidence(db: SqliteLike, id: string): void {
 }
 
 export function searchEvidence(db: SqliteLike, scope: string, query: string, limit = 50): EvidenceRecord[] {
+  if (shouldUseEvidenceFts(db, query)) {
+    const ids = searchEvidenceIdsFts(db, scope, query, limit);
+    if (ids.length === 0) return [];
+    const rows = db.prepare(`SELECT * FROM evidence WHERE id IN (${ids.map(() => '?').join(',')})`).all(...ids);
+    const byId = new Map(rows.map((row) => [String((row as { id?: unknown }).id ?? ''), rowToEvidence(row)]));
+    return ids.map((id) => byId.get(id)).filter((r): r is EvidenceRecord => !!r);
+  }
+  // 回退：短查询或索引不可用。
+  // 行为差异（有意为之）：LIKE 路径额外匹配 content_hash 子串，FTS 路径只匹配 content
+  // —— 索引一个哈希列没有意义，而按哈希取整行本就走 findEvidenceByHash 的精确查找。
+  // 因此「用 ≥3 字符的哈希片段去搜证据」在 FTS 路径下不再命中。
   const like = `%${query}%`;
   return db
     .prepare(

@@ -96,17 +96,13 @@ export default function ScheduledPanel({ onClose }: { onClose?: () => void }) {
             <CalendarCheck size={20} />
           </span>
           <span className="text-sm font-medium text-text-muted">{tPanel('sched.empty')}</span>
-          <span className="text-2xs text-text-faint leading-[1.5]">{tPanel('sched.emptyHint')}</span>
         </div>
       ) : (
         <ul className="list-none m-0 p-0 flex flex-col gap-2">
           {jobs.map((job) => {
             const run = job.lastRun;
             return (
-              <li
-                key={job.id}
-                className="px-4 py-3 rounded-xl bg-[var(--color-bg-secondary)] border border-[var(--color-border-dim)]"
-              >
+              <li key={job.id} className="px-4 py-3 rounded-xl bg-[var(--color-bg-secondary)]">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-text-primary truncate">{job.name}</span>
                   <span className="shrink-0 inline-flex items-center h-5 px-1.5 rounded-md bg-[var(--color-bg-inset)] text-2xs text-text-muted font-mono">

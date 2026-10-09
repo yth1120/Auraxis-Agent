@@ -344,7 +344,12 @@ export default function ChatArea() {
       </div>
 
       <ChatReplayModal open={replayOpen} onClose={() => setReplayOpen(false)} events={replayEvents} />
-      <ChatToolOverlay activeToolView={activeToolView} onClose={() => setActiveToolView('none')} />
+      {/* 工具视图从悬浮顶栏下沿开始，避免把顶栏一起盖住。 */}
+      <ChatToolOverlay
+        activeToolView={activeToolView}
+        onClose={() => setActiveToolView('none')}
+        topInset={headerHeight}
+      />
     </div>
   );
 }

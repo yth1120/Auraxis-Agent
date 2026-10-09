@@ -3,6 +3,7 @@ import path from 'path';
 import { createHash } from 'crypto';
 import { sqliteAvailable } from '../session-projection-cache';
 import { SqliteBackend, JsonBackend } from './memory-db-backends';
+import type { EmbeddingIdentity } from './embedding-provider';
 import type {
   MemoryBackend,
   MemoryInput,
@@ -176,6 +177,14 @@ export function deleteBelief(id: string): void {
   getBackend().deleteBelief(id);
 }
 
+/**
+ * 硬删除信念（连带链接 / 修订 / 向量缓存）。**只给「替换机器生成的派生内容」用** ——
+ * 用户可见的删除走 `deleteBelief`（软删 + 审计）或 `eraseScope`（带审计记录）。
+ */
+export function hardDeleteBeliefs(ids: string[]): number {
+  return getBackend().hardDeleteBeliefs(ids);
+}
+
 export function addBeliefEvidence(link: BeliefEvidenceLink): void {
   getBackend().addBeliefEvidence(link);
 }
@@ -194,6 +203,29 @@ export function addBeliefRejection(rejection: BeliefRejectionInput): void {
 
 export function listBeliefRejections(scope: string, limit?: number): BeliefRejection[] {
   return getBackend().listBeliefRejections(scope, limit);
+}
+
+// ─── Public API — belief 向量缓存 ──────────────────────
+// 语义是「有没有缓存」，不是「有没有向量」：没有向量存储的后端返回空 Map / 无操作，
+// 调用方每次重算即可 —— 结果一致，只是没有省下重算。
+
+/** 本后端是否提供向量缓存（JSON 后端为 false）。 */
+export function vectorsAvailable(): boolean {
+  return getBackend().vectorsAvailable();
+}
+
+/** 取身份匹配的向量；不匹配的行视同缺失。 */
+export function loadVectors(scope: string, identity: EmbeddingIdentity): Map<string, number[]> {
+  return getBackend().loadVectors(scope, identity);
+}
+
+/** 写入向量缓存（原地覆盖，整批一个事务）。 */
+export function saveVectors(
+  scope: string,
+  identity: EmbeddingIdentity,
+  entries: Array<{ beliefId: string; vector: number[] }>,
+): void {
+  getBackend().saveVectors(scope, identity, entries);
 }
 
 // ─── Public API — read runs ────────────────────────────

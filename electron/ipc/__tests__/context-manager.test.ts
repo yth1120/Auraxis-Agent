@@ -3,10 +3,15 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import {
   STATIC_SYSTEM_PROMPT,
   buildSessionPreamble,
   prepareCacheAlignedMessages,
+  resetPromptVariantCache,
+  resolvePromptVariant,
   findSafeBoundaries,
   countCompleteRounds,
   findTruncationIndex,
@@ -78,6 +83,62 @@ describe('Static Prefix Locking (Cache Alignment)', () => {
     // [3] user: chat message
     expect(msgs[3].role).toBe('user');
     expect(msgs[3].content).toBe('Hello');
+  });
+
+  // 提示词变体是评测 A/B 用的实验开关。它对缓存前缀的唯一合法位置是 [3] ——
+  // 一旦混进 [0..2]，每次请求都会变成 cache miss，而且**不会有任何报错**。
+  describe('提示词变体（实验开关）', () => {
+    const base = { platform: 'linux', projectRoot: '/home/project' } as const;
+
+    it('未启用时布局与从前逐字节相同', () => {
+      const msgs = prepareCacheAlignedMessages({
+        ...base,
+        chatMessages: [{ role: 'user', content: 'Hello' }],
+        promptVariant: null,
+      });
+      expect(msgs).toHaveLength(4);
+      expect(msgs[3].content).toBe('Hello');
+    });
+
+    it('启用时插在 [3]，[0..2] 一个字节都不变', () => {
+      const without = prepareCacheAlignedMessages({ ...base, chatMessages: [], promptVariant: null });
+      const withVariant = prepareCacheAlignedMessages({
+        ...base,
+        chatMessages: [{ role: 'user', content: 'Hello' }],
+        promptVariant: '回答前先复述一遍任务。',
+      });
+      expect(withVariant.slice(0, 3)).toEqual(without.slice(0, 3));
+      expect(withVariant[3].content).toBe('回答前先复述一遍任务。');
+      expect(withVariant[4].content).toBe('Hello');
+    });
+
+    it('空变体不进消息数组（不留占位）', () => {
+      const msgs = prepareCacheAlignedMessages({
+        ...base,
+        chatMessages: [{ role: 'user', content: 'Hello' }],
+        promptVariant: null,
+      });
+      expect(msgs.map((m) => m.content)).not.toContain('');
+    });
+
+    it('从文件读取并按路径缓存；读不到时按未启用处理', () => {
+      const dir = mkdtempSync(path.join(os.tmpdir(), 'auraxis-variant-'));
+      const file = path.join(dir, 'v.txt');
+      writeFileSync(file, '变体正文', 'utf8');
+      try {
+        expect(resolvePromptVariant({ AURAXIS_PROMPT_VARIANT_FILE: file } as NodeJS.ProcessEnv)).toBe('变体正文');
+        // 同一路径第二次读取走缓存（进程内一次；评测每个用例都是新进程）。
+        writeFileSync(file, '改过了', 'utf8');
+        expect(resolvePromptVariant({ AURAXIS_PROMPT_VARIANT_FILE: file } as NodeJS.ProcessEnv)).toBe('变体正文');
+        expect(
+          resolvePromptVariant({ AURAXIS_PROMPT_VARIANT_FILE: path.join(dir, 'missing.txt') } as NodeJS.ProcessEnv),
+        ).toBeNull();
+        expect(resolvePromptVariant({} as NodeJS.ProcessEnv)).toBeNull();
+      } finally {
+        resetPromptVariantCache();
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
   });
 
   it('prepareCacheAlignedMessages filters out system messages from chat', () => {

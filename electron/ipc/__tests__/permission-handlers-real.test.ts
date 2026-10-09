@@ -28,7 +28,9 @@ const handler = (ch: string) => h.handlers.get(ch)! as any;
 const tmpRoot = mkdtempSync(path.join(os.tmpdir(), 'auraxis-perm-'));
 
 function makeWin() {
-  return { isDestroyed: () => false, webContents: { send: vi.fn() } } as any;
+  const send = vi.fn();
+  // 同时满足假窗口与 SchedulerNotifier 端口：notifier.send 转发到 webContents.send。
+  return { isDestroyed: () => false, webContents: { send }, send, isAlive: () => true } as any;
 }
 
 beforeEach(async () => {

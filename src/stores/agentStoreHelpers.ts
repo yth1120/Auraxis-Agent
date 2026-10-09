@@ -208,6 +208,7 @@ function toolEventEntry(event: AgentRuntimeEvent): AgentLogEntry | null {
 function iterationEventEntry(event: AgentRuntimeEvent): AgentLogEntry | null {
   switch (event.type) {
     case 'iteration_start':
+      // 预算由引擎如实带上（宿主解析不出时不带 → 这里保持 undefined，界面不显示上限）。
       return {
         type: 'iteration_start',
         timestamp: Date.now(),

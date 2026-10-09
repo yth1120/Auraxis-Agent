@@ -139,7 +139,10 @@ describe('runSubAgent — 同步执行路径', () => {
     await vi.waitFor(() => expect(h.loops).toHaveLength(1));
 
     const opts = h.loops[0].opts;
-    expect(opts.tools.map((t: any) => t.name)).toEqual(['Read', 'Write', 'Bash', 'Agent', 'Grep']);
+    // general-purpose 不再固定注入全部工具，而是按任务预选 + 附 ToolSearch 逃生口。
+    // 本 fixture 的 5 个工具恰好都在核心集里，所以这里看不到裁剪（裁剪行为由
+    // tool-catalog 的测试钉住），能观察到的是 ToolSearch 被挂上。
+    expect(opts.tools.map((t: any) => t.name)).toEqual(['Read', 'Write', 'Bash', 'Agent', 'Grep', 'ToolSearch']);
     expect(opts.model).toBe('deepseek-v4-pro');
     expect(opts.autoApprove).toBeUndefined();
     expect(opts.mode).toBe('ask');

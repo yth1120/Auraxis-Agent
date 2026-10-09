@@ -10,9 +10,14 @@ import {
   DeviceMobile as MobileOutlined,
   DeviceTablet as TabletOutlined,
   Clock as ClockOutlined,
+  CursorClick as CursorClickOutlined,
+  X as CloseOutlined,
   Tray,
 } from '@/components/common/icons';
 import { useT } from '../../i18n';
+import { useAppStore } from '../../stores/useAppStore';
+import { useChatStore } from '../../stores/useChatStore';
+import { annotationLabel } from '../../core/activity/annotation';
 
 interface PreviewBrowserProps {
   tabId: string;
@@ -81,6 +86,9 @@ export default function PreviewBrowser({ tabId }: PreviewBrowserProps) {
   const [canForward, setCanForward] = useState(false);
   const [title, setTitle] = useState('');
   const [consoleErrors, setConsoleErrors] = useState(0);
+  // 标注模式：开启后点击页面元素即可给它写评论（评论随下一条消息进入 Agent 上下文）。
+  const [annotating, setAnnotating] = useState(false);
+  const pendingAnnotations = useChatStore((s) => s.pendingAnnotations);
   const [viewport, setViewport] = useState<Viewport>('desktop');
   const [history, setHistory] = useState<HistoryEntry[]>(loadHistory);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -140,6 +148,34 @@ export default function PreviewBrowser({ tabId }: PreviewBrowserProps) {
       if (e.level >= 2) setConsoleErrors((n) => n + 1);
     };
 
+    // 把这块 webview 登记为**可被 Agent 驱动**的浏览器目标（见 electron/browser-target.ts）。
+    // 只有登记过的 webContents 才可寻址 —— 这是"Agent 只能驱动用户打开的预览"的落点。
+    const registerTarget = () => {
+      try {
+        const id = wv.getWebContentsId();
+        if (id > 0) void window.electronAPI?.browser?.register(id);
+      } catch {
+        /* webview 尚未就绪 */
+      }
+    };
+    const unregisterTarget = () => {
+      try {
+        const id = wv.getWebContentsId();
+        if (id > 0) void window.electronAPI?.browser?.unregister(id);
+      } catch {
+        /* 已经销毁 */
+      }
+    };
+    wv.addEventListener('did-stop-loading', registerTarget);
+    // 挂载即登记；面板关闭（卸载）时注销，避免留下失效句柄。
+    registerTarget();
+
+    // Agent 打开网页时，主进程已经导航过了；这里只负责把它切到前台。
+    const offOpenRequest = window.electronAPI?.browser?.onOpenRequest?.(({ url: target }) => {
+      useAppStore.getState().setRightPanelView('preview');
+      if (target) wv.loadURL(target)?.catch(() => setLoading(false));
+    });
+
     wv.addEventListener('did-start-loading', onStart);
     wv.addEventListener('did-stop-loading', onStop);
     wv.addEventListener('did-navigate', onNav);
@@ -149,6 +185,9 @@ export default function PreviewBrowser({ tabId }: PreviewBrowserProps) {
     wv.addEventListener('console-message', onConsole);
 
     return () => {
+      unregisterTarget();
+      offOpenRequest?.();
+      wv.removeEventListener('did-stop-loading', registerTarget);
       wv.removeEventListener('did-start-loading', onStart);
       wv.removeEventListener('did-stop-loading', onStop);
       wv.removeEventListener('did-navigate', onNav);
@@ -158,6 +197,83 @@ export default function PreviewBrowser({ tabId }: PreviewBrowserProps) {
       wv.removeEventListener('console-message', onConsole);
     };
   }, [refreshNavState, title]);
+
+  // 标注模式：用户点页面元素 → 生成一个尽量稳定的选择器，并把元素文本带回来。
+  //
+  // 单独一个 effect（只依赖 annotating）：它嵌在主 effect 里时，主 effect 每次因
+  // title/refreshNavState 变化重跑都会重新武装一次页面侧的点击监听，而卸载中的那次
+  // 无法回收 —— 页面里会留下多个监听器。页面脚本因此改成**自我替换**：新的一次会先
+  // 摘掉上一次的监听器，重复武装也不会叠加。
+  //
+  // 整段逻辑必须跑在**页面上下文**里（渲染层的闭包传不进 webview），所以用
+  // executeJavaScript 返回一个 Promise：页面侧只负责"等一次点击并回报元素"，
+  // 评论由渲染层用 prompt 收集。注入的是只读脚本，不改页面。
+  useEffect(() => {
+    if (!isElectronEnv || !annotating) return;
+    const wv = webviewRef.current;
+    if (!wv) return;
+    let cancelled = false;
+    void wv
+      .executeJavaScript(
+        `new Promise((resolve) => {
+           const build = (node) => {
+             if (node.id) return '#' + node.id;
+             const parts = [];
+             let cur = node;
+             while (cur && cur.tagName && parts.length < 4) {
+               let part = cur.tagName.toLowerCase();
+               const parent = cur.parentElement;
+               if (parent) {
+                 const same = Array.prototype.filter.call(parent.children, (c) => c.tagName === cur.tagName);
+                 if (same.length > 1) part += ':nth-of-type(' + (same.indexOf(cur) + 1) + ')';
+               }
+               parts.unshift(part);
+               cur = parent;
+             }
+             return parts.join(' > ');
+           };
+           const onClick = (e) => {
+             e.preventDefault();
+             e.stopPropagation();
+             document.removeEventListener('click', window.__axAnnotateClick, true);
+             window.__axAnnotateClick = null;
+             const el = e.target;
+             if (!el || !el.tagName) { resolve(null); return; }
+             resolve({ selector: build(el), tag: el.tagName.toLowerCase(), text: (el.innerText || el.textContent || '').slice(0, 200) });
+           };
+           if (window.__axAnnotateClick) document.removeEventListener('click', window.__axAnnotateClick, true);
+           window.__axAnnotateClick = onClick;
+           document.addEventListener('click', onClick, true);
+         })`,
+        true,
+      )
+      .then((picked: { selector?: string; tag?: string; text?: string } | null) => {
+        if (cancelled) return;
+        setAnnotating(false);
+        if (!picked?.selector) return;
+        const shown = (picked.text || '').trim().slice(0, 40) || picked.tag || '';
+        const comment = window.prompt(t('pb.annotatePrompt', { target: shown }));
+        if (!comment?.trim()) return;
+        useChatStore.getState().addPendingAnnotation({
+          id: `annot-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          url: urlRef.current || wv.getURL(),
+          ...(title ? { title } : {}),
+          selector: picked.selector,
+          ...(picked.text ? { elementText: picked.text } : {}),
+          ...(picked.tag ? { tag: picked.tag } : {}),
+          comment: comment.trim(),
+          ts: Date.now(),
+        });
+        useAppStore.getState().setRightPanelView('preview');
+      })
+      .catch(() => {
+        if (!cancelled) setAnnotating(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // isElectronEnv 是模块级常量，不进依赖数组。
+  }, [annotating, title, t]);
 
   // Iframe load events (browser fallback only).
   useEffect(() => {
@@ -228,7 +344,7 @@ export default function PreviewBrowser({ tabId }: PreviewBrowserProps) {
 
   return (
     <div className="flex flex-col h-full w-full bg-[var(--color-bg-primary)] overflow-hidden">
-      <div className="flex items-center px-3 py-2 gap-2 bg-secondary border-b border-[var(--color-border-dim)] shrink-0">
+      <div className="flex items-center px-3 py-2 gap-2 bg-bg-secondary border-b border-[var(--color-border-dim)] shrink-0">
         <Space size={2}>
           <Tooltip title={t('pb.back')}>
             <Button
@@ -273,12 +389,12 @@ export default function PreviewBrowser({ tabId }: PreviewBrowserProps) {
             style={{ width: '100%' }}
           />
           {suggestions.length > 0 && (
-            <div className="absolute top-[calc(100%+4px)] left-0 right-0 z-20 bg-elevated rounded-lg border border-dim shadow-md overflow-hidden">
+            <div className="absolute top-[calc(100%+4px)] left-0 right-0 z-20 bg-bg-elevated rounded-lg border border-border-dim shadow-md overflow-hidden">
               <div className="flex items-center justify-between px-2 py-1 border-b border-[var(--color-border-dim)]">
-                <span className="text-2xs text-muted">{t('pb.history')}</span>
+                <span className="text-2xs text-text-muted">{t('pb.history')}</span>
                 <button
                   type="button"
-                  className="text-2xs text-muted hover:text-secondary cursor-pointer"
+                  className="text-2xs text-text-muted hover:text-text-secondary cursor-pointer"
                   onMouseDown={(e) => {
                     e.preventDefault();
                     setHistory([]);
@@ -335,6 +451,16 @@ export default function PreviewBrowser({ tabId }: PreviewBrowserProps) {
               onClick={() => setViewport('mobile')}
             />
           </Tooltip>
+          {isElectronEnv && hasContent && (
+            <Tooltip title={annotating ? t('pb.annotateOn') : t('pb.annotate')}>
+              <Button
+                type={annotating ? 'primary' : 'text'}
+                size="small"
+                icon={<CursorClickOutlined />}
+                onClick={() => setAnnotating((v) => !v)}
+              />
+            </Tooltip>
+          )}
           {isElectronEnv && (
             <Tooltip title={t('pb.consoleErrors', { n: consoleErrors })}>
               <Badge count={consoleErrors} size="small" offset={[-2, 4]}>
@@ -345,15 +471,36 @@ export default function PreviewBrowser({ tabId }: PreviewBrowserProps) {
         </Space>
       </div>
 
-      <div className="flex-1 relative overflow-auto bg-secondary flex items-stretch justify-center">
+      {pendingAnnotations.length > 0 && (
+        <div className="flex flex-col gap-0.5 px-2 py-1.5 border-b border-border-dim" data-pending-annotations>
+          <span className="text-2xs text-text-muted">{t('pb.pendingAnnotations', { n: pendingAnnotations.length })}</span>
+          {pendingAnnotations.map((a) => (
+            <div key={a.id} className="flex items-center gap-1.5 text-2xs text-text-secondary min-w-0">
+              <span className="truncate">
+                {annotationLabel(a)} · {a.comment}
+              </span>
+              <button
+                type="button"
+                className="ax-tool-row-link shrink-0"
+                aria-label={t('pb.removeAnnotation')}
+                onClick={() => useChatStore.getState().removePendingAnnotation(a.id)}
+              >
+                <CloseOutlined size={12} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="flex-1 relative overflow-auto bg-bg-secondary flex items-stretch justify-center">
         {!hasContent ? (
           <div className="w-full flex items-center justify-center p-8">
             <div className="flex flex-col items-center justify-center gap-1.5 text-center">
-              <span className="text-faint [&_svg]:w-5 [&_svg]:h-5">
+              <span className="text-text-faint [&_svg]:w-5 [&_svg]:h-5">
                 <Tray size={20} />
               </span>
-              <div className="text-xs text-muted">{warning ?? t('pb.startHint')}</div>
-              {!warning && <div className="text-xs text-faint">{t('pb.examples')}</div>}
+              <div className="text-xs text-text-muted">{warning ?? t('pb.startHint')}</div>
+              {!warning && <div className="text-xs text-text-faint">{t('pb.examples')}</div>}
             </div>
           </div>
         ) : isElectronEnv ? (
@@ -377,7 +524,7 @@ export default function PreviewBrowser({ tabId }: PreviewBrowserProps) {
       </div>
 
       {title && (
-        <div className="flex items-center px-3 py-1 text-xs text-faint bg-secondary border-t border-[var(--color-border-dim)] whitespace-nowrap overflow-hidden text-ellipsis shrink-0">
+        <div className="flex items-center px-3 py-1 text-xs text-text-faint bg-bg-secondary border-t border-[var(--color-border-dim)] whitespace-nowrap overflow-hidden text-ellipsis shrink-0">
           {title} · {url}
         </div>
       )}

@@ -61,6 +61,7 @@ import {
   runDriveRead,
   runNotionCreatePage,
   runNotionSearch,
+  runIngestDocument,
   runReadDocument,
   runSlackListChannels,
   runSlackPostMessage,
@@ -79,6 +80,7 @@ import {
   runUpdateGoal,
 } from './agents';
 import { runSessionEventRead, runSessionEventSearch, runSessionTrace } from './session';
+import { runBrowserOpen, runBrowserRead, runBrowserScreenshot } from './browser';
 
 export const toolRegistry = {
   ListSkills: runListSkills,
@@ -87,6 +89,7 @@ export const toolRegistry = {
   ReadSpill: runReadSpill,
   AskUser: runAskUser,
   ReadDocument: runReadDocument,
+  IngestDocument: runIngestDocument,
   WriteDocument: runWriteDocument,
   SlackListChannels: runSlackListChannels,
   SlackPostMessage: runSlackPostMessage,
@@ -151,4 +154,7 @@ export const toolRegistry = {
   SessionEventSearch: runSessionEventSearch,
   SessionEventRead: runSessionEventRead,
   SessionTrace: runSessionTrace,
+  BrowserOpen: runBrowserOpen,
+  BrowserRead: runBrowserRead,
+  BrowserScreenshot: runBrowserScreenshot,
 };

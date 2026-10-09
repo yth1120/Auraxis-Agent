@@ -5,14 +5,24 @@
  * sandbox-policy and permission-profile. Keeping one matrix makes it much
  * harder to add a tool with inconsistent Work/Profile/Sandbox treatment.
  */
+import { isExternalSourceTool } from './tool-provider';
 
-/** Pure read tools that never mutate files or external state. */
+// 策略层从本模块取「外部来源」判定，与能力集合共用同一个导入点。
+export { isExternalSourceTool };
+
+/**
+ * Pure read tools that never mutate files or external state.
+ *
+ * `IngestDocument` 归在这里：它读文件、只写应用自己的记忆库，不改工作区也不碰外部状态。
+ * 能力矩阵的轴是「对文件/外部世界做了什么」，把它算成写文件会让 Work 门与沙箱门误判。
+ */
 export const FILE_READ_TOOLS = new Set([
   'Read',
   'ReadImage',
   'Grep',
   'Glob',
   'ReadDocument',
+  'IngestDocument',
   'LSP',
   'SessionQuery',
   'SessionEventSearch',
@@ -37,16 +47,31 @@ export const FILE_DIFF_TOOLS = new Set(['Write', 'Edit', 'NotebookEdit']);
 /** Read-only integration lookups (no external mutation). */
 export const INTEGRATION_READ_TOOLS = new Set(['SlackListChannels', 'DriveList', 'DriveRead', 'NotionSearch']);
 
+/**
+ * 内置预览浏览器的工具族。
+ *
+ * 归在"读"侧（不改工作区、不写文件），但**必须**走网络与审批：它让模型主动联网、
+ * 并在一个真实页面上下文里执行读取脚本。能力集合只有这一份，别再在别处列一遍。
+ */
+export const BROWSER_TOOLS = new Set(['BrowserOpen', 'BrowserRead', 'BrowserScreenshot']);
+
 /** All network-facing tools, including external mutation integrations. */
 export const NETWORK_TOOLS = new Set([
   'WebFetch',
   'WebSearch',
+  // 打开网页 = 主动联网取内容，与 WebFetch 同级；且它会驱动一个真实浏览器上下文。
+  ...BROWSER_TOOLS,
   ...INTEGRATION_READ_TOOLS,
   'SlackPostMessage',
   'NotionCreatePage',
 ]);
 
-/** Tools that can be auto-approved in interactive mode without a diff. */
+/**
+ * Tools that can be auto-approved in interactive mode without a diff.
+ *
+ * `IngestDocument` **刻意不在**这里：它虽然只读文件，却会往项目记忆里持续写入内容。
+ * 自动批准等于让模型在用户不知情时改变长期状态；留下一次审批是它应有的代价。
+ */
 export const SAFE_READONLY_TOOLS = new Set(['Read', 'Grep', 'Glob', 'ReadDocument', ...INTEGRATION_READ_TOOLS]);
 
 /** Local shells. Bash is handled separately after a command-policy check. */
@@ -99,6 +124,7 @@ export const DANGEROUS_TOOLS = new Set([
   'WriteDocument',
   'WebFetch',
   'WebSearch',
+  ...BROWSER_TOOLS,
   'ReviewArtifact',
   'GitCommit',
   'SlackPostMessage',
@@ -155,7 +181,9 @@ export function toolCapability(toolName: string): ToolCapability {
 }
 
 export function isDangerousTool(toolName: string): boolean {
-  return DANGEROUS_TOOLS.has(toolName) || toolName.startsWith('mcp__');
+  // 外部来源（MCP / 插件）语义不可验证，一律按危险工具走审批。判定收敛在
+  // tool-provider.isExternalSourceTool，此处不再自行匹配前缀。
+  return DANGEROUS_TOOLS.has(toolName) || isExternalSourceTool(toolName);
 }
 
 export function isWorkForbiddenTool(toolName: string): boolean {

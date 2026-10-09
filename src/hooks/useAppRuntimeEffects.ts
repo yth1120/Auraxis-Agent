@@ -44,6 +44,26 @@ export function useThemeClass(resolvedTheme: 'light' | 'dark'): void {
 }
 
 /**
+ * 无边框窗口的圆角：窗口以 `transparent: true` 创建，系统不画圆角，
+ * 四角由页面自绘（见 tokens.css 的 `--ax-window-radius`）。最大化时归零，
+ * 否则贴边的窗口会在屏幕角落露出透明缺口。
+ */
+export function useWindowCornerClass(): void {
+  useEffect(() => {
+    const api = window.electronAPI;
+    if (!api?.isMaximized) return;
+    const apply = (maximized: boolean) => {
+      document.documentElement.classList.toggle('ax-maximized', maximized);
+    };
+    void api
+      .isMaximized()
+      .then(apply)
+      .catch(() => {});
+    return api.onMaximizeChange?.(apply);
+  }, []);
+}
+
+/**
  * Frosted sidebar / Aqua glass：外层透明只在原生 Acrylic 可用时开启，
  * 启动与解锁瞬间不会露出桌面。挂载时再确认一次 Glass 能力作为 rehydrate 兜底。
  */
@@ -98,11 +118,23 @@ export function useSettingsPrefetch(): void {
   }, []);
 }
 
-/** 首次挂载时补一个默认聊天标签页，避免工作台空白。 */
+/**
+ * 主区固定显示对话：顶部 tab 栏已移除，辅助视图（文件 / 变更 / 预览）都在
+ * 右侧工作台面板里。这里负责补默认对话标签，并把历史存档里的非对话标签清掉
+ * —— 否则老存档的 activeTabId 可能停在一个再也无法切回的标签上。
+ */
 export function useDefaultChatTab(): void {
   useEffect(() => {
-    const { tabs, addTab } = useAppStore.getState();
-    if (tabs.length === 0) addTab({ type: 'chat', label: t('nav.chat'), metadata: {} });
+    const { tabs, activeTabId, addTab, closeTab, setActiveTab } = useAppStore.getState();
+    for (const tab of tabs) {
+      if (tab.type !== 'chat') closeTab(tab.id);
+    }
+    const chatTab = useAppStore.getState().tabs.find((tab) => tab.type === 'chat');
+    if (!chatTab) {
+      addTab({ type: 'chat', label: t('nav.chat'), metadata: {} });
+      return;
+    }
+    if (activeTabId !== chatTab.id) setActiveTab(chatTab.id);
   }, []);
 }
 

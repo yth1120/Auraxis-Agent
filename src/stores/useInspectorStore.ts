@@ -26,7 +26,6 @@ export function mapTodosToTasks(todos: RawTodo[]): AgentTask[] {
 
 export interface InspectorStore {
   /** Plan-first task checklist (TodoWrite-driven) */
-  tasks: AgentTask[];
   /** Plans awaiting or having received approval */
   plans: PlanData[];
   /** System messages routed from the agent loop (context compression, retries, etc.) */
@@ -36,7 +35,6 @@ export interface InspectorStore {
   /** Timestamp of most recent tool activity (for pulse animation cooldown) */
   lastToolActivity: number;
 
-  setTasks: (tasks: AgentTask[]) => void;
   addPlan: (plan: PlanData) => void;
   updatePlan: (planId: string, updates: Partial<PlanData>) => void;
   removePlan: (planId: string) => void;
@@ -64,13 +62,11 @@ export function selectPendingPlan(plans: PlanData[], currentAgentId: string | nu
 }
 
 export const useInspectorStore = create<InspectorStore>()((set) => ({
-  tasks: [],
   plans: [],
   systemMessages: [],
   activeToolCount: 0,
   lastToolActivity: 0,
 
-  setTasks: (tasks) => set({ tasks }),
 
   addPlan: (plan) =>
     set((s) => ({
@@ -97,5 +93,5 @@ export const useInspectorStore = create<InspectorStore>()((set) => ({
 
   touchToolActivity: () => set({ lastToolActivity: Date.now() }),
 
-  clear: () => set({ tasks: [], plans: [], systemMessages: [], activeToolCount: 0, lastToolActivity: 0 }),
+  clear: () => set({ plans: [], systemMessages: [], activeToolCount: 0, lastToolActivity: 0 }),
 }));

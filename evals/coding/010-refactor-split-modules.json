@@ -1,0 +1,27 @@
+{
+  "id": "coding-010-refactor-split-modules",
+  "category": "coding",
+  "task": "重构配置层：把 src/config.ts 拆成两个模块 src/constants/timeouts.ts（apiTimeoutMs = 30000）与 src/constants/retries.ts（retryCount = 3），并让 src/config.ts 从这两个模块导入后重新导出，保持对外行为不变。只改这三个文件。",
+  "fixture": "basic-project",
+  "checks": [
+    {
+      "id": "timeouts-created",
+      "kind": "file_contains",
+      "path": "src/constants/timeouts.ts",
+      "needle": "apiTimeoutMs"
+    },
+    { "id": "retries-created", "kind": "file_contains", "path": "src/constants/retries.ts", "needle": "retryCount" },
+    { "id": "config-reexports", "kind": "file_contains", "path": "src/config.ts", "needle": "timeouts" },
+    { "id": "legacy-kept", "kind": "file_unchanged", "path": "src/legacy/config.ts" },
+    {
+      "id": "scope",
+      "kind": "no_unexpected_changes",
+      "allow": ["src/config.ts", "src/constants/timeouts.ts", "src/constants/retries.ts"]
+    }
+  ],
+  "tools": {
+    "expect": ["Read", "Write"],
+    "requireArgs": { "Write": ["file_path"] }
+  },
+  "process": { "maxFailedToolCalls": 4, "maxIterations": 20 }
+}

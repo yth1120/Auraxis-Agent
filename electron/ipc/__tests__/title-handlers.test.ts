@@ -13,6 +13,7 @@ vi.mock('electron', () => ({
 
 import { normalizeSessionTitle, buildTitlePrompt, generateSessionTitle } from '../title-handlers';
 import { registerLlmAdapter } from '../../agent-runtime/llm-adapter';
+import { resetSemanticCacheForTest } from '../semantic-cache';
 
 describe('session-title', () => {
   it('normalizes raw model output into a clean one-line title', () => {
@@ -65,6 +66,36 @@ describe('session-title', () => {
       adapter: 'title-fail',
     });
     expect(title).toBeNull();
+  });
+
+  it('语义缓存开启时，同样的开场白不再调用 LLM', async () => {
+    const calls: string[] = [];
+    registerLlmAdapter('title-cache', async (cfg) => {
+      calls.push(cfg.model);
+      return {
+        contentTimeline: [],
+        toolCalls: [],
+        rawText: '"登录按钮圆角"',
+        thinkingText: '',
+        isFinal: false,
+        completionStopReason: 'end_turn',
+      };
+    });
+    const opts = { model: 'deepseek-v4-flash', apiKey: 'k', apiBase: 'http://x', adapter: 'title-cache' };
+    const messages = [{ content: '帮我优化登录流程并把按钮改成圆角' }];
+
+    resetSemanticCacheForTest();
+    process.env.AURAXIS_SEMANTIC_CACHE = '1';
+    try {
+      const first = await generateSessionTitle(messages, opts);
+      expect(first).toBe('登录按钮圆角');
+      expect(calls).toHaveLength(1);
+      expect(await generateSessionTitle(messages, opts)).toBe(first);
+      expect(calls, '第二次应命中语义缓存').toHaveLength(1);
+    } finally {
+      delete process.env.AURAXIS_SEMANTIC_CACHE;
+      resetSemanticCacheForTest();
+    }
   });
 
   it('returns null without an API key', async () => {

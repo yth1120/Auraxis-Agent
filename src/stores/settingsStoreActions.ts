@@ -11,6 +11,8 @@ type SettingsStoreActions = Omit<
   | 'deepseekApiKeyConfigured'
   | 'defaultModel'
   | 'fallbackModel'
+  | 'fastModel'
+  | 'strongModel'
   | 'projectPath'
   | 'notifyOnAgentComplete'
   | 'notificationMode'
@@ -124,6 +126,8 @@ export function createSettingsStoreActions(set: SetState, get: GetState): Settin
       set({ fallbackModel: model });
       window.electronAPI?.settings.set('fallbackModel', model).catch(() => {});
     },
+    setFastModel: (model) => set({ fastModel: model }),
+    setStrongModel: (model) => set({ strongModel: model }),
 
     setProjectPath: (path) => {
       set({ projectPath: path });

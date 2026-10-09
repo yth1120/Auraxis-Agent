@@ -31,6 +31,7 @@ export { estimateTokens };
 
 /** An indivisible group of messages — removed or kept as a unit. */
 
+import { readFileSync } from 'node:fs';
 import { buildAtomicGroups } from './context-manager-utils';
 
 // ═══════════════════════════════════════════════════════════
@@ -100,12 +101,51 @@ export function buildSessionPreamble(params: { platform: string; projectRoot: st
 export const WORK_GUIDE_MESSAGE = '请根据 system prompt 中的任务描述开始工作。节奏由你自主决定。';
 
 /**
+ * 实验用提示词变体（评测 A/B 用，默认关闭）。
+ *
+ * 变体文本从 `AURAXIS_PROMPT_VARIANT_FILE` 指向的文件读取，**插在 [3]（稳定头之后）**，
+ * 绝不进 [0] 的静态前缀 —— 那一段的字节稳定性是缓存命中的全部依据，往里塞任何随环境
+ * 变化的东西都会让每次请求退化成 cache miss。
+ *
+ * 读取结果按**路径**缓存（进程内一次），因此同一进程内改文件不会中途生效；评测每个
+ * 用例都是一次新进程，这正是我们要的语义。
+ *
+ * 生效时打一条日志：一个能悄悄改产品提示词的环境变量必须留痕，否则"为什么这次回答
+ * 不一样"会极难查。
+ */
+const variantCache = new Map<string, string | null>();
+
+export function resolvePromptVariant(env: NodeJS.ProcessEnv = process.env): string | null {
+  const file = (env.AURAXIS_PROMPT_VARIANT_FILE || '').trim();
+  if (!file) return null;
+  if (variantCache.has(file)) return variantCache.get(file)!;
+  let text: string | null = null;
+  try {
+    const content = readFileSync(file, 'utf8').trim();
+    text = content || null;
+    if (text) console.warn(`[context-manager] 已启用提示词变体：${file}`);
+  } catch (err) {
+    console.warn(`[context-manager] 提示词变体文件读取失败，按未启用处理：${file}`, err);
+  }
+  variantCache.set(file, text);
+  return text;
+}
+
+/** Test seam — 清掉变体文本缓存。 */
+export function resetPromptVariantCache(): void {
+  variantCache.clear();
+}
+
+/**
  * Prepare the initial message array with cache-aligned layout:
  *
  *   [0] system: STATIC_SYSTEM_PROMPT        ← cached prefix (never changes)
  *   [1] user: session preamble                ← dynamic but stable within session
  *   [2] user: minimal work guide              ← static work instructions
- *   [3..N] user: chat messages from the user  ← conversation body
+ *   [3] user: prompt variant (opt-in, 实验)    ← 见 resolvePromptVariant
+ *   [4..N] user: chat messages from the user  ← conversation body
+ *
+ * 无变体时 [3] 就是对话首条 —— 变体是**插入**而非占位，不留空消息。
  *
  * The system prompt (index 0) + tools schema (sent via `tools` param) form
  * the immutable cache prefix that DeepSeek matches on every request.
@@ -115,6 +155,8 @@ export function prepareCacheAlignedMessages(params: {
   projectRoot: string;
   isDeepThink?: boolean;
   chatMessages: { role: string; content: LoopMessage['content'] }[];
+  /** 提示词变体；缺省时自动从环境读取（评测脚本按臂设置）。 */
+  promptVariant?: string | null;
 }): LoopMessage[] {
   const preamble = buildSessionPreamble({
     platform: params.platform,
@@ -123,6 +165,8 @@ export function prepareCacheAlignedMessages(params: {
   });
 
   const workGuide = WORK_GUIDE_MESSAGE;
+  const variant = params.promptVariant === undefined ? resolvePromptVariant() : params.promptVariant;
+  const variantMessages: LoopMessage[] = variant ? [{ role: 'user' as const, content: variant }] : [];
 
   const filtered = params.chatMessages.filter((m) => m.role !== 'system');
 
@@ -130,6 +174,7 @@ export function prepareCacheAlignedMessages(params: {
     { role: 'system' as const, content: STATIC_SYSTEM_PROMPT },
     { role: 'user' as const, content: preamble },
     { role: 'user' as const, content: workGuide },
+    ...variantMessages,
     ...filtered,
   ];
 }

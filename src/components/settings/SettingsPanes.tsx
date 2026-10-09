@@ -32,9 +32,13 @@ export function SettingsGeneralPane() {
     deepseekApiKey,
     defaultModel,
     fallbackModel,
+    fastModel,
+    strongModel,
     setApiKey,
     setDefaultModel,
     setFallbackModel,
+    setFastModel,
+    setStrongModel,
     clearApiKeys,
     notificationMode,
     setNotificationMode,
@@ -111,10 +115,10 @@ export function SettingsGeneralPane() {
 
   return (
     <>
-      <SettingsPaneHeader title={t('settings.item.general')} description={t('settings.pane.general.desc')} />
+      <SettingsPaneHeader title={t('settings.item.general')} />
       <SettingsSectionTitle>{t('settings.section.api')}</SettingsSectionTitle>
       <section className="mb-2">
-        <SettingItem title={t('settings.apiKey')} description={t('settings.apiKey.desc')}>
+        <SettingItem title={t('settings.apiKey')}>
           <div className="flex w-full gap-1 p-1 border border-border-default rounded-lg overflow-hidden">
             <Input.Password
               value={deepseekApiKey}
@@ -165,7 +169,7 @@ export function SettingsGeneralPane() {
             </div>
           )}
         </SettingItem>
-        <SettingItem title={t('settings.defaultModel')} description={t('settings.defaultModel.desc')} noBorder>
+        <SettingItem title={t('settings.defaultModel')} noBorder>
           <Select
             value={defaultModel}
             onChange={(val) => {
@@ -186,6 +190,30 @@ export function SettingsGeneralPane() {
             options={[
               { value: '', label: t('settings.fallbackModel.none') },
               ...models.filter((m) => m.id !== defaultModel).map((m) => ({ value: m.id, label: m.name })),
+            ]}
+          />
+        </SettingItem>
+        <SettingItem title={t('settings.fastModel')} description={t('settings.fastModel.desc')} noBorder>
+          <Select
+            value={fastModel}
+            onChange={setFastModel}
+            style={{ width: '100%' }}
+            getPopupContainer={(node) => node.parentElement || document.body}
+            options={[
+              { value: '', label: t('settings.fastModel.none') },
+              ...models.map((m) => ({ value: m.id, label: m.name })),
+            ]}
+          />
+        </SettingItem>
+        <SettingItem title={t('settings.strongModel')} description={t('settings.strongModel.desc')} noBorder>
+          <Select
+            value={strongModel}
+            onChange={setStrongModel}
+            style={{ width: '100%' }}
+            getPopupContainer={(node) => node.parentElement || document.body}
+            options={[
+              { value: '', label: t('settings.strongModel.none') },
+              ...models.map((m) => ({ value: m.id, label: m.name })),
             ]}
           />
         </SettingItem>
@@ -239,7 +267,7 @@ export function SettingsGeneralPane() {
 
       <SettingsSectionTitle>{t('settings.section.notifications')}</SettingsSectionTitle>
       <section className="mb-2">
-        <SettingItem title={t('settings.notify.done')} description={t('settings.notify.done.desc')}>
+        <SettingItem title={t('settings.notify.done')}>
           <Select
             value={notificationMode}
             onChange={(val) => setNotificationMode(val)}
@@ -252,11 +280,7 @@ export function SettingsGeneralPane() {
             ]}
           />
         </SettingItem>
-        <SettingItem
-          title={t('settings.notify.permission')}
-          description={t('settings.notify.permission.desc')}
-          noBorder
-        >
+        <SettingItem title={t('settings.notify.permission')} noBorder>
           <Switch checked={permissionNotifications} onChange={setPermissionNotifications} />
         </SettingItem>
       </section>

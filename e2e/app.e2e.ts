@@ -142,30 +142,68 @@ test('Code 模式顶部工具面板可开合且不被遮挡', async () => {
     .locator('xpath=ancestor::div[contains(@style,"height: 0px")]');
   await expect(closedDrawer).toBeAttached();
 
-  // 工作台面板：打开右侧面板 -> 面板 Tab 可见 -> 再次点击关闭
+  // 工作台面板：打开右侧面板 -> 功能清单可见 -> 再次点击关闭
   await page.getByRole('button', { name: '工作台面板' }).click();
-  const panelTabs = page.getByRole('tablist', { name: '工作台面板' });
-  await expect(panelTabs.getByRole('tab', { name: '文件' })).toBeVisible();
-  await expect(panelTabs.getByRole('tab', { name: '执行详情' })).toBeVisible();
-  await expect(panelTabs.getByRole('tab', { name: '时间线' })).toBeVisible();
-  await expect(panelTabs.getByRole('tab', { name: '审查' })).toBeVisible();
-  await expect(panelTabs.getByRole('tab', { name: '预览' })).toBeVisible();
+  // 顶部 tab 栏已移除：主区固定显示对话。
+  await expect(page.locator('.tab-bar')).toHaveCount(0);
+  const panelMenu = page.getByRole('navigation', { name: '工作台面板' });
+  // 每行的可访问名就是功能名（exact）：行右侧的「新建」另有自己的标签。
+  await expect(panelMenu.getByRole('button', { name: '变更', exact: true })).toBeVisible();
+  await expect(panelMenu.getByRole('button', { name: '文件', exact: true })).toBeVisible();
+  await expect(panelMenu.getByRole('button', { name: '执行详情', exact: true })).toBeVisible();
+  await expect(panelMenu.getByRole('button', { name: '时间线', exact: true })).toBeVisible();
+  await expect(panelMenu.getByRole('button', { name: '预览', exact: true })).toBeVisible();
+  // 审查已并入变更、终端只保留顶栏入口：清单里不再有这两项。
+  await expect(panelMenu.getByRole('button', { name: '审查', exact: true })).toHaveCount(0);
+  await expect(panelMenu.getByRole('button', { name: '终端', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: '工作台面板' }).click();
-  await expect(panelTabs.getByRole('tab', { name: '文件' })).toBeHidden();
+  await expect(panelMenu.getByRole('button', { name: '文件', exact: true })).toBeHidden();
 });
 
-test('Code 模式右侧工作台面板 Tab 切换', async () => {
+test('Code 模式右侧工作台面板可进入每个功能并返回清单', async () => {
   await page.getByRole('radio', { name: 'Code' }).click();
   await page.getByRole('button', { name: '工作台面板' }).click();
 
-  const panelTabs = page.getByRole('tablist', { name: '工作台面板' });
-  const tabs = ['文件', '执行详情', '时间线', '审查', '预览'];
-  for (const name of tabs) {
-    const tab = panelTabs.getByRole('tab', { name });
-    await tab.click();
-    await expect(tab).toHaveAttribute('aria-selected', 'true');
+  const panelMenu = page.getByRole('navigation', { name: '工作台面板' });
+  // 顶栏也有一个叫「返回」的导航按钮（禁用态），这里只取右面板里的那个。
+  const panelBack = page.locator('[data-pane="right"]').getByRole('button', { name: '返回' });
+  for (const name of ['变更', '文件', '执行详情', '时间线', '预览']) {
+    await panelMenu.getByRole('button', { name, exact: true }).click();
+    await expect(panelBack).toBeVisible();
+    await panelBack.click();
+    await expect(panelMenu.getByRole('button', { name, exact: true })).toBeVisible();
   }
 
+  await page.getByRole('button', { name: '工作台面板' }).click();
+});
+
+test('右侧面板：每个功能都能新建，分栏是左右并排', async () => {
+  await page.getByRole('radio', { name: 'Code' }).click();
+  await page.getByRole('button', { name: '工作台面板' }).click();
+
+  const panelMenu = page.getByRole('navigation', { name: '工作台面板' });
+  // 已接入真实后端的每个功能都带「新建」；缺 runtime 的两个是锁定态（无新建）。
+  await expect(panelMenu.getByRole('button', { name: /在新的一栏打开/ })).toHaveCount(8);
+  await expect(panelMenu.getByRole('button', { name: 'Computer Use', exact: true })).toBeDisabled();
+  await expect(panelMenu.getByRole('button', { name: 'Pull Request', exact: true })).toBeDisabled();
+
+  await panelMenu.getByRole('button', { name: '在新的一栏打开「文件」' }).click();
+
+  const pane1 = page.locator('#root [data-pane="1"]');
+  const pane2 = page.locator('#root [data-pane="2"]');
+  await expect(pane2).toBeVisible();
+  // 面板宽度有 300ms 过渡：等它停下来再量几何，避免量到动画中间帧。
+  await page.waitForTimeout(450);
+
+  // 左右并排：同一水平线，第二栏贴在第一栏右侧（不是上下堆叠）
+  const box1 = await pane1.boundingBox();
+  const box2 = await pane2.boundingBox();
+  expect(box1 && box2).toBeTruthy();
+  expect(Math.abs((box2?.y ?? 0) - (box1?.y ?? 0))).toBeLessThan(8);
+  expect(box2?.x ?? 0).toBeGreaterThanOrEqual((box1?.x ?? 0) + (box1?.width ?? 0) - 1);
+
+  // 详情头部同样有「新建」：再开一栏时替换第二栏内容
+  await expect(page.locator('[data-pane="1"]')).toBeVisible();
   await page.getByRole('button', { name: '工作台面板' }).click();
 });
 
@@ -187,15 +225,9 @@ test('Code 模式侧边栏工具面板可打开', async () => {
 
   // 技能目录
   await sidebar.getByRole('button', { name: '技能' }).click();
-  await expect(page.getByRole('dialog')).toBeVisible();
-  await page.keyboard.press('Escape');
-  await expect(page.getByRole('dialog'))
-    .toBeHidden({ timeout: 3000 })
-    .catch(async () => {
-      // 满载时偶发：Esc 未命中弹窗键盘监听，兜底点关闭按钮，避免 CI 偶发红。
-      await page.locator('.ant-modal-close').click();
-      await expect(page.getByRole('dialog')).toBeHidden();
-    });
+  await expect(page.getByRole('heading', { name: '技能目录' })).toBeVisible();
+  await sidebar.getByRole('button', { name: '技能' }).click();
+  await expect(page.getByRole('heading', { name: '技能目录' })).toBeHidden();
 });
 
 test('输入区模型选择与思考深度面板联动', async () => {

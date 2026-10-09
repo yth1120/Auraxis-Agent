@@ -36,12 +36,48 @@ export interface WorkDelivery {
   summary?: string;
 }
 
+/** MCP 传输方式：本地 stdio 子进程，或远程 Streamable HTTP 端点。 */
+export type MCPTransportKind = 'stdio' | 'http';
+
+/**
+ * 远程 MCP 访问令牌的凭据名。
+ *
+ * 令牌**不写进配置**（配置会落 localStorage），而是存进 safeStorage 加密的凭据库；
+ * 配置里只保留 serverId，主进程按同一规则推导凭据名后取出注入 Authorization 头。
+ */
+export function mcpTokenCredentialName(serverId: string): string {
+  return `MCP_TOKEN_${(serverId || 'server').replace(/[^A-Za-z0-9]/g, '_').toUpperCase()}`;
+}
+
+/** OAuth 相关凭据名（令牌 / 动态客户端注册信息 / PKCE verifier），同样只存加密凭据库。 */
+export function mcpOAuthCredentialNames(serverId: string): {
+  tokens: string;
+  client: string;
+  verifier: string;
+} {
+  const base = (serverId || 'server').replace(/[^A-Za-z0-9]/g, '_').toUpperCase();
+  return {
+    tokens: `MCP_OAUTH_TOKENS_${base}`,
+    client: `MCP_OAUTH_CLIENT_${base}`,
+    verifier: `MCP_OAUTH_VERIFIER_${base}`,
+  };
+}
+
 export interface MCPServerConfig {
   id: string;
   name: string;
+  /** stdio 传输的启动命令；http 传输时留空。 */
   command: string;
   args: string[];
   env?: Record<string, string>;
+  /** 传输方式；缺省时按是否提供 `url` 推断（有 url 走 http，否则 stdio）。 */
+  transport?: MCPTransportKind;
+  /** Streamable HTTP 端点（仅 http 传输）。默认只允许 https，localhost/127.0.0.1 例外。 */
+  url?: string;
+  /** 远程端点的额外请求头（例如自建网关的静态令牌）。 */
+  headers?: Record<string, string>;
+  /** 启用 OAuth（PKCE + 动态客户端注册）：连接时若服务端要求授权，会打开浏览器走授权码流程。 */
+  oauth?: boolean;
   /** 仅为 DeepSeek Harness 预设启用：把 Auraxis 中已保存的 DeepSeek Key
    *  注入该 MCP 子进程，避免把密钥复制到 localStorage。 */
   useAuraxisDeepSeekKey?: boolean;
@@ -63,6 +99,18 @@ export interface MCPStatus {
   connected: boolean;
   toolCount: number;
   error?: string;
+  /** 服务端自报的实现名与版本（来自 initialize 结果），连接成功后才有。 */
+  serverName?: string;
+  serverVersion?: string;
+  /** 服务端是否声明 tools 能力。 */
+  supportsTools?: boolean;
+  /** 服务端是否会在工具列表变化时推送 tools/list_changed（客户端会据此自动刷新）。 */
+  toolListChanged?: boolean;
+  /**
+   * 服务端在 capabilities.extensions 里声明的扩展名。
+   * 仓库当前不实现任何扩展，这里只如实透出协商结果，供判断是否值得接入。
+   */
+  extensions?: string[];
 }
 
 export interface PermissionRule {

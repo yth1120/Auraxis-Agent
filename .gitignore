@@ -19,6 +19,8 @@ npm-debug.log*
 
 # Coverage
 coverage/
+evals/reports/
+evals/candidates/
 test-results/
 playwright-report/
 
@@ -57,6 +59,7 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .pytest_cache/
+.ruff_cache/
 
 # 用 Auraxis 演练生成的临时项目（不参与构建与单测）
 /test1/
@@ -65,3 +68,6 @@ __pycache__/
 # 论文/文档生成产物（本地脚本输出，不入库）
 .thesis-build/
 .paper-build/
+
+# scripts/ui-preview.mjs 的截图输出（生成物）
+screenshots/

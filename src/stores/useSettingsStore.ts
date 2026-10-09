@@ -23,6 +23,8 @@ export const useSettingsStore = create<SettingsStore>()(
       deepseekApiKeyConfigured: false,
       defaultModel: 'deepseek-flash',
       fallbackModel: '',
+      fastModel: '',
+      strongModel: '',
       projectPath: null,
       notifyOnAgentComplete: true,
       notificationMode: 'always' as const,
@@ -61,6 +63,8 @@ export const useSettingsStore = create<SettingsStore>()(
       partialize: (state) => ({
         defaultModel: state.defaultModel,
         fallbackModel: state.fallbackModel,
+        fastModel: state.fastModel,
+        strongModel: state.strongModel,
         projectPath: state.projectPath,
         notifyOnAgentComplete: state.notifyOnAgentComplete,
         notificationMode: state.notificationMode,

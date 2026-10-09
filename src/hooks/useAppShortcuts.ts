@@ -23,7 +23,7 @@ function focusPane(name: string): void {
 }
 
 /** 打开右侧面板的某个视图（Chat 模式下不生效）。 */
-function openRightPanelView(view: 'inspector' | 'review' | 'preview' | 'timeline'): void {
+function openRightPanelView(view: 'inspector' | 'diff' | 'preview' | 'timeline' | 'summary' | 'plan' | 'file-tree'): void {
   if (useAppStore.getState().sidebarMode === 'chat') return;
   const app = useAppStore.getState();
   app.setRightPanelView(view);
@@ -44,7 +44,8 @@ function confirmClearChat(): void {
 }
 
 /** 描述 → 动作。返回 undefined 表示该绑定未注册动作。 */
-const SHORTCUT_ACTIONS: Record<string, ShortcutHandler> = {
+/** 导出供一致性用例使用：`binding.description` 同时是显示文案的查表键与这里的派发键。 */
+export const SHORTCUT_ACTIONS: Record<string, ShortcutHandler> = {
   清空对话: (e) => {
     e.preventDefault();
     confirmClearChat();
@@ -74,9 +75,9 @@ const SHORTCUT_ACTIONS: Record<string, ShortcutHandler> = {
     e.preventDefault();
     openRightPanelView('inspector');
   },
-  '右侧面板：审查': (e) => {
+  '右侧面板：变更': (e) => {
     e.preventDefault();
-    openRightPanelView('review');
+    openRightPanelView('diff');
   },
   '右侧面板：预览': (e) => {
     e.preventDefault();
@@ -85,6 +86,18 @@ const SHORTCUT_ACTIONS: Record<string, ShortcutHandler> = {
   '右侧面板：时间线': (e) => {
     e.preventDefault();
     openRightPanelView('timeline');
+  },
+  '右侧面板：概览': (e) => {
+    e.preventDefault();
+    openRightPanelView('summary');
+  },
+  '右侧面板：计划': (e) => {
+    e.preventDefault();
+    openRightPanelView('plan');
+  },
+  '右侧面板：文件': (e) => {
+    e.preventDefault();
+    openRightPanelView('file-tree');
   },
   打开集成终端: (e) => {
     e.preventDefault();

@@ -23,12 +23,12 @@ export function MemoryAudit({ audit }: { audit: BeliefAuditPayload | undefined }
           {audit.belief.status}
         </Tag>
         {audit.belief.legacy === 1 && <Tag style={{ fontSize: 10 }}>{t('mem.audit.legacy')}</Tag>}
-        <span className="text-2xs text-muted">
+        <span className="text-2xs text-text-muted">
           {t('mem.audit.support')}: {audit.evidence[0]?.support_strength?.toFixed(2) ?? '0'}
         </span>
       </div>
       {audit.evidence.length === 0 ? (
-        <p className="m-0 text-xs text-muted">{t('mem.audit.noEvidence')}</p>
+        <p className="m-0 text-xs text-text-muted">{t('mem.audit.noEvidence')}</p>
       ) : (
         <div className="space-y-2">
           {audit.evidence.slice(0, 5).map((item) => (
@@ -36,11 +36,11 @@ export function MemoryAudit({ audit }: { audit: BeliefAuditPayload | undefined }
               key={item.evidence.id}
               className="px-2 py-1.5 rounded-md bg-[var(--color-bg-secondary)] border border-[var(--color-border-dim)]"
             >
-              <div className="text-2xs text-muted mb-1">
+              <div className="text-2xs text-text-muted mb-1">
                 [{item.evidence.role}] {new Date(item.evidence.ts).toLocaleString()} · {t('mem.audit.support')}{' '}
                 {item.support_strength.toFixed(2)}
               </div>
-              <p className="m-0 text-xs leading-[1.6] text-secondary break-words">
+              <p className="m-0 text-xs leading-[1.6] text-text-secondary break-words">
                 {item.evidence.content.slice(0, 300)}
               </p>
               {item.signals.length > 0 && (
@@ -58,11 +58,11 @@ export function MemoryAudit({ audit }: { audit: BeliefAuditPayload | undefined }
       )}
       {audit.revisions.length > 0 && (
         <div className="mt-2">
-          <div className="text-2xs text-muted mb-1 flex items-center gap-1">
+          <div className="text-2xs text-text-muted mb-1 flex items-center gap-1">
             <HistoryOutlined size={12} /> {t('mem.audit.revisions')}
           </div>
           {audit.revisions.slice(-5).map((revision) => (
-            <div key={`${revision.ts}-${revision.next_status}`} className="text-2xs text-secondary">
+            <div key={`${revision.ts}-${revision.next_status}`} className="text-2xs text-text-secondary">
               {revision.prev_status || '-'} → {revision.next_status} · {revision.reason || ''} ·{' '}
               {new Date(revision.ts).toLocaleString()}
             </div>
@@ -94,22 +94,22 @@ export function MemoryEvidenceList({
             <div
               key={item.id}
               className={clsx(
-                'px-3 py-2 rounded-md mb-2 bg-secondary border border-dim cursor-pointer transition-colors duration-fast hover:bg-accent-soft',
+                'px-3 py-2 rounded-md mb-2 bg-bg-secondary border border-border-dim cursor-pointer transition-colors duration-150 hover:bg-accent-soft',
                 expanded && 'border-primary',
               )}
               onClick={() => onToggle(item.id)}
             >
               <div className="flex items-center gap-2">
                 <Tag style={{ fontSize: 10 }}>{item.role}</Tag>
-                <span className="text-xs text-secondary truncate flex-1">{item.content.slice(0, 120)}</span>
-                <span className="text-2xs text-muted shrink-0">{new Date(item.ts).toLocaleString()}</span>
+                <span className="text-xs text-text-secondary truncate flex-1">{item.content.slice(0, 120)}</span>
+                <span className="text-2xs text-text-muted shrink-0">{new Date(item.ts).toLocaleString()}</span>
               </div>
               {expanded && (
                 <div className="mt-2 pt-2 border-t border-[var(--color-border-dim)]">
-                  <p className="m-0 mb-2 text-xs leading-[1.6] text-secondary whitespace-pre-wrap break-words">
+                  <p className="m-0 mb-2 text-xs leading-[1.6] text-text-secondary whitespace-pre-wrap break-words">
                     {item.content}
                   </p>
-                  <div className="text-2xs text-muted">
+                  <div className="text-2xs text-text-muted">
                     hash: {item.content_hash.slice(0, 16)}… · {item.session_id || '-'}
                   </div>
                 </div>
@@ -141,7 +141,7 @@ export function MemoryDiagnostics({
     <div className="flex-1 overflow-y-auto px-3 pb-3">
       <div className="flex gap-2 mb-3">
         <Input
-          prefix={<SearchOutlined className="text-muted" />}
+          prefix={<SearchOutlined className="text-text-muted" />}
           placeholder={t('mem.diag.queryPlaceholder')}
           value={query}
           onChange={(event) => onQueryChange(event.target.value)}
@@ -156,30 +156,30 @@ export function MemoryDiagnostics({
         <EmptyState title={t('mem.diag.emptyTitle')} description={t('mem.diag.emptyHint')} />
       ) : (
         <div className="space-y-3">
-          <div className="px-3 py-2 rounded-md bg-secondary border border-dim">
+          <div className="px-3 py-2 rounded-md bg-bg-secondary border border-border-dim">
             <div className="text-xs font-medium text-text-primary mb-1 flex items-center gap-1">
               <EyeOutlined size={14} /> {t('mem.diag.routes')}
             </div>
             {diagnostics.routes.map((route) => (
               <div key={route.route} className="flex items-center justify-between text-xs py-0.5">
-                <span className="text-secondary">
+                <span className="text-text-secondary">
                   {route.route}
                   {route.skipped ? ' (skipped)' : ''}
                 </span>
-                <span className="text-muted">
+                <span className="text-text-muted">
                   {route.hits} hits · {route.latencyMs}ms
                 </span>
               </div>
             ))}
             <div className="flex items-center justify-between text-xs py-0.5 border-t border-[var(--color-border-dim)] mt-1 pt-1">
-              <span className="text-secondary">{t('mem.diag.budget')}</span>
-              <span className="text-muted">
+              <span className="text-text-secondary">{t('mem.diag.budget')}</span>
+              <span className="text-text-muted">
                 {diagnostics.budget.used}/{diagnostics.budget.allocated} tokens
                 {diagnostics.budget.truncated ? ' · truncated' : ''}
               </span>
             </div>
           </div>
-          <div className="px-3 py-2 rounded-md bg-secondary border border-dim">
+          <div className="px-3 py-2 rounded-md bg-bg-secondary border border-border-dim">
             <div className="text-xs font-medium text-text-primary mb-1">{t('mem.diag.flags')}</div>
             {[
               ['missingEvidence', diagnostics.missingEvidence],
@@ -188,7 +188,7 @@ export function MemoryDiagnostics({
               ['retrievalLoss', diagnostics.retrievalLoss],
             ].map(([flagKey, flagValue]) => (
               <div key={String(flagKey)} className="flex items-center justify-between text-xs py-0.5">
-                <span className="text-secondary">{String(flagKey)}</span>
+                <span className="text-text-secondary">{String(flagKey)}</span>
                 <span className={flagValue ? 'text-[var(--color-danger)]' : 'text-[var(--color-success)]'}>
                   {flagValue ? 'true' : 'false'}
                 </span>
@@ -196,10 +196,10 @@ export function MemoryDiagnostics({
             ))}
           </div>
           {result.context.length > 0 && (
-            <div className="px-3 py-2 rounded-md bg-secondary border border-dim">
+            <div className="px-3 py-2 rounded-md bg-bg-secondary border border-border-dim">
               <div className="text-xs font-medium text-text-primary mb-1">{t('mem.diag.facts')}</div>
               {result.facts.slice(0, 10).map((fact, index) => (
-                <p key={index} className="m-0 text-xs text-secondary leading-[1.6] break-words">
+                <p key={index} className="m-0 text-xs text-text-secondary leading-[1.6] break-words">
                   {fact}
                 </p>
               ))}
@@ -249,7 +249,7 @@ export function MemoryList({
             <div
               key={item.id}
               className={clsx(
-                'px-3 py-2 rounded-md mb-2 bg-secondary border border-dim cursor-pointer transition-colors duration-fast hover:bg-accent-soft',
+                'px-3 py-2 rounded-md mb-2 bg-bg-secondary border border-border-dim cursor-pointer transition-colors duration-150 hover:bg-accent-soft',
                 expanded && 'border-primary',
               )}
               onClick={() => onToggle(item.id)}
@@ -272,7 +272,7 @@ export function MemoryList({
               </div>
               {expanded && (
                 <div className="mt-2 pt-2 border-t border-[var(--color-border-dim)]">
-                  <p className="m-0 mb-2 text-xs leading-[1.6] text-secondary whitespace-pre-wrap break-word">
+                  <p className="m-0 mb-2 text-xs leading-[1.6] text-text-secondary whitespace-pre-wrap break-word">
                     {item.content}
                   </p>
                   {tags.length > 0 && (
@@ -284,7 +284,7 @@ export function MemoryList({
                       ))}
                     </div>
                   )}
-                  <div className="text-xs text-muted mb-1">{new Date(item.timestamp).toLocaleString()}</div>
+                  <div className="text-xs text-text-muted mb-1">{new Date(item.timestamp).toLocaleString()}</div>
                   <MemoryAudit audit={auditMap[item.id]} />
                   <div className="flex gap-1 mt-2">
                     <Button

@@ -1,5 +1,5 @@
 /** agent-scheduler-permission.ts — unattended permission checker. */
-import { BrowserWindow } from 'electron';
+import { createElectronSchedulerNotifier } from './agent-scheduler-notifier';
 import { requestPermission } from './permission-handlers';
 import { normalizeApprovalPolicy } from '../contracts/core';
 import type { AgentConfig } from './agent-scheduler-types';
@@ -13,10 +13,10 @@ export function createUnattendedPermissionChecker(
   projectPath: string,
 ): (toolName: string, input: Record<string, unknown>, toolCallId?: string, agentId?: string) => Promise<boolean> {
   return async (toolName, input, toolCallId, agentId) => {
-    const win = BrowserWindow.getAllWindows()[0] || null;
-    if (!win || win.isDestroyed()) return false;
+    const notifier = createElectronSchedulerNotifier();
+    if (!notifier || !notifier.isAlive()) return false;
     const isReviewGate = toolName === 'ReviewArtifact' && input?.action === 'continue_after_failed_review';
-    return requestPermission(toolName, input, win, toolCallId, {
+    return requestPermission(toolName, input, notifier, toolCallId, {
       mode: isReviewGate || config.workTier === 'full' ? 'ask' : normalizeApprovalPolicy(config.mode ?? 'ask'),
       approvedPlanSteps: config.approvedPlanSteps,
       projectRoot: projectPath,

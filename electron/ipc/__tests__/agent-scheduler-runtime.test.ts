@@ -54,6 +54,14 @@ vi.mock('../agent-subagent-registry', () => ({
   getSubAgentStates: vi.fn(() => []),
   sendMessageToSubAgent: vi.fn(() => ({ ok: false, error: '子代理不存在' })),
 }));
+const stats = vi.hoisted(() => ({ trackTokens: vi.fn(async () => {}) }));
+vi.mock('../stats-handlers', () => ({
+  trackTokens: stats.trackTokens,
+  trackToolCall: vi.fn(async () => {}),
+  trackLinesGenerated: vi.fn(async () => {}),
+  trackSession: vi.fn(async () => {}),
+  trackMessage: vi.fn(async () => {}),
+}));
 vi.mock('../agent-defs', () => ({
   getAgentDef: vi.fn(() => ({
     getSystemPrompt: (task: string) => `SYS:${task}`,
@@ -87,6 +95,9 @@ import { appendAgentLog } from '../../session-log';
 import { readSettings } from '../settings-store';
 import { getSubAgentStates, getAgentDef } from '../agent-handlers';
 import { ptyRegistry } from '../pty-tool';
+import { configureSchedulerHost, resetSchedulerHost } from '../agent-scheduler-ports';
+import { recordApproval, resetApprovalLedger } from '../approval-ledger';
+import type { AgentTraceRun } from '../../contracts/agent-trace';
 
 import { installAgentRuntimePorts } from '../runtime-ports';
 
@@ -132,11 +143,27 @@ beforeEach(async () => {
     .mockReset()
     .mockResolvedValue(null as any);
   vi.mocked(loadAgentSnapshots).mockReset().mockResolvedValue([]);
+  // 宿主端口是模块级状态：每个用例回到 Electron 默认实现。
+  resetSchedulerHost();
+  // 审批台账同样是模块级状态。
+  resetApprovalLedger();
   vi.mocked(getSubAgentStates).mockReset().mockReturnValue([]);
   vi.mocked(getAgentDef).mockClear();
   vi.mocked(saveAgentSnapshot).mockClear();
   vi.mocked(appendAgentLog).mockClear();
   vi.mocked(ptyRegistry.clearOwner).mockClear();
+  stats.trackTokens.mockClear();
+});
+
+describe('AgentScheduler — 用量记账', () => {
+  it('引擎的 usage 事件会进统计（此前只广播给前端）', async () => {
+    scheduler.startAgent(makeCfg(), projectRoot);
+    await vi.waitFor(() => expect(h.loops).toHaveLength(1));
+
+    h.loops[0].opts.observer.emit({ type: 'usage', inputTokens: 1200, outputTokens: 340 });
+
+    await vi.waitFor(() => expect(stats.trackTokens).toHaveBeenCalledWith(1200, 340));
+  });
 });
 
 describe('AgentScheduler — 启动与生命周期', () => {
@@ -594,6 +621,66 @@ describe('AgentScheduler — 清理与持久化', () => {
     // 重复 id 跳过
     await scheduler.restoreSnapshots();
     expect(scheduler.getAgentInstances()).toHaveLength(1);
+  });
+
+  // 宿主端口注入缝：换掉整张表后核心必须走注入实现，且不再触碰真实宿主模块。
+  // 这是无头环境（SDK / CLI）与测试能够不依赖 electron / PTY / FTS / settings 的前提。
+  it('注入宿主端口后核心改走注入实现，真实宿主模块不被触碰', async () => {
+    const injected = {
+      createNotifier: () => null,
+      loadSnapshots: vi.fn(async () => []),
+      readSettings: vi.fn(async () => ({})),
+      clearPtyOwner: vi.fn(),
+      removeSnapshot: vi.fn(async () => {}),
+      removeSearchDoc: vi.fn(async () => {}),
+      exportTrace: vi.fn(async () => {}),
+    };
+    configureSchedulerHost(injected);
+    vi.mocked(loadAgentSnapshots).mockClear();
+    vi.mocked(readSettings).mockClear();
+
+    await scheduler.restoreSnapshots();
+    scheduler.pruneStale();
+
+    expect(injected.loadSnapshots).toHaveBeenCalled();
+    // 真实宿主模块一次都没被碰到。
+    expect(loadAgentSnapshots).not.toHaveBeenCalled();
+    expect(readSettings).not.toHaveBeenCalled();
+    expect(vi.mocked(ptyRegistry.clearOwner)).not.toHaveBeenCalled();
+  });
+
+  // 轨迹导出时机：Agent 进入终止态时把投影后的轨迹交给宿主端口，且同一 Agent 只导一次
+  // （notifyTerminal 有多条调用路径，重复导出会在后端产生重复 span）。
+  it('Agent 终止时把轨迹交给宿主导出，且同一个 Agent 只导出一次', async () => {
+    const exportTrace = vi.fn(async (_run: AgentTraceRun) => {});
+    configureSchedulerHost({
+      createNotifier: () => null,
+      loadSnapshots: vi.fn(async () => []),
+      readSettings: vi.fn(async () => ({})),
+      clearPtyOwner: vi.fn(),
+      removeSnapshot: vi.fn(async () => {}),
+      removeSearchDoc: vi.fn(async () => {}),
+      exportTrace,
+    });
+
+    const id = scheduler.startAgent(makeCfg({ name: 'TraceTarget' }), projectRoot);
+    await vi.waitFor(() => expect(h.loops).toHaveLength(1));
+    // 模拟权限通道在决策点写入审批（真实路径见 permission-handlers 的三处 recordApproval）。
+    recordApproval(id, 'Bash', 'requested', 1000);
+    recordApproval(id, 'Bash', 'granted', 1100);
+    h.loops[0].resolve(settledLoop());
+    await vi.waitFor(() => expect(exportTrace).toHaveBeenCalledTimes(1));
+
+    const run = exportTrace.mock.calls[0][0];
+    expect(run.sessionId).toBe(id);
+    expect(run.status).toBe('completed');
+    // 投影确实带上了统计（具体条数取决于日志，不作强断言以免脆化）。
+    expect(typeof run.stats.turns).toBe('number');
+    // 审批由调用方注入投影（不在 Agent 日志里），必须随轨迹一起交出去。
+    expect(run.approvals).toEqual([
+      { id: 'approval-1', toolName: 'Bash', at: 1000, status: 'requested' },
+      { id: 'approval-2', toolName: 'Bash', at: 1100, status: 'granted' },
+    ]);
   });
 });
 

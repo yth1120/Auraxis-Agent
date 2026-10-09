@@ -89,6 +89,36 @@ describe('InputDock — Todo / Goal / Queue 三段式', () => {
     expect(useChatStore.getState().agentQueue.map((q) => q.text)).toEqual(['第二条排队消息', '第三条排队消息']);
   });
 
+  it('点击面板外部收起展开的队列列表', () => {
+    const { container } = render(<InputDock onSendNow={() => {}} />);
+    const queueToggle = [...container.querySelectorAll('button')].find((b) => b.textContent?.includes('排队消息'))!;
+    fireEvent.click(queueToggle);
+    expect(container.textContent).toContain('第一条排队消息');
+
+    // 点击输入框之外的任意位置都应收起。
+    fireEvent.mouseDown(document.body);
+    expect(container.textContent).not.toContain('第一条排队消息');
+  });
+
+  it('点击面板外部收起展开的任务列表', () => {
+    const { container } = render(<InputDock onSendNow={() => {}} />);
+    const todoToggle = [...container.querySelectorAll('button')].find((b) => b.textContent?.includes('任务'))!;
+    fireEvent.click(todoToggle);
+    expect(container.textContent).toContain('实现排队语义');
+
+    fireEvent.mouseDown(document.body);
+    expect(container.textContent).not.toContain('实现排队语义');
+  });
+
+  it('点击面板内部不收起队列列表', () => {
+    const { container } = render(<InputDock onSendNow={() => {}} />);
+    const queueToggle = [...container.querySelectorAll('button')].find((b) => b.textContent?.includes('排队消息'))!;
+    fireEvent.click(queueToggle);
+
+    fireEvent.mouseDown(queueToggle);
+    expect(container.textContent).toContain('第一条排队消息');
+  });
+
   it('renders nothing when Todo/Goal/Queue are all empty', () => {
     act(() => {
       useAgentStore.setState({ agents: [], currentAgentId: null });

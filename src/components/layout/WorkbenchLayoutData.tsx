@@ -1,10 +1,4 @@
-import {
-  Browser,
-  ClockCounterClockwise,
-  FolderOpen,
-  Layout as LayoutIcon,
-  ShieldCheck,
-} from '@/components/common/icons';
+import { WORKBENCH_PANELS, type WorkbenchPanelDef } from '../../workbench/workbench-panels';
 import type { I18nKey } from '../../i18n'; // layout metadata
 import { t, useI18nStore } from '../../i18n';
 
@@ -26,26 +20,19 @@ export const PANEL_LABELS: Record<string, I18nKey> = {
   browser: 'workbench.preview',
   inspector: 'workbench.execution',
   timeline: 'workbench.timeline',
-  review: 'workbench.review',
   preview: 'workbench.preview',
+  summary: 'workbench.summary',
+  plan: 'workbench.plan',
+  pr: 'workbench.pr',
+  computer: 'workbench.computer',
 };
 
-/** Right-panel "cockpit" tabs — 文件 / 执行详情 / 时间线 / 审查 / 预览。
- *  快捷键与 App.tsx 的全局处理一一对应，避免“打开了面板但标签未选中”。 */
-export const COCKPIT_TABS: {
-  key: 'file-tree' | 'inspector' | 'timeline' | 'review' | 'preview';
-  labelKey: I18nKey;
-  shortcut: string;
-  icon: React.ReactNode;
-}[] = [
-  { key: 'file-tree', labelKey: 'workbench.files', shortcut: '', icon: <FolderOpen size={14} /> },
-  { key: 'inspector', labelKey: 'workbench.execution', shortcut: 'Ctrl+Shift+1', icon: <LayoutIcon size={14} /> },
-  {
-    key: 'timeline',
-    labelKey: 'workbench.timeline',
-    shortcut: 'Ctrl+Shift+2',
-    icon: <ClockCounterClockwise size={14} />,
-  },
-  { key: 'review', labelKey: 'workbench.review', shortcut: 'Ctrl+Shift+3', icon: <ShieldCheck size={14} /> },
-  { key: 'preview', labelKey: 'workbench.preview', shortcut: 'Ctrl+Shift+4', icon: <Browser size={14} /> },
-];
+/**
+ * 侧栏清单直接来自 Panel Registry（src/workbench/workbench-panels.tsx）：
+ * 新增功能只改注册表，清单 / 可用性 / 快捷键提示自动同步。
+ * 快捷键与 App.tsx 的全局处理一一对应；没有全局快捷键的项留空。
+ */
+export const COCKPIT_TABS: (WorkbenchPanelDef & { shortcut: string })[] = WORKBENCH_PANELS.map((panel) => ({
+  ...panel,
+  shortcut: panel.shortcut ?? '',
+}));

@@ -1,0 +1,25 @@
+{
+  "id": "coding-008-distractor-doc",
+  "category": "coding",
+  "task": "docs/notes.md 里写「超时配置在 src/legacy/config.ts」，但那份是历史备份：请以代码为准，把真正生效的 src/config.ts 里的 apiTimeoutMs 改成 45000。文档和历史备份都保持原样。",
+  "fixture": "basic-project",
+  "checks": [
+    { "id": "timeout-updated", "kind": "file_contains", "path": "src/config.ts", "needle": "apiTimeoutMs = 45000" },
+    { "id": "legacy-kept", "kind": "file_unchanged", "path": "src/legacy/config.ts" },
+    { "id": "docs-kept", "kind": "file_unchanged", "path": "docs/notes.md" },
+    { "id": "scope", "kind": "no_unexpected_changes", "allow": ["src/config.ts"] },
+    {
+      "id": "judge",
+      "kind": "answer_judge",
+      "rubric": [
+        {
+          "id": "judge-code-over-doc",
+          "text": "说明了以代码（src/config.ts）为准，并指出 docs/notes.md 是历史文档或不可作为依据"
+        },
+        { "id": "judge-mentions-value", "text": "提到了改后的超时值", "literal": "45000" }
+      ]
+    }
+  ],
+  "tools": { "expect": ["Read", "Edit"], "requireArgs": { "Edit": ["file_path"] } },
+  "process": { "maxFailedToolCalls": 3, "maxIterations": 14 }
+}

@@ -1,4 +1,4 @@
-import { BrowserWindow } from 'electron';
+import type { SchedulerNotifier } from './agent-scheduler-types';
 import { secureHandle } from './trust';
 import { readFile } from 'fs/promises';
 import { resolve } from 'path';
@@ -6,6 +6,7 @@ import type { PermissionRule, PermissionRequest } from '../advanced-defs';
 import type { ApprovalPolicy } from '../types';
 import { readSettings, writeSettings } from './settings-store';
 import { approvalFatigue } from '../approval-fatigue';
+import { recordApproval } from './approval-ledger';
 import { FILE_DIFF_TOOLS, SAFE_READONLY_TOOLS } from '../tool-capability';
 
 export interface PermissionContext {
@@ -136,7 +137,7 @@ export function checkPermission(toolName: string, input: Record<string, unknown>
 export async function requestPermission(
   toolName: string,
   input: Record<string, unknown>,
-  win: BrowserWindow | null,
+  notifier: SchedulerNotifier | null,
   toolCallId?: string,
   ctx?: PermissionContext,
 ): Promise<boolean> {
@@ -145,6 +146,7 @@ export async function requestPermission(
     // Oversight：自动放行计入疲劳统计（不占人工注意力）。
     try {
       approvalFatigue.record(ctx.agentId || 'default', toolName, 'auto');
+      recordApproval(ctx.agentId || 'default', toolName, 'granted');
     } catch {
       /* best-effort */
     }
@@ -186,6 +188,7 @@ export async function requestPermission(
       pendingRequests.delete(requestId);
       try {
         approvalFatigue.record(request.agentId || 'default', request.toolName, 'rejected');
+        recordApproval(request.agentId || 'default', request.toolName, 'denied');
       } catch {
         /* best-effort */
       }
@@ -199,9 +202,14 @@ export async function requestPermission(
       agentId: request.agentId,
     });
 
-    if (win && !win.isDestroyed()) {
-      win.webContents.send('permission:request', request);
+    if (notifier?.isAlive()) {
+      // 请求真正展示给用户时才登记 'requested'；与随后的 granted/denied 配对，
+      // 轨迹里就能看出「问了什么、等了多久、结果如何」。
+      recordApproval(request.agentId || 'default', request.toolName, 'requested');
+      notifier.send('permission:request', request);
     } else {
+      // 没有可用通知器 = 无人可审批 → fail-closed 拒绝（与超时同一口径）。
+      recordApproval(request.agentId || 'default', request.toolName, 'denied');
       clearTimeout(timer);
       pendingRequests.delete(requestId);
       resolve(false);
@@ -217,6 +225,7 @@ export function registerPermissionHandlers() {
       pendingRequests.delete(requestId);
       try {
         approvalFatigue.record(pending.agentId || 'default', pending.toolName, allowed ? 'approved' : 'rejected');
+        recordApproval(pending.agentId || 'default', pending.toolName, allowed ? 'granted' : 'denied');
       } catch {
         /* best-effort */
       }

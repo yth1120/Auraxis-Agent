@@ -133,6 +133,9 @@ function createSessionCrudActions(set: SetState, get: GetState): Pick<SessionSto
       set((s) => ({
         sessions: s.sessions.map((ses) => (ses.id === id ? { ...ses, archived } : ses)),
       }));
+      // 必须写进权威 meta：只改本地的话，启动时 `syncFromLogs` 的重投影会把它覆盖掉，
+      // 用户看到的是"归档过的会话又回到列表里"。`pinned` 一直是这么做的，归档漏了这一步。
+      pushSessionMeta(id, { archived });
       if (archived && get().currentSessionId === id) set({ currentSessionId: null });
     },
 
@@ -243,7 +246,12 @@ function createSessionLifecycleActions(set: SetState, get: GetState): Pick<Sessi
           if (!local || local.messages.length < sum.messageCount) {
             const projRes = await api.project(sum.id);
             if (projRes.ok && projRes.data) {
-              refreshed.set(sum.id, projectedToSession(projRes.data));
+              const next = projectedToSession(projRes.data);
+              // 日志权威，但**只在它确实知道的时候**：`archived` 可能从未写进 meta
+              // （修复前归档过的会话、或那次 push 失败）。此时保留本地值，
+              // 否则整体替换会把归档状态静默抹掉 —— 那正是这个字段以前丢失的原因。
+              // 注意用 `??` 而不是 `||`：取消归档写的是 `false`，不能被当作"没有"。
+              refreshed.set(sum.id, { ...next, archived: projRes.data.archived ?? local?.archived });
               continue;
             }
           }

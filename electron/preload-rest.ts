@@ -19,6 +19,12 @@ export function createRestApi() {
         invoke('undo:revertSessions', { sessionIds, projectRoot }),
     },
 
+    // 变更审阅的比较范围（未提交 / 整分支）；「本次任务」走上面的 undo:getSessionDiffs。
+    git: {
+      diffScope: (scope: 'uncommitted' | 'branch', projectRoot: string) =>
+        invoke('git:diffScope', { scope, projectRoot }),
+    },
+
     snapshot: {
       create: (projectRoot: string, name: string) => invoke('snapshot:create', projectRoot, name),
       list: (projectRoot: string) => invoke('snapshot:list', projectRoot),
@@ -143,6 +149,15 @@ export function createRestApi() {
       message: (record: { messageId: string; sessionId: string; rating: 'up' | 'down' | null; note?: string }) =>
         invoke('feedback:message', record),
       messageList: (sessionId: string) => invoke('feedback:messageList', sessionId),
+    },
+
+    browser: {
+      /** 上报可被 Agent 驱动的预览目标（webview 的 webContents id）。 */
+      register: (webContentsId: number) => invoke('browser:register', webContentsId),
+      unregister: (webContentsId: number) => invoke('browser:unregister', webContentsId),
+      /** Agent 请求打开某个地址 → 渲染层把预览面板切到前台。 */
+      onOpenRequest: (callback: (payload: { url: string }) => void) =>
+        subscribe('browser:openRequest', (payload) => callback(payload as { url: string })),
     },
 
     sessionTitle: {

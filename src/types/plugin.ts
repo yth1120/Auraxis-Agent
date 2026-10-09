@@ -1,6 +1,10 @@
-/** Plugin system type definitions */
-
-import type { ToolDef } from './tools';
+/**
+ * Plugin system type definitions.
+ *
+ * 渲染层插件**没有工具扩展点**（曾有一个 `tools` 字段，但那些工具进的是无人读取的
+ * 注册表，从未到达模型）。工具必须经主进程管线（权限 / 沙箱 / 审批），由动态插件
+ * （`MountPlugin`）或 MCP 提供。渲染层插件只提供命令、生命周期钩子与 UI 扩展。
+ */
 
 // ─── Extension Points ─────────────────────────────────
 
@@ -42,7 +46,6 @@ export interface Plugin {
   /** Minimum app version required */
   minAppVersion?: string;
   /** Extension points */
-  tools?: ToolDef[];
   commands?: CommandDefinition[];
   hooks?: PluginHooks;
   ui?: PluginUI;

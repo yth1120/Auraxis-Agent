@@ -12,6 +12,7 @@ import { useSessionStore } from './useSessionStore';
 import { useAppStore } from './useAppStore';
 import { useSettingsStore } from './useSettingsStore';
 import { useInspectorStore } from './useInspectorStore';
+import { useActivityStore } from './useActivityStore';
 import { useUndoStore } from './useUndoStore';
 
 export type ChatSetState = (partial: Partial<ChatStore> | ((state: ChatStore) => Partial<ChatStore>)) => void;
@@ -31,6 +32,8 @@ export function createChatMessageActions(deps: ChatMessageActionsDeps) {
     clearMessages: () => {
       if (get().isStreaming) get().stopStreaming();
       useInspectorStore.getState().clear();
+      // 展开态与真实终态都属于"这一批消息"：换会话/清空时必须一起重置，否则会张冠李戴。
+      useActivityStore.getState().resetForSession();
       const sid = useSessionStore.getState().currentSessionId;
       set({
         messages: [],
@@ -56,6 +59,7 @@ export function createChatMessageActions(deps: ChatMessageActionsDeps) {
       const sessionProject = session.projectRoot;
       if (sessionProject) useSettingsStore.getState().setProjectPath(sessionProject);
       useInspectorStore.getState().clear();
+      useActivityStore.getState().resetForSession();
       // 会话自带 mode：打开会话时恢复它自己的模式，避免"Code 会话被强制当 Chat 打开"，
       // 也避免跨能力边界时把历史带进另一条引擎通道。
       const sessionMode = (session as { mode?: 'chat' | 'work' | 'code' }).mode ?? 'chat';

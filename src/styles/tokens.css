@@ -8,6 +8,9 @@
 /* Aura Purple is an accent only (~3% of the UI). The action color is
    brand black; surfaces are cool neutral whites — no warm ivory. */
 :root {
+  /* 无边框主窗口的圆角：窗口以 transparent 创建，系统不画圆角，
+     四角由 body 自绘；最大化时由 html.ax-maximized 归零。 */
+  --ax-window-radius: 12px;
   --color-primary: #111216;
   --color-primary-hover: #292c32;
   --color-primary-active: #3a3e45;
@@ -45,20 +48,27 @@
   --color-text-faint: #61676f;
   --color-text-on-accent: #ffffff;
 
-  --color-border-dim: rgba(30, 35, 42, 0.065);
-  --color-border-default: rgba(30, 35, 42, 0.085);
-  --color-border-strong: rgba(30, 35, 42, 0.13);
+  /* 线框加深：仍用暖炭色而非纯黑，保证深色/浅色下都「看得见但不抢戏」 */
+  --color-border-dim: rgba(28, 32, 38, 0.1);
+  --color-border-default: rgba(28, 32, 38, 0.135);
+  --color-border-strong: rgba(28, 32, 38, 0.19);
   --color-hover: rgba(30, 35, 42, 0.08);
 
-  --color-success: #4f7c68;
-  --color-success-soft: rgba(79, 124, 104, 0.1);
-  --color-danger: #a25b60;
-  --color-danger-soft: rgba(162, 91, 96, 0.1);
-  --color-danger-border: rgba(162, 91, 96, 0.22);
+  /* 状态色：三者在浅色下都曾是「好看但不达标」的中间调 —— warning 在任何底色上
+     只有 2.90~3.40，success/danger 在次要底色与自身 -soft 底上差 0.1~0.45。
+     现值是在**保持色相与饱和度**的前提下，沿明度轴取到的最近达标色（全部 ≥4.5），
+     所以观感仍是同一族颜色，只是深了一档。改动必须三处同改：这里、app.css 的
+     @theme、theme.ts 的 antd 轨。 */
+  --color-success: #497260;
+  --color-success-soft: rgba(73, 114, 96, 0.1);
+  --color-success-border: rgba(73, 114, 96, 0.22);
+  --color-danger: #9a575b;
+  --color-danger-soft: rgba(154, 87, 91, 0.1);
+  --color-danger-border: rgba(154, 87, 91, 0.22);
   --color-danger-lighter: #b06f74;
-  --color-warning: #b97f3e;
-  --color-warning-soft: rgba(185, 127, 62, 0.1);
-  --color-warning-border: rgba(185, 127, 62, 0.24);
+  --color-warning: #8d612f;
+  --color-warning-soft: rgba(141, 97, 47, 0.1);
+  --color-warning-border: rgba(141, 97, 47, 0.24);
 
   --color-code-bg: #f5f6f8;
   --color-surface: #ffffff;
@@ -106,16 +116,19 @@
   --color-text-faint: #9da2a9;
   --color-text-on-accent: #111216;
 
-  --color-border-dim: rgba(62, 67, 76, 0.55);
-  --color-border-default: #2a2e35;
-  --color-border-strong: #383d45;
+  --color-border-dim: rgba(74, 80, 90, 0.62);
+  --color-border-default: #343a43;
+  --color-border-strong: #464d58;
   --color-hover: rgba(241, 241, 238, 0.09);
 
+  /* 深色下只有 danger 不达标（在 bg-elevated 上 3.45）：沿明度轴提亮到 #bf8c90。
+     success / warning 在深色下本就 ≥4.64，不动。 */
   --color-success: #4fae86;
   --color-success-soft: rgba(79, 174, 134, 0.12);
-  --color-danger: #b07177;
-  --color-danger-soft: rgba(176, 113, 119, 0.12);
-  --color-danger-border: rgba(176, 113, 119, 0.24);
+  --color-success-border: rgba(79, 174, 134, 0.24);
+  --color-danger: #bf8c90;
+  --color-danger-soft: rgba(191, 140, 144, 0.12);
+  --color-danger-border: rgba(191, 140, 144, 0.24);
   --color-danger-lighter: #c98e92;
   --color-warning: #b8935a;
   --color-warning-soft: rgba(184, 147, 90, 0.12);
@@ -313,14 +326,16 @@
   background: rgba(255, 255, 255, 0.32);
 }
 
-/* ── Reduced motion — performance & accessibility ────────── */
+/* ── Reduced motion — performance & accessibility ──────────
+ * animation 压到 0.01ms（装饰动效不外显、antd 入场仍能收到 animationend）；
+ * **不压制 transition-duration**：侧栏折叠、模式切换滑块等功能性过渡要保留，
+ * 且 rc-motion 收不到 transitionend 时弹窗会停在透明态（「点了没反应」）。 */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
 }

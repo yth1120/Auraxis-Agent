@@ -36,7 +36,9 @@ export default function QuickActionsPanel() {
   const t = useT();
   return (
     <section className="mb-12 last:mb-0">
-      <div className="mx-auto grid max-w-[720px] grid-cols-4 gap-2.5">
+      {/* 主列窄时降成两列：四列在 480px 下每格只剩 ~96px，中文描述会被省略号吃光。
+          用容器查询而不是媒体查询 —— 右栏拖满时窗口很宽、主列却只有 480px。 */}
+      <div className="mx-auto grid max-w-[720px] grid-cols-2 @[620px]:grid-cols-4 gap-2.5">
         {HOME_SKILLS.map((skill) => (
           <button
             key={skill.key}

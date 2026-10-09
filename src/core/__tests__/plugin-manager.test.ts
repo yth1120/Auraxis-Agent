@@ -19,7 +19,6 @@ vi.mock('../command-registry', () => ({
 }));
 
 import { validatePlugin, getCapabilitySummary, scanForRisks, loadPlugin } from '../plugin-loader';
-import { registerTools, unregisterTools } from '../tool-registry';
 import { registerCommands, unregisterCommands } from '../command-registry';
 
 const plugin = () => ({
@@ -27,7 +26,6 @@ const plugin = () => ({
   name: '测试插件',
   version: '1.0.0',
   description: 'd',
-  tools: [{ name: 'p-tool', description: 't', input_schema: {} }],
   commands: [{ id: 'c1', name: 'cmd', handler: () => {} }],
   hooks: { afterSessionEnd: vi.fn() },
 });
@@ -89,30 +87,27 @@ describe('pluginManager — install / enable / disable', () => {
     expect(confirm).toHaveBeenCalledWith(expect.stringContaining('危险模式'));
   });
 
-  it('enable 激活工具/命令/钩子，disable 反注册', () => {
+  it('enable 激活命令/钩子，disable 反注册', () => {
     pluginManager.install(plugin() as any, '/p.js');
     const installed = usePluginStore.getState().installedPlugins[0];
     usePluginStore.getState().enablePlugin(installed.id);
 
     pluginManager.enable(installed.id);
-    expect(registerTools).toHaveBeenCalledWith('p1', expect.any(Array));
     expect(registerCommands).toHaveBeenCalledWith('p1', expect.any(Array));
     expect(pluginManager.getEnabledPlugins()).toHaveLength(1);
-    expect(pluginManager.getTools()[0].name).toBe('p-tool');
     expect(pluginManager.getCommands()[0].name).toBe('cmd');
 
     pluginManager.disable(installed.id);
-    expect(unregisterTools).toHaveBeenCalledWith('p1');
     expect(unregisterCommands).toHaveBeenCalledWith('p1');
     expect(usePluginStore.getState().installedPlugins[0].enabled).toBe(false);
   });
 
-  it('uninstall 移除插件并反注册', () => {
+  it('uninstall 移除插件并反注册命令', () => {
     pluginManager.install(plugin() as any, '/p.js');
     const installed = usePluginStore.getState().installedPlugins[0];
     pluginManager.uninstall(installed.id);
     expect(usePluginStore.getState().installedPlugins).toHaveLength(0);
-    expect(unregisterTools).toHaveBeenCalledWith('p1');
+    expect(unregisterCommands).toHaveBeenCalledWith('p1');
   });
 });
 
@@ -139,7 +134,7 @@ describe('pluginManager — installFromPath / loadAll / hooks', () => {
       ],
     });
     pluginManager.loadAll();
-    expect(registerTools).toHaveBeenCalledWith('p1', expect.any(Array));
+    expect(registerCommands).toHaveBeenCalledWith('p1', expect.any(Array));
   });
 
   it('executeHook 转发到插件钩子', () => {

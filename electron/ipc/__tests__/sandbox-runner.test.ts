@@ -220,7 +220,13 @@ describe.runIf(canRunAc && runSandboxSuite)(
     it(
       'runs at Low integrity with an AppContainer-scoped token',
       async () => {
-        const { res, stdout, stderr } = await runAc(['cmd.exe', '/c', 'whoami /groups']);
+        // 必须**直接**启动 whoami.exe，不能经 `cmd.exe /c whoami /groups`：
+        // 在本机（Windows 11 26300）上，容器内的 cmd.exe 派生任何**外部** exe
+        // 都会让子进程以 0xC0000142（STATUS_DLL_INIT_FAILED）启动失败，
+        // 而 cmd 内建命令（echo/type）与容器直接启动的 exe 都正常。
+        // 被测的性质是"令牌是 AppContainer 作用域的低完整性级别"，与谁去 fork
+        // 无关，所以走容器支持的那条路径 —— 断言本身一字未改。
+        const { res, stdout, stderr } = await runAc(['whoami.exe', '/groups']);
         expect(res, stderr).not.toBeNull();
         expect(res!.exitCode, stderr).toBe(0);
         const groups = stdout;

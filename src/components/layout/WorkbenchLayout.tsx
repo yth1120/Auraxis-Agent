@@ -8,21 +8,29 @@ import { useNotificationStore } from '../../stores/useNotificationStore';
 import { useTerminalTasksStore } from '../../stores/useTerminalTasksStore';
 import { useSettingsStore } from '../../stores/useSettingsStore';
 import { useT } from '../../i18n';
+import { WorkbenchRightAside } from './WorkbenchRightPanelNav';
 
 import SiderNav from './SiderNav';
-import TabBar from './TabBar';
 import TerminalDrawer from './TerminalDrawer';
-import { COCKPIT_TABS, PANEL_LABELS } from './WorkbenchLayoutData';
 import { WorkbenchHeader } from './WorkbenchHeader';
 import { buildEditMenuItems, buildFileMenuItems, buildHelpMenuItems, buildViewMenuItems } from './WorkbenchMenus';
 import { useWorkbenchPaneResize, WORKBENCH_MAIN_MIN } from './useWorkbenchPaneResize';
-import { WorkbenchRightPanel, WorkbenchTabContent } from './WorkbenchContent';
+import { useMainAreaTopVar } from './useMainAreaTopVar';
+import { WorkbenchTabContent } from './WorkbenchContent';
 
 /** 玻璃化边框：关闭时无边框色；100% 全透明，其余按档位淡出。 */
 function glassBorderColor(glassOn: boolean, level: number): string | undefined {
   if (!glassOn) return undefined;
   if (level >= 100) return 'transparent';
   return `color-mix(in srgb, var(--color-border-dim) ${Math.round(50 * (1 - level / 100))}%, transparent)`;
+}
+
+/**
+ * 只有面板真正展开时才允许全屏：面板隐藏却仍是全屏的话，侧栏会保留一个铺满
+ * 窗口的固定层，把后面所有界面的点击都挡住。
+ */
+function fullscreenAttr(hasRightPanel: boolean, fullscreen: boolean): true | undefined {
+  return hasRightPanel && fullscreen ? true : undefined;
 }
 
 export default function WorkbenchLayout() {
@@ -36,7 +44,7 @@ export default function WorkbenchLayout() {
     setSidebarWidth,
     showRightPanel,
     rightPanelView,
-    setRightPanelView,
+    rightPanelFullscreen,
     rightPanelWidth,
     setRightPanelWidth,
     setPaneSizes,
@@ -104,7 +112,8 @@ export default function WorkbenchLayout() {
     if (!openFileRequest) return;
     const st = useAppStore.getState();
     if (st.sidebarMode === 'chat') return;
-    st.setRightPanelView('file-tree');
+    // 目标面板由请求自己带（diff 与文件树是两件事，不能一律切文件树）
+    st.setRightPanelView(openFileRequest.target === 'diff' ? 'diff' : 'file-tree');
     if (!st.showRightPanel) st.toggleRightPanel();
   }, [openFileRequest]);
   useEffect(() => {
@@ -130,7 +139,7 @@ export default function WorkbenchLayout() {
 
   // Chat mode is pure conversation — the workbench panel only exists in Work/Agent.
   const hasRightPanel = showRightPanel && rightPanelView !== 'none' && sidebarMode !== 'chat';
-  // Narrow right panel: tab labels collapse to icons so the row never crowds.
+  // Narrow right panel: the header hint collapses so the row never crowds.
   const rightPanelCompact = rightPanelWidth <= 340;
 
   const fileMenuItems = useMemo(() => buildFileMenuItems(t), [t]);
@@ -161,6 +170,9 @@ export default function WorkbenchLayout() {
     setRightPanelWidth,
     setPaneSizes,
   });
+
+  // 右侧栏全屏时只铺满主界面：把顶部栏（菜单栏）之下的起点交给 CSS。
+  useMainAreaTopVar(hasRightPanel && rightPanelFullscreen, bodyRef.current);
 
   return (
     <Layout
@@ -195,9 +207,6 @@ export default function WorkbenchLayout() {
         isElectron={isElectron}
         isMaximized={isMaximized}
       />
-
-      {/* ── Tab Bar ── Only when multiple workbench tabs are actually open. */}
-      {tabs.length > 1 && <TabBar />}
 
       {/* ── Body: drawer sider + Allotment (Content | optional Right Panel) ── */}
       <div
@@ -247,7 +256,10 @@ export default function WorkbenchLayout() {
                 data-pane="main"
                 tabIndex={-1}
                 className={clsx(
-                  'relative w-full h-full rounded-none overflow-hidden flex flex-col box-border !border-none outline-none',
+                  // `@container`：右栏拖满时窗口可以很宽、而主列只有 480px，
+                  // 这种情况下**媒体查询看不到**（它只知道窗口），只有容器查询能
+                  // 让主区内部按"我有多宽"自适应。用 `@max-[…]:` / `@[…]:` 变体。
+                  '@container relative w-full h-full rounded-none overflow-hidden flex flex-col box-border !border-none outline-none',
                   // 只有 Aqua 模式让主区融入背景；侧栏玻璃模式下主区保持不透明。
                   aquaGlassOn ? '!bg-transparent' : '!bg-bg-primary',
                 )}
@@ -272,6 +284,7 @@ export default function WorkbenchLayout() {
             transition so toggle open/close animates instead of snapping. */}
         <aside
           data-pane="right"
+          data-fullscreen={fullscreenAttr(hasRightPanel, rightPanelFullscreen)}
           tabIndex={-1}
           aria-hidden={!hasRightPanel || undefined}
           className={clsx(
@@ -299,32 +312,7 @@ export default function WorkbenchLayout() {
               onDoubleClick={() => setRightPanelWidth(360)}
             />
           )}
-          {sidebarMode !== 'chat' && (
-            <div className="flex flex-col h-full">
-              <div className="flex items-center shrink-0 h-11 px-2 border-b border-[var(--color-border-dim)]">
-                <div className="ax-panel-tabs" role="tablist" aria-label={t('workbench.tablist')}>
-                  {COCKPIT_TABS.map((tab) => (
-                    <button
-                      key={tab.key}
-                      role="tab"
-                      aria-selected={rightPanelView === tab.key}
-                      aria-label={t(tab.labelKey)}
-                      className="ax-panel-tab"
-                      data-active={rightPanelView === tab.key || undefined}
-                      onClick={() => setRightPanelView(tab.key)}
-                      title={`${t(PANEL_LABELS[tab.key] ?? 'workbench.overview')}${tab.shortcut ? ` (${tab.shortcut})` : ''}`}
-                    >
-                      {tab.icon}
-                      {!rightPanelCompact && <span>{t(tab.labelKey)}</span>}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="ax-right-panel-content flex-1 overflow-y-auto min-h-0">
-                <WorkbenchRightPanel rightPanelView={rightPanelView} />
-              </div>
-            </div>
-          )}
+          {sidebarMode !== 'chat' && <WorkbenchRightAside compact={rightPanelCompact} />}
         </aside>
       </div>
     </Layout>

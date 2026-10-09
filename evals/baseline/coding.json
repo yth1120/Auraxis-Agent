@@ -1,0 +1,1227 @@
+{
+  "generatedAt": "2026-10-07T06:29:39.065Z",
+  "mode": "live",
+  "cases": [
+    {
+      "id": "coding-001-timeout",
+      "category": "coding",
+      "task": "把 src/config.ts 里的 apiTimeoutMs 改成 60000，不要改动其它文件。",
+      "passed": true,
+      "score": 1,
+      "checks": [
+        {
+          "id": "timeout-updated",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "id": "scope",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "id": "process:failed-tools",
+          "passed": true,
+          "detail": "工具失败 0 次（上限 3）"
+        },
+        {
+          "id": "process:iterations",
+          "passed": true,
+          "detail": "迭代 4（上限 12）"
+        }
+      ],
+      "checksSpec": [
+        {
+          "id": "timeout-updated",
+          "kind": "file_contains",
+          "path": "src/config.ts",
+          "needle": "apiTimeoutMs = 60000"
+        },
+        {
+          "id": "scope",
+          "kind": "no_unexpected_changes",
+          "allow": [
+            "src/config.ts"
+          ]
+        }
+      ],
+      "processGates": {
+        "maxFailedToolCalls": 3,
+        "maxIterations": 12
+      },
+      "tools": {
+        "expect": [
+          "Read",
+          "Edit"
+        ],
+        "forbid": [
+          "Delete"
+        ],
+        "requireArgs": {
+          "Read": [
+            "file_path"
+          ],
+          "Edit": [
+            "file_path"
+          ]
+        }
+      },
+      "toolMetrics": {
+        "selection": 1,
+        "argumentAccuracy": 1,
+        "unnecessaryCalls": 0,
+        "verifiedAfterEdit": false,
+        "failedToolCalls": 0,
+        "repeatedToolRuns": 0
+      },
+      "verification": {
+        "status": "verified",
+        "confidence": 0.75,
+        "evidence": [
+          {
+            "kind": "edit",
+            "detail": "最后一次修改在 2026-10-07T06:29:46.658Z"
+          },
+          {
+            "kind": "missing_verification",
+            "detail": "修改之后没有执行验证命令，完成度缺少运行证据"
+          }
+        ]
+      },
+      "changedFiles": [
+        "config.ts"
+      ],
+      "trace": null,
+      "traceUnavailable": null,
+      "agentExitOk": true,
+      "routedModel": "deepseek-v4-pro",
+      "difficulty": "low",
+      "routeReason": "baseline",
+      "agentStderr": "",
+      "arm": "baseline",
+      "tokensIn": 11905,
+      "tokensOut": 62
+    },
+    {
+      "id": "coding-002-untouched-app",
+      "category": "coding",
+      "task": "把 src/config.ts 的 retryCount 改成 5；src/app.ts 保持原样。",
+      "passed": true,
+      "score": 1,
+      "checks": [
+        {
+          "id": "retry-updated",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "id": "app-kept",
+          "passed": true,
+          "detail": "ok"
+        }
+      ],
+      "checksSpec": [
+        {
+          "id": "retry-updated",
+          "kind": "file_contains",
+          "path": "src/config.ts",
+          "needle": "retryCount = 5"
+        },
+        {
+          "id": "app-kept",
+          "kind": "file_unchanged",
+          "path": "src/app.ts"
+        }
+      ],
+      "processGates": null,
+      "tools": {
+        "expect": [
+          "Read",
+          "Edit"
+        ],
+        "requireArgs": {
+          "Edit": [
+            "file_path"
+          ]
+        }
+      },
+      "toolMetrics": {
+        "selection": 1,
+        "argumentAccuracy": 1,
+        "unnecessaryCalls": 0,
+        "verifiedAfterEdit": false,
+        "failedToolCalls": 0,
+        "repeatedToolRuns": 0
+      },
+      "verification": {
+        "status": "verified",
+        "confidence": 0.75,
+        "evidence": [
+          {
+            "kind": "edit",
+            "detail": "最后一次修改在 2026-10-07T06:29:56.833Z"
+          },
+          {
+            "kind": "missing_verification",
+            "detail": "修改之后没有执行验证命令，完成度缺少运行证据"
+          }
+        ]
+      },
+      "changedFiles": [
+        "config.ts"
+      ],
+      "trace": null,
+      "traceUnavailable": null,
+      "agentExitOk": true,
+      "routedModel": "deepseek-v4-pro",
+      "difficulty": "low",
+      "routeReason": "baseline",
+      "agentStderr": "",
+      "arm": "baseline",
+      "tokensIn": 11912,
+      "tokensOut": 120
+    },
+    {
+      "id": "coding-003-verify-before-done",
+      "category": "coding",
+      "task": "给 src/config.ts 增加一行 export const featureFlag = true;，只改这一个文件。",
+      "passed": true,
+      "score": 1,
+      "checks": [
+        {
+          "id": "flag-added",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "id": "scope",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "id": "process:failed-tools",
+          "passed": true,
+          "detail": "工具失败 0 次（上限 2）"
+        },
+        {
+          "id": "process:iterations",
+          "passed": true,
+          "detail": "迭代 4（上限 12）"
+        }
+      ],
+      "checksSpec": [
+        {
+          "id": "flag-added",
+          "kind": "file_contains",
+          "path": "src/config.ts",
+          "needle": "featureFlag = true"
+        },
+        {
+          "id": "scope",
+          "kind": "no_unexpected_changes",
+          "allow": [
+            "src/config.ts"
+          ]
+        }
+      ],
+      "processGates": {
+        "maxFailedToolCalls": 2,
+        "maxIterations": 12
+      },
+      "tools": {
+        "expect": [
+          "Read",
+          "Edit"
+        ],
+        "requireArgs": {
+          "Edit": [
+            "file_path"
+          ]
+        }
+      },
+      "toolMetrics": {
+        "selection": 1,
+        "argumentAccuracy": 1,
+        "unnecessaryCalls": 0,
+        "verifiedAfterEdit": false,
+        "failedToolCalls": 0,
+        "repeatedToolRuns": 0
+      },
+      "verification": {
+        "status": "verified",
+        "confidence": 0.75,
+        "evidence": [
+          {
+            "kind": "edit",
+            "detail": "最后一次修改在 2026-10-07T06:30:06.530Z"
+          },
+          {
+            "kind": "missing_verification",
+            "detail": "修改之后没有执行验证命令，完成度缺少运行证据"
+          }
+        ]
+      },
+      "changedFiles": [
+        "config.ts"
+      ],
+      "trace": null,
+      "traceUnavailable": null,
+      "agentExitOk": true,
+      "routedModel": "deepseek-v4-pro",
+      "difficulty": "medium",
+      "routeReason": "baseline",
+      "agentStderr": "",
+      "arm": "baseline",
+      "tokensIn": 11951,
+      "tokensOut": 129
+    },
+    {
+      "id": "coding-004-multi-file",
+      "category": "coding",
+      "task": "在 src/config.ts 里新增一行 export const maxRetries = 5;，并让 src/app.ts 从 config 导入 maxRetries 后再导出它。只改这两个文件。",
+      "passed": true,
+      "score": 1,
+      "checks": [
+        {
+          "id": "config-max",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "id": "app-uses-max",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "id": "app-changed",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "id": "scope",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "id": "process:failed-tools",
+          "passed": true,
+          "detail": "工具失败 0 次（上限 3）"
+        },
+        {
+          "id": "process:iterations",
+          "passed": true,
+          "detail": "迭代 4（上限 14）"
+        }
+      ],
+      "checksSpec": [
+        {
+          "id": "config-max",
+          "kind": "file_contains",
+          "path": "src/config.ts",
+          "needle": "maxRetries = 5"
+        },
+        {
+          "id": "app-uses-max",
+          "kind": "file_contains",
+          "path": "src/app.ts",
+          "needle": "maxRetries"
+        },
+        {
+          "id": "app-changed",
+          "kind": "file_changed",
+          "path": "src/app.ts"
+        },
+        {
+          "id": "scope",
+          "kind": "no_unexpected_changes",
+          "allow": [
+            "src/config.ts",
+            "src/app.ts"
+          ]
+        }
+      ],
+      "processGates": {
+        "maxFailedToolCalls": 3,
+        "maxIterations": 14
+      },
+      "tools": {
+        "expect": [
+          "Read",
+          "Edit"
+        ],
+        "requireArgs": {
+          "Edit": [
+            "file_path"
+          ]
+        }
+      },
+      "toolMetrics": {
+        "selection": 1,
+        "argumentAccuracy": 1,
+        "unnecessaryCalls": 0,
+        "verifiedAfterEdit": false,
+        "failedToolCalls": 0,
+        "repeatedToolRuns": 3
+      },
+      "verification": {
+        "status": "verified",
+        "confidence": 0.75,
+        "evidence": [
+          {
+            "kind": "edit",
+            "detail": "最后一次修改在 2026-10-07T06:30:19.677Z"
+          },
+          {
+            "kind": "missing_verification",
+            "detail": "修改之后没有执行验证命令，完成度缺少运行证据"
+          }
+        ]
+      },
+      "changedFiles": [
+        "app.ts",
+        "config.ts"
+      ],
+      "trace": null,
+      "traceUnavailable": null,
+      "agentExitOk": true,
+      "routedModel": "deepseek-v4-pro",
+      "difficulty": "medium",
+      "routeReason": "baseline",
+      "agentStderr": "",
+      "arm": "baseline",
+      "tokensIn": 12751,
+      "tokensOut": 220
+    },
+    {
+      "id": "coding-005-must-verify",
+      "category": "coding",
+      "task": "把 src/config.ts 的 apiTimeoutMs 改成 60000，然后运行 node check.mjs 确认通过。不要改其它文件。",
+      "passed": true,
+      "score": 1,
+      "checks": [
+        {
+          "id": "timeout-updated",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "id": "scope",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "id": "process:failed-tools",
+          "passed": true,
+          "detail": "工具失败 0 次（上限 4）"
+        },
+        {
+          "id": "process:iterations",
+          "passed": true,
+          "detail": "迭代 5（上限 14）"
+        },
+        {
+          "id": "process:verified-after-edit",
+          "passed": true,
+          "detail": "ok"
+        }
+      ],
+      "checksSpec": [
+        {
+          "id": "timeout-updated",
+          "kind": "file_contains",
+          "path": "src/config.ts",
+          "needle": "apiTimeoutMs = 60000"
+        },
+        {
+          "id": "scope",
+          "kind": "no_unexpected_changes",
+          "allow": [
+            "src/config.ts"
+          ]
+        }
+      ],
+      "processGates": {
+        "maxFailedToolCalls": 4,
+        "maxIterations": 14,
+        "requireVerifiedAfterEdit": true
+      },
+      "tools": {
+        "expect": [
+          "Read",
+          "Edit",
+          "Bash"
+        ],
+        "forbid": [
+          "Delete"
+        ],
+        "requireArgs": {
+          "Edit": [
+            "file_path"
+          ],
+          "Bash": [
+            "command"
+          ]
+        }
+      },
+      "toolMetrics": {
+        "selection": 1,
+        "argumentAccuracy": 1,
+        "unnecessaryCalls": 0,
+        "verifiedAfterEdit": true,
+        "failedToolCalls": 0,
+        "repeatedToolRuns": 0
+      },
+      "verification": {
+        "status": "verified",
+        "confidence": 1,
+        "evidence": [
+          {
+            "kind": "edit",
+            "detail": "最后一次修改在 2026-10-07T06:30:31.812Z"
+          },
+          {
+            "kind": "verification_command",
+            "detail": "修改之后执行过验证命令（Bash / ReviewArtifact）"
+          }
+        ]
+      },
+      "changedFiles": [
+        "config.ts"
+      ],
+      "trace": null,
+      "traceUnavailable": null,
+      "agentExitOk": true,
+      "routedModel": "deepseek-v4-pro",
+      "difficulty": "low",
+      "routeReason": "baseline",
+      "agentStderr": "",
+      "arm": "baseline",
+      "tokensIn": 12220,
+      "tokensOut": 67
+    },
+    {
+      "id": "coding-006-decoy-file",
+      "category": "coding",
+      "task": "把 src/config.ts 的 retryCount 改成 5；src/legacy/config.ts 是历史备份，必须保持原样。",
+      "passed": true,
+      "score": 1,
+      "checks": [
+        {
+          "id": "retry-updated",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "id": "decoy-untouched",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "id": "scope",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "id": "process:failed-tools",
+          "passed": true,
+          "detail": "工具失败 0 次（上限 3）"
+        },
+        {
+          "id": "process:iterations",
+          "passed": true,
+          "detail": "迭代 4（上限 12）"
+        }
+      ],
+      "checksSpec": [
+        {
+          "id": "retry-updated",
+          "kind": "file_contains",
+          "path": "src/config.ts",
+          "needle": "retryCount = 5"
+        },
+        {
+          "id": "decoy-untouched",
+          "kind": "file_unchanged",
+          "path": "src/legacy/config.ts"
+        },
+        {
+          "id": "scope",
+          "kind": "no_unexpected_changes",
+          "allow": [
+            "src/config.ts"
+          ]
+        }
+      ],
+      "processGates": {
+        "maxFailedToolCalls": 3,
+        "maxIterations": 12
+      },
+      "tools": {
+        "expect": [
+          "Read",
+          "Edit"
+        ],
+        "requireArgs": {
+          "Edit": [
+            "file_path"
+          ]
+        }
+      },
+      "toolMetrics": {
+        "selection": 1,
+        "argumentAccuracy": 1,
+        "unnecessaryCalls": 0,
+        "verifiedAfterEdit": false,
+        "failedToolCalls": 0,
+        "repeatedToolRuns": 2
+      },
+      "verification": {
+        "status": "verified",
+        "confidence": 0.75,
+        "evidence": [
+          {
+            "kind": "edit",
+            "detail": "最后一次修改在 2026-10-07T06:30:41.760Z"
+          },
+          {
+            "kind": "missing_verification",
+            "detail": "修改之后没有执行验证命令，完成度缺少运行证据"
+          }
+        ]
+      },
+      "changedFiles": [
+        "config.ts"
+      ],
+      "trace": null,
+      "traceUnavailable": null,
+      "agentExitOk": true,
+      "routedModel": "deepseek-v4-pro",
+      "difficulty": "low",
+      "routeReason": "baseline",
+      "agentStderr": "",
+      "arm": "baseline",
+      "tokensIn": 12324,
+      "tokensOut": 149
+    },
+    {
+      "id": "coding-007-cross-file-extract",
+      "category": "coding",
+      "task": "把 src/config.ts 里的 apiTimeoutMs 抽到新文件 src/constants/timeouts.ts（初值仍为 30000），并让 src/config.ts 从该文件导入后重新导出。只改这两个文件。",
+      "passed": true,
+      "score": 1,
+      "checks": [
+        {
+          "id": "constants-created",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "id": "config-imports",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "id": "no-legacy-touch",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "id": "scope",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "id": "process:failed-tools",
+          "passed": true,
+          "detail": "工具失败 0 次（上限 4）"
+        },
+        {
+          "id": "process:iterations",
+          "passed": true,
+          "detail": "迭代 4（上限 18）"
+        }
+      ],
+      "checksSpec": [
+        {
+          "id": "constants-created",
+          "kind": "file_contains",
+          "path": "src/constants/timeouts.ts",
+          "needle": "apiTimeoutMs"
+        },
+        {
+          "id": "config-imports",
+          "kind": "file_contains",
+          "path": "src/config.ts",
+          "needle": "timeouts"
+        },
+        {
+          "id": "no-legacy-touch",
+          "kind": "file_unchanged",
+          "path": "src/legacy/config.ts"
+        },
+        {
+          "id": "scope",
+          "kind": "no_unexpected_changes",
+          "allow": [
+            "src/config.ts",
+            "src/constants/timeouts.ts"
+          ]
+        }
+      ],
+      "processGates": {
+        "maxFailedToolCalls": 4,
+        "maxIterations": 18
+      },
+      "tools": {
+        "expect": [
+          "Read",
+          "Write",
+          "Edit"
+        ],
+        "requireArgs": {
+          "Write": [
+            "file_path"
+          ],
+          "Edit": [
+            "file_path"
+          ]
+        }
+      },
+      "toolMetrics": {
+        "selection": 0.6666666666666666,
+        "argumentAccuracy": 1,
+        "unnecessaryCalls": 0,
+        "verifiedAfterEdit": false,
+        "failedToolCalls": 0,
+        "repeatedToolRuns": 2
+      },
+      "verification": {
+        "status": "verified",
+        "confidence": 0.75,
+        "evidence": [
+          {
+            "kind": "edit",
+            "detail": "最后一次修改在 2026-10-07T06:30:53.483Z"
+          },
+          {
+            "kind": "missing_verification",
+            "detail": "修改之后没有执行验证命令，完成度缺少运行证据"
+          }
+        ]
+      },
+      "changedFiles": [
+        "config.ts",
+        "timeouts.ts"
+      ],
+      "trace": null,
+      "traceUnavailable": null,
+      "agentExitOk": true,
+      "routedModel": "deepseek-v4-pro",
+      "difficulty": "medium",
+      "routeReason": "baseline",
+      "agentStderr": "",
+      "arm": "baseline",
+      "tokensIn": 12287,
+      "tokensOut": 178
+    },
+    {
+      "id": "coding-008-distractor-doc",
+      "category": "coding",
+      "task": "docs/notes.md 里写「超时配置在 src/legacy/config.ts」，但那份是历史备份：请以代码为准，把真正生效的 src/config.ts 里的 apiTimeoutMs 改成 45000。文档和历史备份都保持原样。",
+      "passed": true,
+      "score": 1,
+      "checks": [
+        {
+          "id": "timeout-updated",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "id": "legacy-kept",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "id": "docs-kept",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "id": "scope",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "id": "process:failed-tools",
+          "passed": true,
+          "detail": "工具失败 0 次（上限 3）"
+        },
+        {
+          "id": "process:iterations",
+          "passed": true,
+          "detail": "迭代 4（上限 14）"
+        }
+      ],
+      "checksSpec": [
+        {
+          "id": "timeout-updated",
+          "kind": "file_contains",
+          "path": "src/config.ts",
+          "needle": "apiTimeoutMs = 45000"
+        },
+        {
+          "id": "legacy-kept",
+          "kind": "file_unchanged",
+          "path": "src/legacy/config.ts"
+        },
+        {
+          "id": "docs-kept",
+          "kind": "file_unchanged",
+          "path": "docs/notes.md"
+        },
+        {
+          "id": "scope",
+          "kind": "no_unexpected_changes",
+          "allow": [
+            "src/config.ts"
+          ]
+        }
+      ],
+      "processGates": {
+        "maxFailedToolCalls": 3,
+        "maxIterations": 14
+      },
+      "tools": {
+        "expect": [
+          "Read",
+          "Edit"
+        ],
+        "requireArgs": {
+          "Edit": [
+            "file_path"
+          ]
+        }
+      },
+      "toolMetrics": {
+        "selection": 1,
+        "argumentAccuracy": 1,
+        "unnecessaryCalls": 0,
+        "verifiedAfterEdit": false,
+        "failedToolCalls": 0,
+        "repeatedToolRuns": 0
+      },
+      "verification": {
+        "status": "verified",
+        "confidence": 0.75,
+        "evidence": [
+          {
+            "kind": "edit",
+            "detail": "最后一次修改在 2026-10-07T06:31:04.891Z"
+          },
+          {
+            "kind": "missing_verification",
+            "detail": "修改之后没有执行验证命令，完成度缺少运行证据"
+          }
+        ]
+      },
+      "changedFiles": [
+        "config.ts"
+      ],
+      "trace": null,
+      "traceUnavailable": null,
+      "agentExitOk": true,
+      "routedModel": "deepseek-v4-pro",
+      "difficulty": "medium",
+      "routeReason": "baseline",
+      "agentStderr": "",
+      "arm": "baseline",
+      "tokensIn": 11954,
+      "tokensOut": 107
+    },
+    {
+      "id": "coding-009-fix-until-check-passes",
+      "category": "coding",
+      "task": "把 src/config.ts 的 apiTimeoutMs 改成 60000、retryCount 改成 5，然后运行 node check.mjs 直到它通过。只改 src/config.ts。",
+      "passed": true,
+      "score": 1,
+      "checks": [
+        {
+          "id": "timeout-updated",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "id": "retry-updated",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "id": "scope",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "id": "process:failed-tools",
+          "passed": true,
+          "detail": "工具失败 0 次（上限 2）"
+        },
+        {
+          "id": "process:iterations",
+          "passed": true,
+          "detail": "迭代 5（上限 12）"
+        },
+        {
+          "id": "process:verified-after-edit",
+          "passed": true,
+          "detail": "ok"
+        }
+      ],
+      "checksSpec": [
+        {
+          "id": "timeout-updated",
+          "kind": "file_contains",
+          "path": "src/config.ts",
+          "needle": "apiTimeoutMs = 60000"
+        },
+        {
+          "id": "retry-updated",
+          "kind": "file_contains",
+          "path": "src/config.ts",
+          "needle": "retryCount = 5"
+        },
+        {
+          "id": "scope",
+          "kind": "no_unexpected_changes",
+          "allow": [
+            "src/config.ts"
+          ]
+        }
+      ],
+      "processGates": {
+        "maxFailedToolCalls": 2,
+        "maxIterations": 12,
+        "requireVerifiedAfterEdit": true
+      },
+      "tools": {
+        "expect": [
+          "Read",
+          "Edit",
+          "Bash"
+        ],
+        "forbid": [
+          "Delete"
+        ],
+        "requireArgs": {
+          "Edit": [
+            "file_path"
+          ],
+          "Bash": [
+            "command"
+          ]
+        }
+      },
+      "toolMetrics": {
+        "selection": 1,
+        "argumentAccuracy": 1,
+        "unnecessaryCalls": 0,
+        "verifiedAfterEdit": true,
+        "failedToolCalls": 0,
+        "repeatedToolRuns": 1
+      },
+      "verification": {
+        "status": "verified",
+        "confidence": 1,
+        "evidence": [
+          {
+            "kind": "edit",
+            "detail": "最后一次修改在 2026-10-07T06:31:19.337Z"
+          },
+          {
+            "kind": "verification_command",
+            "detail": "修改之后执行过验证命令（Bash / ReviewArtifact）"
+          }
+        ]
+      },
+      "changedFiles": [
+        "config.ts"
+      ],
+      "trace": null,
+      "traceUnavailable": null,
+      "agentExitOk": true,
+      "routedModel": "deepseek-v4-pro",
+      "difficulty": "medium",
+      "routeReason": "baseline",
+      "agentStderr": "",
+      "arm": "baseline",
+      "tokensIn": 12696,
+      "tokensOut": 71
+    },
+    {
+      "id": "coding-010-refactor-split-modules",
+      "category": "coding",
+      "task": "重构配置层：把 src/config.ts 拆成两个模块 src/constants/timeouts.ts（apiTimeoutMs = 30000）与 src/constants/retries.ts（retryCount = 3），并让 src/config.ts 从这两个模块导入后重新导出，保持对外行为不变。只改这三个文件。",
+      "passed": true,
+      "score": 1,
+      "checks": [
+        {
+          "id": "timeouts-created",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "id": "retries-created",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "id": "config-reexports",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "id": "legacy-kept",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "id": "scope",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "id": "process:failed-tools",
+          "passed": true,
+          "detail": "工具失败 1 次（上限 4）"
+        },
+        {
+          "id": "process:iterations",
+          "passed": true,
+          "detail": "迭代 9（上限 20）"
+        }
+      ],
+      "checksSpec": [
+        {
+          "id": "timeouts-created",
+          "kind": "file_contains",
+          "path": "src/constants/timeouts.ts",
+          "needle": "apiTimeoutMs"
+        },
+        {
+          "id": "retries-created",
+          "kind": "file_contains",
+          "path": "src/constants/retries.ts",
+          "needle": "retryCount"
+        },
+        {
+          "id": "config-reexports",
+          "kind": "file_contains",
+          "path": "src/config.ts",
+          "needle": "timeouts"
+        },
+        {
+          "id": "legacy-kept",
+          "kind": "file_unchanged",
+          "path": "src/legacy/config.ts"
+        },
+        {
+          "id": "scope",
+          "kind": "no_unexpected_changes",
+          "allow": [
+            "src/config.ts",
+            "src/constants/timeouts.ts",
+            "src/constants/retries.ts"
+          ]
+        }
+      ],
+      "processGates": {
+        "maxFailedToolCalls": 4,
+        "maxIterations": 20
+      },
+      "tools": {
+        "expect": [
+          "Read",
+          "Write"
+        ],
+        "requireArgs": {
+          "Write": [
+            "file_path"
+          ]
+        }
+      },
+      "toolMetrics": {
+        "selection": 1,
+        "argumentAccuracy": 1,
+        "unnecessaryCalls": 2,
+        "verifiedAfterEdit": false,
+        "failedToolCalls": 1,
+        "repeatedToolRuns": 5
+      },
+      "verification": {
+        "status": "verified",
+        "confidence": 0.7,
+        "evidence": [
+          {
+            "kind": "edit",
+            "detail": "最后一次修改在 2026-10-07T06:31:43.208Z"
+          },
+          {
+            "kind": "missing_verification",
+            "detail": "修改之后没有执行验证命令，完成度缺少运行证据"
+          },
+          {
+            "kind": "tool_failure",
+            "detail": "1 次工具调用失败"
+          }
+        ]
+      },
+      "changedFiles": [
+        "config.ts",
+        "retries.ts",
+        "timeouts.ts"
+      ],
+      "trace": null,
+      "traceUnavailable": null,
+      "agentExitOk": true,
+      "routedModel": "deepseek-v4-pro",
+      "difficulty": "high",
+      "routeReason": "baseline",
+      "agentStderr": "",
+      "arm": "baseline",
+      "tokensIn": 13963,
+      "tokensOut": 266
+    },
+    {
+      "id": "coding-011-migrate-consumers",
+      "category": "coding",
+      "task": "迁移超时配置的消费方：新建 src/constants/timeouts.ts（apiTimeoutMs = 45000），把 src/config.ts 与 src/app.ts 都改成从该模块导入（config 重新导出、app 使用它），src/legacy/config.ts 保持不动。只改这三个文件。",
+      "passed": true,
+      "score": 1,
+      "checks": [
+        {
+          "id": "timeouts-created",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "id": "config-imports",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "id": "app-migrated",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "id": "legacy-kept",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "id": "scope",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "id": "process:failed-tools",
+          "passed": true,
+          "detail": "工具失败 0 次（上限 4）"
+        },
+        {
+          "id": "process:iterations",
+          "passed": true,
+          "detail": "迭代 6（上限 20）"
+        }
+      ],
+      "checksSpec": [
+        {
+          "id": "timeouts-created",
+          "kind": "file_contains",
+          "path": "src/constants/timeouts.ts",
+          "needle": "45000"
+        },
+        {
+          "id": "config-imports",
+          "kind": "file_contains",
+          "path": "src/config.ts",
+          "needle": "timeouts"
+        },
+        {
+          "id": "app-migrated",
+          "kind": "file_changed",
+          "path": "src/app.ts"
+        },
+        {
+          "id": "legacy-kept",
+          "kind": "file_unchanged",
+          "path": "src/legacy/config.ts"
+        },
+        {
+          "id": "scope",
+          "kind": "no_unexpected_changes",
+          "allow": [
+            "src/config.ts",
+            "src/app.ts",
+            "src/constants/timeouts.ts"
+          ]
+        }
+      ],
+      "processGates": {
+        "maxFailedToolCalls": 4,
+        "maxIterations": 20
+      },
+      "tools": {
+        "expect": [
+          "Read",
+          "Edit",
+          "Write"
+        ],
+        "requireArgs": {
+          "Edit": [
+            "file_path"
+          ],
+          "Write": [
+            "file_path"
+          ]
+        }
+      },
+      "toolMetrics": {
+        "selection": 1,
+        "argumentAccuracy": 1,
+        "unnecessaryCalls": 0,
+        "verifiedAfterEdit": false,
+        "failedToolCalls": 0,
+        "repeatedToolRuns": 2
+      },
+      "verification": {
+        "status": "verified",
+        "confidence": 0.75,
+        "evidence": [
+          {
+            "kind": "edit",
+            "detail": "最后一次修改在 2026-10-07T06:32:01.802Z"
+          },
+          {
+            "kind": "missing_verification",
+            "detail": "修改之后没有执行验证命令，完成度缺少运行证据"
+          }
+        ]
+      },
+      "changedFiles": [
+        "app.ts",
+        "config.ts",
+        "timeouts.ts"
+      ],
+      "trace": null,
+      "traceUnavailable": null,
+      "agentExitOk": true,
+      "routedModel": "deepseek-v4-pro",
+      "difficulty": "high",
+      "routeReason": "baseline",
+      "agentStderr": "",
+      "arm": "baseline",
+      "tokensIn": 13356,
+      "tokensOut": 260
+    }
+  ]
+}

@@ -151,7 +151,7 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
       <div className="pt-4 px-4">
         <Input
           ref={inputRef}
-          prefix={<SearchOutlined className="text-muted" />}
+          prefix={<SearchOutlined className="text-text-muted" />}
           placeholder={t('palette.placeholder')}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
@@ -163,7 +163,7 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
       </div>
       <div className="max-h-[320px] overflow-y-auto p-2 pb-4">
         {filtered.length === 0 ? (
-          <div className="text-center p-6 text-muted text-sm">{t('palette.empty')}</div>
+          <div className="text-center p-6 text-text-muted text-sm">{t('palette.empty')}</div>
         ) : (
           filtered.map((item, index) => {
             const prefix = item.id.split('-')[0] ?? '';
@@ -191,17 +191,17 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
                   onClick={item.action}
                   onMouseEnter={() => setSelected(index)}
                   className={clsx(
-                    'flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer transition-colors duration-fast ease-out',
+                    'flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer transition-colors duration-150 ease-out',
                     index === selected ? 'bg-accent-soft' : 'hover:bg-accent-soft',
                   )}
                 >
-                  <span className="text-lg text-secondary w-[22px] text-center shrink-0">{item.icon}</span>
+                  <span className="text-lg text-text-secondary w-[22px] text-center shrink-0">{item.icon}</span>
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium text-text-primary">{item.title}</div>
-                    <div className="text-2xs text-muted mt-1">{item.description}</div>
+                    <div className="text-2xs text-text-muted mt-1">{item.description}</div>
                   </div>
                   {item.shortcut && (
-                    <span className="font-mono text-2xs text-muted bg-primary-soft py-1 px-2 rounded-md whitespace-nowrap">
+                    <span className="font-mono text-2xs text-text-muted bg-primary-soft py-1 px-2 rounded-md whitespace-nowrap">
                       {item.shortcut}
                     </span>
                   )}
@@ -211,7 +211,7 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
           })
         )}
       </div>
-      <div className="border-t border-dim p-2 px-4 flex gap-4 text-2xs text-muted">
+      <div className="border-t border-border-dim p-2 px-4 flex gap-4 text-2xs text-text-muted">
         <span>
           <kbd className="bg-primary-soft px-1.5 py-0.5 rounded-md">↑↓</kbd> {t('palette.nav')}
         </span>

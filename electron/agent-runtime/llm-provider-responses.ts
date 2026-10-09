@@ -12,16 +12,14 @@
  */
 import axios from 'axios';
 import { runtimePorts } from './ports';
-import { resolveModelId } from '../contracts/core';
+import { modelCapabilities, resolveModelId } from '../contracts/core';
 import type { LlmInvokeParams, LlmUsage } from './llm-types';
 import type { AssistantMessage, LoopMessage, ToolCall } from './agent-loop-types';
 import { buildOpenAIFormatTools, normalizeProviderContent, sanitizeToolCallPairing } from './llm-provider-format';
 import { createStreamFilter } from './text-filter';
 
-/** base_url 或显式 apiBase 指向 Responses 端点时走本适配器。 */
-export function isResponsesFormatEndpoint(apiBase: string): boolean {
-  return /\/responses\/?$/i.test(apiBase || '');
-}
+// 端点判定统一放在 contracts/core.ts（单一实现），此处仅保持历史导入路径可用。
+export { isResponsesFormatEndpoint } from '../contracts/core';
 
 type Item = Record<string, unknown>;
 
@@ -164,7 +162,7 @@ export async function invokeDeepSeekResponses(params: LlmInvokeParams): Promise<
     body.tools = formattedTools;
     body.tool_choice = params.toolChoice ?? 'auto';
   }
-  if (model.startsWith('deepseek-')) {
+  if (modelCapabilities(model).reasoning) {
     // 与 ChatCompletions 一致：思考默认开启，必须显式表达开关。
     body.reasoning = { effort: params.isDeepThink ? params.reasoningEffort || 'high' : 'none' };
   }

@@ -44,7 +44,7 @@ function collect(): {
   for (const file of sourceFiles(path.join(root, 'electron'))) {
     const text = fs.readFileSync(file, 'utf8');
     for (const m of text.matchAll(/(?:secureHandle|ipcMain\.handle)\(\s*'([^']+)'/g)) handled.add(m[1]);
-    for (const m of text.matchAll(/webContents\.send\(\s*'([^']+)'/g)) pushed.add(m[1]);
+    for (const m of text.matchAll(/(?:webContents|notifier)\.send\(\s*'([^']+)'/g)) pushed.add(m[1]);
     if (path.basename(file).startsWith('preload')) {
       for (const m of text.matchAll(/invoke\(\s*'([^']+)'/g)) invoked.add(m[1]);
       for (const m of text.matchAll(/subscribe\(\s*'([^']+)'/g)) subscribed.add(m[1]);

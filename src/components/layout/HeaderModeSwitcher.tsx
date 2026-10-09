@@ -7,13 +7,23 @@ import { useChatStore } from '../../stores/useChatStore';
 import { useSessionStore } from '../../stores/useSessionStore';
 import { crossesCapabilityBoundary, pickSessionForMode, type SidebarMode } from '../../stores/sessionModeSwitch';
 import { useT } from '../../i18n';
+import { modeLabel } from './modeLabels';
 
 interface Props {
   collapsed?: boolean;
 }
 
-const ITEM_GAP = 4;
+/**
+ * 尺寸常量。**可见元素与隐藏测量元素必须共用**，否则等宽测量与滑块贴合会错位。
+ *
+ * 档位取法：最初（minH 20 / padding 2-14 / 图标 14 / 字号 12）偏小，
+ * 后来一次放大（24 / 5-16 / 16 / 13）过头、挡视野。现值是两者的中间 ——
+ * 图标回到全应用通用的 14 档，高度与内边距各取一半。
+ */
+const ITEM_GAP = 5;
 const THUMB_PAD = 2;
+const ITEM_PADDING = '3px 14px';
+const ITEM_MIN_H = 22;
 
 const MODES = [
   { key: 'chat', icon: ChatCircle, labelKey: 'mode.chat', tipKey: 'mode.chatTip' },
@@ -108,8 +118,8 @@ export default function HeaderModeSwitcher({ collapsed }: Props) {
     useChatStore.getState().clearMessages();
   };
 
-  // 模式切换按钮上的对话模式按用户要求显示为 Chat（其余文案保持中文）。
-  const labelOf = (mode: (typeof MODES)[number]) => (mode.key === 'chat' ? 'Chat' : t(mode.labelKey));
+  // 模式显示名统一走 modeLabel()：顶部信息区与本切换器必须显示同一个名字
+  const labelOf = (mode: (typeof MODES)[number]) => modeLabel(mode.key, t);
 
   // ── Collapsed: icon-only vertical stack ──
   if (collapsed) {
@@ -124,7 +134,7 @@ export default function HeaderModeSwitcher({ collapsed }: Props) {
                 role="tab"
                 aria-selected={active}
                 className={clsx(
-                  'w-9 h-8 flex items-center justify-center border-none rounded-full cursor-pointer text-base transition-[background,color] duration-150',
+                  'w-9 h-9 flex items-center justify-center border-none rounded-full cursor-pointer text-base transition-[background,color] duration-150',
                   active
                     ? 'bg-primary-soft text-primary'
                     : 'bg-transparent text-text-muted hover:bg-[var(--color-hover)] hover:text-text-secondary',
@@ -187,19 +197,19 @@ export default function HeaderModeSwitcher({ collapsed }: Props) {
               aria-checked={active}
               data-model-type={m.key}
               className={clsx(
-                'relative shrink-0 cursor-pointer select-none overflow-hidden rounded-full bg-transparent text-base font-medium transition-[color,background-color] duration-200 outline-none',
+                'relative shrink-0 cursor-pointer select-none overflow-hidden rounded-full bg-transparent text-sm font-medium transition-[color,background-color] duration-200 outline-none',
                 active
                   ? 'text-text-primary'
                   : 'text-text-muted hover:bg-[var(--color-hover)] hover:text-text-secondary',
               )}
-              style={{ width: itemWidth ?? undefined, padding: '4px 22px' }}
+              style={{ width: itemWidth ?? undefined, padding: ITEM_PADDING }}
               onClick={() => switchMode(m.key)}
             >
               <div
                 className="flex items-center justify-center whitespace-nowrap"
-                style={{ minHeight: 26, gap: ITEM_GAP }}
+                style={{ minHeight: ITEM_MIN_H, gap: ITEM_GAP }}
               >
-                <Icon size={15} />
+                <Icon size={14} />
                 <span className="leading-[1.2]">{labelOf(m)}</span>
               </div>
               {/* 隐藏测量元素（aa40b5de）：决定所有胶囊的等宽 */}
@@ -209,10 +219,10 @@ export default function HeaderModeSwitcher({ collapsed }: Props) {
                 }}
                 data-role="measure"
                 aria-hidden
-                className="invisible pointer-events-none absolute flex items-center whitespace-nowrap"
-                style={{ padding: '4px 22px', gap: ITEM_GAP }}
+                className="invisible pointer-events-none absolute flex items-center whitespace-nowrap text-sm font-medium"
+                style={{ padding: ITEM_PADDING, gap: ITEM_GAP }}
               >
-                <Icon size={15} />
+                <Icon size={14} />
                 <span className="leading-[1.2]">{labelOf(m)}</span>
               </div>
             </div>

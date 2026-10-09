@@ -6,7 +6,6 @@ import { backfillComposer } from '../../utils/backfillComposer';
 import { useAppStore } from '../../stores/useAppStore';
 import type { SystemMessageEntry } from '../../stores/useInspectorStore';
 import type { NextStep, QualityRun, TaskFailure } from '../../utils/agentQuality';
-import DeliverablesRow from '../common/DeliverablesRow';
 import { formatElapsed, formatTokens } from './WorkspaceInspectorUtils';
 
 export function AgentInspectorHeader({
@@ -67,33 +66,8 @@ export function AgentInspectorHeader({
         <span className="inline-flex items-center h-5 px-2 rounded-full bg-[var(--color-bg-inset)] text-2xs text-text-muted tabular-nums">
           {formatTokens(totalTokens)} tokens
         </span>
-        {agent.goal && (
-          <span
-            className="inline-flex items-center h-5 max-w-[220px] px-2 rounded-full bg-[var(--color-bg-inset)] text-2xs text-text-muted truncate"
-            title={tPanel('inspector.goalTip', { text: agent.goal.text, n: agent.goal.maxRounds })}
-          >
-            {tPanel('inspector.goal', { text: agent.goal.text })}
-          </span>
-        )}
       </div>
     </div>
-  );
-}
-
-export function AgentSummaryCard({ agent }: { agent: AgentInfo }) {
-  const tPanel = useT();
-  return (
-    <section className="px-3.5 py-2.5 mb-2.5 rounded-xl bg-[var(--color-bg-secondary)]">
-      <header className="text-2xs font-semibold text-text-muted tracking-wide mb-1.5">
-        {tPanel('inspector.taskSummary')}
-      </header>
-      <div className="text-xs text-text-secondary leading-[1.5] line-clamp-3">{agent.description || agent.name}</div>
-      {(agent.result || agent.error) && (
-        <div className="mt-1.5 text-xs text-text-secondary leading-[1.5] line-clamp-3">
-          {agent.result || agent.error}
-        </div>
-      )}
-    </section>
   );
 }
 
@@ -196,7 +170,7 @@ export function NextStepsCard({ agent, steps }: { agent: AgentInfo; steps: NextS
             onClick={() => {
               if (step.kind === 'view' && step.view === 'diff') {
                 const app = useAppStore.getState();
-                app.setRightPanelView('review');
+                app.setRightPanelView('diff');
                 if (!app.showRightPanel) app.toggleRightPanel();
               } else if (step.prompt) {
                 backfillComposer(step.prompt, agent.id);
@@ -211,18 +185,6 @@ export function NextStepsCard({ agent, steps }: { agent: AgentInfo; steps: NextS
           </button>
         ))}
       </div>
-    </section>
-  );
-}
-
-export function DeliverablesCard({ files, onPreview }: { files: string[]; onPreview: (filePath: string) => void }) {
-  const tPanel = useT();
-  return (
-    <section className="px-3.5 py-2.5 mb-2.5 rounded-xl bg-[var(--color-bg-secondary)]">
-      <header className="text-2xs font-semibold text-text-muted tracking-wide mb-1.5">
-        {tPanel('inspector.deliverables')}
-      </header>
-      <DeliverablesRow files={files} onPreview={onPreview} />
     </section>
   );
 }
@@ -250,7 +212,7 @@ export function SystemMessagesList({ messages }: { messages: SystemMessageEntry[
   const tPanel = useT();
   return (
     <section className="px-0.5 pt-[10px] border-t border-[var(--color-border-dim)] mt-1">
-      <header className="text-2xs font-semibold text-muted tracking-wide mb-[6px]">
+      <header className="text-2xs font-semibold text-text-muted tracking-wide mb-[6px]">
         {tPanel('inspector.systemPrompt')}
       </header>
       <ul className="list-none m-0 p-0 flex flex-col gap-1">
@@ -258,7 +220,7 @@ export function SystemMessagesList({ messages }: { messages: SystemMessageEntry[
           <li
             key={message.id}
             className={clsx(
-              'text-xs leading-[1.5] px-2 py-[5px] rounded-md border border-transparent bg-dim text-secondary break-words',
+              'text-xs leading-[1.5] px-2 py-[5px] rounded-md border border-transparent bg-bg-inset text-text-secondary break-words',
               message.level === 'info' && 'bg-primary-soft border-primary',
               message.level === 'warning' && 'bg-warning-soft border-warning',
               message.level === 'error' && 'bg-danger-soft border-danger text-text-secondary',

@@ -1,6 +1,5 @@
 /** agent-scheduler-support.ts — scheduler helper functions. */
-import type { BrowserWindow } from 'electron';
-import type { AgentInstance } from './agent-scheduler-types';
+import type { AgentInstance, SchedulerNotifier } from './agent-scheduler-types';
 import { taskPlanToFrontendPlan } from './agent-scheduler-types';
 import { isRecord } from '../utils/guards';
 
@@ -10,16 +9,16 @@ export function genId(): string {
 
 export { isRecord };
 
-export function broadcast(win: BrowserWindow | null, agentId: string, event: unknown) {
-  if (win && !win.isDestroyed() && isRecord(event)) {
-    win.webContents.send(`agent:event:${agentId}`, { ...event, agentId });
+export function broadcast(notifier: SchedulerNotifier | null, agentId: string, event: unknown) {
+  if (notifier && notifier.isAlive() && isRecord(event)) {
+    notifier.send(`agent:event:${agentId}`, { ...event, agentId });
   }
 }
 
 /** Send agent:updated for frontend real-time state sync. */
-export function notifyFrontend(win: BrowserWindow | null, inst: AgentInstance) {
-  if (win && !win.isDestroyed()) {
-    win.webContents.send('agent:updated', {
+export function notifyFrontend(notifier: SchedulerNotifier | null, inst: AgentInstance) {
+  if (notifier && notifier.isAlive()) {
+    notifier.send('agent:updated', {
       id: inst.agentId,
       agentId: inst.agentId,
       name: inst.config.name,

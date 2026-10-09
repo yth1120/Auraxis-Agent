@@ -286,7 +286,7 @@ export function registerMemoryIpc() {
 
   secureHandle('memory:readForQuery', async (_event, projectPath: string, query: string, opts?: ReadQueryOptions) => {
     try {
-      return { ok: true, data: readForQuery(query, projectPath, opts) };
+      return { ok: true, data: await readForQuery(query, projectPath, opts) };
     } catch (error: unknown) {
       return { ok: false, error: errorText(error) };
     }
@@ -320,13 +320,28 @@ export function registerMemoryIpc() {
         signals += detected.length;
       }
       const beliefs = getBeliefsByScope(projectPath, { activeOnly: false });
+      const linksByBelief = new Map<string, string[]>();
+      for (const link of listBeliefEvidence()) {
+        const ids = linksByBelief.get(link.belief_id);
+        if (ids) ids.push(link.evidence_id);
+        else linksByBelief.set(link.belief_id, [link.evidence_id]);
+      }
+      // 校验用的证据**不能只取自「最近 500 条」那个窗口**：窗口外的引用会被判成
+      // 「引用了不存在的 evidence」而把合法信念误拒（长文档入库后，较早分块的证据
+      // 很容易被挤出窗口）。窗口没命中的 id 回源补查一次，代价与信念数同阶。
       const evidenceById = new Map(evidence.map((e) => [e.id, e]));
+      for (const ids of linksByBelief.values()) {
+        for (const id of ids) {
+          if (evidenceById.has(id)) continue;
+          const hit = getEvidenceById(id);
+          if (hit) evidenceById.set(id, hit);
+        }
+      }
       let rejected = 0;
       for (const b of beliefs) {
         if (b.legacy === 1) continue;
-        const links = listBeliefEvidence(b.id);
         const validation = validateBeliefAnchors(
-          { text: b.text, evidenceIds: links.map((l) => l.evidence_id) },
+          { text: b.text, evidenceIds: linksByBelief.get(b.id) ?? [] },
           evidenceById,
         );
         if (!validation.ok) {

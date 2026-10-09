@@ -1,3 +1,4 @@
+import { PROJECTION_VERSION } from '../../contracts/session-types';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { promises as fs } from 'fs';
 import os from 'os';
@@ -100,6 +101,7 @@ describe('session projection cache', () => {
       messageCount: 1,
       eventCount: 1,
       lastSeq: 1,
+    projVersion: PROJECTION_VERSION,
     };
     await cache.write(row);
     expect(await cache.read('r1')).toMatchObject({ id: 'r1', title: 'T' });
@@ -121,6 +123,7 @@ describe('session projection cache', () => {
       messageCount: 1,
       eventCount: 1,
       lastSeq: 1,
+    projVersion: PROJECTION_VERSION,
     });
     await cache.write(row('keep'));
     await cache.write(row('drop'));

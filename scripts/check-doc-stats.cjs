@@ -49,19 +49,19 @@ function collectCoverageClaims(metric) {
 const currentTestCountMentioned = docs.some((file) => {
   if (!fs.existsSync(file)) return false;
   const text = fs.readFileSync(file, 'utf8');
-  return text.includes('278 个测试文件') || text.includes('278 test files');
+  return text.includes('325 个测试文件') || text.includes('325 test files');
 });
 if (!currentTestCountMentioned) {
-  failures.push('文档未记录当前全量测试文件数 278');
+  failures.push('文档未记录当前全量测试文件数 325');
 }
 
 const currentCaseCountMentioned = docs.some((file) => {
   if (!fs.existsSync(file)) return false;
   const text = fs.readFileSync(file, 'utf8');
-  return text.includes('2,144') || text.includes('2144');
+  return text.includes('2,739') || text.includes('2739');
 });
 if (!currentCaseCountMentioned) {
-  failures.push('文档未记录当前全量通过用例数 2144');
+  failures.push('文档未记录当前全量通过用例数 2739');
 }
 
 for (const file of docs) {
@@ -74,7 +74,62 @@ for (const file of docs) {
     text.includes('274 个测试文件') ||
     text.includes('274 test files') ||
     text.includes('2,122') ||
-    text.includes('2122')
+    text.includes('2122') ||
+    // 2026-10 之前的档位：283 / 2,225、278 / 2,144（后者是 CHANGELOG 里的历史值，
+    // 只对 README / AGENTS / docs 生效，因此用能区分上下文的长串而不是裸数字）。
+    text.includes('306 个测试文件') ||
+    text.includes('306 test files') ||
+    text.includes('2,470 用例') ||
+    text.includes('2,470 个用例') ||
+    text.includes('2,470 passing cases') ||
+    text.includes('2,470 cases') ||
+    // 2026-10 档位：311 / 2,526（被 315 / 2,572 取代）。
+    text.includes('311 个测试文件') ||
+    text.includes('311 test files') ||
+    text.includes('2,526 用例') ||
+    text.includes('2,526 个用例') ||
+    text.includes('2,526 passing cases') ||
+    text.includes('2,526 cases') ||
+    text.includes('2,526') ||
+    text.includes('2,572') ||
+    text.includes('2572') ||
+    text.includes('2,574') ||
+    text.includes('2574') ||
+    text.includes('315 个测试文件') ||
+    text.includes('315 test files') ||
+    text.includes('2,587 用例') ||
+    text.includes('2,587 个用例') ||
+    text.includes('2,587 passing cases') ||
+    text.includes('2,587 cases') ||
+    text.includes('2,587') ||
+    text.includes('2587') ||
+    text.includes('2,682') ||
+    text.includes('2682') ||
+    text.includes('321 个测试文件') ||
+    text.includes('321 test files') ||
+    text.includes('2,684 用例') ||
+    text.includes('2,684 个用例') ||
+    text.includes('2,684 passing cases') ||
+    text.includes('2,684 cases') ||
+    text.includes('2,684') ||
+    text.includes('2684') ||
+    // 2026-10 档位：322 / 2,708（被 324 / 2,728 取代）。
+    text.includes('322 个测试文件') ||
+    text.includes('322 test files') ||
+    text.includes('2,708') ||
+    text.includes('2708') ||
+    text.includes('299 个测试文件') ||
+    text.includes('299 test files') ||
+    text.includes('2,383 用例') ||
+    text.includes('2,383 个用例') ||
+    text.includes('2,383 passing cases') ||
+    text.includes('2,383 cases') ||
+    text.includes('283 个测试文件') ||
+    text.includes('283 test files') ||
+    text.includes('2,225 用例') ||
+    text.includes('2,225 个用例') ||
+    text.includes('2,225 passing cases') ||
+    text.includes('2,225 cases')
   ) {
     failures.push(`${path.relative(root, file)}: 仍包含旧的测试数量`);
   }

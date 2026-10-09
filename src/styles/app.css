@@ -165,8 +165,16 @@
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  flex: none;
-  margin-left: 6px;
+  /* `flex: none` 在窄主列（480px→正文列 ~388px）下会把这一簇连同摘要一起挤出
+     行尾并被 `overflow:hidden` 裁掉：不可收缩项合计已接近行长，摘要先被
+     ellipsis 成 0（文件名/命令整条看不见），接着「查看 Diff / 打开文件」被切。
+     改成可收缩后，内部本就带省略号的链接会优雅退化成「打开…」。 */
+  flex: 0 1 auto;
+  min-width: 0;
+  /* `auto` 而不是固定值：没有摘要的行（子代理、纯图标行）此前会把耗时/按钮
+     挤在标题旁边，与其它行右对齐的观感不一致（截图里发现的）。 */
+  margin-left: auto;
+  padding-left: 6px;
   opacity: 0;
   transition: opacity 100ms ease;
 }
@@ -390,21 +398,27 @@
   --color-text-faint: #61676f;
   --color-text-on-accent: #ffffff;
 
-  --color-border-dim: rgba(30, 35, 42, 0.065);
-  --color-border-default: rgba(30, 35, 42, 0.085);
-  --color-border-strong: rgba(30, 35, 42, 0.13);
+  /* `@theme` 落进 `@layer theme`，而 tokens.css 由文件末尾的 `@import` 落进更高
+     优先级的 `@layer utilities` —— 所以这几个值**永远不生效**（曾经的 0.065 / 0.085 /
+     0.13 / #f6f7f9 就是这种"看起来权威却从不生效"的谎话）。这里对齐 tokens.css，
+     只为不再误导下一个改色的人；改色仍然要两处同改。 */
+  --color-border-dim: rgba(28, 32, 38, 0.1);
+  --color-border-default: rgba(28, 32, 38, 0.135);
+  --color-border-strong: rgba(28, 32, 38, 0.19);
 
-  --color-success: #4f7c68;
-  --color-success-soft: rgba(79, 124, 104, 0.1);
-  --color-danger: #a25b60;
-  --color-danger-soft: rgba(162, 91, 96, 0.1);
-  --color-danger-border: rgba(162, 91, 96, 0.22);
+  /* 状态色：与 tokens.css 同值（对比度达标后的取值，理由见那边的注释）。 */
+  --color-success: #497260;
+  --color-success-soft: rgba(73, 114, 96, 0.1);
+  --color-success-border: rgba(73, 114, 96, 0.22);
+  --color-danger: #9a575b;
+  --color-danger-soft: rgba(154, 87, 91, 0.1);
+  --color-danger-border: rgba(154, 87, 91, 0.22);
   --color-danger-lighter: #b06f74;
-  --color-warning: #b97f3e;
-  --color-warning-soft: rgba(185, 127, 62, 0.1);
-  --color-warning-border: rgba(185, 127, 62, 0.24);
+  --color-warning: #8d612f;
+  --color-warning-soft: rgba(141, 97, 47, 0.1);
+  --color-warning-border: rgba(141, 97, 47, 0.24);
 
-  --color-code-bg: #f6f7f9;
+  --color-code-bg: #f5f6f8;
   --color-surface: #ffffff;
   --color-surface-hover: #eef0f3;
   --color-surface-inset: rgba(30, 35, 42, 0.045);
@@ -504,7 +518,12 @@
   --shadow-card: 0 1px 2px rgba(20, 24, 30, 0.05);
   --shadow-card-hover: 0 2px 4px rgba(20, 24, 30, 0.05), 0 8px 20px rgba(20, 24, 30, 0.1);
 
-  /* Animation durations */
+  /* Animation durations.
+   * ⚠️ 这些**不是 Tailwind 的命名空间**（v4 的 `duration-*` 只认裸数字白名单
+   * {75,100,150,200,300,500,700,1000}，或名为 `--transition-duration-*` 的自定义项）。
+   * 所以 `duration-fast` / `duration-normal` 这类类名**永远不会生成 CSS**，
+   * 只会静默回落到 `transition-*` 自带的 150ms。写类名请用 `duration-150` / `duration-200`。
+   * 下面这几个变量仍然有用：CSS 里 `var(--duration-normal)` 是正常的。 */
   --duration-instant: 80ms;
   --duration-fast: 150ms;
   --duration-normal: 200ms;
@@ -538,14 +557,21 @@ body,
   user-select: none;
 }
 
-/* Reduced motion preference */
+/* Reduced motion preference
+ *
+ * 分两层处理，别一刀切：
+ *  - **animation 压到 0.01ms**：装饰性动效（流光、脉冲、循环闪烁）不再持续，
+ *    同时 antd 用 animation 做入场的组件（Dropdown / Tooltip / Notification）
+ *    仍会收到 animationend，不会卡在初态。
+ *  - **transition 一律保留**：侧栏折叠、模式切换滑块、面板淡入都是过渡；
+ *    把 transition-duration 压成 0 会让它们「没有动画」，而且 rc-motion 收不到
+ *    transitionend 时弹窗会停在透明态（表现成「点了没反应」）。 */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
 }
@@ -594,10 +620,34 @@ body,
   outline-offset: 2px;
 }
 
+html {
+  /* 窗口是 transparent 的：圆角之外必须是透明的，否则四角会露出方角 */
+  background: transparent;
+}
+
+/* 最大化时窗口贴满屏幕，圆角要归零（否则屏幕角落会露出透明缺口） */
+html.ax-maximized {
+  --ax-window-radius: 0px;
+}
+
 body {
-  background: var(--color-bg-primary);
+  /* 不在这里铺底色：方角底会盖掉 #root 的圆角 */
+  background: transparent;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* 无边框窗口唯一的圆角表面：由 #root 铺底色并裁掉四角外的一切内容
+   （各面板都是满屏不透明底，不裁的话圆角会被它们盖回方角）。
+   #root 已有 overflow: hidden，这里只补圆角。 */
+#root {
+  background: var(--color-bg-primary);
+  border-radius: var(--ax-window-radius);
+}
+
+/* 玻璃主题要露出原生 Acrylic，根容器不能有实色底 */
+html.auraxis-glass #root {
+  background: transparent;
 }
 
 /* Frosted sidebar (Windows 11 Acrylic): drop the opaque app canvas so the

@@ -36,10 +36,10 @@ describe('ModeTrigger', () => {
     expect(clicked).toBe(true);
   });
 
-  it('shows DeepSeek V4 Flash when the flash model is selected', () => {
+  it('shows the current name when an old saved model id is selected', () => {
     useChatStore.setState({ selectedModel: 'deepseek-v4-flash' });
     render(<ModeTrigger onClick={() => {}} />);
-    expect(screen.getByText((content) => content.includes('DeepSeek V4 Flash'))).toBeDefined();
+    expect(screen.getByText((content) => content.includes('DeepSeek V4.1 Flash'))).toBeDefined();
   });
 
   it('Chat 思考关闭时触发器不显示思考深度', () => {
@@ -66,14 +66,14 @@ describe('ModeTrigger', () => {
 });
 
 describe('ModePanelContent', () => {
-  it('renders all models and thinking depth directly', () => {
+  it('只列出当前在售模型，不再出现旧名条目', () => {
     useChatStore.setState({ reasoningEffort: 'medium' });
     render(<ModePanelContent />);
     expect(screen.getByText('DeepSeek V4.1 Flash')).toBeDefined();
     expect(screen.getByText('DeepSeek V4 Pro')).toBeDefined();
-    expect(screen.getByText('DeepSeek V4 Flash（旧名 → V4.1 Flash）')).toBeDefined();
-    expect(screen.getByText('DeepSeek V4 Flash Vision Exp（旧名 → V4.1 Flash）')).toBeDefined();
-    expect(screen.getAllByText('旧名').length).toBe(2);
+    // 旧名已从产品里移除：既没有旧名条目，也没有「旧名」徽标。
+    expect(screen.queryByText(/旧名/)).toBeNull();
+    expect(screen.queryByText(/Vision Exp/)).toBeNull();
     expect(screen.getByText('思考深度')).toBeDefined();
     expect(screen.getByRole('slider', { name: '思考深度' })).toBeDefined();
     expect(screen.getByText('中度思考')).toBeDefined();
@@ -85,10 +85,11 @@ describe('ModePanelContent', () => {
     expect(useChatStore.getState().selectedModel).toBe('deepseek-flash');
   });
 
-  it('clicking the legacy Flash name still switches model (kept for compatibility)', () => {
-    render(<ModePanelContent />);
-    fireEvent.click(screen.getByText('DeepSeek V4 Flash Vision Exp（旧名 → V4.1 Flash）'));
-    expect(useChatStore.getState().selectedModel).toBe('deepseek-v4-flash-vision-exp');
+  it('旧设置里保存的旧模型名显示为当前名（不会漏出旧 id）', () => {
+    useChatStore.setState({ selectedModel: 'deepseek-v4-flash-vision-exp' });
+    render(<ModeTrigger onClick={() => {}} />);
+    expect(screen.getByText((content) => content.includes('DeepSeek V4.1 Flash'))).toBeDefined();
+    expect(screen.queryByText((content) => content.includes('deepseek-v4-flash-vision-exp'))).toBeNull();
   });
 
   it('clicking DeepSeek V4 Pro switches model', () => {

@@ -30,16 +30,8 @@ export function validatePlugin(obj: unknown): { valid: boolean; warnings: string
       warnings.push(`缺少必填字段: ${field}`);
     }
   }
-  // Check tools have valid schema
-  if (Array.isArray(p.tools)) {
-    for (const value of p.tools) {
-      if (!value || typeof value !== 'object' || Array.isArray(value)) continue;
-      const t = value as Record<string, unknown>;
-      if (!t.name || !t.description || !t.input_schema) {
-        warnings.push(`工具 "${String(t.name ?? '(未命名)')}" 缺少必填字段`);
-      }
-    }
-  }
+  // 渲染层插件没有工具扩展点，因此不再校验 tools 的 schema —— 那只会让作者以为
+  // 工具已生效。此处只提示声明将被忽略（详见 loadPlugin 的告警）。
   return { valid: warnings.length === 0, warnings };
 }
 
@@ -118,6 +110,15 @@ export async function loadPlugin(modulePath: string): Promise<Plugin | null> {
       console.warn(`[plugin-loader] invalid plugin at ${modulePath}:`, warnings.join(', '));
       return null;
     }
+    // 渲染层插件没有工具扩展点：作者声明了 tools 时必须明确告知被忽略，
+    // 否则会以为工具已生效（这些工具永远不会到达模型）。
+    const declaredTools = (plugin as { tools?: unknown }).tools;
+    if (Array.isArray(declaredTools) && declaredTools.length > 0) {
+      console.warn(
+        `[plugin-loader] ${modulePath}: 渲染层插件不支持扩展工具，${declaredTools.length} 个 tools 声明被忽略；` +
+          '请改用主进程动态插件（MountPlugin）或 MCP。',
+      );
+    }
     return plugin as Plugin;
   } catch (err) {
     console.warn(`[plugin-loader] failed to load ${modulePath}:`, err);
@@ -127,7 +128,6 @@ export async function loadPlugin(modulePath: string): Promise<Plugin | null> {
 
 export function getCapabilitySummary(plugin: Plugin): string {
   const parts: string[] = [];
-  if (plugin.tools?.length) parts.push(`${plugin.tools.length} 个工具`);
   if (plugin.commands?.length) parts.push(`${plugin.commands.length} 个命令`);
   if (plugin.hooks) parts.push('生命周期钩子');
   if (plugin.ui) parts.push('UI 扩展');

@@ -3,7 +3,7 @@
  * Registry, lifecycle observations, messaging and progress reports live in
  * `agent-subagent-registry.ts` so this file keeps the runner/API surface thin.
  */
-import { BrowserWindow } from 'electron';
+import { createElectronSchedulerNotifier } from './agent-scheduler-notifier';
 import { secureHandle } from './trust';
 import { waitForPlanApproval } from './plan-handlers';
 import type { AgentInfo } from '../advanced-defs';
@@ -92,7 +92,9 @@ async function resolveSubAgentConfig(params: SubAgentParams): Promise<{ error: s
   }
   const { readSettings } = await import('./settings-store');
   const agentDef = getAgentDef(params.subagentType);
-  const tools = getToolsForAgent(params.subagentType);
+  // 传入任务文本：无约束的代理（general-purpose）据此按任务预选工具并附 ToolSearch 逃生口，
+  // 不再固定注入全部内置工具 schema。
+  const tools = getToolsForAgent(params.subagentType, params.description || params.prompt);
   const settings = await readSettings();
   const model =
     typeof settings.executeModel === 'string' && settings.executeModel
@@ -272,20 +274,20 @@ export async function runSubAgent(params: SubAgentParams): Promise<{ output: unk
   }
   registerSubAgent(agent, controller);
 
-  const win = BrowserWindow.getAllWindows()[0] || null;
+  const notifier = createElectronSchedulerNotifier();
   agent.parentAgentId = params.requestId;
-  if (win && !win.isDestroyed()) win.webContents.send('agent:updated', { ...agent });
+  if (notifier?.isAlive()) notifier.send('agent:updated', { ...agent });
 
   const onUpdate = (updated: AgentInfo) => {
     setSubAgent(updated);
-    if (win && !win.isDestroyed()) win.webContents.send('agent:updated', { ...updated });
+    if (notifier?.isAlive()) notifier.send('agent:updated', { ...updated });
   };
   const broadcast = (a: AgentInfo) => {
-    if (win && !win.isDestroyed()) win.webContents.send('agent:updated', { ...a });
+    if (notifier?.isAlive()) notifier.send('agent:updated', { ...a });
   };
 
   const runLoop = () => {
-    const observer = createSubAgentObserver(agent, win, onUpdate);
+    const observer = createSubAgentObserver(agent, notifier, onUpdate);
     setSubAgentObserver(agentId, observer);
     return agentLoopRun({
       model: cfg.model,
@@ -312,7 +314,8 @@ export async function runSubAgent(params: SubAgentParams): Promise<{ output: unk
       planModel: cfg.planModel,
       sessionId: agentId,
       messageQueue: () => drainSubAgentInbox(agentId),
-      onPlanGenerated: (plan) => waitForPlanApproval(plan, win, { projectRoot: params.projectRoot, title: agent.name }),
+      onPlanGenerated: (plan) =>
+        waitForPlanApproval(plan, notifier, { projectRoot: params.projectRoot, title: agent.name }),
       depth: cfg.depth,
       surface: params.surface,
     });

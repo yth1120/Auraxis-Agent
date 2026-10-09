@@ -109,10 +109,11 @@ describe('validatePlugin', () => {
     expect(validatePlugin({ id: 'x' }).warnings.join(' ')).toContain('缺少必填字段');
   });
 
-  it('reports malformed tools while accepting a well-formed plugin', () => {
-    expect(
-      validatePlugin({ id: 'x', name: 'x', version: '1', description: 'x', tools: [{ name: 't' }] }).warnings.join(' '),
-    ).toContain('缺少必填字段');
+  it('不再校验 tools schema：声明 tools 不影响插件有效性', () => {
+    // 渲染层插件没有工具扩展点，tools 声明被忽略（由 loadPlugin 告警提示）。
+    expect(validatePlugin({ id: 'x', name: 'x', version: '1', description: 'x', tools: [{ name: 't' }] }).valid).toBe(
+      true,
+    );
     expect(validatePlugin({ id: 'x', name: 'x', version: '1', description: 'x' }).valid).toBe(true);
   });
 });
@@ -122,15 +123,26 @@ describe('loadPlugin and capability summary', () => {
     await expect(loadPlugin('../outside.js')).resolves.toBeNull();
   });
 
-  it('summarizes capabilities and handles an empty plugin', () => {
-    const withTool: Plugin = {
+  it('能力摘要只反映命令 / 钩子 / UI，不再声称扩展工具', () => {
+    const withTool = {
       id: 'x',
       name: 'x',
       version: '1',
       description: 'x',
       tools: [{ name: 't', description: 'd', input_schema: { type: 'object', properties: {}, required: [] } }],
-    };
-    expect(getCapabilitySummary(withTool)).toContain('1 个工具');
+    } as unknown as Plugin;
+    // 只声明 tools 的插件在渲染层没有任何扩展点。
+    expect(getCapabilitySummary(withTool)).toBe('此插件无扩展点');
+
+    const withCommand = {
+      id: 'c',
+      name: 'c',
+      version: '1',
+      description: 'c',
+      commands: [{ name: 'n', description: 'd', usage: '', execute: () => true }],
+    } as unknown as Plugin;
+    expect(getCapabilitySummary(withCommand)).toBe('此插件将扩展: 1 个命令');
+
     expect(getCapabilitySummary({ id: 'x', name: 'x', version: '1', description: 'x' })).toBe('此插件无扩展点');
   });
 });

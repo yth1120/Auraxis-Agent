@@ -291,7 +291,7 @@ export default function FileTreePanel({ tabId: _tabId, variant = 'tabs' }: FileT
             )}
             onClick={() => useAppStore.getState().setActiveFilePath(null)}
           >
-            <Folder size={14} className={!activeFilePath ? 'text-primary' : 'text-faint'} />
+            <Folder size={14} className={!activeFilePath ? 'text-primary' : 'text-text-faint'} />
             {tPanel('ftp.fileTree')}
           </button>
           {fileTabs.map((t) => {
@@ -312,7 +312,7 @@ export default function FileTreePanel({ tabId: _tabId, variant = 'tabs' }: FileT
                   onClick={() => useAppStore.getState().setActiveFilePath(t.path)}
                   title={t.path}
                 >
-                  <FileText size={14} className={clsx('shrink-0', active ? 'text-primary' : 'text-faint')} />
+                  <FileText size={14} className={clsx('shrink-0', active ? 'text-primary' : 'text-text-faint')} />
                   <span
                     className={clsx(
                       'truncate text-xs max-w-[130px]',
@@ -326,7 +326,7 @@ export default function FileTreePanel({ tabId: _tabId, variant = 'tabs' }: FileT
                   type="button"
                   aria-label={`${tPanel('ftp.closeTip')} ${t.name}`}
                   title={tPanel('ftp.closeTip')}
-                  className="flex items-center justify-center w-4 h-4 rounded-md text-faint cursor-pointer border-none bg-transparent hover:bg-[var(--color-hover)] hover:text-text-primary shrink-0"
+                  className="flex items-center justify-center w-4 h-4 rounded-md text-text-faint cursor-pointer border-none bg-transparent hover:bg-[var(--color-hover)] hover:text-text-primary shrink-0"
                   onClick={() => useAppStore.getState().closeFileTab(t.path)}
                 >
                   <X size={12} />

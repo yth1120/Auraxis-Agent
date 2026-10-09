@@ -35,14 +35,22 @@ const FILE_PATH_TOOLS = new Set([
   'Grep',
   'Glob',
   'ReadDocument',
+  'IngestDocument',
   'WriteDocument',
   'NotebookEdit',
 ]);
 
 async function resolveExecutor(toolName: string): Promise<ToolExecutor | null> {
+  // 此处保留 mcp__ 前缀判断是**分派**需要（要据此拿到动态 import 的 executeMcpTool），
+  // 不是策略判断：危险工具、受限沙箱、Work 文档门与并发安全四类门禁一律改为走
+  // tool-provider.isExternalSourceTool()，不再各自匹配前缀。
   if (toolName.startsWith('mcp__')) {
     const { executeMcpTool } = await import('../../tool-registry');
-    return async (toolInput: Record<string, unknown>) => executeMcpTool(toolName, toolInput ?? {});
+    // 必须是 (input, ctx) 两参：`ToolExecutor` 的调用点会把 ctx 一并传入，
+    // 少声明一个参数会静默丢掉 ctx.abortSignal —— 长跑 MCP 工具就只剩 30s
+    // 请求超时可等，也无法让 SDK 上发 notifications/cancelled。
+    return async (toolInput: Record<string, unknown>, ctx: ToolContext) =>
+      executeMcpTool(toolName, toolInput ?? {}, ctx?.abortSignal);
   }
   const registered = toolRegistry[toolName as keyof typeof toolRegistry];
   return registered ? (registered as unknown as ToolExecutor) : await dynamicPluginExecutor(toolName);
@@ -117,27 +125,51 @@ async function applySandboxGate(
   ctx: ToolContext,
 ): Promise<SandboxOutcome> {
   const { enforceSandbox, commandMutates } = await import('../../sandbox-policy');
+  const decision = resolvePerCallSandbox(toolName, input, ctx);
+  if (decision.rejected) {
+    return {
+      ctx,
+      commandMutates,
+      effectiveSandbox: decision.effectiveSandbox,
+      error: { output: null, error: decision.rejected },
+    };
+  }
+  const effectiveSandbox = decision.effectiveSandbox;
+  const sandbox = enforceSandbox({ sandboxMode: effectiveSandbox, toolName, input });
+  if (!sandbox.allowed) {
+    return { ctx, commandMutates, effectiveSandbox, error: { output: null, error: `沙箱拒绝: ${sandbox.reason}` } };
+  }
+  return { ctx: { ...ctx, sandboxMode: effectiveSandbox }, commandMutates, effectiveSandbox, error: null };
+}
+
+/**
+ * per-call 沙箱请求的裁决（纯函数，便于单测）。
+ *
+ * 只认「更宽」的请求：自动模式下且未授权 → 直接拒绝（保持原有的安全语义）。
+ * 更窄的请求会被忽略 —— 否则模型给一条写命令标上 sandbox_permissions=read，
+ * 就会被只读白名单打死并反复重试（评测实测：27 次失败调用、迭代翻倍）。
+ */
+export function resolvePerCallSandbox(
+  toolName: string,
+  input: Record<string, unknown>,
+  ctx: Pick<ToolContext, 'mode' | 'autoApprove' | 'sandboxMode'>,
+): { effectiveSandbox: SandboxMode; rejected: string | null } {
   const perCall =
     toolName === 'Bash' &&
     typeof input.sandbox_permissions === 'string' &&
     ['read', 'workspace-write', 'full'].includes(input.sandbox_permissions)
       ? (input.sandbox_permissions as SandboxMode)
       : undefined;
-  const effectiveSandbox = perCall ?? ctx.sandboxMode ?? 'full';
-  const escalated = !!perCall && perCall !== ctx.sandboxMode;
-  if (escalated && ctx.mode === 'auto' && !ctx.autoApprove) {
+  const runSandbox: SandboxMode = ctx.sandboxMode ?? 'full';
+  const rank: Record<SandboxMode, number> = { read: 0, 'workspace-write': 1, full: 2 };
+  const wantsWider = !!perCall && rank[perCall] > rank[runSandbox];
+  if (wantsWider && ctx.mode === 'auto' && !ctx.autoApprove) {
     return {
-      ctx,
-      commandMutates,
-      effectiveSandbox,
-      error: { output: null, error: '模型不允许在自动模式下自行提升沙箱权限；请由用户在权限对话框中确认后重试。' },
+      effectiveSandbox: perCall!,
+      rejected: '模型不允许在自动模式下自行提升沙箱权限；请由用户在权限对话框中确认后重试。',
     };
   }
-  const sandbox = enforceSandbox({ sandboxMode: effectiveSandbox, toolName, input });
-  if (!sandbox.allowed) {
-    return { ctx, commandMutates, effectiveSandbox, error: { output: null, error: `沙箱拒绝: ${sandbox.reason}` } };
-  }
-  return { ctx: { ...ctx, sandboxMode: effectiveSandbox }, commandMutates, effectiveSandbox, error: null };
+  return { effectiveSandbox: wantsWider ? perCall! : runSandbox, rejected: null };
 }
 
 /**

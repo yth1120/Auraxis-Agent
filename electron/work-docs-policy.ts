@@ -8,7 +8,7 @@
  * 硬门禁是最终防线，不依赖模型自觉。
  */
 
-import { FILE_WRITE_TOOLS, WORK_FORBIDDEN_TOOLS, isWorkForbiddenTool } from './tool-capability';
+import { FILE_WRITE_TOOLS, WORK_FORBIDDEN_TOOLS, isExternalSourceTool, isWorkForbiddenTool } from './tool-capability';
 
 export type WorkSurface = 'chat' | 'work' | 'code';
 
@@ -136,9 +136,9 @@ export function workDocsOnlyVerdict(
 ): WorkDocsVerdict {
   if (surface !== 'work') return { allowed: true };
 
-  // MCP 工具的文件语义对 Work 模式不可见，无法保证“只改文档”，一律拒绝。
-  if (toolName.startsWith('mcp__')) {
-    return { allowed: false, reason: 'Work 模式不允许调用 MCP 工具（无法验证其文件操作边界）' };
+  // 外部来源工具（MCP / 插件）的文件语义对 Work 模式不可见，无法保证“只改文档”，一律拒绝。
+  if (isExternalSourceTool(toolName)) {
+    return { allowed: false, reason: 'Work 模式不允许调用外部来源工具（无法验证其文件操作边界）' };
   }
 
   // 所有 shell/终端/代码执行及运行时扩展入口一律拒绝。Work 模式的硬边界

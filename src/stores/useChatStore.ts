@@ -9,6 +9,7 @@ import { createChatLogBuffer, createUsageAccumulator, type ChatLogBuffer, type U
 import { getApiKeyFromStore, useSettingsStore } from './useSettingsStore';
 import { useSessionStore } from './useSessionStore';
 import { useInspectorStore } from './useInspectorStore';
+import { markStreamTerminal } from './useActivityStore';
 import { disposeChatStoreSideEffects, registerChatStoreSideEffects } from './chatStoreSideEffects';
 import { createChatMessageActions } from './chatActions';
 import { createContinueCodeAction } from './chatContinueCode';
@@ -92,6 +93,7 @@ export const useChatStore = create<ChatStore>()(
       lastUserMessage: null,
       composerFocusTick: 0,
       pendingNewTask: false,
+      pendingAnnotations: [],
 
       setInputValue: (value) =>
         set((s) => {
@@ -102,6 +104,10 @@ export const useChatStore = create<ChatStore>()(
       consumeModelPanelRequest: () => set({ modelPanelRequest: 0 }),
       requestComposerFocus: () => set((s) => ({ composerFocusTick: s.composerFocusTick + 1 })),
       setPendingNewTask: (v) => set({ pendingNewTask: v }),
+      addPendingAnnotation: (annotation) => set((s) => ({ pendingAnnotations: [...s.pendingAnnotations, annotation] })),
+      removePendingAnnotation: (id) =>
+        set((s) => ({ pendingAnnotations: s.pendingAnnotations.filter((a) => a.id !== id) })),
+      clearPendingAnnotations: () => set({ pendingAnnotations: [] }),
       toggleDeepThink: () =>
         set((s) => ({ isDeepThink: !s.isDeepThink, ...(!s.isDeepThink ? { reasoningEffort: 'high' as const } : {}) })),
       setReasoningEffort: (effort) => set({ reasoningEffort: effort, isDeepThink: true }),
@@ -147,6 +153,10 @@ export const useChatStore = create<ChatStore>()(
         usage?.flush();
         useInspectorStore.getState().setActiveToolCount(0);
         streamRuntime.stopping = true;
+        // 停止只清 isStreaming、**不改消息本身**，所以执行视图推导不出"这一轮是被停掉的"。
+        // 在这里补记一笔真实终态：否则 Run 头只能显示成"完成"，那是假的。
+        // reason 由调用方区分（用户点停止 / 看门狗超时 / 静默断连），见 markStreamTerminal。
+        markStreamTerminal(get().messages as never, 'stopped');
         set({ isStreaming: false, currentIteration: null, maxIterations: null, lastCompression: null });
         abortActiveStream(streamRuntime);
         void chatLog?.flush();

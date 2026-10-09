@@ -39,7 +39,7 @@ export default function SiderAccountMenu({
         classNames={{ root: 'account-popup' }}
         menu={{ items: [] }}
         popupRender={() => (
-          <div className="w-[236px] p-1 gap-1 bg-[var(--color-bg-elevated)] rounded-xl shadow-[var(--shadow-md)] flex flex-col opacity-0 translate-y-1 animate-[smartPanelInUp_0.18s_ease_forwards]">
+          <div className="w-[236px] p-1 gap-1 bg-[var(--color-bg-elevated)] rounded-xl shadow-[var(--shadow-md)] flex flex-col animate-[smartPanelInUp_0.18s_ease_forwards]">
             <div className="flex items-center gap-2 px-2 pt-2 pb-2 min-w-0">
               <Avatar name={accountName || accountEmail} src={accountAvatar} size={34} />
               <span className="min-w-0 flex flex-col">

@@ -1,5 +1,6 @@
 import type { ToolDef } from '../tool-defs';
 import { getAllTools } from '../tool-registry';
+import { selectToolsForTask, TOOL_SEARCH_DEF } from '../agent-runtime/tool-catalog';
 
 // ─── Built-in Agent Definitions ──────────────────────
 
@@ -136,7 +137,7 @@ export function getAgentDef(type: string): AgentTypeDef {
   return BUILTIN_AGENTS[type] || BUILTIN_AGENTS['general-purpose'];
 }
 
-export function getToolsForAgent(agentType: string): ToolDef[] {
+export function getToolsForAgent(agentType: string, taskText?: string): ToolDef[] {
   const def = getAgentDef(agentType);
   const allowed = def.allowedTools;
   const disallowed = new Set(def.disallowedTools || []);
@@ -146,5 +147,17 @@ export function getToolsForAgent(agentType: string): ToolDef[] {
   if (allowed) {
     return baseTools.filter((t) => allowed.includes(t.name));
   }
-  return baseTools.filter((t) => !disallowed.has(t.name));
+  // 声明了禁止清单的代理（Explore / Plan）以该清单为契约，不再按任务裁剪 ——
+  // 裁剪叠加在禁止清单上只会让契约更难推理。
+  if (def.disallowedTools?.length) {
+    return baseTools.filter((t) => !disallowed.has(t.name));
+  }
+
+  // 无任何约束的代理（general-purpose）此前拿到全部内置工具。改为与调度器同一套
+  // 任务预选 + ToolSearch 逃生口：评测实测固定注入从 71 降到 9 个核心集后，输入 token
+  // 137k → 62k（约 −54%）而通过率不变（evals/reports/learned-9-tools.json）。
+  // 未给任务文本时保持全量，避免在无从判断时削弱能力。
+  if (!taskText?.trim()) return baseTools;
+  // surface 缺省按 'code' 处理 —— 子代理本就是任务/coding 语义。
+  return selectToolsForTask(baseTools, { task: taskText }).concat([TOOL_SEARCH_DEF]);
 }

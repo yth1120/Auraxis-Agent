@@ -110,6 +110,7 @@ vi.mock('../goal-store', () => ({
 }));
 
 import { executeToolCall, abortTool } from '../tool-handlers';
+import { resolvePerCallSandbox } from '../tool-handlers/pipeline';
 import { isSandboxSupported, runSandboxedCommand } from '../../sandbox-runner';
 import { finishBashTask } from '../task-monitor';
 
@@ -178,6 +179,20 @@ describe('Bash — 参数校验', () => {
     expect(
       (await executeToolCall('Bash', { command: 'ls', sandbox_permissions: 'bogus', justification: 'x' }, ctx())).error,
     ).toContain('无效的 sandbox_permissions');
+  });
+
+  it('per-call 更窄的沙箱请求被忽略（不再被只读白名单打死）', async () => {
+    // 纯裁决：运行沙箱 full，模型在命令上标 read → 忽略（旧行为会送进只读白名单并拒绝）。
+    const narrow = resolvePerCallSandbox('Bash', { sandbox_permissions: 'read' }, ctx());
+    expect(narrow.effectiveSandbox).toBe('full');
+    expect(narrow.rejected).toBeNull();
+    // 更宽的请求仍然要被拦（安全语义不变）。
+    const wider = resolvePerCallSandbox(
+      'Bash',
+      { sandbox_permissions: 'full' },
+      ctx({ sandboxMode: 'workspace-write', autoApprove: false }),
+    );
+    expect(wider.rejected).toContain('自行提升沙箱权限');
   });
 
   it('受限沙箱下拒绝后台执行', async () => {

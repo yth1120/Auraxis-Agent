@@ -1,5 +1,4 @@
 /** agent-scheduler-snapshot.ts — scheduler checkpoint mapping and restore. */
-import type { BrowserWindow } from 'electron';
 import { requestPermission } from './permission-handlers';
 import {
   saveAgentSnapshot,
@@ -11,7 +10,7 @@ import { appendAgentLog } from '../session-log';
 import { normalizeWorkAutonomyTier } from '../contracts/advanced';
 import { normalizeApprovalPolicy } from '../contracts/core';
 import type { SandboxMode } from '../sandbox-policy';
-import type { AgentConfig, AgentInstance } from './agent-scheduler-types';
+import type { AgentConfig, AgentInstance, SchedulerNotifier } from './agent-scheduler-types';
 
 export function buildAgentSnapshotRecord(inst: AgentInstance): AgentSnapshotRecord {
   return {
@@ -68,7 +67,7 @@ export function persistAgentInstance(inst: AgentInstance): void {
 export function restoreAgentSnapshot(
   record: AgentSnapshotRecord,
   apiKey: string,
-  getWindow: () => BrowserWindow | null,
+  getNotifier: () => SchedulerNotifier | null,
 ): AgentInstance {
   const config: AgentConfig = {
     name: record.name,
@@ -120,10 +119,10 @@ export function restoreAgentSnapshot(
     checkPermission: config.autoApprove
       ? () => Promise.resolve(true)
       : (toolName, input, toolCallId, agentId) => {
-          const win = getWindow();
-          if (!win) return Promise.resolve(false);
+          const notifier = getNotifier();
+          if (!notifier) return Promise.resolve(false);
           const isReviewGate = toolName === 'ReviewArtifact' && input?.action === 'continue_after_failed_review';
-          return requestPermission(toolName, input, win, toolCallId, {
+          return requestPermission(toolName, input, notifier, toolCallId, {
             mode: isReviewGate || config.workTier === 'full' ? 'ask' : normalizeApprovalPolicy(config.mode),
             approvedPlanSteps: config.approvedPlanSteps,
             projectRoot: record.projectPath,

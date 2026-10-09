@@ -9,7 +9,6 @@ interface PresetPanelProps {
   /** Current selection, shown as quiet text on the header right. */
   current?: string;
   subtitle?: string;
-  popDirection: 'up' | 'down';
   children: ReactNode;
   footer?: ReactNode;
 }
@@ -19,15 +18,7 @@ interface PresetPanelProps {
  * permission): a quiet minimal card — title + current value, hairline
  * dividers, tight option rows and a slim settings footer.
  */
-export default function PresetPanel({
-  ariaLabel,
-  title,
-  current,
-  subtitle,
-  popDirection,
-  children,
-  footer,
-}: PresetPanelProps) {
+export default function PresetPanel({ ariaLabel, title, current, subtitle, children, footer }: PresetPanelProps) {
   return (
     <div
       role="menu"
@@ -35,10 +26,8 @@ export default function PresetPanel({
       className={clsx(
         'flex flex-col w-[260px] p-1.5 bg-[var(--color-bg-elevated)] border border-[var(--color-border-dim)] rounded-[14px]',
         'shadow-[0_10px_32px_-8px_rgba(20,24,30,0.14)]',
-        'opacity-0 translate-y-1',
-        popDirection === 'down'
-          ? 'animate-[smartPanelInDown_0.16s_ease_forwards]'
-          : 'animate-[smartPanelInUp_0.16s_ease_forwards]',
+        // 直接弹出：不要入场动画（原先的 opacity-0 + slide 会被看成「一张纸滑出来」，
+        // 而且一旦动画不执行，弹层还会停在透明态）。
       )}
     >
       <div className="flex items-baseline justify-between gap-3 px-2.5 pt-2 pb-1">

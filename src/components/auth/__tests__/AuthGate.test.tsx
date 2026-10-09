@@ -34,7 +34,7 @@ describe('AuthGate — 注册登录按钮', () => {
     });
   });
 
-  it('从登录页可以返回创建账户页面', async () => {
+  it('从登录页可以切到注册页（顶部「注册」页签）', async () => {
     (window as any).electronAPI.auth.status = vi.fn(async () => ({
       ok: true,
       data: { phase: 'locked', registered: true },
@@ -44,8 +44,8 @@ describe('AuthGate — 注册登录按钮', () => {
         <div />
       </AuthGate>,
     );
-    const link = await screen.findByRole('button', { name: '还没有账户？创建账户' });
-    fireEvent.click(link);
+    const tab = await screen.findByRole('radio', { name: '注册' });
+    fireEvent.click(tab);
     expect(await screen.findByPlaceholderText('怎么称呼你')).toBeTruthy();
   });
 });

@@ -329,9 +329,7 @@ export default function ChatInputComposer({
             className={clsx(
               'z-[1050] p-1 gap-1 w-[232px] bg-[var(--color-bg-elevated)] rounded-xl flex flex-col',
               'shadow-[var(--shadow-md)]',
-              modePanelPos.direction === 'up'
-                ? 'animate-[smartPanelInUp_0.18s_ease_forwards]'
-                : 'animate-[smartPanelInDown_0.18s_ease_forwards]',
+              // 直接弹出：与运行权限 / 执行挡位弹层保持一致，不做入场动画
             )}
             style={{
               position: 'fixed',

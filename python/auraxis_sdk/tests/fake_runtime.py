@@ -1,7 +1,10 @@
 """Fake Auraxis runtime for the Python SDK integration test."""
 
+import contextlib
 import json
+import os
 import socket
+import sys
 import threading
 import time
 
@@ -12,6 +15,13 @@ def main() -> None:
     srv.bind(("127.0.0.1", 0))
     srv.listen(8)
     port = srv.getsockname()[1]
+    # 可选：在报出端口前先向 stderr 写入大量数据。调用方若不排空 stderr，这里会写满
+    # 管道缓冲并永久阻塞 —— 正是回归用例 test_drains_stderr 要复现的场景。
+    noisy = int(os.environ.get("FAKE_RUNTIME_STDERR_BYTES", "0") or "0")
+    for _ in range(noisy // 100):
+        sys.stderr.write("x" * 99 + "\n")
+    sys.stderr.flush()
+
     print(f"AURAXIS_SDK_PORT={port}", flush=True)
 
     def handle(conn: socket.socket) -> None:
@@ -58,10 +68,8 @@ def main() -> None:
         except OSError:
             pass
         finally:
-            try:
+            with contextlib.suppress(OSError):
                 conn.close()
-            except OSError:
-                pass
 
     def serve() -> None:
         while True:

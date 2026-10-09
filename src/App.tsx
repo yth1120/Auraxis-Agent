@@ -24,6 +24,7 @@ import {
   useSettingsPrefetch,
   useSystemPrefersDark,
   useThemeClass,
+  useWindowCornerClass,
   useWorktreeBridge,
 } from './hooks/useAppRuntimeEffects';
 import { useAppShortcuts, useZoomShortcuts } from './hooks/useAppShortcuts';
@@ -51,6 +52,7 @@ export default function App() {
 
   // 启动/卸载期副作用按类别拆分在 useAppRuntimeEffects 中，App 只做装配。
   useThemeClass(resolvedTheme);
+  useWindowCornerClass();
   useGlassClassEffects();
   useSettingsPrefetch();
   useDefaultChatTab();

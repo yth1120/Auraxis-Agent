@@ -91,6 +91,28 @@ describe('event-bridge → ToolStreamEvent', () => {
     );
     expect(err).toMatchObject({ type: 'tool_error', requestId: RID, error: 'boom' });
 
+    // 引擎算好的摘要事实必须过桥：从前在这里被丢掉，聊天区因此永远拿不到摘要。
+    const withSummary = toToolStreamEvent(
+      {
+        type: 'tool_end',
+        toolCallId: 'tc-9',
+        toolName: 'Read',
+        output: 'a\nb\nc',
+        durationMs: 3,
+        stepGroupId: 'g2',
+        input: { file_path: 'x.ts' },
+        summary: { filePath: 'x.ts', lines: 3, size: 5 },
+      },
+      RID,
+    );
+    expect(withSummary).toMatchObject({ summary: { filePath: 'x.ts', lines: 3, size: 5 } });
+    // 没有摘要时不要凭空造一个空对象（会让下游以为"摘要存在但为空"）。
+    const withoutSummary = toToolStreamEvent(
+      { type: 'tool_end', toolCallId: 'tc-8', toolName: 'Bash', output: '', durationMs: 1, stepGroupId: 'g2', input: {} },
+      RID,
+    );
+    expect(withoutSummary && 'summary' in withoutSummary).toBe(false);
+
     const aborted = toToolStreamEvent(
       {
         type: 'tool_aborted',
@@ -106,11 +128,21 @@ describe('event-bridge → ToolStreamEvent', () => {
   });
 
   it('maps iteration_start to the chat iteration counter', () => {
+    // 上限只来自调用方解析出的真实预算（resolveIterationBudget）。
+    expect(toToolStreamEvent({ type: 'iteration_start', iteration: 4, timestamp: 1 }, RID, 42)).toEqual({
+      type: 'iteration',
+      requestId: RID,
+      iteration: 4,
+      maxIterations: 42,
+    });
+  });
+
+  it('拿不到预算时省略 maxIterations，而不是编一个数', () => {
+    // 从前这里硬编码 25：Agent 真实预算不是 25 时，界面会把它显示错。
     expect(toToolStreamEvent({ type: 'iteration_start', iteration: 4, timestamp: 1 }, RID)).toEqual({
       type: 'iteration',
       requestId: RID,
       iteration: 4,
-      maxIterations: 25,
     });
   });
 

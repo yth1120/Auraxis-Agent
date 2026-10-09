@@ -3,7 +3,16 @@ import clsx from 'clsx';
 import { Check, Copy } from '@/components/common/icons';
 import DiffView from '../permissions/DiffView';
 import { useT } from '../../i18n';
-import { basename } from '../../utils/paths';
+import { middleEllipsis } from '../../utils/paths';
+import type {
+  CodeCardModel,
+  DiffCardModel,
+  PlanCardModel,
+  ReadCardModel,
+  SearchCardModel,
+  WebCardModel,
+} from '../../core/activity/agentCards';
+import StateDot from '../common/StateDot';
 
 const MAX_LINES = 16;
 const HEAD_LINES = 8;
@@ -38,12 +47,8 @@ function CopyButton({ text }: { text: string }) {
 }
 
 /* ── Read card ─────────────────────────────────────── */
-export interface AgentReadCardProps {
-  label?: string;
-  content: string;
-  startLine?: number;
-  totalLines?: number;
-}
+/** props 直接取自 `core/activity/agentCards.ts` 的提取模型 —— 两侧同一个类型，不会漂移。 */
+export type AgentReadCardProps = ReadCardModel;
 
 export function AgentReadCard({ label, content, startLine = 1, totalLines }: AgentReadCardProps) {
   const t = useT();
@@ -66,7 +71,9 @@ export function AgentReadCard({ label, content, startLine = 1, totalLines }: Age
   return (
     <div className="rounded-xl border border-border-default bg-code-bg overflow-hidden">
       <div className="flex items-center justify-between gap-3 px-3.5 py-2.5 bg-[var(--color-bg-inset)] border-b border-border-dim">
-        <span className="min-w-0 truncate font-mono text-2xs text-text-primary">{label ? basename(label) : ''}</span>
+        <span className="min-w-0 truncate font-mono text-2xs text-text-primary" title={label ?? undefined}>
+          {label ? middleEllipsis(label, 56) : ''}
+        </span>
         <span className="flex items-center gap-3 shrink-0">
           {windowed && (
             <span className="text-2xs text-text-muted">
@@ -103,13 +110,7 @@ export function AgentReadCard({ label, content, startLine = 1, totalLines }: Age
 }
 
 /* ── Search card (grep matches / glob paths) ──────── */
-export interface AgentSearchCardProps {
-  kind: 'matches' | 'paths';
-  files?: { path: string; matches: { lineNumber: number; line: string }[] }[];
-  paths?: string[];
-  total?: number;
-  truncated?: boolean;
-}
+export type AgentSearchCardProps = SearchCardModel;
 
 export function AgentSearchCard({ kind, files = [], paths = [], total, truncated }: AgentSearchCardProps) {
   const t = useT();
@@ -210,14 +211,7 @@ export function AgentSearchCard({ kind, files = [], paths = [], total, truncated
 }
 
 /* ── Web card (search sources / fetch summary) ────── */
-export interface AgentWebCardProps {
-  kind: 'search' | 'fetch';
-  answer?: string;
-  sources?: { url: string; title?: string; snippet?: string; publishedAt?: string }[];
-  url?: string;
-  statusCode?: number;
-  truncated?: boolean;
-}
+export type AgentWebCardProps = WebCardModel;
 
 function safeHref(url: string): string | undefined {
   try {
@@ -303,20 +297,53 @@ export function AgentWebCard({ kind, answer, sources = [], url, statusCode, trun
           </>
         )}
       </div>
+      {/* 抓取/读取到的正文：此前全仓库没有任何界面显示过它（只有链接与状态码）。 */}
+      {kind === 'fetch' && answer && (
+        <div className="border-t border-border-dim">
+          <div className="flex items-center justify-between gap-3 px-3 pt-2">
+            <span className="text-2xs text-text-faint">{t('tool.fetchedContent')}</span>
+            <CopyButton text={answer} />
+          </div>
+          <div className="px-3 pb-2 max-h-[320px] overflow-y-auto">
+            <pre className="m-0 font-mono text-xs leading-relaxed text-text-secondary whitespace-pre-wrap break-words">
+              {answer}
+            </pre>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Plan card (TodoWrite / Replan) ───────────────── */
+/**
+ * 计划清单：**刻意不是卡片** —— 无底色、无描边、行高紧凑。
+ * AGENTS.md 禁止卡片套卡片，而计划卡本身又总是嵌在某个容器里（执行视图的展开体）。
+ */
+export function AgentPlanCard({ steps, done, total, hiddenSteps }: PlanCardModel) {
+  const t = useT();
+  return (
+    <div className="flex flex-col gap-0.5 py-0.5" data-plan-progress={`${done}/${total}`}>
+      <div className="text-2xs text-text-muted">{t('activity.plan.progress', { done, total })}</div>
+      {steps.map((step, i) => (
+        <div key={i} className="flex items-start gap-2 text-xs leading-5">
+          <span className="shrink-0 mt-[3px]">
+            <StateDot state={step.status === 'done' ? 'done' : step.status === 'running' ? 'ongoing' : 'warning'} />
+          </span>
+          <span className={clsx('min-w-0', step.status === 'done' ? 'text-text-muted' : 'text-text-secondary')}>
+            {step.label}
+          </span>
+        </div>
+      ))}
+      {hiddenSteps > 0 && (
+        <div className="text-2xs text-text-faint">{t('activity.plan.more', { n: hiddenSteps })}</div>
+      )}
     </div>
   );
 }
 
 /* ── Diff card (Write/Edit) ───────────────────────── */
-export function AgentDiffCard({
-  oldContent,
-  newContent,
-  fileName,
-}: {
-  oldContent: string;
-  newContent: string;
-  fileName?: string;
-}) {
+export function AgentDiffCard({ oldContent, newContent, fileName }: DiffCardModel) {
   return (
     <div className="rounded-xl border border-border-default overflow-hidden">
       <DiffView oldContent={oldContent} newContent={newContent} fileName={fileName} />
@@ -325,21 +352,7 @@ export function AgentDiffCard({
 }
 
 /* ── RunCode card (program + output) ──────────────── */
-export function AgentRunCodeCard({
-  code,
-  language,
-  stdout,
-  stderr,
-  exitCode,
-  timedOut,
-}: {
-  code: string;
-  language?: string;
-  stdout?: string;
-  stderr?: string;
-  exitCode?: number | null;
-  timedOut?: boolean;
-}) {
+export function AgentRunCodeCard({ code, language, stdout, stderr, exitCode, timedOut }: CodeCardModel) {
   const t = useT();
   const output = [stdout, stderr].filter(Boolean).join('\n');
   return (

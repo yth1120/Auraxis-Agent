@@ -7,6 +7,7 @@ this client reads the port, connects, and speaks newline-delimited JSON-RPC.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import queue
@@ -16,8 +17,9 @@ import socket
 import subprocess
 import threading
 import time
+from collections import deque
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 
 class AuraxisError(RuntimeError):
@@ -50,18 +52,18 @@ def _default_main() -> str:
 
 
 class _Request:
-    __slots__ = ("event", "result", "error")
+    __slots__ = ("error", "event", "result")
 
     def __init__(self) -> None:
         self.event = threading.Event()
         self.result: Any = None
-        self.error: Optional[BaseException] = None
+        self.error: BaseException | None = None
 
 
 class AuraxisClient:
     """JSON-RPC client over one TCP connection."""
 
-    def __init__(self, sock: socket.socket, request_timeout: float = 120.0, token: Optional[str] = None) -> None:
+    def __init__(self, sock: socket.socket, request_timeout: float = 120.0, token: str | None = None) -> None:
         self._sock = sock
         self._request_timeout = request_timeout
         self._token = token
@@ -114,7 +116,7 @@ class AuraxisClient:
                 req.error = AuraxisError("Auraxis runtime closed")
                 req.event.set()
 
-    def request(self, method: str, params: Optional[dict] = None, timeout: Optional[float] = None) -> Any:
+    def request(self, method: str, params: dict | None = None, timeout: float | None = None) -> Any:
         if self._closed:
             raise AuraxisError("Auraxis client is closed")
         with self._lock:
@@ -145,9 +147,9 @@ class AuraxisClient:
     def run_agent(
         self,
         prompt: str,
-        description: Optional[str] = None,
-        subagent_type: Optional[str] = None,
-        project_root: Optional[str] = None,
+        description: str | None = None,
+        subagent_type: str | None = None,
+        project_root: str | None = None,
     ) -> Any:
         params = {
                 "prompt": prompt,
@@ -159,7 +161,7 @@ class AuraxisClient:
             params["token"] = self._token
         return self.request("agent.run", params)
 
-    def search_sessions(self, query: str, limit: Optional[int] = None) -> dict:
+    def search_sessions(self, query: str, limit: int | None = None) -> dict:
         params = {"query": query, "limit": limit}
         if self._token:
             params["token"] = self._token
@@ -169,10 +171,8 @@ class AuraxisClient:
         if self._closed:
             return
         self._closed = True
-        try:
+        with contextlib.suppress(OSError):
             self._sock.close()
-        except OSError:
-            pass
 
 
 class AuraxisRuntime:
@@ -189,21 +189,27 @@ class AuraxisRuntime:
         self.close()
 
     def close(self) -> None:
-        try:
+        with contextlib.suppress(Exception):
             self.client.close()
-        except Exception:
-            pass
         if self._proc.poll() is None:
-            try:
+            with contextlib.suppress(Exception):
                 self._proc.kill()
-            except Exception:
-                pass
+        # kill 只发信号、不回收：必须 wait 才能收尸，否则子进程以僵尸态残留，
+        # CPython 在 GC 时会告警 "subprocess ... is still running"。
+        with contextlib.suppress(Exception):
+            self._proc.wait(timeout=5)
+        # Popen 只是持有管道引用，不负责关闭；等子进程收尸后再显式关掉，
+        # 否则 GC 时同样告警 unclosed file。
+        for stream in (self._proc.stdin, self._proc.stdout, self._proc.stderr):
+            with contextlib.suppress(Exception):
+                if stream is not None:
+                    stream.close()
 
 
 def create_client(
-    electron_path: Optional[str] = None,
-    main_js: Optional[str] = None,
-    env: Optional[dict] = None,
+    electron_path: str | None = None,
+    main_js: str | None = None,
+    env: dict | None = None,
     spawn_timeout: float = 30.0,
     request_timeout: float = 120.0,
 ) -> AuraxisRuntime:
@@ -224,24 +230,52 @@ def create_client(
         stderr=subprocess.PIPE,
         env=proc_env,
     )
-    assert proc.stdout is not None
+    # 收窄必须落在局部绑定上：闭包捕获的是可变属性 proc.stdout，外层 assert 对
+    # 闭包体无效（pyright reportOptionalMemberAccess），运行期也可能被改。
+    stdout = proc.stdout
+    assert stdout is not None
 
-    lines: "queue.Queue[Optional[str]]" = queue.Queue()
+    lines: queue.Queue[str | None] = queue.Queue()
 
     def _reader() -> None:
         try:
-            for raw in iter(proc.stdout.readline, b""):
+            for raw in iter(stdout.readline, b""):
                 lines.put(raw.decode("utf-8", "replace"))
+        except (OSError, ValueError):
+            # 关闭 close() 会显式关掉管道，阻塞中的 readline 会抛 ValueError。
+            pass
         finally:
             lines.put(None)
 
     threading.Thread(target=_reader, daemon=True).start()
 
-    port: Optional[int] = None
+    # stderr 必须持续排空：只设 PIPE 而不读，子进程一旦写满管道缓冲就会永久阻塞，
+    # 而父进程还在等端口 —— 最终以一句毫无线索的超时收场。排空线程在整个会话期间
+    # 保持存活，并保留末尾若干行用于失败诊断（对应 TS SDK 的 onStderr）。
+    stderr = proc.stderr
+    stderr_tail: deque[str] = deque(maxlen=50)
+
+    def _drain_stderr() -> None:
+        if stderr is None:
+            return
+        try:
+            for raw in iter(stderr.readline, b""):
+                stderr_tail.append(raw.decode("utf-8", "replace").rstrip())
+        except (OSError, ValueError):
+            pass
+
+    def stderr_hint() -> str:
+        if not stderr_tail:
+            return ""
+        return "\n--- runtime stderr (tail) ---\n" + "\n".join(stderr_tail)
+
+    threading.Thread(target=_drain_stderr, daemon=True).start()
+
+    port: int | None = None
     deadline = time.monotonic() + spawn_timeout
     while time.monotonic() < deadline:
         if proc.poll() is not None:
-            raise AuraxisError(f"Auraxis runtime exited (code={proc.returncode})")
+            raise AuraxisError(f"Auraxis runtime exited (code={proc.returncode}){stderr_hint()}")
         try:
             line = lines.get(timeout=0.2)
         except queue.Empty:
@@ -255,7 +289,7 @@ def create_client(
 
     if port is None:
         proc.kill()
-        raise AuraxisError("Auraxis runtime 未在超时内输出 SDK 端口")
+        raise AuraxisError(f"Auraxis runtime 未在超时内输出 SDK 端口{stderr_hint()}")
 
     sock = socket.create_connection(("127.0.0.1", port), timeout=10)
     client = AuraxisClient(sock, request_timeout, token)

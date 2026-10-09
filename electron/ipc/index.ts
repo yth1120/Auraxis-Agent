@@ -12,10 +12,12 @@ import { registerContextHandlers } from './context-handlers';
 import { registerPermissionHandlers } from './permission-handlers';
 import { loadPermissionRules } from './permission-handlers';
 import { registerMcpHandlers } from './mcp-handlers';
+import { registerGitHandlers } from './git-handlers';
 import { registerAgentHandlers } from './agent-handlers';
 import { registerSystemHandlers } from './system-handlers';
 import { registerUpdateHandlers } from './update-handlers';
 import { registerMemoryIpc } from './memory-ipc';
+import { registerBrowserHandlers } from './browser-handlers';
 import { registerSchedulerIpc } from './agent-scheduler';
 import { registerConflictIpc } from './conflict-detector';
 import { registerUndoIpc } from './undo-manager';
@@ -58,6 +60,7 @@ import { getAllModels } from './model-config';
 import { resolveTrustedProjectRoot } from './project-access';
 import { getActiveWorktree } from './tool-handlers';
 import { installAgentRuntimePorts } from './runtime-ports';
+import { registerAiSdkAdapter } from '../agent-runtime/llm-adapter-ai-sdk';
 
 /** Windows 11 build 22000+ exposes the native Mica/Acrylic material API. */
 export function isWindows11(): boolean {
@@ -144,7 +147,9 @@ function registerWindowHandlers() {
         win.setBackgroundMaterial('acrylic');
       } else {
         win.setBackgroundMaterial('none');
-        win.setBackgroundColor('#0a0202');
+        // 保持窗口透明：不透明底色会在页面的圆角之外露出一圈方角矩形，
+        // 四角就永远是直的。页面自身用 #root 铺不透明底，视觉上没有变化。
+        win.setBackgroundColor('#00000000');
       }
       return { ok: true };
     } catch (error: unknown) {
@@ -332,6 +337,12 @@ export function registerIpcHandlers() {
   // agent-runtime 宿主端口必须在任何引擎调用之前装配（P2 依赖倒置）。
   installAgentRuntimePorts();
 
+  // 注册官方 AI SDK 适配器：OpenAI 兼容线默认走它（见 llm-adapter 的
+  // resolveLlmGateway）。注册动作放在组合根而非 seam，是为了让 llm-adapter 不必
+  // 反向 import 实现（那条边会与 ai-sdk → llm-adapter 构成环，环预算为 0）。
+  // 未注册时网关判定自动失效、回退内置实现，因此测试可各自选择是否注册。
+  registerAiSdkAdapter();
+
   registerWindowHandlers();
 
   registerShellHandlers();
@@ -352,10 +363,12 @@ export function registerIpcHandlers() {
   registerAskHandlers();
   registerRuntimeInspectIpc();
   registerMcpHandlers();
+  registerGitHandlers();
   registerAgentHandlers();
   registerSystemHandlers();
   registerUpdateHandlers();
   registerMemoryIpc();
+  registerBrowserHandlers();
   registerSchedulerIpc();
   registerConflictIpc();
   registerUndoIpc();

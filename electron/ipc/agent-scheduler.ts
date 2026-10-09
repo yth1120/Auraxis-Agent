@@ -1,5 +1,6 @@
 import { errorText } from '../errors';
 import { BrowserWindow, app } from 'electron';
+import { createElectronSchedulerNotifier } from './agent-scheduler-notifier';
 import { secureHandle } from './trust';
 import { approveSubAgentDelivery } from './agent-subagent-registry';
 import { resolveTrustedProjectRoot } from './project-access';
@@ -42,14 +43,14 @@ export function registerSchedulerIpc() {
         ? () => Promise.resolve(true)
         : async (toolName: string, input: Record<string, unknown>, toolCallId?: string, agentId?: string) => {
             if (!sender || sender.isDestroyed()) return false;
-            const win = BrowserWindow.fromWebContents(sender) || null;
+            const notifier = createElectronSchedulerNotifier(BrowserWindow.fromWebContents(sender) || null);
             // The auto tier's review gate must always ask, even though the
             // task itself runs in auto mode — otherwise shouldAutoApprove
             // would silently approve the "continue after failed review?"
             // checkpoint. Forcing mode 'ask' for this synthetic request keeps
             // the pause real without changing the task's own policy.
             const isReviewGate = toolName === 'ReviewArtifact' && input?.action === 'continue_after_failed_review';
-            return requestPermission(toolName, input, win!, toolCallId, {
+            return requestPermission(toolName, input, notifier, toolCallId, {
               mode:
                 isReviewGate || params.config.workTier === 'full' ? 'ask' : normalizeApprovalPolicy(params.config.mode),
               approvedPlanSteps: params.config.approvedPlanSteps,

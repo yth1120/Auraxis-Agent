@@ -33,18 +33,22 @@ export default class ErrorBoundary extends Component<Props, State> {
     if (this.state.hasError) {
       if (this.props.fallback) return this.props.fallback;
 
+      // 页面底色要的是「应用主背景」`--color-bg-primary`。写成 `bg-primary` 会解析成
+      // **品牌墨黑** `--color-primary`：浅色下整屏近黑、配 `text-text-primary` 就是
+      // 黑底黑字（对比度 1.00），深色下反过来变 1.02。
       return (
-        <div className="flex items-center justify-center h-screen bg-primary p-6">
-          <div className="bg-secondary border border-dim rounded-md shadow-lg overflow-hidden max-w-[420px] w-full">
+        <div className="flex items-center justify-center h-screen bg-bg-primary p-6">
+          <div className="bg-bg-secondary border border-border-dim rounded-md shadow-lg overflow-hidden max-w-[420px] w-full">
             <div className="h-[3px] bg-[var(--color-primary)]" />
             <div className="p-8 text-center">
               <h2 className="font-heading text-xl font-semibold text-text-primary m-0 mb-2">{t('error.title')}</h2>
-              <p className="text-xs text-muted m-0 mb-1 px-3 py-2 bg-danger-soft rounded-md font-mono break-all">
+              <p className="text-xs text-text-muted m-0 mb-1 px-3 py-2 bg-danger-soft rounded-md font-mono break-all">
                 {this.state.error?.message || t('error.unknown')}
               </p>
-              <p className="text-xs text-faint mt-3 mb-6">{t('error.hint')}</p>
+              <p className="text-xs text-text-faint mt-3 mb-6">{t('error.hint')}</p>
               <button
-                className="inline-flex items-center gap-2 bg-accent text-on-accent border-none rounded-md px-5 py-2 font-body text-sm font-medium cursor-pointer transition-colors duration-normal ease-out hover:bg-accent-hover"
+                data-filled
+                className="inline-flex items-center gap-2 bg-accent text-text-on-accent border-none rounded-md px-5 py-2 font-body text-sm font-medium cursor-pointer transition-colors duration-200 ease-out hover:bg-accent-hover"
                 onClick={this.handleReset}
               >
                 {t('error.recover')}

@@ -46,10 +46,10 @@ export function SettingsAppearancePane() {
 
   return (
     <>
-      <SettingsPaneHeader title={t('settings.item.appearance')} description={t('settings.pane.appearance.desc')} />
+      <SettingsPaneHeader title={t('settings.item.appearance')} />
       <SettingsSectionTitle>{t('settings.section.language')}</SettingsSectionTitle>
       <section className="mb-2">
-        <SettingItem title={t('settings.language.label')} description={t('settings.language.desc')} noBorder>
+        <SettingItem title={t('settings.language.label')} noBorder>
           <Select
             value={locale}
             onChange={(value) => setLocale(value)}
@@ -63,7 +63,7 @@ export function SettingsAppearancePane() {
       </section>
       <SettingsSectionTitle>{t('settings.section.theme')}</SettingsSectionTitle>
       <section className="mb-2">
-        <SettingItem title={t('settings.theme.mode')} description={t('settings.theme.mode.desc')} noBorder>
+        <SettingItem title={t('settings.theme.mode')} noBorder>
           <Segmented
             value={themeMode}
             onChange={(value) => setTheme(value as 'system' | 'light' | 'dark')}

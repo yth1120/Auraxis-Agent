@@ -1,22 +1,25 @@
 /** agent-scheduler-runtime.ts — scheduler run preparation and loop parameter builders. */
-import type { BrowserWindow } from 'electron';
 import { TOOL_DEFINITIONS } from '../tool-defs';
 // agent-handlers 只是再导出 agent-defs，直连可避免 scheduler → handler 的反向依赖。
 import { getAgentDef } from './agent-defs';
 import { appendWorkDocsSystemRule } from '../work-docs-policy';
 import { readSettings } from './settings-store';
 import { resolveModelApiBase, resolveModelApiKey } from './model-config';
+import { routeModel } from '../agent-runtime/model-router';
+import { selectToolsForTask } from '../agent-runtime/tool-catalog';
+import { TOOL_SEARCH_DEF } from '../agent-runtime/tool-catalog';
 import { isPermissionPreset, PERMISSION_PRESETS } from '../contracts/permission';
 import { waitForPlanApproval } from './plan-handlers';
 import { appendAgentLog } from '../session-log';
 import { broadcast, notifyFrontend } from './agent-scheduler-support';
+import { trackTokens } from './stats-handlers';
 import type {
   AgentLoopConfig,
   AgentLoopEvent,
   AgentObserver,
   AgentStateSnapshot,
 } from '../agent-runtime/agent-loop-types';
-import type { AgentInstance } from './agent-scheduler-types';
+import type { AgentInstance, SchedulerNotifier } from './agent-scheduler-types';
 import type { ApprovalPolicy } from '../types';
 import type { SandboxMode } from '../sandbox-policy';
 
@@ -39,30 +42,42 @@ export function prepareAgentPrompt(inst: AgentInstance): void {
 
 export function selectAgentTools(inst: AgentInstance): typeof TOOL_DEFINITIONS {
   const toolNames = new Set(inst.config.tools || []);
-  if (toolNames.size === 0) return TOOL_DEFINITIONS;
+  // 未显式指定工具时按任务预选（动态装载）：少给集成/元工具，省掉每轮固定 schema 开销。
+  if (toolNames.size === 0) {
+    return selectToolsForTask([...TOOL_DEFINITIONS], {
+      task: inst.config.description || inst.config.displayDescription || inst.config.name || '',
+      surface: inst.config.surface,
+    }).concat([TOOL_SEARCH_DEF]) as typeof TOOL_DEFINITIONS;
+  }
   return TOOL_DEFINITIONS.filter((t) => toolNames.has(t.name));
 }
 
 export function createAgentObserver(
   instances: Map<string, AgentInstance>,
   agentId: string,
-  win: BrowserWindow | null,
+  notifier: SchedulerNotifier | null,
 ): AgentObserver {
   return {
     emit: (event: AgentLoopEvent) => {
       // Forward raw event to the renderer. The `agent:event:${id}` channel
       // is consumed by useAgentStore's per-agent subscription, which expects
       // the unprefixed event.type (text_chunk, tool_start, etc.).
-      broadcast(win, agentId, event);
+      broadcast(notifier, agentId, event);
       const i = instances.get(agentId);
       if (!i) return;
       if (event.type === 'tool_start') i.toolCallCount++;
       if (event.type === 'iteration_start') i.iterations = event.iteration;
+      // 调度器的用量此前只广播给前端，从不进统计 —— 于是设置面板的 token 数只涵盖
+      // Chat 查询路径，Agent 真正跑掉的量一直没记账。这里补上与 query-engine 同一个入口。
+      // （只认引擎的 `usage`：`usage_update` 是 event-bridge 给前端的同义事件，两者一起认会重复计。）
+      if (event.type === 'usage') {
+        void trackTokens(event.inputTokens, event.outputTokens).catch(() => {});
+      }
       if (event.type === 'plan_created' || event.type === 'plan_updated') {
         i.plan = event.plan;
         // Plan changed → push a fresh agent:updated so AgentDashboard's
         // {todos} progress bar refreshes without waiting for refreshStates.
-        notifyFrontend(win, i);
+        notifyFrontend(notifier, i);
       }
       // Work 交付物结构化采集：Write/Edit/NotebookEdit 成功即登记，
       // 验收面板不再只靠日志反推。
@@ -110,12 +125,28 @@ export interface SchedulerRunContext {
 
 export async function resolveAgentRunContext(inst: AgentInstance): Promise<SchedulerRunContext> {
   const runtimeSettings = (await readSettings().catch(() => null)) ?? {};
-  const model: string =
+  const baseModel: string =
     typeof runtimeSettings.executeModel === 'string' && runtimeSettings.executeModel
       ? String(runtimeSettings.executeModel)
       : inst.config.model || 'deepseek-v4-pro';
   const planModel: string =
-    typeof runtimeSettings.planModel === 'string' && runtimeSettings.planModel ? runtimeSettings.planModel : model;
+    typeof runtimeSettings.planModel === 'string' && runtimeSettings.planModel ? runtimeSettings.planModel : baseModel;
+  // 难度路由：按任务文本选档位；未配置 fastModel/strongModel 时行为与从前一致。
+  const routing = routeModel(
+    inst.config.description || inst.config.displayDescription || inst.config.name || '',
+    {
+      model: baseModel,
+      ...(typeof runtimeSettings.fastModel === 'string' && runtimeSettings.fastModel
+        ? { fastModel: runtimeSettings.fastModel }
+        : {}),
+      ...(typeof runtimeSettings.strongModel === 'string' && runtimeSettings.strongModel
+        ? { strongModel: runtimeSettings.strongModel }
+        : {}),
+      planModel,
+    },
+    { explicitModel: inst.config.model },
+  );
+  const model: string = routing.model;
   const apiBase = await resolveModelApiBase(model);
   const modelApiKey: string = (await resolveModelApiKey(model)) || '';
   const presetSpec =
@@ -141,7 +172,7 @@ export async function resolveAgentRunContext(inst: AgentInstance): Promise<Sched
 
 export interface BuildAgentLoopOptionsArgs {
   inst: AgentInstance;
-  win: BrowserWindow | null;
+  notifier: SchedulerNotifier | null;
   tools: typeof TOOL_DEFINITIONS;
   checkPermission?: (
     toolName: string,
@@ -155,7 +186,7 @@ export interface BuildAgentLoopOptionsArgs {
 }
 
 export function buildAgentLoopOptions(args: BuildAgentLoopOptionsArgs): AgentLoopConfig {
-  const { inst, win, tools, checkPermission, runtime, resumeFrom, messageQueue } = args;
+  const { inst, notifier, tools, checkPermission, runtime, resumeFrom, messageQueue } = args;
   const boundCheckPermission = checkPermission
     ? (tn: string, inp: Record<string, unknown>, tcid?: string) => checkPermission(tn, inp, tcid, inst.agentId)
     : () => Promise.resolve(true);
@@ -184,7 +215,7 @@ export function buildAgentLoopOptions(args: BuildAgentLoopOptionsArgs): AgentLoo
         : (inst.config.reasoningEffort as 'low' | 'high' | 'max' | undefined),
     toolChoice: inst.config.toolChoice,
     onPlanGenerated: (plan) =>
-      waitForPlanApproval(plan, win, {
+      waitForPlanApproval(plan, notifier, {
         projectRoot: inst.projectPath,
         title: inst.config.name,
         agentId: inst.agentId,

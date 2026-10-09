@@ -16,7 +16,7 @@ export function SettingsPluginsPane() {
   const disablePlugin = usePluginStore((s) => s.disablePlugin);
   return (
     <>
-      <SettingsPaneHeader title={t('settings.item.plugins')} description={t('settings.pane.plugins.desc')} />
+      <SettingsPaneHeader title={t('settings.item.plugins')} />
       <div className="flex items-center justify-between mb-1">
         <span className="text-sm font-semibold text-text-primary">
           {t('settings.installedN', { n: installedPlugins.length })}

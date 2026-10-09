@@ -49,6 +49,8 @@ function handleToolStart(ctx: QueryEventDeps, event: ToolLifecycleEvent): void {
     toolCallId: event.toolCallId,
     requestId: event.requestId,
     input: event.input,
+    // 分组键必须落盘：只放在内存的 ToolCall 上时，刷新后同一轮的并行批会全部塌平。
+    stepGroupId: event.stepGroupId,
   });
   ctx.flushAll();
   useInspectorStore.getState().incrementActiveTools();
@@ -100,6 +102,10 @@ function handleToolEnd(ctx: QueryEventDeps, event: ToolLifecycleEvent): void {
     toolCallId: event.toolCallId,
     requestId: event.requestId,
     output: event.output,
+    stepGroupId: event.stepGroupId,
+    durationMs: event.durationMs,
+    // 引擎的摘要事实与耗时同样要落盘，否则刷新后只剩一个光秃秃的工具名。
+    ...(event.summary ? { summary: event.summary } : {}),
   });
   ctx.flushAll();
   useInspectorStore.getState().decrementActiveTools();
@@ -112,6 +118,9 @@ function handleToolEnd(ctx: QueryEventDeps, event: ToolLifecycleEvent): void {
       status: 'done',
       output: event.output,
       endTime: event.timestamp,
+      ...(event.durationMs !== undefined ? { durationMs: event.durationMs } : {}),
+      // 摘要用引擎算好的那份（buildToolSummary），不再由 UI 从入参重推。
+      ...(event.summary ? { summary: event.summary } : {}),
       ...(oldContent !== undefined ? { oldContent } : {}),
       ...(newContent !== undefined ? { newContent } : {}),
     }),
@@ -133,13 +142,24 @@ function handleToolError(ctx: QueryEventDeps, event: ToolLifecycleEvent): void {
     toolCallId: event.toolCallId,
     requestId: event.requestId,
     error: event.error,
+    stepGroupId: event.stepGroupId,
   });
   handleSettledTool(ctx, event, { status: 'error', error: event.error, endTime: event.timestamp });
 }
 
 function handleToolAborted(ctx: QueryEventDeps, event: ToolLifecycleEvent): void {
+  // 中止（用户取消 / 权限被拒）是**终态里的独立一种**，不是"完成但报错"。
+  // 从前记成 status:'done' + error 文本，界面上就显示成「已完成」——见 types/tools.ts 的说明。
+  ctx.chatLog?.queue(ctx.logSessionId, 'tool', {
+    action: 'aborted',
+    toolName: event.toolName,
+    toolCallId: event.toolCallId,
+    requestId: event.requestId,
+    error: event.error,
+    stepGroupId: event.stepGroupId,
+  });
   handleSettledTool(ctx, event, {
-    status: 'done',
+    status: 'cancelled',
     error: event.error,
     endTime: event.timestamp,
     streamOutput: undefined,
@@ -240,7 +260,7 @@ export function createQueryEventHandler(deps: QueryEventDeps) {
       case 'tool_aborted':
         return handleToolAborted(deps, event);
       case 'iteration':
-        deps.set({ currentIteration: event.iteration, maxIterations: event.maxIterations });
+        deps.set({ currentIteration: event.iteration, maxIterations: event.maxIterations ?? null });
         return;
       case 'system_message':
         useInspectorStore.getState().addSystemMessage({

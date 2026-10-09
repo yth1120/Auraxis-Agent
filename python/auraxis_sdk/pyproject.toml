@@ -1,15 +1,68 @@
 [build-system]
-requires = ["setuptools>=61"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "auraxis-sdk"
-version = "3.4.0"
+version = "3.5.0"
 description = "Python client SDK for driving an Auraxis runtime over JSON-RPC 2.0 (loopback TCP)"
 requires-python = ">=3.9"
 readme = "README.md"
-license = { text = "MIT" }
+license = "MIT"
+authors = [{ name = "Auraxis" }]
+keywords = ["ai", "agent", "auraxis", "sdk", "json-rpc"]
+# 许可证用 PEP 639 的 SPDX 表达式（上面的 license 字段），因此不再列
+# "License :: OSI Approved :: MIT License" 分类器 —— 两者并用 setuptools 会发废弃警告。
+# 构建隔离会自动取到满足 requires 的 setuptools，无需本机预装新版。
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+]
+
+[project.urls]
+Homepage = "https://github.com/yth1120/Auraxis-Agent"
+Repository = "https://github.com/yth1120/Auraxis-Agent"
+Issues = "https://github.com/yth1120/Auraxis-Agent/issues"
+
+# 开发工具链（ruff 静态检查 / pytest 测试）。版本钉死，与 CI 安装的一致，
+# 避免"本地过、CI 挂"这类不可复现的差异。
+[project.optional-dependencies]
+dev = ["ruff==0.16.10", "pytest==9.1.1"]
 
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["auraxis_sdk*"]
+
+[tool.ruff]
+# 包声明 requires-python >= 3.9，静态检查按同一口径判定可用语法。
+target-version = "py39"
+# 与仓库 Prettier 的 printWidth 对齐。
+line-length = 120
+src = ["auraxis_sdk", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
+ignore = [
+  # BLE001：SDK 需要把任意后端异常转成可读错误，此处按需保留裸 except。
+  "BLE001",
+  # RUF001/RUF003：中文注释与文案里的全角标点（：、（）等）是刻意的，不是笔误。
+  "RUF001",
+  "RUF003",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# 测试与假 runtime 允许使用断言式写法与较长函数。
+"tests/*" = ["S101"]
+
+[tool.pyright]
+include = ["auraxis_sdk", "tests"]
+pythonVersion = "3.9"
+typeCheckingMode = "basic"
+reportMissingImports = "error"
+reportUnnecessaryTypeIgnoreComment = "warning"

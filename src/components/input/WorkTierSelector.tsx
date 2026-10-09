@@ -68,7 +68,6 @@ export default function WorkTierSelector({ popDirection = 'up' }: WorkTierSelect
       ariaLabel={t('work.tier.title')}
       title={t('work.tier.title')}
       current={t(TIER_LABEL_KEY[tier])}
-      popDirection={popDirection}
       footer={
         <button
           type="button"
@@ -109,8 +108,12 @@ export default function WorkTierSelector({ popDirection = 'up' }: WorkTierSelect
       onOpenChange={setOpen}
       menu={{ items: [] }}
       popupRender={() => panel}
+      // 直接弹出：连 Dropdown 外层的 slide 入场也一并关掉（见 overrides.css）
+      classNames={{ root: 'ax-composer-popup' }}
       trigger={['click']}
       placement={popDirection === 'down' ? 'bottomLeft' : 'topLeft'}
+      // 向上弹出时再抬高一点，避免贴着输入框
+      align={{ offset: popDirection === 'down' ? [0, 6] : [0, -6] }}
     >
       <button
         type="button"

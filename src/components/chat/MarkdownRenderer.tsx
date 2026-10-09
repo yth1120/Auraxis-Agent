@@ -132,7 +132,14 @@ const MarkdownBody = memo(function MarkdownBody({ content, onApplyCode, onPrevie
             );
           },
           table({ children }) {
-            return <table className="border-collapse w-full my-4 rounded-xl overflow-hidden text-sm">{children}</table>;
+            // 外面必须包一层横向滚动容器：表格 min-content 超过正文列宽时，
+            // 裸 table 会把**整条消息列表**（Virtuoso 的滚动层）撑出横向滚动，
+            // 于是所有消息一起左右平移。包一层后只有表格自己滚。
+            return (
+              <div className="my-4 overflow-x-auto">
+                <table className="border-collapse w-full rounded-xl overflow-hidden text-sm">{children}</table>
+              </div>
+            );
           },
           blockquote({ children }) {
             return (

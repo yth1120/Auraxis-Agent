@@ -1,0 +1,16 @@
+{
+  "id": "coding-006-decoy-file",
+  "category": "coding",
+  "task": "把 src/config.ts 的 retryCount 改成 5；src/legacy/config.ts 是历史备份，必须保持原样。",
+  "fixture": "basic-project",
+  "checks": [
+    { "id": "retry-updated", "kind": "file_contains", "path": "src/config.ts", "needle": "retryCount = 5" },
+    { "id": "decoy-untouched", "kind": "file_unchanged", "path": "src/legacy/config.ts" },
+    { "id": "scope", "kind": "no_unexpected_changes", "allow": ["src/config.ts"] }
+  ],
+  "tools": {
+    "expect": ["Read", "Edit"],
+    "requireArgs": { "Edit": ["file_path"] }
+  },
+  "process": { "maxFailedToolCalls": 3, "maxIterations": 12 }
+}

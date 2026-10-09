@@ -152,7 +152,7 @@ export default function AccountPane() {
 
   return (
     <div className="mb-6 flex flex-col gap-3">
-      <SettingItem title={t('auth.account')} description={t('auth.accountDesc')}>
+      <SettingItem title={t('auth.account')}>
         <div className="flex flex-col gap-3 w-full">
           <div className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl bg-[var(--color-bg-secondary)] border border-[var(--color-border-dim)]">
             <Avatar name={name || email} src={avatar} size={44} />
@@ -211,7 +211,7 @@ export default function AccountPane() {
       </SettingItem>
 
       <div className="mt-1">
-        <SettingItem title={t('auth.changePassword')} description={t('auth.changePasswordDesc')}>
+        <SettingItem title={t('auth.changePassword')}>
           <div className="flex flex-col gap-2 w-full">
             <Input.Password
               value={currentPwd}
@@ -245,7 +245,7 @@ export default function AccountPane() {
         </SettingItem>
       </div>
 
-      <SettingItem title={t('auth.session')} description={t('auth.sessionDesc')}>
+      <SettingItem title={t('auth.session')}>
         <Button danger onClick={confirmLogout} className="self-start">
           {t('auth.logout')}
         </Button>

@@ -1,6 +1,7 @@
 /** memory-db-sqlite-schema.ts — SQLite schema initialization and legacy migration. */
 import type { SqliteLike } from '../session-projection-cache';
 import { legacyTypeToKind, type MemoryRecord } from './memory-db-types';
+import { ensureMemoryFts } from './memory-fts';
 
 export function initializeSqliteSchema(db: SqliteLike): void {
   db.exec(`
@@ -128,6 +129,11 @@ export function initializeSqliteSchema(db: SqliteLike): void {
     );
     CREATE INDEX IF NOT EXISTS idx_erase_audits_scope ON erase_audits(scope, ts);
   `);
+
+  // 记忆全文索引（FTS5 + trigram + 外部内容表，触发器自动同步）。
+  // 放在 schema 建成之后：外部内容表需要 beliefs / evidence 已存在。
+  // 失败不抛出 —— 老 SQLite 无 trigram 时由检索侧退回 LIKE。
+  ensureMemoryFts(db);
 }
 
 export function migrateLegacyMemories(db: SqliteLike): void {

@@ -47,17 +47,17 @@ export default function MermaidBlock({ code }: MermaidBlockProps) {
 
   if (error) {
     return (
-      <div className="my-2.5 border border-dim rounded-lg overflow-hidden contain-[layout_style_paint]">
+      <div className="my-2.5 border border-border-dim rounded-lg overflow-hidden contain-[layout_style_paint]">
         <div className="px-4 py-3 bg-danger-soft border-l-[3px] border-l-danger">
           <span className="text-sm font-semibold text-text-secondary">{tPanel('mermaid.renderFailedTitle')}</span>
-          <pre className="mt-2 text-xs text-secondary font-mono whitespace-pre-wrap">{error}</pre>
+          <pre className="mt-2 text-xs text-text-secondary font-mono whitespace-pre-wrap">{error}</pre>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="my-2.5 border border-dim rounded-lg overflow-hidden contain-[layout_style_paint]">
+    <div className="my-2.5 border border-border-dim rounded-lg overflow-hidden contain-[layout_style_paint]">
       {svg ? (
         <div
           ref={containerRef}
@@ -65,7 +65,7 @@ export default function MermaidBlock({ code }: MermaidBlockProps) {
           dangerouslySetInnerHTML={{ __html: svg }}
         />
       ) : (
-        <div className="py-6 text-center text-sm text-muted">{tPanel('mermaid.rendering')}</div>
+        <div className="py-6 text-center text-sm text-text-muted">{tPanel('mermaid.rendering')}</div>
       )}
     </div>
   );

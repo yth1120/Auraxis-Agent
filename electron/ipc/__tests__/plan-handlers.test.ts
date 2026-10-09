@@ -25,7 +25,8 @@ const plan = {
 } as any;
 
 function makeWin() {
-  return { isDestroyed: () => false, webContents: { send: vi.fn() } };
+  const send = vi.fn();
+  return { isDestroyed: () => false, webContents: { send }, send, isAlive: () => true };
 }
 
 beforeEach(() => {
@@ -57,7 +58,8 @@ describe('waitForPlanApproval', () => {
 
   it('窗口销毁时不发事件，仍可审批', async () => {
     vi.useFakeTimers();
-    const win = { isDestroyed: () => true, webContents: { send: vi.fn() } };
+    const deadSend = vi.fn();
+    const win = { isDestroyed: () => true, webContents: { send: deadSend }, send: deadSend, isAlive: () => false };
     const p = waitForPlanApproval(plan, win as any, {});
     expect(win.webContents.send).not.toHaveBeenCalled();
     await vi.runAllTicks();

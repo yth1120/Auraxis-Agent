@@ -21,15 +21,36 @@ describe('frontend perf guards', () => {
     expect(list).toContain('increaseViewportBy');
   });
 
-  it('chat bubbles and tool cards are memoized', () => {
+  it('chat bubbles and activity rows are memoized', () => {
     for (const rel of [
       'components/chat/MessageBubble.tsx',
       'components/chat/UserMessage.tsx',
       'components/chat/AssistantMessage.tsx',
-      'components/chat/ToolCallCard.tsx',
+      // 执行视图（替代原 ToolCallCard / ToolCallTimeline）：每行都随流式事件重渲染，
+      // 不 memo 化会让一次长跑把整棵 Run 重算。
+      'components/activity/AgentRun.tsx',
+      'components/activity/ActivityItem.tsx',
+      'components/activity/ActivityList.tsx',
+      'components/activity/ActivityDetail.tsx',
     ]) {
       expect(src(rel)).toMatch(/memo\(/);
     }
+  });
+
+  /**
+   * 分派必须走注册表，而不是漏 case 会静默返回 undefined 的 switch ——
+   * 那种"编译通过、屏幕上什么都不显示"的退化最难查。
+   */
+  it('tool output cards are dispatched through an exhaustive registry', () => {
+    const card = src('components/agent/ToolOutputCard.tsx');
+    expect(card).toContain('RENDERERS');
+    expect(card).not.toMatch(/switch\s*\(\s*card\.card\s*\)/);
+    expect(card).toContain('CardRenderers');
+  });
+
+  it('activity card order and detail dispatch tables are declared once', () => {
+    expect(src('core/activity/agentCards.ts')).toContain('CARD_ORDER');
+    expect(src('core/activity/presentation.ts')).toContain('DETAIL_BY_TYPE');
   });
 
   it('StatsHeatmap uses echarts/core selective imports', () => {

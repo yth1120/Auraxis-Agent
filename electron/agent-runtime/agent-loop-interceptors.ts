@@ -36,6 +36,26 @@ export function createPlanIntercept(
   } = ctx;
 
   return async (tc) => {
+    // 发现入口：按需放开工具分组（就地更新 engine 的工具表，下一步即可调用）。
+    if (tc.name === 'ToolSearch') {
+      const { runtimePorts } = await import('./ports');
+      const { resolveToolSearch } = await import('./tool-catalog');
+      const args = (tc.input ?? {}) as { groups?: string[]; query?: string };
+      const all = runtimePorts().listTools();
+      const current = config.tools ?? all;
+      const added = resolveToolSearch(all, args, current);
+      if (added.length > 0) {
+        const next = [...current, ...added];
+        config.tools = next;
+        updateEngine({ tools: next });
+      }
+      return {
+        output: {
+          enabled: added.map((t) => t.name),
+          note: added.length ? '已放开这些工具，可直接调用。' : '没有匹配到新的工具分组。',
+        },
+      };
+    }
     let activePlan = readActivePlan();
     let mode = readMode();
 

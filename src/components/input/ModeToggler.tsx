@@ -3,6 +3,7 @@ import { Brain, CaretDown, Check as CheckIcon } from '@/components/common/icons'
 import { useChatStore } from '../../stores/useChatStore';
 import { useAppStore } from '../../stores/useAppStore';
 import { BUILT_IN_MODELS } from '../../types/chat';
+import { resolveModelId } from '../../types/chat';
 import clsx from 'clsx';
 import { useT, type I18nKey } from '../../i18n';
 import { ThinkingDepthSelector, THINKING_LEVELS, type ThinkingLevel } from './ThinkingDepthSelector';
@@ -20,8 +21,10 @@ const THINKING_DESC_KEY: Record<ThinkingLevel, I18nKey> = {
   high: 'think.high.desc',
 };
 
+/** 显示名：旧模型名先规范化到当前名，避免旧 id 以裸字符串漏到界面上。 */
 function modelName(modelId: string): string {
-  return BUILT_IN_MODELS.find((m) => m.id === modelId)?.name ?? modelId;
+  const id = resolveModelId(modelId);
+  return BUILT_IN_MODELS.find((m) => m.id === id)?.name ?? id;
 }
 
 function modelDescriptionKey(modelId: string): I18nKey {
@@ -71,7 +74,11 @@ export const ModeTrigger = memo(
         aria-expanded={open}
       >
         <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{modelName(selectedModel)}</span>
-        {showEffort && <span className="shrink-0 text-text-muted">/ {effortLabel}</span>}
+        {/* 窄主列（右栏拖满时主区只有 480px）下让出「思考档位」：它占 ~80px，
+            不让出去整排就装不下，发送键会被挤出可视区。档位本身就在点击展开的
+            面板里，所以这里是**降级展示**而不是丢功能。容器查询而非媒体查询 ——
+            窗口可以很宽而主列很窄。 */}
+        {showEffort && <span className="shrink-0 text-text-muted @max-[560px]:hidden">/ {effortLabel}</span>}
         <ChevronDown open={open} />
       </button>
     );
@@ -139,11 +146,6 @@ export const ModePanelContent = memo(function ModePanelContent({ onSelect }: { o
                 >
                   {m.name}
                 </span>
-                {m.legacy && (
-                  <span className="inline-flex h-4 shrink-0 items-center whitespace-nowrap rounded-full px-1.5 text-[10px] leading-4 font-medium bg-[var(--color-bg-inset)] text-text-muted">
-                    {t('model.legacy')}
-                  </span>
-                )}
                 {m.experimental && (
                   <span className="inline-flex h-4 shrink-0 items-center whitespace-nowrap rounded-full px-1.5 text-[10px] leading-4 font-medium bg-[var(--color-warning-soft)] text-warning">
                     {t('model.experimental')}

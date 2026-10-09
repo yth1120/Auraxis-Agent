@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Button, Checkbox, Input, Space, List, Tag, message, Popconfirm } from 'antd';
+import { Button, Checkbox, Input, Space, List, Tag, message, Popconfirm, Segmented } from 'antd';
 import {
   PlusCircle as PlusCircleOutlined,
   MinusCircle as MinusCircleOutlined,
@@ -8,12 +8,32 @@ import {
   Globe,
 } from '@/components/common/icons';
 import DeepSeekHarnessIcon from '@/components/common/DeepSeekHarnessIcon';
-import type { MCPServerConfig, MCPStatus } from '../../types/advanced';
+import type { MCPServerConfig, MCPStatus, MCPTransportKind } from '../../types/advanced';
+import { mcpTokenCredentialName } from '../../types/advanced';
 import { useAdvancedStore } from '../../stores/useAdvancedStore';
 import { useT } from '../../i18n';
 
 function generateId(): string {
   return `mcp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+}
+
+/** 把 "Key: Value" 逐行文本解析成请求头对象；非法行直接忽略。 */
+export function parseHeaderLines(text: string): Record<string, string> {
+  const headers: Record<string, string> = {};
+  for (const line of text.split('\n')) {
+    const idx = line.indexOf(':');
+    if (idx <= 0) continue;
+    const key = line.slice(0, idx).trim();
+    const value = line.slice(idx + 1).trim();
+    if (key && value) headers[key] = value;
+  }
+  return headers;
+}
+
+/** 服务端会按 url 推断传输，这里给出与主进程一致的展示口径。 */
+export function transportOf(server: MCPServerConfig): MCPTransportKind {
+  if (server.transport === 'http' || server.transport === 'stdio') return server.transport;
+  return server.url ? 'http' : 'stdio';
 }
 
 const DEEPSEEK_HARNESS_PRESET: Omit<MCPServerConfig, 'enabled'> = {
@@ -55,6 +75,11 @@ export default function MCPSettings({ servers, statuses, onUpdateServers }: MCPS
   const [newName, setNewName] = useState('');
   const [newCommand, setNewCommand] = useState('');
   const [newArgs, setNewArgs] = useState('');
+  const [newTransport, setNewTransport] = useState<MCPTransportKind>('stdio');
+  const [newUrl, setNewUrl] = useState('');
+  const [newHeaders, setNewHeaders] = useState('');
+  const [newToken, setNewToken] = useState('');
+  const [newOauth, setNewOauth] = useState(false);
   const [useAuraxisKey, setUseAuraxisKey] = useState(false);
   const updateMcpStatus = useAdvancedStore((s) => s.updateMcpStatus);
 
@@ -70,25 +95,53 @@ export default function MCPSettings({ servers, statuses, onUpdateServers }: MCPS
     });
   }, [updateMcpStatus]);
 
-  const handleAdd = () => {
-    if (!newName.trim() || !newCommand.trim()) {
-      message.warning(t('mcp.namePrompt'));
+  const handleAdd = async () => {
+    const isHttp = newTransport === 'http';
+    if (!newName.trim() || (isHttp ? !newUrl.trim() : !newCommand.trim())) {
+      message.warning(isHttp ? t('mcp.namePromptHttp') : t('mcp.namePrompt'));
       return;
     }
 
-    const server: MCPServerConfig = {
-      id: generateId(),
-      name: newName.trim(),
-      command: newCommand.trim(),
-      args: newArgs.trim().split(/\s+/).filter(Boolean),
-      ...(useAuraxisKey ? { useAuraxisDeepSeekKey: true } : {}),
-      enabled: true,
-    };
+    const headers = isHttp ? parseHeaderLines(newHeaders) : {};
+    const id = generateId();
+    const server: MCPServerConfig = isHttp
+      ? {
+          id,
+          name: newName.trim(),
+          command: '',
+          args: [],
+          transport: 'http',
+          url: newUrl.trim(),
+          ...(Object.keys(headers).length > 0 ? { headers } : {}),
+          ...(newOauth ? { oauth: true } : {}),
+          enabled: true,
+        }
+      : {
+          id,
+          name: newName.trim(),
+          command: newCommand.trim(),
+          args: newArgs.trim().split(/\s+/).filter(Boolean),
+          ...(useAuraxisKey ? { useAuraxisDeepSeekKey: true } : {}),
+          enabled: true,
+        };
+
+    // 令牌不进配置（配置会落 localStorage），写进 safeStorage 加密的凭据库。
+    if (isHttp && newToken.trim()) {
+      const saved = await window.electronAPI?.credentials?.set(mcpTokenCredentialName(id), newToken.trim());
+      if (!saved?.ok) {
+        message.error(t('mcp.tokenSaveFailed', { error: String(saved?.error ?? '') }));
+        return;
+      }
+    }
 
     onUpdateServers([...servers, server]);
     setNewName('');
     setNewCommand('');
     setNewArgs('');
+    setNewUrl('');
+    setNewHeaders('');
+    setNewToken('');
+    setNewOauth(false);
     setUseAuraxisKey(false);
     message.success(t('mcp.added', { name: server.name }));
   };
@@ -170,7 +223,7 @@ export default function MCPSettings({ servers, statuses, onUpdateServers }: MCPS
   return (
     <div className="p-0">
       <div className="mb-5 pb-4 border-b border-[var(--color-border-dim)]">
-        <div className="font-body text-xs text-muted mb-2 uppercase tracking-[1px]">{t('mcp.addTitle')}</div>
+        <div className="font-body text-xs text-text-muted mb-2 uppercase tracking-[1px]">{t('mcp.addTitle')}</div>
         <Space.Compact style={{ width: '100%', marginBottom: 8 }}>
           <Input
             placeholder={t('mcp.namePlaceholder')}
@@ -179,36 +232,80 @@ export default function MCPSettings({ servers, statuses, onUpdateServers }: MCPS
             size="small"
           />
         </Space.Compact>
-        <Space.Compact style={{ width: '100%', marginBottom: 8 }}>
-          <Input
-            placeholder={t('mcp.cmdPlaceholder')}
-            value={newCommand}
-            onChange={(e) => setNewCommand(e.target.value)}
-            size="small"
-          />
-        </Space.Compact>
-        <Space.Compact style={{ width: '100%', marginBottom: 8 }}>
-          <Input
-            placeholder={t('mcp.argsPlaceholder')}
-            value={newArgs}
-            onChange={(e) => setNewArgs(e.target.value)}
-            size="small"
-          />
-        </Space.Compact>
-        <Checkbox
-          checked={useAuraxisKey}
-          onChange={(e) => setUseAuraxisKey(e.target.checked)}
-          className="!mb-2 !text-xs"
-        >
-          {t('mcp.useAuraxisKey')}
-        </Checkbox>
+        <Segmented
+          block
+          size="small"
+          value={newTransport}
+          onChange={(value) => setNewTransport(value as MCPTransportKind)}
+          options={[
+            { label: t('mcp.transportStdio'), value: 'stdio' },
+            { label: t('mcp.transportHttp'), value: 'http' },
+          ]}
+          className="!mb-2"
+        />
+        {newTransport === 'http' ? (
+          <>
+            <Space.Compact style={{ width: '100%', marginBottom: 8 }}>
+              <Input
+                placeholder={t('mcp.urlPlaceholder')}
+                value={newUrl}
+                onChange={(e) => setNewUrl(e.target.value)}
+                size="small"
+              />
+            </Space.Compact>
+            <Input.TextArea
+              placeholder={t('mcp.headersPlaceholder')}
+              value={newHeaders}
+              onChange={(e) => setNewHeaders(e.target.value)}
+              rows={2}
+              className="!mb-2 !text-xs"
+            />
+            <Input.Password
+              placeholder={t('mcp.tokenPlaceholder')}
+              value={newToken}
+              onChange={(e) => setNewToken(e.target.value)}
+              size="small"
+              className="!mb-2"
+            />
+            <Checkbox checked={newOauth} onChange={(e) => setNewOauth(e.target.checked)} className="!mb-2 !text-xs">
+              {t('mcp.oauthLabel')}
+            </Checkbox>
+            <div className="mb-2 font-body text-xs text-text-faint leading-relaxed">{t('mcp.httpHint')}</div>
+          </>
+        ) : (
+          <>
+            <Space.Compact style={{ width: '100%', marginBottom: 8 }}>
+              <Input
+                placeholder={t('mcp.cmdPlaceholder')}
+                value={newCommand}
+                onChange={(e) => setNewCommand(e.target.value)}
+                size="small"
+              />
+            </Space.Compact>
+            <Space.Compact style={{ width: '100%', marginBottom: 8 }}>
+              <Input
+                placeholder={t('mcp.argsPlaceholder')}
+                value={newArgs}
+                onChange={(e) => setNewArgs(e.target.value)}
+                size="small"
+              />
+            </Space.Compact>
+            <Checkbox
+              checked={useAuraxisKey}
+              onChange={(e) => setUseAuraxisKey(e.target.checked)}
+              className="!mb-2 !text-xs"
+            >
+              {t('mcp.useAuraxisKey')}
+            </Checkbox>
+          </>
+        )}
         <Button
           type="dashed"
           icon={<PlusCircleOutlined />}
           onClick={handleAdd}
           size="small"
           block
-          className="!border-primary !text-secondary hover:!text-text-primary"
+          className="!border-primary !text-text-secondary hover:!text-text-primary"
         >
           {t('mcp.add')}
         </Button>
@@ -222,7 +319,7 @@ export default function MCPSettings({ servers, statuses, onUpdateServers }: MCPS
         >
           {t('mcp.preset')}
         </Button>
-        <div className="mt-2 font-body text-xs text-faint leading-relaxed">{t('mcp.dshHint')}</div>
+        <div className="mt-2 font-body text-xs text-text-faint leading-relaxed">{t('mcp.dshHint')}</div>
         <Button
           type="default"
           icon={<Globe size={16} />}
@@ -233,13 +330,13 @@ export default function MCPSettings({ servers, statuses, onUpdateServers }: MCPS
         >
           {t('mcp.larkPreset')}
         </Button>
-        <div className="mt-2 font-body text-xs text-faint leading-relaxed">{t('mcp.larkHint')}</div>
+        <div className="mt-2 font-body text-xs text-text-faint leading-relaxed">{t('mcp.larkHint')}</div>
       </div>
 
       <div className="p-0">
-        <div className="font-body text-xs text-muted mb-2 uppercase tracking-[1px]">{t('mcp.configured')}</div>
+        <div className="font-body text-xs text-text-muted mb-2 uppercase tracking-[1px]">{t('mcp.configured')}</div>
         {servers.length === 0 ? (
-          <div className="text-faint font-body text-xs text-center p-5">{t('mcp.empty')}</div>
+          <div className="text-text-faint font-body text-xs text-center p-5">{t('mcp.empty')}</div>
         ) : (
           <List
             dataSource={servers}
@@ -292,6 +389,22 @@ export default function MCPSettings({ servers, statuses, onUpdateServers }: MCPS
                           {connected ? t('mcp.connectedState', { n: status?.toolCount || 0 }) : t('mcp.notConnected')}
                         </Tag>
                         {server.name}
+                        {connected && status?.toolListChanged && (
+                          <Tag className="!text-2xs !leading-none" title={t('mcp.liveTools')}>
+                            {t('mcp.liveTools')}
+                          </Tag>
+                        )}
+                        {connected && status?.serverName && (
+                          <Tag
+                            className="!text-2xs !leading-none"
+                            title={t('mcp.serverImpl', {
+                              name: status.serverName,
+                              version: status.serverVersion || '',
+                            })}
+                          >
+                            {status.serverName}
+                          </Tag>
+                        )}
                         {server.useAuraxisDeepSeekKey && (
                           <Tag color="blue" className="!text-xs !leading-none">
                             {t('mcp.useAuraxisKey')}
@@ -300,8 +413,12 @@ export default function MCPSettings({ servers, statuses, onUpdateServers }: MCPS
                       </span>
                     }
                     description={
-                      <span className="font-body text-xs text-faint">
-                        {server.command} {server.args.join(' ')}
+                      <span className="font-body text-xs text-text-faint">
+                        {/* 历史配置可能缺字段（旧版本写入的条目没有 args），
+                            这里必须容错：一旦抛错整块面板会被 ErrorBoundary 接管。 */}
+                        {transportOf(server) === 'http'
+                          ? `${t('mcp.transportHttp')} · ${server.url ?? ''}`
+                          : `${server.command ?? ''} ${(server.args ?? []).join(' ')}`.trim()}
                       </span>
                     }
                   />

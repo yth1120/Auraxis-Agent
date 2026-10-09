@@ -12,6 +12,7 @@ import { DOCUMENT_TOOL_DEFINITIONS } from './documents';
 import { INTEGRATION_TOOL_DEFINITIONS } from './integrations';
 import { TERMINAL_TOOL_DEFINITIONS } from './terminal';
 import { RUNTIME_TOOL_DEFINITIONS } from './runtime';
+import { BROWSER_TOOL_DEFINITIONS } from './browser';
 
 export type { ToolDef, ToolName, BuiltInToolName, ToolStreamEvent } from './types';
 
@@ -27,4 +28,5 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   ...INTEGRATION_TOOL_DEFINITIONS,
   ...TERMINAL_TOOL_DEFINITIONS,
   ...RUNTIME_TOOL_DEFINITIONS,
+  ...BROWSER_TOOL_DEFINITIONS,
 ];

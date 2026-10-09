@@ -173,6 +173,8 @@ describe('agentLoopRun — unified step-engine loop', () => {
 
     expect(result.iterations).toBe(2);
     expect(result.toolCallCount).toBe(1);
+    // 阶段轨迹随结果返回：规划在 seeding 内完成，随后进入迭代并正常收尾。
+    expect(result.phases).toEqual(['seeding', 'iterating', 'completed']);
     expect(result.plan?.tasks).toHaveLength(1);
     expect(result.messages.some((m) => m.role === 'tool' && m.content === '"ok"')).toBe(true);
     expect(events.some((e) => e.type === 'plan_created')).toBe(true);

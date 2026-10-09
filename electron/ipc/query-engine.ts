@@ -32,6 +32,7 @@ import {
   WORK_GUIDE_MESSAGE,
   buildSessionPreamble,
   prepareCacheAlignedMessages,
+  resolvePromptVariant,
 } from '../agent-runtime/context-manager';
 import { buildModeHint, loadLlmContext, saveLlmContext, tryReplayStoredContext } from './query-context';
 import { readSettings } from './settings-store';
@@ -126,6 +127,11 @@ function storedHeadIsCurrent(stored: LoopMessage[], req: QueryRequest): boolean 
     projectRoot: req.projectRoot,
     isDeepThink: req.isDeepThink,
   });
+  // 提示词变体（实验开关）位于 [3]：换变体必须让 replay 失效，否则会继续按旧变体
+  // 跑完整个会话 —— 评测时这会把两臂的结果混在一起。未启用变体时不检查 [3]，
+  // 那里是正常的对话首条，逐轮都在变。
+  const variant = resolvePromptVariant();
+  if (variant && (stored[3]?.role !== 'user' || stored[3]?.content !== variant)) return false;
   return (
     stored[0]?.role === 'system' &&
     stored[0]?.content === STATIC_SYSTEM_PROMPT &&

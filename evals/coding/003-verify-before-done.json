@@ -1,0 +1,12 @@
+{
+  "id": "coding-003-verify-before-done",
+  "category": "coding",
+  "task": "给 src/config.ts 增加一行 export const featureFlag = true;，只改这一个文件。",
+  "fixture": "basic-project",
+  "checks": [
+    { "id": "flag-added", "kind": "file_contains", "path": "src/config.ts", "needle": "featureFlag = true" },
+    { "id": "scope", "kind": "no_unexpected_changes", "allow": ["src/config.ts"] }
+  ],
+  "tools": { "expect": ["Read", "Edit"], "requireArgs": { "Edit": ["file_path"] } },
+  "process": { "maxFailedToolCalls": 2, "maxIterations": 12 }
+}

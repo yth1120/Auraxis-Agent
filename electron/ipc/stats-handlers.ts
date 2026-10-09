@@ -9,6 +9,8 @@ import { app } from 'electron';
 import { secureHandle } from './trust';
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import path from 'path';
+import { llmGatewaySnapshot } from '../agent-runtime/llm-gateway';
+import { semanticCacheStats } from './semantic-cache';
 
 /* ── Types ──────────────────────────────────────────────── */
 
@@ -164,7 +166,18 @@ export function registerStatsHandlers(): void {
   secureHandle('stats:get', async () => {
     try {
       const s = await loadStats();
-      return { ok: true, data: formatStats(s) };
+      // LLM 网关账本（按模型 × 会话的成本、provider 健康、限流状态）是**进程内**的：
+      // 它描述的是"这一次运行花了多少"，与上面那份持久化的历史累计是两回事，
+      // 因此并列返回而不是合并进 StatsData。
+      return {
+        ok: true,
+        data: {
+          ...formatStats(s),
+          llm: llmGatewaySnapshot(),
+          // 语义缓存同样只活在本进程：命中率是它唯一值得看的东西（没命中就等于没开）。
+          semanticCache: semanticCacheStats(),
+        },
+      };
     } catch (e: unknown) {
       return { ok: false, error: errorText(e) };
     }

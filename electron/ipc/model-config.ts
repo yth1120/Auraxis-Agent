@@ -1,12 +1,23 @@
 import { readSettings } from './settings-store';
 import { getDeepSeekBaseUrl } from '../api-config';
-import { BUILT_IN_MODELS } from '../types';
-import type { ModelDefinition } from '../types';
+import { BUILT_IN_MODELS, isModelProtocol, resolveModelId } from '../types';
+import type { ModelCapabilities, ModelDefinition, ModelProvider } from '../types';
 
 export type { ModelDefinition };
 
-export function getProvider(_modelId: string): 'deepseek' {
-  return 'deepseek';
+/**
+ * 模型所属 provider。
+ *
+ * 内置模型以定义里的 `provider` 为准（`contracts/core.ts` 是唯一事实源），
+ * 未登记但沿用 deepseek 命名的模型归为 deepseek，其余一律视为自定义 provider
+ * —— 这样第三方模型不会被错误地标注成 deepseek。
+ */
+export function getProvider(modelId: string): ModelProvider {
+  const id = resolveModelId(modelId || '').toLowerCase();
+  const builtIn = BUILT_IN_MODELS.find((m) => m.id.toLowerCase() === id);
+  if (builtIn) return builtIn.provider;
+  if (id.startsWith('deepseek-')) return 'deepseek';
+  return 'custom';
 }
 
 /**
@@ -16,6 +27,20 @@ export function getProvider(_modelId: string): 'deepseek' {
  */
 export function getDefaultApiBase(): string {
   return getDeepSeekBaseUrl();
+}
+
+/**
+ * 解析自定义模型的能力声明。只接受布尔值，未声明的维度留给
+ * `modelCapabilities()` 的内置元数据与名称启发式兜底（不在此处臆测默认值）。
+ */
+function parseCapabilities(raw: unknown): Partial<ModelCapabilities> | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const src = raw as Record<string, unknown>;
+  const out: Partial<ModelCapabilities> = {};
+  if (typeof src.tools === 'boolean') out.tools = src.tools;
+  if (typeof src.vision === 'boolean') out.vision = src.vision;
+  if (typeof src.reasoning === 'boolean') out.reasoning = src.reasoning;
+  return Object.keys(out).length > 0 ? out : undefined;
 }
 
 /** Parse custom models from AURAXIS_MODELS env var (JSON) — cached */
@@ -38,22 +63,29 @@ function parseEnvModels(): ModelDefinition[] {
         (m): m is Record<string, unknown> =>
           !!m && typeof m === 'object' && !Array.isArray(m) && typeof m.id === 'string' && typeof m.name === 'string',
       )
-      .map((m) => ({
-        id: m.id as string,
-        name: m.name as string,
-        provider: 'deepseek' as const,
-        maxTokens: typeof m.maxTokens === 'number' ? m.maxTokens : undefined,
-        contextWindow:
-          typeof m.contextWindow === 'number'
-            ? m.contextWindow
-            : typeof m.context_window === 'number'
-              ? m.context_window
-              : undefined,
-        supportsImages: m.supportsImages === true || m.supports_images === true,
-        experimental: m.experimental === true,
-        apiBase: typeof m.apiBase === 'string' ? m.apiBase : typeof m.api_base === 'string' ? m.api_base : undefined,
-        apiKey: typeof m.apiKey === 'string' ? m.apiKey : typeof m.api_key === 'string' ? m.api_key : undefined,
-      }));
+      .map((m) => {
+        const capabilities = parseCapabilities(m.capabilities);
+        return {
+          id: m.id as string,
+          name: m.name as string,
+          // provider 可显式声明（第三方 / 自建端点）；未声明时保持历史默认 deepseek。
+          provider: typeof m.provider === 'string' && m.provider ? m.provider : 'deepseek',
+          // 协议可显式声明；非法值丢弃，交给 resolveModelProtocol 从 apiBase 形状推断。
+          ...(isModelProtocol(m.protocol) ? { protocol: m.protocol } : {}),
+          ...(capabilities ? { capabilities } : {}),
+          maxTokens: typeof m.maxTokens === 'number' ? m.maxTokens : undefined,
+          contextWindow:
+            typeof m.contextWindow === 'number'
+              ? m.contextWindow
+              : typeof m.context_window === 'number'
+                ? m.context_window
+                : undefined,
+          supportsImages: m.supportsImages === true || m.supports_images === true,
+          experimental: m.experimental === true,
+          apiBase: typeof m.apiBase === 'string' ? m.apiBase : typeof m.api_base === 'string' ? m.api_base : undefined,
+          apiKey: typeof m.apiKey === 'string' ? m.apiKey : typeof m.api_key === 'string' ? m.api_key : undefined,
+        };
+      });
     return _cachedEnvModels;
   } catch {
     _cachedEnvModels = [];

@@ -1,8 +1,7 @@
 /** preload-core.ts — memory/settings/context/agent/permission/plan renderer bridge. */
 import type { AgentInfo, PermissionRequest } from './contracts/advanced';
+import type { AgentRuntimeEvent } from './contracts/agent-events';
 import { invoke, subscribe } from './preload-shared';
-
-type AgentEventPayload = { type: string } & Record<string, unknown>;
 
 export function createCoreApi() {
   return {
@@ -119,8 +118,8 @@ export function createCoreApi() {
       clearAll: () => invoke('agent:clearAll'),
       onUpdated: (callback: (agent: AgentInfo) => void) =>
         subscribe('agent:updated', (agent) => callback(agent as AgentInfo)),
-      onEvent: (agentId: string, callback: (event: AgentEventPayload) => void) =>
-        subscribe(`agent:event:${agentId}`, (event) => callback(event as AgentEventPayload)),
+      onEvent: (agentId: string, callback: (event: AgentRuntimeEvent) => void) =>
+        subscribe(`agent:event:${agentId}`, (event) => callback(event as AgentRuntimeEvent)),
     },
 
     app: {

@@ -19,7 +19,7 @@ export default function SettingItem({ title, description, children, noBorder }: 
     >
       <div className="flex flex-col gap-0.5">
         <span className="text-sm font-medium text-text-primary leading-[1.4]">{title}</span>
-        {description && <span className="text-xs leading-[1.4] text-muted">{description}</span>}
+        {description && <span className="text-xs leading-[1.4] text-text-muted">{description}</span>}
       </div>
       <div className="flex justify-end w-full max-[720px]:justify-start">{children}</div>
     </div>

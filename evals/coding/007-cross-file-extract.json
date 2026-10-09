@@ -1,0 +1,22 @@
+{
+  "id": "coding-007-cross-file-extract",
+  "category": "coding",
+  "task": "把 src/config.ts 里的 apiTimeoutMs 抽到新文件 src/constants/timeouts.ts（初值仍为 30000），并让 src/config.ts 从该文件导入后重新导出。只改这两个文件。",
+  "fixture": "basic-project",
+  "checks": [
+    {
+      "id": "constants-created",
+      "kind": "file_contains",
+      "path": "src/constants/timeouts.ts",
+      "needle": "apiTimeoutMs"
+    },
+    { "id": "config-imports", "kind": "file_contains", "path": "src/config.ts", "needle": "timeouts" },
+    { "id": "no-legacy-touch", "kind": "file_unchanged", "path": "src/legacy/config.ts" },
+    { "id": "scope", "kind": "no_unexpected_changes", "allow": ["src/config.ts", "src/constants/timeouts.ts"] }
+  ],
+  "tools": {
+    "expect": ["Read", "Write", "Edit"],
+    "requireArgs": { "Write": ["file_path"], "Edit": ["file_path"] }
+  },
+  "process": { "maxFailedToolCalls": 4, "maxIterations": 18 }
+}

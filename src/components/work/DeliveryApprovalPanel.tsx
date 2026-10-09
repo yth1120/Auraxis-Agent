@@ -6,6 +6,7 @@ import { useAgentStore } from '../../stores/useAgentStore';
 import { useAppStore } from '../../stores/useAppStore';
 import type { AgentInfo } from '../../types/agent';
 import { workDeliverables, workDeliveryResult } from './workUtils';
+import SectionTitle from './WorkSectionTitle';
 
 /**
  * Work 交付验收收口：任务执行完进入 review 状态后，用户在这里
@@ -41,15 +42,8 @@ export default function DeliveryApprovalPanel({ agent }: { agent: AgentInfo }) {
   };
 
   return (
-    <section className="p-4 rounded-2xl bg-[var(--color-bg-secondary)] border border-[var(--color-border-dim)]">
-      <div className="flex items-center gap-2 mb-3">
-        <span className="flex items-center justify-center w-6 h-6 rounded-lg bg-primary-soft text-primary">
-          <ClipboardCheck size={14} />
-        </span>
-        <span className="text-xs font-semibold text-text-primary tracking-[0.04em] uppercase">
-          {t('work.delivery.title')}
-        </span>
-      </div>
+    <section className="mb-2">
+      <SectionTitle icon={<ClipboardCheck size={13} />} label={t('work.delivery.title')} />
 
       {result && (
         <div className="mb-3">
@@ -92,6 +86,7 @@ export default function DeliveryApprovalPanel({ agent }: { agent: AgentInfo }) {
         <button
           type="button"
           disabled={busy !== null}
+          data-filled
           className={clsx(
             'inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg text-xs font-medium cursor-pointer transition-colors duration-150',
             'bg-primary text-white border-none hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed',

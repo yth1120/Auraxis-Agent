@@ -11,6 +11,14 @@ import type { ApprovalPolicy } from '../types';
 import type { SandboxMode } from '../sandbox-policy';
 import type { AgentLogEntry } from '../advanced-defs';
 
+/** 调度器向渲染层推送事件的宿主端口：把 BrowserWindow 依赖挡在适配层之外。 */
+export interface SchedulerNotifier {
+  /** 等价于 win.webContents.send(channel, payload)（窗口不可用时静默丢弃）。 */
+  send(channel: string, payload: unknown): void;
+  /** 窗口是否仍可用；false 时调度器应跳过推送。 */
+  isAlive(): boolean;
+}
+
 export interface FrontendTaskPlan {
   todos: { content: string; status: string; activeForm: string }[];
 }

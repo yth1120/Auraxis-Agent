@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef } from 'react';
-import type { ReactNode } from 'react';
 import {
   ArrowUp,
   CheckCircle,
@@ -25,6 +24,8 @@ import { collectQualityRuns } from '../../utils/agentQuality';
 import { workDeliverables, workProgress, workStatusLabelKey, workTodos } from './workUtils';
 import WorkExecutionFlow from './WorkExecutionFlow';
 import DeliveryApprovalPanel from './DeliveryApprovalPanel';
+// 分区标题统一走共享组件（分区本身不带卡片外观，避免两层容器）
+import SectionTitle from './WorkSectionTitle';
 
 const STATUS_DOT: Record<string, string> = {
   running: 'bg-primary',
@@ -35,17 +36,6 @@ const STATUS_DOT: Record<string, string> = {
   error: 'bg-danger',
   stopped: 'bg-[var(--color-text-faint)]',
 };
-
-function SectionTitle({ icon, label }: { icon: ReactNode; label: string }) {
-  return (
-    <div className="flex items-center gap-2 mb-2.5">
-      <span className="flex items-center justify-center w-6 h-6 rounded-lg bg-[var(--color-bg-inset)] text-text-muted">
-        {icon}
-      </span>
-      <span className="text-xs font-semibold text-text-secondary tracking-[0.04em] uppercase">{label}</span>
-    </div>
-  );
-}
 
 export default function WorkItemView({
   agent,
@@ -120,7 +110,7 @@ export default function WorkItemView({
         <div style={{ height: headerInset }} aria-hidden="true" />
         <div className="w-full min-w-0 max-w-[720px] mx-auto flex flex-col gap-5">
           {/* ── Item header ── */}
-          <div className="flex flex-col gap-3 p-4 rounded-2xl bg-[var(--color-bg-secondary)] border border-[var(--color-border-dim)]">
+          <div className="flex flex-col gap-3 p-4 rounded-2xl bg-[var(--color-bg-secondary)]">
             <div className="flex items-start gap-2.5 min-w-0">
               <span
                 className={clsx(
@@ -271,7 +261,7 @@ export default function WorkItemView({
                   <button
                     key={path}
                     type="button"
-                    className="inline-flex items-center gap-1.5 h-8 max-w-full px-2.5 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border-dim)] text-2xs text-text-secondary cursor-pointer hover:bg-[var(--color-bg-elevated)] hover:border-[var(--color-border-strong)] transition-colors duration-150"
+                    className="inline-flex items-center gap-1.5 h-8 max-w-full px-2.5 rounded-lg bg-[var(--color-bg-inset)] text-2xs text-text-secondary cursor-pointer hover:bg-[var(--color-bg-elevated)] transition-colors duration-150"
                     title={`${t('work.openFile')}: ${path}`}
                     onClick={() => openFile(path)}
                   >
@@ -292,10 +282,7 @@ export default function WorkItemView({
               <SectionTitle icon={<ShieldCheck size={13} />} label={t('work.quality')} />
               <div className="flex flex-col gap-1.5">
                 {failedQuality.map((run, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl bg-[var(--color-bg-secondary)] border border-[var(--color-border-dim)]"
-                  >
+                  <div key={i} className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl bg-[var(--color-bg-inset)]">
                     <XCircle size={15} className="shrink-0 text-danger" />
                     <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-2xs text-text-secondary">
                       {run.checkType}

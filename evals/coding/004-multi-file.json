@@ -1,0 +1,17 @@
+{
+  "id": "coding-004-multi-file",
+  "category": "coding",
+  "task": "在 src/config.ts 里新增一行 export const maxRetries = 5;，并让 src/app.ts 从 config 导入 maxRetries 后再导出它。只改这两个文件。",
+  "fixture": "basic-project",
+  "checks": [
+    { "id": "config-max", "kind": "file_contains", "path": "src/config.ts", "needle": "maxRetries = 5" },
+    { "id": "app-uses-max", "kind": "file_contains", "path": "src/app.ts", "needle": "maxRetries" },
+    { "id": "app-changed", "kind": "file_changed", "path": "src/app.ts" },
+    { "id": "scope", "kind": "no_unexpected_changes", "allow": ["src/config.ts", "src/app.ts"] }
+  ],
+  "tools": {
+    "expect": ["Read", "Edit"],
+    "requireArgs": { "Edit": ["file_path"] }
+  },
+  "process": { "maxFailedToolCalls": 3, "maxIterations": 14 }
+}

@@ -7,9 +7,18 @@ import {
 } from '../../electron/types';
 import type { ApiMessageContent } from '../../electron/types';
 import type { PermissionRequest, DeepSeekToolChoice, WorkAutonomyTier } from './advanced';
+import type { BrowserAnnotation } from './browser';
+import type { WorkbenchPanelKey } from '../workbench/workbench-panels';
 
+/**
+ * 右侧栏可显示的功能视图（'menu' 是清单态，'none' 表示面板关闭）。
+ * 功能键来自 Panel Registry（src/workbench/workbench-panels.tsx）。
+ */
+export type RightPanelTab = 'menu' | 'none' | WorkbenchPanelKey;
 export type AIModel = ModelDefinition;
 export type { ModelProvider };
+// 旧模型名 → 当前规范名：渲染层显示模型名时统一走它，避免旧 id 漏到界面上。
+export { resolveModelId } from '../../electron/contracts/core';
 
 /** DeepSeek API reasoning_effort 三档（官方 low/high/max）。 */
 export type ApiReasoningEffort = 'low' | 'high' | 'max';
@@ -27,7 +36,6 @@ export const BUILT_IN_MODELS: AIModel[] = SHARED_MODELS.map((m) => ({
   contextWindow: m.contextWindow,
   supportsImages: m.supportsImages,
   experimental: m.experimental,
-  legacy: m.legacy,
   apiBase: m.apiBase,
 }));
 
@@ -128,6 +136,13 @@ export interface Message {
   disclosure?: ContextDisclosure;
   /** Inline permission request — rendered as InlinePermissionCard in the chat stream. */
   permissionRequest?: PermissionRequest;
+  /**
+   * 用户在预览页面上选的元素 + 写的评论（见 electron/contracts/browser.ts）。
+   *
+   * 它是**用户输入**，所以挂在用户消息上：随消息进入 Agent 上下文（`chatSendMessage` 会把它
+   * 渲染进发给模型的内容），刷新后随会话一起恢复。
+   */
+  annotations?: BrowserAnnotation[];
 }
 
 export interface CodeBlock {
@@ -216,6 +231,14 @@ export interface ChatStore {
     tokensSaved?: number;
   } | null;
   lastUserMessage: string | null;
+  /**
+   * 已标注但还没随消息发出去的页面标注（见 BrowserAnnotation）。
+   * 只活在内存里：它是一份"待发送的草稿"，刷新即丢，和输入框草稿同一性质。
+   */
+  pendingAnnotations: BrowserAnnotation[];
+  addPendingAnnotation: (annotation: BrowserAnnotation) => void;
+  removePendingAnnotation: (id: string) => void;
+  clearPendingAnnotations: () => void;
   /** Bumped when another view asks the composer to focus (diff 继续改, 错误修复). */
   composerFocusTick: number;
   /** Set by 新建任务 / 新建对话: the next code-mode send must NOT fall back
@@ -266,7 +289,7 @@ export type LeftPanelTab = 'agents' | 'sessions' | 'files' | 'git';
 export type ThemeMode = 'system' | 'light' | 'dark';
 
 /** Full-screen tool entry views (front-end shells; real engines land later). */
-export type ToolView = 'none' | 'notifications' | 'scheduled' | 'plugins' | 'terminal';
+export type ToolView = 'none' | 'notifications' | 'scheduled' | 'plugins' | 'skills' | 'terminal';
 
 /** Goal-mode state — `/goal` shell until the real long-running engine lands. */
 export interface GoalState {
@@ -310,7 +333,13 @@ export interface AppStore {
   // Workbench multi-tab
   tabs: WorkbenchTab[];
   activeTabId: string | null;
-  rightPanelView: 'file-tree' | 'inspector' | 'timeline' | 'review' | 'preview' | 'none';
+  rightPanelView: RightPanelTab;
+  /** 右侧栏全屏：面板临时铺满窗口（盖住左侧栏与主内容）。 */
+  rightPanelFullscreen: boolean;
+  /** 右侧栏分栏：上下两栏，可同时看两个功能。 */
+  rightPanelSplit: boolean;
+  /** 第二栏当前功能（与第一栏各自独立）。 */
+  rightPanelView2: RightPanelTab;
   /** Sidebar content mode — 'chat' = conversation surface, 'work'/'code' = agent tasks. */
   sidebarMode: 'chat' | 'work' | 'code';
   /** Work 模式执行自主度档位（切换模式后保留，仅 Work 使用）。 */
@@ -345,8 +374,13 @@ export interface AppStore {
   agentRawLogRequest: number;
   /** Error navigation request: { ts, dir } where dir is +1 / -1. */
   agentErrorNavRequest: { ts: number; dir: 1 | -1 } | null;
-  /** Cross-panel request to open a file in the 文件 right-panel tab. */
-  openFileRequest: { path: string; requestId: number } | null;
+  /**
+   * Cross-panel request to open a file in a right-panel surface.
+   *
+   * `target` 决定切到哪个面板：文件树（默认）或变更 diff。此前只有一个"切文件树"的
+   * 隐含目标，于是执行视图的「查看 Diff」会被它覆盖成文件树 —— 永远看不到 diff。
+   */
+  openFileRequest: { path: string; requestId: number; target: 'file-tree' | 'diff' } | null;
   /** Multi-file tabs inside the 文件 panel (session-only, not persisted). */
   fileTabs: { path: string; name: string }[];
   /** Active file tab path; null = the fixed 文件树 tab. */
@@ -391,7 +425,7 @@ export interface AppStore {
   setActiveLeftPanel: (tab: LeftPanelTab) => void;
   setGlassLayoutMounted: (v: boolean) => void;
   incrementFileTreeVersion: () => void;
-  requestOpenFile: (path: string) => void;
+  requestOpenFile: (path: string, target?: 'file-tree' | 'diff') => void;
   clearOpenFileRequest: () => void;
   openFileTab: (path: string) => void;
   closeFileTab: (path: string) => void;
@@ -404,7 +438,12 @@ export interface AppStore {
   setActiveTab: (tabId: string) => void;
   updateTab: (tabId: string, updates: Partial<WorkbenchTab>) => void;
   closeAllTabs: () => void;
-  setRightPanelView: (view: 'file-tree' | 'inspector' | 'timeline' | 'review' | 'preview' | 'none') => void;
+  setRightPanelView: (view: RightPanelTab) => void;
+  toggleRightPanelFullscreen: () => void;
+  toggleRightPanelSplit: () => void;
+  setRightPanelView2: (view: RightPanelTab) => void;
+  /** 在新的一栏（左右分栏的第二栏）打开某个功能。 */
+  openRightPanelInNewPane: (view: RightPanelTab) => void;
 
   // Navigation
   goBack: () => void;
@@ -427,9 +466,6 @@ export interface AgentTask {
   endedAt?: number;
 }
 
-/** State-aware file-tree activity (badges driven by agent tool calls). */
-export type FileActivity = 'reading' | 'editing' | 'modified' | 'created' | 'deleted';
-
 /**
  * Fetch the full model list (built-in + custom from backend).
  * In browser-only mode, returns the built-in list.
@@ -446,7 +482,6 @@ export async function fetchModels(): Promise<AIModel[]> {
         contextWindow: m.contextWindow,
         supportsImages: m.supportsImages,
         experimental: m.experimental,
-        legacy: m.legacy,
         apiBase: m.apiBase,
       }));
     }

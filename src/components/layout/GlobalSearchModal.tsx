@@ -74,9 +74,12 @@ export default function GlobalSearchModal({ open, onClose }: { open: boolean; on
       transitionName=""
       maskTransitionName=""
       destroyOnHidden
-      styles={{ mask: { background: 'var(--glass-mask)' }, body: { padding: 0 } }}
+      styles={{
+        mask: { background: 'var(--glass-mask)' },
+        body: { padding: 0 },
+      }}
     >
-      <div className="flex flex-col overflow-hidden rounded-2xl border border-[var(--color-border-dim)] bg-[var(--color-bg-elevated)] shadow-[var(--shadow-lg)]">
+      <div className="flex flex-col">
         <div className="flex items-center gap-3 shrink-0 h-14 px-4 border-b border-[var(--color-border-dim)]">
           <MagnifyingGlass size={18} className="shrink-0 text-text-muted" />
           <input

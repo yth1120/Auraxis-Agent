@@ -60,7 +60,7 @@ export default function UndoToast() {
         </div>
       )}
       <button
-        className="inline-flex items-center gap-2 bg-elevated border border-dim rounded-md py-2 px-4 font-body text-sm font-medium text-text-primary cursor-pointer transition-colors duration-normal ease-out shadow-md hover:border-accent-border"
+        className="inline-flex items-center gap-2 bg-bg-elevated border border-border-dim rounded-md py-2 px-4 font-body text-sm font-medium text-text-primary cursor-pointer transition-colors duration-200 ease-out shadow-md hover:border-accent-border"
         onClick={handleUndo}
         onContextMenu={(e) => {
           e.preventDefault();
@@ -69,7 +69,7 @@ export default function UndoToast() {
       >
         <UndoOutlined className="text-base text-accent" />
         {undos.length > 1 ? t('undo.undoN', { n: undos.length }) : t('undo.undo')}
-        <span className="text-xs text-muted ml-1 max-w-[120px] overflow-hidden text-ellipsis whitespace-nowrap">
+        <span className="text-xs text-text-muted ml-1 max-w-[120px] overflow-hidden text-ellipsis whitespace-nowrap">
           {recent?.description}
         </span>
       </button>

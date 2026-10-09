@@ -1,7 +1,6 @@
 /** agent-scheduler-lifecycle.ts — pure terminal-result transitions and cleanup. */
-import type { BrowserWindow } from 'electron';
 import type { AgentLoopResult } from '../agent-runtime/agent-loop-types';
-import type { AgentInstance } from './agent-scheduler-types';
+import type { AgentInstance, SchedulerNotifier } from './agent-scheduler-types';
 import { broadcast, notifyFrontend } from './agent-scheduler-support';
 import { ptyRegistry } from './pty-tool';
 import { errorText } from '../errors';
@@ -30,14 +29,14 @@ export function applyLoopResult(inst: AgentInstance, result: AgentLoopResult): b
 }
 
 export function announceAgentResult(
-  win: BrowserWindow | null,
+  notifier: SchedulerNotifier | null,
   agentId: string,
   inst: AgentInstance,
   result: AgentLoopResult,
   needsDeliveryGate: boolean,
 ): void {
-  notifyFrontend(win, inst);
-  broadcast(win, agentId, {
+  notifyFrontend(notifier, inst);
+  broadcast(notifier, agentId, {
     type: 'agent:done',
     success: true,
     summary: result.allText.slice(0, 500),
@@ -45,7 +44,7 @@ export function announceAgentResult(
     iterations: result.iterations,
   });
   if (needsDeliveryGate) {
-    broadcast(win, agentId, {
+    broadcast(notifier, agentId, {
       type: 'delivery_ready',
       files: inst.delivery?.files ?? [],
       result: inst.result,
@@ -60,9 +59,9 @@ export function applyAgentError(inst: AgentInstance, err: unknown): string {
   return inst.error;
 }
 
-export function announceAgentError(win: BrowserWindow | null, agentId: string, inst: AgentInstance): void {
-  notifyFrontend(win, inst);
-  broadcast(win, agentId, { type: 'agent:done', success: false, error: inst.error });
+export function announceAgentError(notifier: SchedulerNotifier | null, agentId: string, inst: AgentInstance): void {
+  notifyFrontend(notifier, inst);
+  broadcast(notifier, agentId, { type: 'agent:done', success: false, error: inst.error });
 }
 
 /** Release PTY ownership and deferred conflict-detector bookkeeping. */

@@ -60,7 +60,6 @@ export default function AgentDashboard() {
   );
   const completedCount = agents.filter((agent) => agent?.status === 'completed').length;
   const totalTools = agents.reduce((sum, agent) => sum + (agent?.toolCallCount || 0), 0);
-  const goalCount = agents.filter((agent) => agent?.goal).length;
 
   const handlePauseAll = () =>
     agents.filter((agent) => agent?.status === 'running').forEach((agent) => pauseAgent(agent.id));
@@ -164,7 +163,9 @@ export default function AgentDashboard() {
               terminal.length > 0 ? `${Math.round((completedCount / terminal.length) * 100)}%` : '—',
             ],
             [t('dashboard.tools'), String(totalTools)],
-            [t('dashboard.goalTasks'), String(goalCount)],
+            // 原第 4 格是「目标任务」，数的是 `agent.goal` —— 渲染层从不给它赋值，
+            // 所以那一格永远是 0（假数字）。换成真的在跑的条数。
+            [t('dashboard.runningTasks'), String(activeCount)],
           ].map(([label, value]) => (
             <div key={label} className="flex flex-col items-center gap-0.5">
               <span className="text-sm font-semibold text-text-primary tabular-nums">{value}</span>

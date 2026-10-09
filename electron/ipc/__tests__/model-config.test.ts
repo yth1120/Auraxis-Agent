@@ -18,12 +18,19 @@ function importFresh() {
 }
 
 describe('getProvider', () => {
-  it('任意模型 ID 返回 deepseek', async () => {
+  it('内置模型用声明值，未登记模型不再被误标为 deepseek', async () => {
     vi.resetModules();
     const { getProvider } = await importFresh();
-    expect(getProvider('any-model')).toBe('deepseek');
+    expect(getProvider('deepseek-flash')).toBe('deepseek');
+    expect(getProvider('deepseek-v4-pro')).toBe('deepseek');
+    // 旧名归一化后仍命中内置定义
     expect(getProvider('deepseek-v4-flash')).toBe('deepseek');
-    expect(getProvider('')).toBe('deepseek');
+    // 未登记但沿用 deepseek 命名
+    expect(getProvider('deepseek-future-model')).toBe('deepseek');
+    // 第三方模型归为自定义 provider，而不是被标成 deepseek
+    expect(getProvider('any-model')).toBe('custom');
+    expect(getProvider('gpt-4o')).toBe('custom');
+    expect(getProvider('')).toBe('custom');
   });
 });
 
@@ -141,15 +148,12 @@ describe('getAllModels', () => {
     }));
     const { getAllModels } = await importFresh();
     const models = await getAllModels();
-    expect(models.length).toBeGreaterThanOrEqual(3);
+    expect(models.map((m: { id: string }) => m.id)).toEqual(['deepseek-flash', 'deepseek-v4-pro']);
     expect(models.find((m: { id: string }) => m.id === 'deepseek-flash')).toBeTruthy();
-    expect(models.find((m: { id: string }) => m.id === 'deepseek-v4-flash')).toBeTruthy();
     expect(models.find((m: { id: string }) => m.id === 'deepseek-v4-pro')).toBeTruthy();
-    const vision = models.find((m: any) => m.id === 'deepseek-v4-flash-vision-exp');
-    expect(vision).toBeTruthy();
-    expect(vision?.supportsImages).toBe(true);
-    // 旧的 vision-exp 已被 V4.1 Flash 取代：保留条目但标记为旧名。
-    expect(vision?.legacy).toBe(true);
+    // 旧名已从模型列表移除，只作为兼容别名存在（resolveModelId 负责解析）。
+    expect(models.find((m: { id: string }) => m.id === 'deepseek-v4-flash')).toBeFalsy();
+    expect(models.find((m: { id: string }) => m.id === 'deepseek-v4-flash-vision-exp')).toBeFalsy();
   });
 
   it('合并 env 自定义模型（去重）', async () => {
@@ -168,7 +172,7 @@ describe('getAllModels', () => {
     const envModel = models.find((m: { id: string }) => m.id === 'env-only');
     expect(envModel).toBeTruthy();
     // 内置模型仍存在
-    expect(models.find((m: { id: string }) => m.id === 'deepseek-v4-flash')).toBeTruthy();
+    expect(models.find((m: { id: string }) => m.id === 'deepseek-flash')).toBeTruthy();
   });
 
   it('合并 settings 自定义模型（去重）', async () => {
@@ -214,5 +218,71 @@ describe('getAllModels', () => {
     }));
     const { getAllModels } = await importFresh();
     await expect(getAllModels()).rejects.toThrow('File not found');
+  });
+});
+
+describe('AURAXIS_MODELS — provider / protocol / capabilities 声明', () => {
+  function mockHost() {
+    vi.doMock('electron', () => ({
+      app: { getPath: () => '/fake/userData' },
+      safeStorage: { isEncryptionAvailable: () => false },
+    }));
+    vi.doMock('../settings-store', () => ({
+      readSettings: vi.fn().mockResolvedValue({}),
+    }));
+  }
+
+  const findBy = (models: unknown[], id: string) =>
+    models.find((m) => (m as { id: string }).id === id) as Record<string, unknown>;
+
+  it('未声明时 provider 保持历史默认 deepseek，且不注入 protocol/capabilities', async () => {
+    delete process.env.AURAXIS_MODELS;
+    process.env.AURAXIS_MODELS = JSON.stringify([{ id: 'plain', name: 'Plain' }]);
+    vi.resetModules();
+    mockHost();
+    const { getAllModels } = await importFresh();
+    const m = findBy(await getAllModels(), 'plain');
+    expect(m.provider).toBe('deepseek');
+    expect(m.protocol).toBeUndefined();
+    expect(m.capabilities).toBeUndefined();
+  });
+
+  it('可显式声明 provider / protocol / capabilities', async () => {
+    delete process.env.AURAXIS_MODELS;
+    process.env.AURAXIS_MODELS = JSON.stringify([
+      {
+        id: 'third-party',
+        name: 'Third Party',
+        provider: 'anthropic',
+        protocol: 'anthropic-messages',
+        capabilities: { tools: true, vision: false, reasoning: true },
+        apiBase: 'https://api.anthropic.com/v1/messages',
+      },
+    ]);
+    vi.resetModules();
+    mockHost();
+    const { getAllModels } = await importFresh();
+    const m = findBy(await getAllModels(), 'third-party');
+    expect(m.provider).toBe('anthropic');
+    expect(m.protocol).toBe('anthropic-messages');
+    expect(m.capabilities).toEqual({ tools: true, vision: false, reasoning: true });
+  });
+
+  it('非法 protocol 被丢弃（交给 apiBase 推断），capabilities 只收布尔值', async () => {
+    delete process.env.AURAXIS_MODELS;
+    process.env.AURAXIS_MODELS = JSON.stringify([
+      {
+        id: 'dirty',
+        name: 'Dirty',
+        protocol: 'not-a-protocol',
+        capabilities: { tools: 'yes', vision: true, reasoning: 1 },
+      },
+    ]);
+    vi.resetModules();
+    mockHost();
+    const { getAllModels } = await importFresh();
+    const m = findBy(await getAllModels(), 'dirty');
+    expect(m.protocol).toBeUndefined();
+    expect(m.capabilities).toEqual({ vision: true });
   });
 });

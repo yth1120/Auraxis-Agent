@@ -6,7 +6,8 @@
  */
 import type { LlmInvokeParams } from './llm-types';
 import type { AssistantMessage } from './agent-loop-types';
-import { isAnthropicFormatEndpoint } from './llm-provider-format';
+import { resolveModelProtocol } from '../contracts/core';
+import { hasRuntimePorts, runtimePorts } from './ports';
 import { invokeDeepSeekAnthropic } from './llm-provider-anthropic';
 import { invokeDeepSeekOpenAI } from './llm-provider-openai';
 import { invokeDeepSeekResponses, isResponsesFormatEndpoint } from './llm-provider-responses';
@@ -15,11 +16,14 @@ export * from './llm-provider-format';
 export { invokeDeepSeekAnthropic, invokeDeepSeekOpenAI, invokeDeepSeekResponses, isResponsesFormatEndpoint };
 
 export async function llmClientInvoke(params: LlmInvokeParams): Promise<AssistantMessage | null> {
-  // Responses 端点（Codex 类客户端格式）优先判断：其 base_url 形如 .../responses。
-  if (isResponsesFormatEndpoint(params.apiBase)) {
+  // 协议判定收敛到 contracts/core.ts 的单一入口，优先级：
+  // 调用方显式传入 → 模型在设置里声明的 protocol → 按端点形状推断。
+  const declared = hasRuntimePorts() ? await runtimePorts().modelProtocol?.(params.model) : undefined;
+  const protocol = params.protocol ?? declared ?? resolveModelProtocol(params.model, params.apiBase);
+  if (protocol === 'openai-responses') {
     return invokeDeepSeekResponses(params);
   }
-  if (isAnthropicFormatEndpoint(params.apiBase)) {
+  if (protocol === 'anthropic-messages') {
     return invokeDeepSeekAnthropic(params);
   }
   return invokeDeepSeekOpenAI(params);

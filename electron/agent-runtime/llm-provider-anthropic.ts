@@ -2,7 +2,7 @@
 import axios from 'axios';
 import { createStreamFilter } from './text-filter';
 import { runtimePorts } from './ports';
-import { resolveModelId } from '../contracts/core';
+import { modelCapabilities, resolveModelId } from '../contracts/core';
 
 import type { LlmInvokeParams } from './llm-types';
 import type { AssistantMessage } from './agent-loop-types';
@@ -43,7 +43,7 @@ async function buildAnthropicRequestBody(params: LlmInvokeParams): Promise<Recor
       body.tool_choice = { type: 'tool', name: tc.function.name };
     }
   }
-  if (model.startsWith('deepseek-')) {
+  if (modelCapabilities(model).reasoning) {
     // Anthropic 兼容格式：reasoning.effort = none 关闭思考（默认是开启的），
     // output_config.effort 控制档位（low/high/max）。
     const effort = params.reasoningEffort || 'high';

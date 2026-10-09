@@ -3,17 +3,6 @@
    ================================================================ */
 
 /* ── Fade In Down ──────────────────────────────────────── */
-@keyframes fadeInDown {
-  from {
-    opacity: 0;
-    transform: translateY(-12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 /* ── Fade Out Down (exit animation) ────────────────────── */
 @keyframes fadeOutDown {
   from {
@@ -103,17 +92,6 @@
 }
 
 /* ── User Message In ──────────────────────────────────── */
-@keyframes userMsgIn {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 /* ── Spark Beat (thinking indicator core pulse) ────────── */
 @keyframes sparkBeat {
   0%,
@@ -154,17 +132,6 @@
 }
 
 /* ── Indicator In (thinking indicator entrance) ────────── */
-@keyframes indicatorIn {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 /* ── Terminal Pulse (status dot) ──────────────────────── */
 @keyframes terminal-pulse {
   0%,
@@ -177,17 +144,6 @@
 }
 
 /* ── Tool Card In (tool call card entrance) ────────────── */
-@keyframes toolCardIn {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 /* ── Pulse Dot (timeline status dot) ───────────────────── */
 @keyframes pulse-dot {
   0%,
@@ -213,17 +169,6 @@
 }
 
 /* ── Compression In ───────────────────────────────────── */
-@keyframes compressionIn {
-  from {
-    opacity: 0;
-    transform: translateY(-6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 /* ── Compression Out ──────────────────────────────────── */
 @keyframes compressionOut {
   from {
@@ -345,13 +290,35 @@
   }
 }
 
-/* ── Reduced motion ────────────────────────────────────── */
+/* ── Reduced motion ────────────────────────────────────────
+ * 装饰性动画压到 0.01ms；transition 一律保留（侧栏折叠 / 模式滑块是过渡，
+ * 且 rc-motion 收不到 transitionend 时弹窗会停在透明初态）。 */
+/**
+ * Activity 入场：轻微淡入 + 2px 位移。
+ *
+ * 由 `core/activity/entrance.ts` 的闸门保证**每个 id 只播一次** —— 滚动时 Virtuoso 会
+ * 回收重挂载行，不加闸门就会每次滚动整屏闪。`prefers-reduced-motion` 在文件末尾统一压掉。
+ */
+@keyframes activityIn {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.ax-activity-in {
+  animation: activityIn 160ms ease-out;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
   }
 }

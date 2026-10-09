@@ -1,3 +1,4 @@
+import contextlib
 import json
 import socket
 import sys
@@ -63,10 +64,8 @@ def start_fake_server():
         except OSError:
             pass
         finally:
-            try:
+            with contextlib.suppress(OSError):
                 conn.close()
-            except OSError:
-                pass
 
     def serve():
         while True:
@@ -132,6 +131,21 @@ class CreateClientTest(unittest.TestCase):
             out = runtime.client.run_agent("你好")
             self.assertEqual(out["ran"], "你好")
             self.assertEqual(runtime.client.search_sessions("x")["count"], 0)
+        finally:
+            runtime.close()
+
+    def test_drains_stderr_so_a_noisy_runtime_cannot_deadlock(self):
+        # 子进程写满 stderr 管道缓冲后，若调用方不排空就会永久阻塞，而父进程还在等
+        # 端口 —— 最终只剩一句无信息量的超时。200KB 远超管道缓冲，必须仍能连上。
+        runtime = create_client(
+            electron_path=sys.executable,
+            main_js=str(ROOT / "tests" / "fake_runtime.py"),
+            env={"FAKE_RUNTIME_STDERR_BYTES": "200000"},
+            spawn_timeout=10,
+            request_timeout=5,
+        )
+        try:
+            self.assertTrue(runtime.client.ping()["pong"])
         finally:
             runtime.close()
 

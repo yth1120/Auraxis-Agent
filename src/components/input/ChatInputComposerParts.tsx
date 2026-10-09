@@ -42,10 +42,13 @@ export function ChatInputWorkspaceStatus({
 }) {
   const t = useT();
   return (
-    <div className={clsx('flex items-center gap-1.5', placement === 'above' ? 'mb-2' : 'mt-2')}>
+    // 窄主列下这行会装不下四个芯片。整行允许换行（芯片作为**整块**下移），
+    // 并且固定文案的芯片加 `shrink-0 whitespace-nowrap` —— 否则「仅支持文档」
+    // 会被压到 ~27px、五个汉字折成三行，撑破固定 h-8 的胶囊底色。
+    <div className={clsx('flex flex-wrap items-center gap-1.5', placement === 'above' ? 'mb-2' : 'mt-2')}>
       <button
         type="button"
-        className="flex items-center gap-1.5 h-8 px-2.5 min-w-0 border-none bg-transparent text-xs text-text-secondary rounded-full cursor-pointer transition-[background,color] duration-fast hover:bg-[var(--color-hover)] hover:text-text-primary"
+        className="flex items-center gap-1.5 h-8 px-2.5 min-w-0 border-none bg-transparent text-xs text-text-secondary rounded-full cursor-pointer transition-[background,color] duration-150 hover:bg-[var(--color-hover)] hover:text-text-primary"
         aria-label={t('composer.selectProjectDir')}
         title={projectPath ?? t('composer.selectProjectDir')}
         onClick={onPickProject}
@@ -56,13 +59,13 @@ export function ChatInputWorkspaceStatus({
         </span>
       </button>
       <span className="w-px h-4 bg-[var(--color-border-dim)] shrink-0" aria-hidden="true" />
-      <span className="inline-flex items-center gap-1.5 h-8 px-2.5 text-xs text-text-secondary rounded-full">
+      <span className="shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 h-8 px-2.5 text-xs text-text-secondary rounded-full">
         <DesktopIcon size={14} className="shrink-0 text-text-muted" />
         {t('composer.local')}
       </span>
       {sidebarMode === 'work' && (
         <span
-          className="inline-flex items-center gap-1.5 h-8 px-2.5 text-xs text-text-secondary rounded-full"
+          className="shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 h-8 px-2.5 text-xs text-text-secondary rounded-full"
           title={t('work.docsOnlyTip')}
         >
           <FileTextIcon size={14} className="shrink-0 text-text-muted" />
@@ -71,7 +74,7 @@ export function ChatInputWorkspaceStatus({
       )}
       {gitBranch && (
         <span
-          className="inline-flex items-center gap-1.5 h-8 px-2.5 text-xs text-text-secondary rounded-full"
+          className="min-w-0 inline-flex items-center gap-1.5 h-8 px-2.5 text-xs text-text-secondary rounded-full"
           title={t('composer.branchTip', { branch: gitBranch })}
         >
           <GitBranchIcon size={14} className="shrink-0 text-text-muted" />
@@ -216,7 +219,7 @@ export function ChatInputToolbar({
           createPortal(
             <div
               ref={smartMorePanelRef}
-              className="z-[1050] w-[168px] p-1 bg-[var(--color-bg-elevated)] rounded-xl border border-[var(--color-border-dim)] shadow-[var(--shadow-md)] flex flex-col opacity-0 translate-y-1 animate-[smartPanelIn_0.18s_ease_forwards]"
+              className="z-[1050] w-[168px] p-1 bg-[var(--color-bg-elevated)] rounded-xl border border-[var(--color-border-dim)] shadow-[var(--shadow-md)] flex flex-col"
               style={{
                 position: 'fixed',
                 left: `${smartMorePosition.left}px`,
@@ -309,7 +312,9 @@ export function ChatInputToolbar({
         </>
       )}
       <div className="flex-1" />
-      <div className="flex items-center gap-1.5 shrink-0 ml-auto">
+      {/* 右簇**可收缩**（`min-w-0` 而不是 `shrink-0`）：窄主列下由模型名让出宽度，
+          图标按钮与发送键各自 `flex: none`，于是整排保持单行且发送键始终可见。 */}
+      <div className="flex items-center gap-1.5 min-w-0 ml-auto">
         <ContextMeter />
         <ModeTrigger ref={modeTriggerRef} onClick={toggleModePanel} open={modePanelOpen} />
         {sidebarMode === 'chat' && (

@@ -38,6 +38,10 @@ export const ArrowRight = makeIcon(L.ArrowRight);
 export const ArrowSquareOut = makeIcon(L.SquareArrowOutUpRight);
 export const ArrowsClockwise = makeIcon(L.RefreshCw);
 export const ArrowsOut = makeIcon(L.Maximize2);
+/** 退出全屏（右侧栏从铺满窗口还原）。 */
+export const ArrowsIn = makeIcon(L.Minimize2);
+/** 左右分栏（右侧栏并排再开一栏）。 */
+export const SplitColumns = makeIcon(L.Columns2);
 export const ArrowUp = makeIcon(L.ArrowUp);
 export const ArrowUpRight = makeIcon(L.ArrowUpRight);
 export const ArrowUUpLeft = makeIcon(L.Undo2);
@@ -103,6 +107,7 @@ export const Lightning = makeIcon(L.Zap);
 export const Link = makeIcon(L.Link);
 export const LinkBreak = makeIcon(L.Link2Off);
 export const ListChecks = makeIcon(L.ListChecks);
+export const Lock = makeIcon(L.Lock);
 export const MagnifyingGlass = makeIcon(L.Search);
 export const MapPin = makeIcon(L.MapPin);
 export const Microphone = makeIcon(L.Mic);
@@ -118,6 +123,8 @@ export const PanelRight = makeIcon(L.PanelRight);
 export const Pause = makeIcon(L.Pause);
 export const PauseCircle = makeIcon(L.CirclePause);
 export const PencilSimple = makeIcon(L.Pencil);
+// 页面标注：点选元素的语义（对齐 Phosphor 的 CursorClick 命名）。
+export const CursorClick = makeIcon(L.MousePointerClick);
 export const Percent = makeIcon(L.Percent);
 export const Play = makeIcon(L.Play);
 export const PlayCircle = makeIcon(L.CirclePlay);

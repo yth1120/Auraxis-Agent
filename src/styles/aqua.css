@@ -85,7 +85,6 @@ html.auraxis-aqua:not(.auraxis-glass) body::before {
 
 /* ── Shared glass card recipe ───────────────────────────── */
 html.auraxis-aqua .ax-header,
-html.auraxis-aqua .tab-bar,
 html.auraxis-aqua [data-pane='sider'],
 html.auraxis-aqua [data-pane='right'] {
   background: var(--ax-aqua-glass);
@@ -137,8 +136,7 @@ html.auraxis-aqua .main-pane-wrap {
 /* Floating header: the top bar becomes a rounded glass card too. Its 10px
    gutters are covered by .ax-aqua-drag-strip so frameless dragging still
    works along the window edge. */
-html.auraxis-aqua .ax-header,
-html.auraxis-aqua .tab-bar {
+html.auraxis-aqua .ax-header {
   margin: 10px 10px 0;
   border-radius: 18px;
   box-shadow: var(--ax-aqua-shadow), var(--ax-aqua-highlight);
@@ -148,8 +146,7 @@ html.auraxis-aqua .tab-bar {
     box-shadow 200ms ease-out;
 }
 
-html.auraxis-aqua.dark .ax-header,
-html.auraxis-aqua.dark .tab-bar {
+html.auraxis-aqua.dark .ax-header {
   box-shadow: var(--ax-aqua-shadow), var(--ax-aqua-highlight);
 }
 
@@ -190,11 +187,6 @@ html.auraxis-aqua [data-pane='right'][aria-hidden='true'] {
   pointer-events: none;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
-}
-
-/* Tab bar (multi-tab workbench). */
-html.auraxis-aqua .tab-bar {
-  border-bottom-color: var(--ax-aqua-hairline);
 }
 
 /* A whisper of light behind the conversation column so the transparent

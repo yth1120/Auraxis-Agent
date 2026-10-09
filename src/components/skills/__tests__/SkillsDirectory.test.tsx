@@ -21,7 +21,7 @@ describe('SkillsDirectory — 技能目录按钮', () => {
   it('renders the directory and opens the folder button', async () => {
     const { getByText } = render(
       <App>
-        <SkillsDirectory open onClose={() => {}} />
+        <SkillsDirectory onClose={() => {}} />
       </App>,
     );
     await act(async () => {});

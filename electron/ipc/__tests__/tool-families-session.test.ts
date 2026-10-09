@@ -226,8 +226,17 @@ describe('SessionEventSearch / Read / Trace', () => {
 describe('executeToolCall 路由兜底', () => {
   it('mcp__ 前缀路由到 MCP 桥', async () => {
     const r = await executeToolCall('mcp__echo', { x: 1 }, ctx());
-    expect(executeMcpTool).toHaveBeenCalledWith('mcp__echo', { x: 1 });
+    expect(executeMcpTool).toHaveBeenCalledWith('mcp__echo', { x: 1 }, undefined);
     expect(r.output).toBe('mcp-result');
+  });
+
+  // 取消传播回归：MCP 分支的 executor 曾经只声明一个形参，把调用点传入的 ctx
+  // 整个丢掉，中止信号因此到不了 client.callTool —— 长跑 MCP 工具只能干等 30s
+  // 请求超时，SDK 也无法上发 notifications/cancelled。
+  it('把 ctx.abortSignal 透传给 MCP 桥', async () => {
+    const ac = new AbortController();
+    await executeToolCall('mcp__echo', { x: 1 }, ctx({ abortSignal: ac.signal }));
+    expect(executeMcpTool).toHaveBeenCalledWith('mcp__echo', { x: 1 }, ac.signal);
   });
 
   it('未知工具返回错误', async () => {

@@ -16,6 +16,24 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
   });
 }
 
+// jsdom 不实现 matchMedia，而 antd 的响应式 observer（List/Grid 等）会在挂载时调用它。
+if (typeof window !== 'undefined' && typeof window.matchMedia !== 'function') {
+  Object.defineProperty(window, 'matchMedia', {
+    configurable: true,
+    writable: true,
+    value: (query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener() {},
+      removeListener() {},
+      addEventListener() {},
+      removeEventListener() {},
+      dispatchEvent: () => false,
+    }),
+  });
+}
+
 // Ant Design 的静态 Modal / message / notification 会在 portal 里创建独立的
 // React root，并带有 motion 定时器（rc-motion 默认 300ms 级）。若这些任务在
 // jsdom 环境卸载后才执行，React 调度器会访问已销毁的 window 并抛出

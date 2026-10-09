@@ -18,10 +18,9 @@ import ThinkingBlock from '../chat/ThinkingBlock';
 import DisclosureRow from '../common/DisclosureRow';
 import ExecutingIndicator from '../common/ExecutingIndicator';
 import StateDot from '../common/StateDot';
-import TerminalBlock from '../common/TerminalBlock';
 import StreamRenderer from '../chat/StreamRenderer';
 import { ToolIcon } from './toolIcons';
-import { AgentDiffCard, AgentReadCard, AgentRunCodeCard, AgentSearchCard, AgentWebCard } from './AgentToolCards';
+import ToolOutputCard from './ToolOutputCard';
 import { cleanText, isFileTool, outputText, summarizeInput } from './AgentConversationUtils';
 
 /** 消息装饰: decorate `/skill` and `@subagent` tokens in the user bubble. */
@@ -71,125 +70,31 @@ function persistToolRowOpenState() {
   }
 }
 
-function readCardProps(entry: AgentLogEntry) {
-  const output = (entry.output ?? {}) as Record<string, unknown>;
-  const content =
-    typeof output.content === 'string' ? output.content : typeof entry.output === 'string' ? entry.output : '';
-  return {
-    label: typeof output.file_path === 'string' ? output.file_path : undefined,
-    content,
-    startLine: typeof output.start_line === 'number' ? output.start_line : 1,
-    totalLines: typeof output.total_lines === 'number' ? output.total_lines : undefined,
-  };
-}
-
-function searchCardProps(entry: AgentLogEntry) {
-  const output = (entry.output ?? {}) as Record<string, unknown>;
-  if (entry.toolName === 'Glob') {
-    const paths = Array.isArray(output.paths)
-      ? (output.paths as string[])
-      : Array.isArray(entry.output)
-        ? (entry.output as string[])
-        : [];
-    return {
-      kind: 'paths' as const,
-      paths,
-      total: typeof output.match_count === 'number' ? output.match_count : paths.length,
-      truncated: output.truncated === true,
-    };
-  }
-  const results = (Array.isArray(output.results) ? output.results : []) as {
-    file?: string;
-    line?: number;
-    content?: string;
-  }[];
-  const byFile = new Map<string, { path: string; matches: { lineNumber: number; line: string }[] }>();
-  for (const result of results) {
-    const path = typeof result.file === 'string' ? result.file : '';
-    if (!path) continue;
-    let group = byFile.get(path);
-    if (!group) {
-      group = { path, matches: [] };
-      byFile.set(path, group);
-    }
-    group.matches.push({
-      lineNumber: typeof result.line === 'number' ? result.line : 0,
-      line: typeof result.content === 'string' ? result.content : '',
-    });
-  }
-  return {
-    kind: 'matches' as const,
-    files: [...byFile.values()],
-    total: typeof output.match_count === 'number' ? output.match_count : results.length,
-    truncated: output.truncated === true,
-  };
-}
-
-function webCardProps(entry: AgentLogEntry) {
-  const output = (entry.output ?? {}) as Record<string, unknown>;
-  if (entry.toolName === 'WebSearch') {
-    const results = (Array.isArray(output.results) ? output.results : []) as {
-      url?: string;
-      title?: string;
-      snippet?: string;
-    }[];
-    return {
-      kind: 'search' as const,
-      sources: results.map((result) => ({ url: result.url ?? '', title: result.title, snippet: result.snippet })),
-      truncated: false,
-    };
-  }
-  const input = entry.input ?? {};
-  return {
-    kind: 'fetch' as const,
-    url: typeof output.url === 'string' ? output.url : typeof input.url === 'string' ? input.url : '',
-    statusCode:
-      typeof output.status_code === 'number'
-        ? output.status_code
-        : typeof output.statusCode === 'number'
-          ? output.statusCode
-          : undefined,
-    truncated: false,
-  };
-}
-
+/**
+ * 工具输出：专用卡片优先，兜底才是通用 IN/OUT。
+ * 提取层与渲染件都被三个视图共用（见 `core/activity/agentCards.ts`）。
+ */
 function renderToolBody(entry: AgentLogEntry): ReactNode {
-  if (entry.toolName === 'Read') return <AgentReadCard {...readCardProps(entry)} />;
-  if (entry.toolName === 'Grep' || entry.toolName === 'Glob') return <AgentSearchCard {...searchCardProps(entry)} />;
-  if (entry.toolName === 'WebFetch' || entry.toolName === 'WebSearch') return <AgentWebCard {...webCardProps(entry)} />;
-  if (entry.toolName === 'RunCode') {
-    const output = (entry.output ?? {}) as {
-      stdout?: string;
-      stderr?: string;
-      exitCode?: number | null;
-      timedOut?: boolean;
-    };
-    return (
-      <AgentRunCodeCard
-        code={typeof entry.input?.code === 'string' ? entry.input.code : ''}
-        language={typeof entry.input?.language === 'string' ? entry.input.language : undefined}
-        stdout={output.stdout}
-        stderr={output.stderr}
-        exitCode={output.exitCode}
-        timedOut={output.timedOut}
-      />
-    );
-  }
-  if (entry.toolName === 'Write' || entry.toolName === 'Edit') {
-    const output = (entry.output ?? {}) as { oldContent?: string; newContent?: string };
-    if (typeof output.oldContent === 'string' && typeof output.newContent === 'string') {
-      return (
-        <AgentDiffCard
-          oldContent={output.oldContent}
-          newContent={output.newContent}
-          fileName={typeof entry.input?.file_path === 'string' ? entry.input.file_path : undefined}
-        />
-      );
-    }
-  }
+  return (
+    <ToolOutputCard
+      toolName={entry.toolName}
+      input={entry.input}
+      output={entry.output}
+      running={entry.type === 'tool_start'}
+      failed={entry.type === 'tool_error'}
+      liveOutput={entry.streamOutput}
+      error={entry.error}
+      fallback={() => <GenericToolBody entry={entry} />}
+    />
+  );
+}
+
+function GenericToolBody({ entry }: { entry: AgentLogEntry }): ReactNode {
+  const hasInput = !!entry.input && Object.keys(entry.input).length > 0;
+  const hasOutput = entry.output != null || !!entry.error;
   return (
     <div className="rounded-xl border border-border-default bg-code-bg overflow-hidden">
-      {entry.input && Object.keys(entry.input).length > 0 && (
+      {hasInput && (
         <div className="grid grid-cols-[max-content_1fr] gap-x-3.5 px-3 py-2 max-h-[150px] overflow-y-auto">
           <span className="sticky top-0 text-2xs font-semibold text-text-faint">IN</span>
           <pre className="m-0 text-2xs leading-relaxed text-text-secondary whitespace-pre-wrap break-all font-mono">
@@ -197,10 +102,8 @@ function renderToolBody(entry: AgentLogEntry): ReactNode {
           </pre>
         </div>
       )}
-      {(entry.output != null || entry.error) && entry.input && Object.keys(entry.input).length > 0 && (
-        <div className="h-px bg-border-dim" />
-      )}
-      {(entry.output != null || entry.error) && (
+      {hasOutput && hasInput && <div className="h-px bg-border-dim" />}
+      {hasOutput && (
         <div className="grid grid-cols-[max-content_1fr] gap-x-3.5 px-3 py-2 max-h-[200px] overflow-y-auto">
           <span className="sticky top-0 text-2xs font-semibold text-text-faint">{entry.error ? 'ERR' : 'OUT'}</span>
           <pre
@@ -282,45 +185,14 @@ function ToolRowLeading({ open, failed, toolName }: { open: boolean; failed: boo
 }
 
 /** 展开态内容：TodoWrite 清单 / Bash 终端 / 其它工具卡片 + 子代理与「查看轨迹」。 */
-function ToolRowBody({
-  entry,
-  running,
-  failed,
-  isBash,
-  bashTerm,
-  command,
-  cwd,
-  homePath,
-  subagents,
-}: {
-  entry: AgentLogEntry;
-  running?: boolean;
-  failed: boolean;
-  isBash: boolean;
-  bashTerm: { content: string; exitCode?: number };
-  command: string;
-  cwd: string | undefined;
-  homePath: string;
-  subagents: AgentInfo[];
-}) {
+function ToolRowBody({ entry, subagents }: { entry: AgentLogEntry; subagents: AgentInfo[] }) {
   const currentAgentId = useAgentStore((s) => s.currentAgentId);
   return (
     <div className="flex flex-col">
       {entry.toolName === 'TodoWrite' && entry.todos ? (
         <Checklist todos={entry.todos} />
-      ) : isBash ? (
-        <TerminalBlock
-          className="ax-tool-card-surface"
-          command={command}
-          cwd={cwd}
-          home={homePath}
-          output={failed && !bashTerm.content ? entry.error || '' : bashTerm.content}
-          running={running}
-          failed={failed}
-          exitCode={bashTerm.exitCode}
-          durationMs={entry.durationMs}
-        />
       ) : (
+        // Bash 也走共享渲染件（终端的实时流 / 失败原因 / 退出码判定只有那一份）。
         <div className="ax-tool-card-surface">{renderToolBody(entry)}</div>
       )}
       {entry.toolName === 'Agent' && subagents.length > 0 && (
@@ -428,23 +300,8 @@ export function AgentToolRow({
   const failed = entry.type === 'tool_error';
   const todoCounts = toolTodoCounts(entry);
   const summary = toolRowSummary(entry, todoCounts, t as never);
-  const isBash = entry.toolName === 'Bash';
   const inputPath =
     isFileTool(entry.toolName) && typeof entry.input?.file_path === 'string' ? entry.input.file_path : undefined;
-  const bashTerm = (() => {
-    if (!running && entry.output != null) {
-      const output = entry.output as { stdout?: string; stderr?: string; exitCode?: number } | null | undefined;
-      const parts: string[] = [];
-      if (output?.stdout) parts.push(output.stdout);
-      if (output?.stderr) parts.push(output.stderr);
-      if (parts.length > 0) return { content: parts.join(''), exitCode: output?.exitCode };
-    }
-    if (entry.streamOutput) return { content: entry.streamOutput };
-    return { content: '' };
-  })();
-  const command = isBash && typeof entry.input?.command === 'string' ? entry.input.command : '';
-  const cwd = isBash && typeof entry.input?.workdir === 'string' ? entry.input.workdir : undefined;
-  const homePath = window.electronAPI?.homePath || '';
   const suffix = toolRowSuffix(entry, todoCounts, subagents.length);
   const leading = <ToolRowLeading open={open} failed={failed} toolName={entry.toolName} />;
   const failureLine = failed && entry.error ? entry.error.split('\n')[0] : null;
@@ -496,19 +353,7 @@ export function AgentToolRow({
           </>
         )}
       </div>
-      {open && (
-        <ToolRowBody
-          entry={entry}
-          running={running}
-          failed={failed}
-          isBash={isBash}
-          bashTerm={bashTerm}
-          command={command}
-          cwd={cwd}
-          homePath={homePath}
-          subagents={subagents}
-        />
-      )}
+      {open && <ToolRowBody entry={entry} subagents={subagents} />}
     </div>
   );
 }

@@ -7,6 +7,7 @@
  */
 import { promises as fs } from 'fs';
 import path from 'path';
+import { PROJECTION_VERSION } from './contracts/session-types';
 import type {
   ProjectedMessage,
   ProjectedSession,
@@ -87,18 +88,25 @@ function applyUserEvent(state: ProjectionState, e: SessionEvent, data: Record<st
 
 function closeOpenTool(
   tc: ProjectedToolCall,
-  action: 'end' | 'error',
+  action: 'end' | 'error' | 'aborted',
   data: Record<string, unknown>,
   ts: number,
 ): void {
   if (action === 'end') {
     tc.status = 'done';
     tc.output = data.output;
+  } else if (action === 'aborted') {
+    // 中止是独立终态（用户取消 / 权限被拒），不是"完成"也不是"出错"。
+    tc.status = 'cancelled';
+    tc.error = typeof data.error === 'string' ? data.error : String(data.error ?? '');
   } else {
     tc.status = 'error';
     tc.error = typeof data.error === 'string' ? data.error : String(data.error ?? '');
   }
   tc.endTime = ts;
+  if (typeof data.durationMs === 'number') tc.durationMs = data.durationMs;
+  if (typeof data.stepGroupId === 'string') tc.stepGroupId = data.stepGroupId;
+  if (data.summary && typeof data.summary === 'object') tc.summary = data.summary as Record<string, unknown>;
 }
 
 function applyToolEvent(state: ProjectionState, e: SessionEvent, data: Record<string, unknown>): void {
@@ -118,12 +126,14 @@ function applyToolEvent(state: ProjectionState, e: SessionEvent, data: Record<st
       startTime: e.ts,
       seq: e.seq,
       input,
+      // 分组信息一直写在事件流里，只是从前没被投影出来 —— 于是刷新后所有分组塌平。
+      ...(typeof data.stepGroupId === 'string' ? { stepGroupId: data.stepGroupId } : {}),
     };
     state.openTools.set(key, tc);
     assistant.toolCalls!.push(tc);
     return;
   }
-  if (action !== 'end' && action !== 'error') return;
+  if (action !== 'end' && action !== 'error' && action !== 'aborted') return;
   const found = state.openTools.get(key);
   if (found) {
     closeOpenTool(found, action, data, e.ts);
@@ -133,13 +143,18 @@ function applyToolEvent(state: ProjectionState, e: SessionEvent, data: Record<st
   assistant.toolCalls!.push({
     id: toolCallId || `tool-${e.seq}`,
     toolName,
-    status: action === 'end' ? 'done' : 'error',
+    status: action === 'end' ? 'done' : action === 'aborted' ? 'cancelled' : 'error',
     startTime: e.ts,
     endTime: e.ts,
     seq: e.seq,
     input,
+    ...(typeof data.stepGroupId === 'string' ? { stepGroupId: data.stepGroupId } : {}),
+    ...(typeof data.durationMs === 'number' ? { durationMs: data.durationMs } : {}),
+    ...(data.summary && typeof data.summary === 'object'
+      ? { summary: data.summary as Record<string, unknown> }
+      : {}),
     output: action === 'end' ? data.output : undefined,
-    error: action === 'error' ? String(data.error ?? '') : undefined,
+    error: action === 'end' ? undefined : String(data.error ?? ''),
   });
 }
 
@@ -343,7 +358,7 @@ export class JsonlSessionStore implements SessionStore {
       const currentSeq = await this.tailLastSeq(bare);
       if (currentSeq === 0) continue;
       const cached = await this.cache()?.read(bare);
-      if (cached && cached.id === bare && cached.lastSeq === currentSeq) {
+      if (cached && cached.id === bare && cached.lastSeq === currentSeq && cached.projVersion === PROJECTION_VERSION) {
         sessions.push({
           id: bare,
           kind: cached.kind,
@@ -354,6 +369,7 @@ export class JsonlSessionStore implements SessionStore {
           projectRoot: cached.projectRoot,
           mode: cached.mode,
           pinned: cached.pinned,
+          archived: cached.archived,
           branchedFrom: cached.branchedFrom ?? undefined,
           messageCount: cached.messageCount,
           eventCount: cached.eventCount,
@@ -379,6 +395,7 @@ export class JsonlSessionStore implements SessionStore {
         projectRoot: meta.projectRoot,
         mode: meta.mode,
         pinned: meta.pinned,
+        archived: meta.archived,
         branchedFrom: meta.branchedFrom,
         messageCount,
         eventCount: events.length,
@@ -393,10 +410,12 @@ export class JsonlSessionStore implements SessionStore {
         projectRoot: meta.projectRoot,
         mode: meta.mode,
         pinned: meta.pinned,
+        archived: meta.archived,
         branchedFrom: meta.branchedFrom ?? null,
         messageCount,
         eventCount: events.length,
         lastSeq: currentSeq,
+        projVersion: PROJECTION_VERSION,
       });
     }
     sessions.sort((a, b) => b.updated - a.updated);
@@ -411,7 +430,13 @@ export class JsonlSessionStore implements SessionStore {
     const currentSeq = await this.tailLastSeq(sessionId);
     if (currentSeq === 0) return null;
     const cached = await this.cache()?.read(sessionId);
-    if (cached && cached.id === sessionId && cached.lastSeq === currentSeq && cached.payload) {
+    if (
+      cached &&
+      cached.id === sessionId &&
+      cached.lastSeq === currentSeq &&
+      cached.projVersion === PROJECTION_VERSION &&
+      cached.payload
+    ) {
       return cached.payload;
     }
 
@@ -437,6 +462,7 @@ export class JsonlSessionStore implements SessionStore {
       projectRoot: meta.projectRoot,
       mode: meta.mode,
       pinned: meta.pinned,
+      archived: meta.archived,
       branchedFrom: meta.branchedFrom,
       messageCount: meta.messageCount ?? messages.length,
       messages,
@@ -451,10 +477,12 @@ export class JsonlSessionStore implements SessionStore {
       projectRoot: projected.projectRoot,
       mode: projected.mode,
       pinned: projected.pinned,
+      archived: projected.archived,
       branchedFrom: projected.branchedFrom ?? null,
       messageCount: projected.messageCount,
       eventCount: events.length,
       lastSeq: currentSeq,
+      projVersion: PROJECTION_VERSION,
       payload: projected,
     });
     return projected;

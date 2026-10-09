@@ -116,7 +116,7 @@ describe('electron tool-registry — MCP routing', () => {
     await expect(executeMcpTool('mcp__srv2__ping', { x: 1 })).resolves.toEqual({
       output: { ok: true },
     });
-    expect(mcpBridge.callMcpTool).toHaveBeenCalledWith('srv2', 'ping', { x: 1 });
+    expect(mcpBridge.callMcpTool).toHaveBeenCalledWith('srv2', 'ping', { x: 1 }, undefined);
   });
 
   it('keeps legacy unqualified MCP names working', async () => {
@@ -132,6 +132,6 @@ describe('electron tool-registry — MCP routing', () => {
     mcpBridge.callMcpTool.mockResolvedValue({ ok: true });
 
     await expect(executeMcpTool('mcp__ping', {})).resolves.toEqual({ output: { ok: true } });
-    expect(mcpBridge.callMcpTool).toHaveBeenCalledWith('srv1', 'ping', {});
+    expect(mcpBridge.callMcpTool).toHaveBeenCalledWith('srv1', 'ping', {}, undefined);
   });
 });

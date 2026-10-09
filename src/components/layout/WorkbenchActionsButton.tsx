@@ -4,9 +4,11 @@ import clsx from 'clsx';
 import { useT } from '../../i18n';
 
 /**
- * One-click workbench panel toggle. The right panel's in-panel tabs
- * (文件 / 执行详情 / 时间线 / 审查 / 预览) handle view switching — the entry
- * stays a simple on/off switch, matching the VSCode panel-toggle pattern.
+ * One-click workbench panel toggle.
+ *
+ * 打开时进入「功能列表」（menu）而不是直接进某个详情：首次点开先看到全部功能
+ * 自上而下的清单，点某一项才进入该功能；再次打开会回到上次停留的功能
+ * （因为关闭面板不会清空 rightPanelView）。
  */
 export default function WorkbenchActionsButton() {
   const t = useT();
@@ -20,7 +22,7 @@ export default function WorkbenchActionsButton() {
       store.toggleRightPanel();
       return;
     }
-    if (store.rightPanelView === 'none') store.setRightPanelView('inspector');
+    if (store.rightPanelView === 'none') store.setRightPanelView('menu');
     if (!store.showRightPanel) store.toggleRightPanel();
   };
 

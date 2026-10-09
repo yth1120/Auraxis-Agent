@@ -304,7 +304,6 @@ export function SettingsConnectionsPane() {
           ))}
         </ul>
       )}
-      <div className="mt-3 text-xs text-text-muted leading-[1.6]">{t('settings.sshHint')}</div>
     </>
   );
 }

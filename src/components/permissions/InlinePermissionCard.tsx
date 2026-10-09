@@ -68,7 +68,12 @@ function summarize(toolName: string, input: Record<string, unknown>): { primary:
 
 interface InlinePermissionCardProps {
   request: PermissionRequest;
-  onResolved: () => void;
+  /**
+   * 决策结果。**必须带上 granted/denied**：执行流程视图要靠它把那一行原地变成
+   * "已授权 / 已拒绝"（`useActivityStore.recordApproval`），只报"结束了"是无法区分的。
+   * 既有的零参调用方（AgentConversation / WorkItemView）依然兼容。
+   */
+  onResolved: (decision: 'granted' | 'denied') => void;
 }
 
 export default function InlinePermissionCard({ request, onResolved }: InlinePermissionCardProps) {
@@ -83,7 +88,7 @@ export default function InlinePermissionCard({ request, onResolved }: InlinePerm
     const remaining = Math.max(0, 120 - elapsed);
     setExpiresIn(remaining);
     if (remaining === 0) {
-      onResolved();
+      onResolved('denied'); // 后端 120s 自动拒绝，前端如实记成拒绝
       return;
     }
     const interval = setInterval(() => {
@@ -93,7 +98,7 @@ export default function InlinePermissionCard({ request, onResolved }: InlinePerm
   }, [request.requestId, request.timestamp, onResolved]);
 
   useEffect(() => {
-    if (expiresIn === 0) onResolved();
+    if (expiresIn === 0) onResolved('denied');
   }, [expiresIn, onResolved]);
 
   const handleRespond = useCallback(
@@ -116,7 +121,7 @@ export default function InlinePermissionCard({ request, onResolved }: InlinePerm
         await window.electronAPI?.permission?.respond(request.requestId, allowed);
       } finally {
         setResponding(false);
-        onResolved();
+        onResolved(allowed ? 'granted' : 'denied');
       }
     },
     [request, onResolved],
@@ -144,24 +149,24 @@ export default function InlinePermissionCard({ request, onResolved }: InlinePerm
   const shown = collapsible && !expanded ? lines.slice(0, COLLAPSE_LINES).join('\n') : primary;
 
   const btnBase =
-    'px-3 py-[3px] rounded-md text-xs leading-5 cursor-pointer transition-colors duration-fast ease-out disabled:opacity-50 disabled:cursor-default';
+    'px-3 py-[3px] rounded-md text-xs leading-5 cursor-pointer transition-colors duration-150 ease-out disabled:opacity-50 disabled:cursor-default';
 
   return (
-    <div className="my-2.5 px-3 py-2.5 border border-dim rounded-md bg-warning-soft text-xs">
+    <div className="my-2.5 px-3 py-2.5 border border-border-dim rounded-md bg-warning-soft text-xs">
       {/* ── Head: icon + tool + risk hint + countdown ── */}
       <div className="flex items-center gap-2 min-w-0">
-        <span className="inline-flex text-base text-secondary shrink-0">
+        <span className="inline-flex text-base text-text-secondary shrink-0">
           {TOOL_ICONS[request.toolName] || <WrenchIcon />}
         </span>
         <span className="font-semibold text-xs text-primary shrink-0">{request.toolName}</span>
         {risk && (
-          <span className={clsx('text-2xs text-muted truncate', risk.level === 'high' && 'text-text-muted')}>
+          <span className={clsx('text-2xs text-text-muted truncate', risk.level === 'high' && 'text-text-muted')}>
             {riskLabel}
           </span>
         )}
         <span
           className={clsx(
-            'inline-flex items-center gap-0.5 ml-auto text-2xs text-muted tabular-nums shrink-0',
+            'inline-flex items-center gap-0.5 ml-auto text-2xs text-text-muted tabular-nums shrink-0',
             expiresIn < 30 && 'text-text-muted',
           )}
         >
@@ -172,8 +177,8 @@ export default function InlinePermissionCard({ request, onResolved }: InlinePerm
       {/* ── Body: tool-aware summary ── */}
       {showDiff ? (
         <>
-          <div className="mt-2 font-mono text-2xs text-secondary truncate">{String(request.input.file_path ?? '')}</div>
-          <div className="mt-1.5 max-h-[220px] overflow-y-auto border border-dim rounded-md">
+          <div className="mt-2 font-mono text-2xs text-text-secondary truncate">{String(request.input.file_path ?? '')}</div>
+          <div className="mt-1.5 max-h-[220px] overflow-y-auto border border-border-dim rounded-md">
             <DiffView
               oldContent={request.oldContent!}
               newContent={diffNewContent!}
@@ -191,7 +196,7 @@ export default function InlinePermissionCard({ request, onResolved }: InlinePerm
             {collapsible && (
               <button
                 type="button"
-                className="mt-1 p-0 border-none bg-transparent text-2xs text-muted cursor-pointer hover:text-primary transition-colors duration-fast ease-out"
+                className="mt-1 p-0 border-none bg-transparent text-2xs text-text-muted cursor-pointer hover:text-primary transition-colors duration-150 ease-out"
                 onClick={() => setExpanded((v) => !v)}
               >
                 {expanded ? t('perm.collapse') : t('perm.expandLines', { n: lines.length })}
@@ -205,7 +210,7 @@ export default function InlinePermissionCard({ request, onResolved }: InlinePerm
       <div className="flex justify-end gap-2 mt-2.5">
         <button
           type="button"
-          className={`${btnBase} border-none bg-transparent text-muted hover:bg-danger-soft hover:text-text-secondary`}
+          className={`${btnBase} border-none bg-transparent text-text-muted hover:bg-danger-soft hover:text-text-secondary`}
           disabled={responding}
           onClick={() => handleRespond(false)}
         >
@@ -221,6 +226,7 @@ export default function InlinePermissionCard({ request, onResolved }: InlinePerm
         </button>
         <button
           type="button"
+          data-filled
           className={`${btnBase} border border-[var(--color-primary)] bg-[var(--color-primary)] text-[var(--color-text-on-accent)] hover:opacity-[0.88]`}
           disabled={responding}
           onClick={() => handleRespond(true, 'always')}

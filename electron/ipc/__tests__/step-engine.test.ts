@@ -148,6 +148,31 @@ describe('step-engine', () => {
     expect(stepEnd).toMatchObject({ iteration: 1, toolsThisIteration: 1 });
   });
 
+  it('iteration_start 带上宿主解析出的真实迭代预算（界面按它显示第 N/M 轮）', async () => {
+    llmMock.mockResolvedValue(finalAssistant);
+    const { cfg, events } = makeCfg({ maxIterations: 42 });
+    const state = createStepState([]);
+    state.iteration = 0;
+
+    await runStep(cfg, state, 'g1');
+
+    const start = events.find((e) => e.type === 'iteration_start') as any;
+    expect(start).toMatchObject({ iteration: 0, maxIterations: 42 });
+  });
+
+  it('拿不到预算时省略 maxIterations，而不是编一个默认值', async () => {
+    llmMock.mockResolvedValue(finalAssistant);
+    const { cfg, events } = makeCfg();
+    const state = createStepState([]);
+    state.iteration = 0;
+
+    await runStep(cfg, state, 'g1');
+
+    const start = events.find((e) => e.type === 'iteration_start') as any;
+    expect(start.iteration).toBe(0);
+    expect('maxIterations' in start).toBe(false);
+  });
+
   it('AURAXIS_MEMORY_RISK_GATE=1 时默认风险门控拒绝高危工具', async () => {
     process.env.AURAXIS_MEMORY_RISK_GATE = '1';
     try {

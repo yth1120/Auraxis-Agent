@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { Input } from 'antd';
 import ExecutingIndicator from '../common/ExecutingIndicator';
 import {
@@ -17,6 +17,7 @@ import { useChatStore } from '@/stores/useChatStore';
 import { useAgentStore } from '@/stores/useAgentStore';
 import type { AgentQueueItem } from '@/types/chat';
 import GoalBar from './GoalBar';
+import { useOutsidePointerDown } from '../../hooks/useOutsidePointerDown';
 import { useT, type I18nKey } from '@/i18n';
 
 /**
@@ -45,6 +46,9 @@ function TodoIcon({ status }: { status: string }) {
 function TodoDock() {
   const t = useT();
   const [open, setOpen] = useState(false);
+  const dockRef = useRef<HTMLDivElement>(null);
+  // 展开的计划列表：点面板外部收起（与弹层行为一致）。
+  useOutsidePointerDown(dockRef, () => setOpen(false), open);
   const currentAgent = useAgentStore((s) => {
     if (!s.currentAgentId) return null;
     return s.agents.find((a) => a.id === s.currentAgentId) ?? null;
@@ -74,7 +78,7 @@ function TodoDock() {
   if (todos.length === 0) return null;
 
   return (
-    <div className="w-full max-w-[var(--content-max-width)] mx-auto mb-1.5">
+    <div ref={dockRef} className="w-full max-w-[var(--content-max-width)] mx-auto mb-1.5">
       <div className="flex items-center gap-2 h-8 px-3 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border-dim)]">
         <button
           type="button"
@@ -215,6 +219,9 @@ function QueueDock({ onSendNow }: { onSendNow: (text: string) => void }) {
   const dequeueAgentMessage = useChatStore((s) => s.dequeueAgentMessage);
   const editAgentQueueItem = useChatStore((s) => s.editAgentQueueItem);
   const [open, setOpen] = useState(false);
+  const dockRef = useRef<HTMLDivElement>(null);
+  // 展开的队列列表：点面板外部收起。
+  useOutsidePointerDown(dockRef, () => setOpen(false), open);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
 
@@ -260,7 +267,7 @@ function QueueDock({ onSendNow }: { onSendNow: (text: string) => void }) {
   );
 
   return (
-    <div className="w-full max-w-[var(--content-max-width)] mx-auto mb-1.5">
+    <div ref={dockRef} className="w-full max-w-[var(--content-max-width)] mx-auto mb-1.5">
       {queue.length === 1 ? (
         <div className="flex items-center gap-2 h-8 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border-dim)]">
           {rows}

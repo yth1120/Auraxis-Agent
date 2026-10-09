@@ -14,8 +14,10 @@ import { PERMISSION_PRESETS } from '../types/advanced';
 import type { ChatLogBuffer, UsageAccumulator } from './chatRuntime';
 import type { ChatSetState } from './chatActions';
 import { createQueryEventHandler } from './chatSendEvents';
+import { renderAnnotationBlock } from '../core/activity/annotation';
 import { chatStreamRuntime as streamRuntime, clearStreamRuntime, unsubscribeStream } from './chatStreamRuntime';
 import { useSessionStore } from './useSessionStore';
+import { markStreamTerminal } from './useActivityStore';
 import { useAppStore } from './useAppStore';
 import { useSettingsStore } from './useSettingsStore';
 import { appendThinkingChunk, setAssistantContent, setAssistantDone, setAssistantError } from './chatStoreHelpers';
@@ -65,6 +67,8 @@ function startStreamWatchdogs(ctx: SendContext): void {
     const state = ctx.get();
     if (!state.isStreaming) return;
     state.stopStreaming();
+    // 覆盖成更具体的原因：stopStreaming 先记的是"用户停止"，但这里其实是静默断连。
+    markStreamTerminal(state.messages as never, 'disconnected');
     ctx.set((s) => {
       const msgs = [...s.messages];
       const last = msgs[msgs.length - 1];
@@ -81,6 +85,7 @@ function startStreamWatchdogs(ctx: SendContext): void {
 
   streamRuntime.streamTimeout = setTimeout(() => {
     ctx.get().stopStreaming();
+    markStreamTerminal(ctx.get().messages as never, 'timeout');
     ctx.set((s) => {
       const msgs = [...s.messages];
       const last = msgs[msgs.length - 1];
@@ -448,11 +453,18 @@ export function createSendMessageAction(deps: ChatSendMessageDeps) {
     const resolved = resolveSessionRefs(trimmed, useSessionStore.getState().sessions);
     const content = resolved.text;
 
+    // 页面标注是**用户输入**：随这条用户消息一起进入上下文。
+    // 渲染成一段明确的文本块（而不是塞进 tool 结果之类的旁路），模型看到的与用户看到的一致。
+    const pendingAnnotations = get().pendingAnnotations ?? [];
+    const annotationBlock = renderAnnotationBlock(pendingAnnotations);
     const userMessage: Message = {
       id: `user-${Date.now()}`,
       role: 'user',
-      content,
+      content: annotationBlock ? `${annotationBlock}
+
+${content}` : content,
       timestamp: Date.now(),
+      ...(pendingAnnotations.length > 0 ? { annotations: pendingAnnotations } : {}),
     };
     const assistantId = `assistant-${Date.now()}`;
     const assistantMessage: Message = {
@@ -472,6 +484,7 @@ export function createSendMessageAction(deps: ChatSendMessageDeps) {
     chatLog?.queue(logSessionId, 'user', { text: content });
     streamRuntime.stopping = false;
     usage?.reset();
+    get().clearPendingAnnotations();
     set({ messages: newMessages, inputValue: '', isStreaming: true, lastUserMessage: content });
     const sentSid = useSessionStore.getState().currentSessionId;
     if (sentSid) get().setInputValue('');

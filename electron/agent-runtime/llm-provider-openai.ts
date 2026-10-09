@@ -2,15 +2,12 @@
 import axios from 'axios';
 import { createStreamFilter } from './text-filter';
 import { runtimePorts } from './ports';
-import { resolveModelId } from '../contracts/core';
+import { isOfficialDeepSeekEndpoint, modelCapabilities, resolveModelId } from '../contracts/core';
 
 import type { LlmInvokeParams } from './llm-types';
 import type { AssistantMessage } from './agent-loop-types';
 import { buildOpenAIFormatTools, normalizeProviderContent, sanitizeToolCallPairing } from './llm-provider-format';
 import { OpenAiStreamAccumulator } from './llm-streams';
-
-/** strict tools 是 DeepSeek 官方 Beta 能力，仅对官方端点启用；自定义兼容端点不强制。 */
-const STRICT_TOOLS_HOST = 'api.deepseek.com';
 
 /** 组装 OpenAI 兼容请求体（system 注入、strict tools、深度思考、JSON 模式、user_id）。 */
 async function buildRequestBody(params: LlmInvokeParams, strictTools: boolean): Promise<Record<string, unknown>> {
@@ -38,7 +35,7 @@ async function buildRequestBody(params: LlmInvokeParams, strictTools: boolean): 
     body.tools = formattedTools;
     body.tool_choice = params.toolChoice ?? 'auto';
   }
-  if (model.startsWith('deepseek-')) {
+  if (modelCapabilities(model).reasoning) {
     // 2026-09 起思考模式默认开启：必须显式发 disabled，否则"关闭思考"仍然会思考。
     body.thinking = { type: isDeepThink ? 'enabled' : 'disabled' };
     if (isDeepThink) body.reasoning_effort = params.reasoningEffort || 'high';
@@ -54,7 +51,8 @@ async function buildRequestBody(params: LlmInvokeParams, strictTools: boolean): 
 
 export async function invokeDeepSeekOpenAI(params: LlmInvokeParams): Promise<AssistantMessage | null> {
   const { apiKey, apiBase, signal } = params;
-  const body = await buildRequestBody(params, apiBase.includes(STRICT_TOOLS_HOST));
+  // strict tools 是 DeepSeek 官方 Beta 能力，仅对官方端点启用；第三方兼容端点不强制。
+  const body = await buildRequestBody(params, isOfficialDeepSeekEndpoint(apiBase));
 
   const response = await axios.post(apiBase, body, {
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },

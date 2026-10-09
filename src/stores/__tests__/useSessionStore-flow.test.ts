@@ -138,6 +138,52 @@ describe('touch / rename / pin / archive / move / new', () => {
     useSessionStore.getState().toggleArchive('missing');
   });
 
+  it('归档必须写进权威 meta（回归钉子：以前漏了 push，重启后归档被清掉）', () => {
+    const id = seed();
+    // `pinned` 一直是这么做的，归档漏了同样的 push —— 于是它只活在 localStorage，
+    // 启动时 syncFromLogs 的重投影会把它整体覆盖。
+    useSessionStore.getState().toggleArchive(id);
+    expect(mocks.meta).toHaveBeenCalledWith(id, { archived: true });
+    useSessionStore.getState().toggleArchive(id);
+    expect(mocks.meta).toHaveBeenCalledWith(id, { archived: false });
+  });
+
+  it('syncFromLogs：日志不知道 archived 时，保留本地的归档状态', async () => {
+    const id = seed();
+    useSessionStore.getState().toggleArchive(id);
+    // 日志报告该会话消息更多 → 走"整体重投影替换"那条分支（最容易丢字段的一条）
+    mocks.list.mockResolvedValue({
+      ok: true,
+      data: [{ id, title: 'T', created: 1, updated: 2, messageCount: 99, eventCount: 99 }],
+    });
+    mocks.project.mockResolvedValue({
+      ok: true,
+      // 注意：投影里**没有** archived —— 模拟修复前归档过的会话
+      data: { id, title: 'T', created: 1, updated: 2, messageCount: 99, messages: [] },
+    });
+
+    await useSessionStore.getState().syncFromLogs();
+
+    expect(useSessionStore.getState().sessions.find((s) => s.id === id)?.archived).toBe(true);
+  });
+
+  it('syncFromLogs：日志明确写了 archived=false 时，以日志为准（取消归档不能被本地覆盖）', async () => {
+    const id = seed();
+    mocks.list.mockResolvedValue({
+      ok: true,
+      data: [{ id, title: 'T', created: 1, updated: 2, messageCount: 99, eventCount: 99 }],
+    });
+    mocks.project.mockResolvedValue({
+      ok: true,
+      data: { id, title: 'T', created: 1, updated: 2, messageCount: 99, messages: [], archived: false },
+    });
+
+    await useSessionStore.getState().syncFromLogs();
+
+    // `?? ` 而不是 `||`：false 是"明确不归档"，不能被当成"日志不知道"
+    expect(useSessionStore.getState().sessions.find((s) => s.id === id)?.archived).toBe(false);
+  });
+
   it('moveSessionToProject 更新项目根', () => {
     const id = seed();
     useSessionStore.getState().moveSessionToProject(id, 'C:/other');

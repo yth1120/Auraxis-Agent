@@ -43,7 +43,6 @@ export default function SiderChatPanel({
           <div className="ax-sidebar-group flex flex-col items-center justify-center gap-[6px] px-4 py-10 text-center">
             <MessageOutlined className="text-[26px] text-text-faint opacity-75 mb-0.5" />
             <span className="text-sm font-medium text-text-muted">{t('sidebar.noChats')}</span>
-            <span className="text-2xs text-text-muted leading-[1.5]">{t('sidebar.clickNewChat')}</span>
           </div>
         ) : singleProject ? (
           timeGroups.map((group) => (

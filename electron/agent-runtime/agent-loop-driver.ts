@@ -18,6 +18,7 @@ import { ts, buildToolSummary, emitToolObserverForResult } from './agent-loop-ut
 import { runStep, createStepState } from './step-engine';
 import type { StepEngineConfig, StepState } from './step-engine-contracts';
 import { makeTurnId } from './engine-events';
+import { LoopPhaseTracker } from './agent-loop-phases';
 import { runtimePorts } from './ports';
 import { devLog } from '../dev-log';
 import type {
@@ -254,6 +255,7 @@ function buildEngineConfig(p: EngineConfigParams): StepEngineConfig {
     compressMode: p.contextConfig.compressMode === 'round' ? 'snip' : (p.contextConfig.compressMode ?? 'step'),
     stepKeepRecent: p.contextConfig.stepKeepRecent,
     compactModel: config.model,
+    maxIterations: config.maxIterations,
     retryBaseDelayMs: 1000,
     adapter: config.adapter,
     fallbackModel: config.fallbackModel,
@@ -378,7 +380,11 @@ async function runIterations(p: RunIterationsParams): Promise<number> {
 }
 
 /** 运行一个完整 agent turn：规划/恢复 → 迭代循环 → turn 收尾。 */
-export async function agentLoopRun(config: AgentLoopConfig): Promise<AgentLoopResult> {
+/**
+ * 循环主体。由导出的 `agentLoopRun` 包一层做阶段收尾 —— 这样主体一行都不用重排缩进，
+ * 阶段机只在外层观察与校验，互不侵入。
+ */
+async function runAgentLoopBody(config: AgentLoopConfig, phases: LoopPhaseTracker): Promise<AgentLoopResult> {
   const { observer, model, projectRoot, systemPrompt } = config;
   const prepared = await prepareLoopContext(config);
   const effectiveSystemPrompt = prepared.effectiveSystemPrompt;
@@ -436,6 +442,8 @@ export async function agentLoopRun(config: AgentLoopConfig): Promise<AgentLoopRe
   // Layer 2 (fail-safe): SAFETY_MAX_ITERATIONS (500) — prevents runaway loops.
   const turnId = makeTurnId(agentSessionId);
   observer.emit({ type: 'turn_start', turnId, timestamp: Date.now() });
+  // 规划 / 计划审批已在上面的 seedLoop 内完成，此处正式进入迭代阶段。
+  phases.enterIterating();
   const lastIteration = await runIterations({
     config,
     engineConfig,
@@ -465,4 +473,23 @@ export async function agentLoopRun(config: AgentLoopConfig): Promise<AgentLoopRe
     plan: engineState.activePlan,
     messages: seed.messages,
   };
+}
+
+/**
+ * Agent 循环入口。
+ *
+ * 阶段机只在外层做「显式化 + 非法转移守卫 + 快照」：主体抛错时按 failed 收尾再原样
+ * 上抛（不吞错、不改变调用方看到的异常），正常返回时按 signal 是否中止收尾并把阶段
+ * 轨迹附在结果上，供排障与回放核对。
+ */
+export async function agentLoopRun(config: AgentLoopConfig): Promise<AgentLoopResult> {
+  const phases = new LoopPhaseTracker();
+  try {
+    const result = await runAgentLoopBody(config, phases);
+    phases.finish(!!config.signal?.aborted);
+    return { ...result, phases: [...phases.history()] };
+  } catch (err) {
+    phases.fail();
+    throw err;
+  }
 }

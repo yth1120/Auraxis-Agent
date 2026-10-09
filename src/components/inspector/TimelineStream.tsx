@@ -184,6 +184,7 @@ export function TimelineStream({
                       <button
                         key={`${entry.toolCallId || entry.timestamp}-${index}`}
                         type="button"
+                        data-filled
                         className={clsx(
                           'h-3 shrink-0 min-w-[3px] rounded-sm border-none cursor-pointer transition-opacity duration-100 hover:opacity-80',
                           entry.type === 'tool_error'

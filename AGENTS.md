@@ -59,13 +59,18 @@ npm run check            # lint + 主进程编译 + 渲染层类型检查 + 全�
 ## UI 视觉规范（严格遵守）
 
 - 主色：品牌黑 `#111216`（深底）/ 象牙白 `#F1F1EE`（浅底文字）+ Aura 紫灰 `#8C8AA8` 仅作约 3% 强调（焦点/选中/状态点）；**禁止蓝色、大面积紫色与渐变作为主色**。
-- 圆角六档：5 / 6（rounded-md）/ 8（rounded-lg）/ 12（rounded-xl）/ 14（rounded-2xl）/ 9999（rounded-full）。禁止 3px、4px、7px、9px、10px 等碎角。
+- **Utility 名 = `bg-` / `text-` / `border-` + 令牌名**，令牌名本身已带语义前缀，所以会出现双写：背景色是 `bg-bg-secondary` / `bg-bg-inset`，次要文字是 `text-text-muted` / `text-text-faint`，hairline 是 `border-border-dim`。**最容易踩的坑是 `bg-primary` / `text-primary`：它们指向品牌色 `--color-primary`（墨黑/象牙白），不是"主背景/正文色"** —— 写成前者会得到黑底黑字。写错这类名字不会报错，只会静默不生成 CSS（或生成成另一个意思）。改完 UI 用 `rg` 确认没有"写了但产物里没有"的类。
+- 圆角档位（**以 `src/styles/app.css` 的 `@theme` 为准**）：4（`rounded-sm`）/ 5（`var(--radius-sm)`，只用于 CSS 层的焦点环）/ 6（`rounded-md`）/ 8（`rounded-lg`、`rounded-card`）/ 12（`rounded-xl`）/ 16（`rounded-2xl`，Tailwind 默认值 —— `@theme` 未覆盖它）/ 22（composer 输入框与用户气泡，见 `ax-ui.css`）/ 9999（`rounded-full`）。禁止 3px、7px、9px、10px 等碎角。antd 组件另有自己的轨道：`theme.ts` 的 `borderRadiusLG`（Modal / Notification = 14）。
 - 边框统一 hairline（`--color-border-dim`）；结构分隔线保留但必须最浅；不新增深色实线。
+- **单层容器**：同一界面只允许一层「面板级容器」（圆角 + 底色）；禁止卡片套卡片、面板套面板。任务视图里的分区（计划 / 执行 / 交付物 / 质量门 / 交付验收）一律用 `WorkSectionTitle` + 透明分区，只有任务头卡承担卡片外观。
+- **分层手段二选一**：面板级容器只靠底色（`--color-bg-secondary`）分层，**不叠加描边**；hairline 描边只留给二级内容盒（滚动区、输入、芯片、行），二级统一用 `--color-bg-inset`。
+- **内容区不加外框**：主内容区最外层不允许整圈线框，分隔只用 `border-b` / `border-t` 单边 hairline。
 - 任何按钮/选中项**禁止左侧色条**；选中态一律用背景高亮（`bg-primary-soft` / `bg-border-dim`）。
 - 零位移动画：按钮禁 hover/active 位移与缩放、弹窗禁开合动画；只允许功能性旋转（spinner）与数据驱动动画（模式滑块、工作流边）。
-- 字重：正文 400、条目/按钮 500、标题/激活 600。字号档位：`text-4xs`(9) / `3xs`(10) / `2xs`(11) / `xs`(12) / `sm`(13) / `base`(14) / `md`(15) / `lg`(16)。
+- 字重：正文 400、条目/按钮 500、标题/激活 600；markdown 正文里的 `h1`–`h3` 是 **700**（`MarkdownRenderer.tsx`）。字号档位：`text-4xs`(9) / `3xs`(10) / `2xs`(11) / `xs`(12) / `sm`(13) / `base`(14) / `md`(15) / `lg`(16)。
+- **写 `duration-*` 只能用裸数字**（`duration-150` / `duration-200`）：Tailwind v4 的 `duration-*` 不认 `--duration-*` 命名空间，`duration-fast` 这类名字**不会生成任何 CSS**、只会静默回落到默认 150ms。
 - 控件高度统一 36px（antd `controlHeight: 36`，见 `src/styles/theme.ts`）。
-- 内容宽度：消息流/输入框 `--content-max-width: 748px`（`src/styles/tokens.css`）；首页快捷卡片可单独 1080px。
+- 内容宽度：消息流/输入框 `--content-max-width: 748px`（`src/styles/tokens.css`）；首页快捷卡片与任务视图正文 720px（`QuickActionsPanel.tsx`、`ChatArea.tsx`、`WorkItemView.tsx`）。
 - 侧边栏透明度：设置 → 外观 → 侧边栏透明度（0–100%）；仅 Windows 11 启用原生 Acrylic（`backgroundMaterial: 'acrylic'`），非 Win11 自动禁用滑杆；最透明保留约 12% 底色保证文字可读，顶部栏保持不透明。
 
 ## 聊天区布局约定
@@ -81,7 +86,8 @@ npm run check            # lint + 主进程编译 + 渲染层类型检查 + 全�
 - 权重→描边：`regular`=1.5、`bold`=1.75、`fill`=2（细描边风格）。
 - 尺寸档位：micro 12 / small 14 / medium 16 / card 20；禁止 11/13/15/17/18/22 等中间值。
 - 着色：默认 `text-muted`，hover/激活 `text-primary`；成功/失败/警告色仅用于语义状态。
-- 唯一允许保留的 SVG：消息上下文仪表进度环、VS Code 品牌标。
+- 唯一允许保留的 SVG：消息上下文仪表进度环、VS Code 品牌标、**Auraxis 运行标记**（`src/components/common/ExecutingIndicator.tsx`，全应用的「正在执行」指示器）。
+- **等待/执行动画**：一律走 CSS 动画，禁止位图（GIF 无法被 `prefers-reduced-motion` 抑制 —— 那会变成用户关不掉的持续运动），且动效只允许**描边流动 / 旋转 / 透明度**，不做位移与缩放（见上文零位移动画）。运行标记的样式在 `src/styles/icons.css`。
 
 ## 安全与验证
 
@@ -94,7 +100,7 @@ npm run check            # lint + 主进程编译 + 渲染层类型检查 + 全�
 ## 测试与验证
 
 - 新增/改动必须过：`npx tsc6 --noEmit`（渲染层）、`npm run electron:compile`（主进程）、`npx vitest run`（全量）、`npx vite build`（构建）。
-- 单元覆盖率门槛：lines/statements ≥ 80%、branches ≥ 80%、functions ≥ 80%（`vitest.config.mts`）；最近一次全仓库分支门禁报告为 89.39% statements / 91.83% lines / 80.52% branches / 88.47% functions，四项均已达标。
+- 单元覆盖率门槛：lines/statements ≥ 80%、branches ≥ 80%、functions ≥ 80%（`vitest.config.mts`）；最近一次全仓库分支门禁报告为 89.86% statements / 92.25% lines / 81.36% branches / 89.00% functions，四项均已达标。
 - 全仓库分支门禁统计范围：`electron/**`、`src/stores/**`、`src/core/**`；`main.ts` / `preload*.ts`（含拆分出的 preload 领域模块）依赖真实 Electron 窗口生命周期，由真实 Electron E2E、SDK smoke 与 headless CLI 验证并明确排除。CI 全量单元测试是三项平台阻断项，Linux 默认执行单元 coverage gate（见 `.github/workflows/build.yml`）。
 - 覆盖率报告：`npm run test:coverage` 同时输出 `coverage/coverage-summary.json`（gitignore，开发期产物），设置面板「测试覆盖率」页经 `coverage:get` IPC 实时读取该文件；README / AGENTS / docs 中的用例数与覆盖率数字以最近一次全量覆盖率为准，更新后必须同步。
 - 覆盖率统计范围：全仓库可单测部分（不含 `src/components/` 与主进程入口）；UI 由组件级测试覆盖，桌面端到端链路由 `npm run test:smoke` 覆盖。

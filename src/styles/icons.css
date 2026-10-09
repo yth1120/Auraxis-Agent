@@ -17,3 +17,47 @@ svg[viewBox='0 0 256 256'] {
   animation: spin 1s linear infinite;
   transform-origin: center;
 }
+
+/* ── Auraxis 运行标记（Axis Mark）────────────────────────────────
+   全应用的「正在执行」指示器，取代原先的 `executing.gif` 位图。
+   构成与动效理由见 `components/common/ExecutingIndicator.tsx`。
+   动的是描边偏移（沿路径流动），不是位移/缩放 —— 符合「零位移动画」。 */
+.ax-axis-mark {
+  display: block;
+  overflow: visible;
+}
+
+.ax-axis-mark__axis,
+.ax-axis-mark__aura,
+.ax-axis-mark__comet {
+  fill: none;
+  stroke: currentColor;
+  /* 1.75 = AGENTS.md 的 bold 档：比图标默认 1.5 略重，让状态标记在 12px 档
+     站得住；实测 2.0 在 12px 下会糊成一块，1.6 又偏细。 */
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.ax-axis-mark__aura {
+  /* 0.28 在 12-16px 档几乎看不见（缩放后描边不到 1px），提到 0.4 才读得出"环" */
+  opacity: 0.4;
+}
+
+.ax-axis-mark__comet {
+  stroke-dashoffset: 0;
+  animation: axAxisOrbit 1.9s linear infinite;
+}
+
+/* `pathLength="100"` 把周长归一化成 100，所以走一整圈正好是 -100。 */
+@keyframes axAxisOrbit {
+  to {
+    stroke-dashoffset: -100;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ax-axis-mark__comet {
+    animation: none;
+  }
+}

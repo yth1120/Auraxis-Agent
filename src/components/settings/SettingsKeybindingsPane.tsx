@@ -46,7 +46,9 @@ export function SettingsKeybindingsPane() {
           title: t('settings.shortcutConflict'),
           content: t('settings.shortcutConflictBody', {
             new: formatBinding(newBinding),
-            desc: KEY_BINDINGS[conflictIndex].description,
+            // 走 i18n，别把 `KEY_BINDINGS` 里的中文 description 直接插进译文
+            // （英文界面下会漏出中文）。
+            desc: t(keybindingDescKey(KEY_BINDINGS[conflictIndex].description)),
           }),
           okText: t('settings.overwrite'),
           cancelText: t('common.cancel'),

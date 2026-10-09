@@ -3,7 +3,17 @@
 import type { ToolName } from '../../electron/contracts/tools';
 export type { ToolName, BuiltInToolName, ToolDef, ToolStreamEvent } from '../../electron/contracts/tools';
 
-type ToolStatus = 'pending' | 'running' | 'done' | 'error';
+/**
+ * 工具调用的状态。
+ *
+ * `cancelled` / `waiting` 是补上的真实状态：引擎**早就在发** `tool_aborted`
+ * （用户中止或权限被拒），此前渲染层把它记成 `done` + 一段 error 文本，于是
+ * 「用户自己取消的步骤」在界面上显示成「已完成但报错」。
+ *
+ * 与 `ActivityStatus` 的差别只有一处且是刻意的：这里用 `done`，Activity 用 `completed`。
+ * 映射集中在 activity 适配器里做一次，不要在两处各写一套。
+ */
+type ToolStatus = 'pending' | 'running' | 'done' | 'error' | 'cancelled' | 'waiting';
 
 export interface ToolCall {
   id: string;
@@ -15,6 +25,13 @@ export interface ToolCall {
   status: ToolStatus;
   startTime: number;
   endTime?: number;
+  /**
+   * 引擎实测的耗时（`tool_end.durationMs`）。
+   *
+   * 它比 `endTime - startTime` 准：后者含事件到达渲染层的传输延迟。缺省时下游按
+   * 两者之差兜底，不要把缺省当成 0。
+   */
+  durationMs?: number;
   error?: string;
   streamOutput?: string;
   /** Groups tool calls from the same LLM turn into a collapsible tree node. */
@@ -25,49 +42,8 @@ export interface ToolCall {
   newContent?: string;
 }
 
-/** Raw agent runtime event streamed over `agent:event:*` IPC. */
-export interface AgentRuntimeEvent extends Record<string, unknown> {
-  type: string;
-  timestamp?: number;
-  text?: string;
-  chunk?: string;
-  progress?: string;
-  message?: string;
-  content?: string;
-  level?: 'warning' | 'info' | string;
-  source?: 'instructions' | 'memory' | string;
-  producer?: string;
-  detail?: string;
-  toolCallId?: string;
-  toolName?: string;
-  input?: Record<string, unknown>;
-  output?: unknown;
-  summary?: Record<string, unknown>;
-  durationMs?: number;
-  stepGroupId?: string;
-  streamOutput?: string;
-  error?: string;
-  iteration?: number;
-  maxIterations?: number;
-  toolsThisIteration?: number;
-  llmLatencyMs?: number;
-  firstTokenMs?: number;
-  outputTokens?: number;
-  turnId?: string;
-  reason?: string;
-  tokensBefore?: number;
-  tokensAfter?: number;
-  messagesRemoved?: number;
-  tokensSaved?: number;
-  inputTokens?: number;
-  reasoningTokens?: number;
-  cacheHitTokens?: number;
-  cacheMissTokens?: number;
-  todos?: Array<{ content: string; status: string; activeForm?: string }>;
-  tasks?: Array<{ description?: string; status?: string }>;
-  /** Raw plan payload: either frontend {todos} or backend TaskPlan {tasks}. */
-  plan?: {
-    todos?: Array<{ content: string; status: string; activeForm?: string }>;
-    tasks?: Array<{ description?: string; status?: string }>;
-  };
-}
+/**
+ * `agent:event:*` 的事件负载 —— 定义在 `electron/contracts/agent-events.ts`
+ * （preload 与渲染层共用同一份，字段名对不上会编译失败），这里只是转出。
+ */
+export type { AgentRuntimeEvent, AgentTodoItem } from '../../electron/contracts/agent-events';

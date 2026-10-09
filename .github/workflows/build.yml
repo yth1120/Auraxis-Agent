@@ -31,13 +31,17 @@ jobs:
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.10'
 
       - run: npm ci
+
+      # Python SDK 的静态检查与测试工具链（版本钉在 pyproject 的 dev extras 里）。
+      - name: Install Python SDK dev toolchain
+        run: python -m pip install --disable-pip-version-check ./python/auraxis_sdk[dev]
 
       # GitHub Linux runner 上 npm ci 解包出的 chrome-sandbox 不满足 SUID 沙箱
       # 的 root/4755 要求，Electron 会直接 FATAL 退出；修复后 smoke/E2E 才能启动。
@@ -49,6 +53,10 @@ jobs:
 
       - run: npm run electron:compile
       - run: npx tsc6 --noEmit -p tsconfig.json
+      # Agent 评测的无 Key 部分：数据集可加载 + 判分器有判别力 + 工具 schema 指纹没漂。
+      # 真实评测（需要 DEEPSEEK_API_KEY）不在 CI 跑，见 evals/README.md。
+      - run: node scripts/agent-eval.cjs --dry
+      - run: node scripts/eval-diff.cjs --check-meta
       - run: npm run sdk:build
       - run: npx vite build
       # Coverage currently passes the configured thresholds; keep the unit
@@ -58,7 +66,8 @@ jobs:
       # 单元与覆盖率步骤统一容忍这类 teardown 噪声，测试失败、覆盖率阈值、
       # E2E、审计等信号保持严格；本地 `npm test` 仍然会把它暴露出来。
       - run: npm run test -- --dangerouslyIgnoreUnhandledErrors
-      - run: npm run sdk:test:py
+      # Python SDK 全检：ruff 静态检查 + pyright 类型检查 + unittest。
+      - run: npm run sdk:check:py
       - name: SDK live smoke (Linux)
         if: runner.os == 'Linux'
         run: xvfb-run -a npm run sdk:smoke

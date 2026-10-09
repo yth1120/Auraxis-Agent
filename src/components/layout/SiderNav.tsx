@@ -8,7 +8,6 @@ import { useSessionStore, type Session } from '../../stores/useSessionStore';
 import { useProjectStore } from '../../stores/useProjectStore';
 import WorkSidebarPanel from '../work/WorkSidebarPanel';
 import { useSettingsStore } from '../../stores/useSettingsStore';
-import SkillsDirectory from '../skills/SkillsDirectory';
 import { useAuthStore } from '../../stores/useAuthStore';
 import clsx from 'clsx';
 import { useShallow } from 'zustand/react/shallow';
@@ -68,7 +67,6 @@ export default function SiderNav({ collapsed }: SiderNavProps) {
   const setCurrentAgent = useAgentStore((s) => s.setCurrentAgent);
   const agentPermissions = useAgentStore((s) => s.agentPermissions);
 
-  const [skillsDirOpen, setSkillsDirOpen] = useState(false);
   const {
     currentSessionId,
     renamingThreadId,
@@ -157,8 +155,7 @@ export default function SiderNav({ collapsed }: SiderNavProps) {
       if (f.key === 'new') {
         if (sidebarMode !== 'chat') handleNewTask();
         else handleNewSession();
-      } else if (f.key === 'skills') setSkillsDirOpen(true);
-      else openToolView(f.key);
+      } else openToolView(f.key);
     };
     return (
       <button
@@ -321,8 +318,6 @@ export default function SiderNav({ collapsed }: SiderNavProps) {
         }}
         onLogout={confirmLogout}
       />
-
-      <SkillsDirectory open={skillsDirOpen} onClose={() => setSkillsDirOpen(false)} />
 
       <SiderRootsModal
         open={!!rootsModalProject}

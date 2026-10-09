@@ -11,6 +11,7 @@ import { invokeLlm } from '../agent-runtime/llm-adapter';
 import { resolveModelApiBase, resolveModelApiKey } from './model-config';
 import { readSettings } from './settings-store';
 import { resolveCredential } from '../credentials';
+import { semanticCacheLookup, semanticCacheStore } from './semantic-cache';
 
 const MAX_TITLE_LENGTH = 60;
 const TITLE_TIMEOUT_MS = 10_000;
@@ -66,6 +67,13 @@ export async function generateSessionTitle(
   if (!apiKey) return null;
   const apiBase = opts.apiBase || (await resolveModelApiBase(model));
   const { system, user } = buildTitlePrompt(messages);
+
+  // 语义缓存：两次会话以相似的开场白开始时复用同一个标题（默认关闭，见 semantic-cache.ts）。
+  // namespace 里编入模型 —— 换模型就是换一种措辞风格，不该互相命中。
+  const namespace = `session-title:${model}`;
+  const cached = await semanticCacheLookup<string>(namespace, user);
+  if (cached) return cached.value;
+
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), TITLE_TIMEOUT_MS);
   try {
@@ -79,7 +87,11 @@ export async function generateSessionTitle(
       signal: ctrl.signal,
       adapter: opts.adapter,
     });
-    return normalizeSessionTitle(result?.rawText);
+    const title = normalizeSessionTitle(result?.rawText);
+    // 只缓存成功结果：失败返回 null，把「这次没生成出来」缓存下来会让后续同类会话
+    // 永远拿不到标题。
+    if (title) await semanticCacheStore(namespace, user, title);
+    return title;
   } catch {
     return null;
   } finally {

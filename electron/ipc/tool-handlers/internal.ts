@@ -8,6 +8,7 @@ import { readFile, writeFile } from 'fs/promises';
 import { outsideWorkspace, resolveToolPath, workspaceRootsOf, type ToolContext, type ToolResult } from './path-utils';
 import { errorRecord, errorText } from '../../errors';
 import { getMainWindowRef } from '../window-ref';
+import { createElectronSchedulerNotifier } from '../agent-scheduler-notifier';
 import { verifyVersionGuard } from '../../version-guard';
 
 const todoStore = new Map<string, { content: string; status: string; activeForm: string }[]>();
@@ -147,7 +148,7 @@ ${params.context ? `上下文信息:\n${params.context}\n\n` : ''}
       };
     }
 
-    const approvedStepIds = await waitForPlanApproval(plan, getMainWindowRef(), {
+    const approvedStepIds = await waitForPlanApproval(plan, createElectronSchedulerNotifier(getMainWindowRef()), {
       projectRoot: ctx.projectRoot,
       title: params.goal,
     });

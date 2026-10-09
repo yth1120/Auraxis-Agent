@@ -6,6 +6,8 @@ import type { WorkAutonomyTier } from '../types/advanced';
 
 let navigating = false;
 const MAX_FILE_TABS = 8;
+/** 左右分栏时面板至少要能放下两栏正文（每栏约 320px）。 */
+const RIGHT_PANEL_SPLIT_WIDTH = 640;
 
 type StoreSet = Parameters<StateCreator<AppStore, [], []>>[0];
 type StoreGet = Parameters<StateCreator<AppStore, [], []>>[1];
@@ -48,6 +50,9 @@ const APP_STORE_INITIAL_STATE: Pick<
   | 'tabs'
   | 'activeTabId'
   | 'rightPanelView'
+  | 'rightPanelFullscreen'
+  | 'rightPanelSplit'
+  | 'rightPanelView2'
   | 'tabHistory'
   | 'tabHistoryIndex'
 > = {
@@ -84,7 +89,13 @@ const APP_STORE_INITIAL_STATE: Pick<
   fileTreeVersion: 0,
   tabs: [],
   activeTabId: null,
-  rightPanelView: 'inspector' as const,
+  rightPanelView: 'menu' as const,
+  /** 右侧栏全屏：面板临时铺满窗口（盖住左侧栏与主内容）。 */
+  rightPanelFullscreen: false,
+  /** 右侧栏分栏：上下两栏，可同时看两个功能。 */
+  rightPanelSplit: false,
+  /** 第二栏当前功能（与第一栏各自独立）。 */
+  rightPanelView2: 'menu' as const,
   tabHistory: [],
   tabHistoryIndex: -1,
 };
@@ -107,7 +118,9 @@ function createGeneralActions(set: StoreSet, _get: StoreGet): AppActions {
 
     setWorkAutonomyTier: (tier) => set({ workAutonomyTier: tier }),
 
-    toggleRightPanel: () => set((s) => ({ showRightPanel: !s.showRightPanel })),
+    // 关闭面板时一并退出全屏：否则「面板已隐藏 + 仍处全屏」会让侧栏保留一个
+    // 铺满窗口的固定层，把后面的界面点击全部挡住。
+    toggleRightPanel: () => set((s) => ({ showRightPanel: !s.showRightPanel, rightPanelFullscreen: false })),
 
     setShowSettings: (show: boolean) => set({ showSettings: show }),
 
@@ -181,7 +194,8 @@ function createGeneralActions(set: StoreSet, _get: StoreGet): AppActions {
 
     incrementFileTreeVersion: () => set((s) => ({ fileTreeVersion: s.fileTreeVersion + 1 })),
 
-    requestOpenFile: (path) => set({ openFileRequest: { path, requestId: Date.now() } }),
+    requestOpenFile: (path, target = 'file-tree') =>
+      set({ openFileRequest: { path, requestId: Date.now(), target } }),
 
     clearOpenFileRequest: () => set({ openFileRequest: null }),
 
@@ -277,6 +291,33 @@ function createTabActions(set: StoreSet, get: StoreGet): AppActions {
 
     setRightPanelView: (view) => {
       set({ rightPanelView: view });
+    },
+
+    toggleRightPanelFullscreen: () => {
+      set((s) => ({ rightPanelFullscreen: !s.rightPanelFullscreen }));
+    },
+
+    toggleRightPanelSplit: () => {
+      set((s) => {
+        const split = !s.rightPanelSplit;
+        return {
+          rightPanelSplit: split,
+          // 左右并排要放得下两栏正文：开启时顺手加宽（布局上限会再收敛）。
+          rightPanelWidth: split ? Math.max(s.rightPanelWidth, RIGHT_PANEL_SPLIT_WIDTH) : s.rightPanelWidth,
+        };
+      });
+    },
+
+    setRightPanelView2: (view) => {
+      set({ rightPanelView2: view });
+    },
+
+    openRightPanelInNewPane: (view) => {
+      set((s) => ({
+        rightPanelView2: view,
+        rightPanelSplit: true,
+        rightPanelWidth: Math.max(s.rightPanelWidth, RIGHT_PANEL_SPLIT_WIDTH),
+      }));
     },
 
     goBack: () => {

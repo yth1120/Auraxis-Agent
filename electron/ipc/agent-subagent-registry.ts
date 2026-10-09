@@ -1,5 +1,6 @@
 /** agent-subagent-registry.ts — sub-agent lifecycle registry and observer bridge. */
-import { BrowserWindow } from 'electron';
+import { createElectronSchedulerNotifier } from './agent-scheduler-notifier';
+import type { SchedulerNotifier } from './agent-scheduler-types';
 import type { AgentInfo, AgentLogEntry } from '../advanced-defs';
 import type { AgentObserver, AgentStateSnapshot } from '../agent-runtime/agent-loop-types';
 import { appendAgentLog } from '../session-log';
@@ -117,9 +118,9 @@ export function sendMessageToSubAgent(agentId: string, message: string): { ok: b
   const queue = subAgentInbox.get(agentId) || [];
   queue.push(text);
   subAgentInbox.set(agentId, queue);
-  const win = BrowserWindow.getAllWindows()[0] || null;
-  if (win && !win.isDestroyed()) {
-    win.webContents.send('agent:message', { agentId, text, ts: Date.now() });
+  const notifier = createElectronSchedulerNotifier();
+  if (notifier?.isAlive()) {
+    notifier.send('agent:message', { agentId, text, ts: Date.now() });
   }
   return { ok: true };
 }
@@ -145,10 +146,10 @@ export function reportFromSubAgent(
   subAgentReports.set(agentId, list.slice(-50));
   target.reports = subAgentReports.get(agentId);
   agents.set(agentId, target);
-  const win = BrowserWindow.getAllWindows()[0] || null;
-  if (win && !win.isDestroyed()) {
-    win.webContents.send('agent:updated', { ...target });
-    win.webContents.send('agent:report', { agentId, parentAgentId: target.parentAgentId, report });
+  const notifier = createElectronSchedulerNotifier();
+  if (notifier?.isAlive()) {
+    notifier.send('agent:updated', { ...target });
+    notifier.send('agent:report', { agentId, parentAgentId: target.parentAgentId, report });
     const observer = subAgentObservers.get(agentId);
     if (observer) observer.emit({ type: 'text_chunk', text: `📤 [汇报] ${text}` });
   }
@@ -161,7 +162,7 @@ export function getSubAgentReports(agentId: string): Array<{ id: string; text: s
 
 export function createSubAgentObserver(
   agent: AgentInfo,
-  win: BrowserWindow | null,
+  notifier: SchedulerNotifier | null,
   onUpdate: (a: AgentInfo) => void,
 ): AgentObserver {
   const logEntry = (entry: AgentLogEntry) => {
@@ -169,7 +170,7 @@ export function createSubAgentObserver(
     if (agent.log.length > 500) agent.log.splice(0, agent.log.length - 500);
   };
   const emitEvent = (event: Record<string, unknown>) => {
-    if (win && !win.isDestroyed()) win.webContents.send(`agent:event:${agent.id}`, { ...event, agentId: agent.id });
+    if (notifier?.isAlive()) notifier.send(`agent:event:${agent.id}`, { ...event, agentId: agent.id });
   };
   return {
     emit(event) {

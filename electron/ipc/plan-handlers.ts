@@ -1,5 +1,6 @@
 import { errorText } from '../errors';
-import { BrowserWindow, app } from 'electron';
+import { app } from 'electron';
+import type { SchedulerNotifier } from './agent-scheduler-types';
 import { secureHandle } from './trust';
 import { resolveTrustedProjectRoot } from './project-access';
 import type { TaskPlan } from '../agent-runtime/agent-loop-types';
@@ -27,7 +28,7 @@ function generatePlanId(): string {
  */
 export async function waitForPlanApproval(
   plan: TaskPlan,
-  win: BrowserWindow | null,
+  notifier: SchedulerNotifier | null,
   opts?: { projectRoot?: string; title?: string; agentId?: string },
 ): Promise<string[] | null> {
   const planId = generatePlanId();
@@ -46,8 +47,8 @@ export async function waitForPlanApproval(
     parameters: {} as Record<string, unknown>,
   }));
 
-  if (win && !win.isDestroyed()) {
-    win.webContents.send('plan:generated', { planId, steps, filePath, agentId: opts?.agentId });
+  if (notifier?.isAlive()) {
+    notifier.send('plan:generated', { planId, steps, filePath, agentId: opts?.agentId });
   }
 
   return new Promise((resolve) => {

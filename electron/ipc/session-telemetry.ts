@@ -48,6 +48,13 @@ const ALLOWED_KEYS = new Set([
   'tokensAfter',
   'messagesRemoved',
   'tokensSaved',
+  // 真实用量（usage 事件）。少了这几个键，导出里的 usage 事件会被 redact 成空壳，
+  // 遥测数据失去意义。它们与 tokensBefore/After 一样是纯计数元数据，不含内容。
+  'inputTokens',
+  'outputTokens',
+  'reasoningTokens',
+  'cacheHitTokens',
+  'cacheMissTokens',
   'messageCount',
   'eventCount',
   'source',

@@ -27,6 +27,43 @@ afterEach(async () => {
   await fs.rm(root, { recursive: true, force: true });
 });
 
+describe('goal-store — 事件格式并入共享词表', () => {
+  it('落盘记录是 SessionEvent 形状：system 事件 + data.event/data.goalType', async () => {
+    await createGoal(SID, '共享词表', 5);
+    const raw = await fs.readFile(path.join(root, `${SID}.jsonl`), 'utf8');
+    const record = JSON.parse(raw.trim().split('\n')[0]) as {
+      seq: number;
+      type: string;
+      ts: number;
+      data: Record<string, unknown>;
+    };
+
+    // 与其它会话日志同一套解析规则，不再是私有约定。
+    expect(record.type).toBe('system');
+    expect(record.data.event).toBe('goal');
+    expect(record.data.goalType).toBe('create');
+    expect(record.data.text).toBe('共享词表');
+    expect(typeof record.seq).toBe('number');
+    expect(typeof record.ts).toBe('number');
+  });
+
+  // 这条性质让「将来把 goal 流并入会话主日志」只需换存储位置、格式不用动。
+  it('文件里混入非 goal 的会话事件时被跳过，不影响回放', async () => {
+    await createGoal(SID, '不该被污染', 5);
+    await fs.appendFile(
+      path.join(root, `${SID}.jsonl`),
+      `${JSON.stringify({ seq: 99, type: 'system', ts: 1, data: { event: 'session_meta', meta: { title: 'x' } } })}\n` +
+        `${JSON.stringify({ seq: 100, type: 'user', ts: 1, data: { text: '别的会话事件' } })}\n`,
+      'utf8',
+    );
+
+    const goal = await getGoal(SID);
+    expect(goal?.text).toBe('不该被污染');
+    // 陌生事件不参与回放，也不推进 revision（revision 停在 create 那条）。
+    expect(goal?.revision).toBe(1);
+  });
+});
+
 describe('goal-store', () => {
   it('creates an active goal and replays it from disk', async () => {
     const created = await createGoal(SID, '完成迁移到 TypeScript', 10);

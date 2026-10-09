@@ -19,7 +19,6 @@ beforeEach(() => {
     permissionStatus: 'idle',
     mcpServers: [],
     mcpStatuses: [],
-    runningAgents: [],
   });
   (window as any).electronAPI = {
     permission: {
@@ -54,39 +53,6 @@ describe('useAdvancedStore — advanced state actions', () => {
     await vi.waitFor(() => expect(useAdvancedStore.getState().permissionRules).toEqual([{ id: 'r2' }]));
   });
 
-  it('updates Mcp status and manages agents/log merging', () => {
-    const s = useAdvancedStore.getState();
-    s.updateMcpStatus({ serverId: 's1', connected: true, toolCount: 1 });
-    s.updateMcpStatus({ serverId: 's1', connected: false, toolCount: 0 });
-    expect(useAdvancedStore.getState().mcpStatuses).toHaveLength(1);
-    expect(useAdvancedStore.getState().mcpStatuses[0].connected).toBe(false);
-
-    const agent = {
-      id: 'a1',
-      name: 'T',
-      description: '',
-      type: 'general-purpose',
-      status: 'running',
-      priority: 'normal',
-      startTime: 1,
-      endTime: undefined,
-      toolCallCount: 0,
-      iterations: 0,
-      messagesCount: 0,
-      log: [],
-    };
-    s.addAgent(agent as any);
-    s.updateAgent('a1', { status: 'completed' });
-    expect(useAdvancedStore.getState().runningAgents[0].status).toBe('completed');
-    s.appendAgentLog('a1', [
-      { type: 'text', text: 'a', timestamp: 1 },
-      { type: 'text', text: 'b', timestamp: 2 },
-      { type: 'tool_start', toolName: 'Read', timestamp: 3 },
-    ] as any);
-    expect(useAdvancedStore.getState().runningAgents[0].log).toHaveLength(2);
-    s.removeAgent('a1');
-    expect(useAdvancedStore.getState().runningAgents).toHaveLength(0);
-  });
 
   it('handles removeRule rejection and missing API', async () => {
     useAdvancedStore.setState({ permissionRules: [rule as any] });

@@ -5,6 +5,7 @@
  * modules (`-memory`, `-evidence`, `-belief`, `-audit`).
  */
 import { openSqlite, type SqliteLike } from '../session-projection-cache';
+import type { EmbeddingIdentity } from './embedding-provider';
 import {
   type BeliefEvidenceLink,
   type BeliefInput,
@@ -56,6 +57,7 @@ import {
   deleteBelief,
   getBeliefById,
   getBeliefsByScope,
+  hardDeleteBeliefs,
   listBeliefEvidence,
   listBeliefRejections,
   listBeliefRevisions,
@@ -71,6 +73,7 @@ import {
   listReadResults,
   listReadRuns,
 } from './memory-db-sqlite-audit';
+import { clearScopeVectors, ensureVectorTable, loadVectors, saveVectors } from './memory-vectors';
 
 export class SqliteBackend implements MemoryBackend {
   private db: SqliteLike;
@@ -185,6 +188,10 @@ export class SqliteBackend implements MemoryBackend {
     deleteBelief(this.db, id);
   }
 
+  hardDeleteBeliefs(ids: string[]): number {
+    return hardDeleteBeliefs(this.db, ids);
+  }
+
   addBeliefEvidence(link: BeliefEvidenceLink): void {
     addBeliefEvidence(this.db, link);
   }
@@ -203,6 +210,26 @@ export class SqliteBackend implements MemoryBackend {
 
   listBeliefRejections(scope: string, limit = 200): BeliefRejection[] {
     return listBeliefRejections(this.db, scope, limit);
+  }
+
+  vectorsAvailable(): boolean {
+    return ensureVectorTable(this.db);
+  }
+
+  loadVectors(scope: string, identity: EmbeddingIdentity): Map<string, number[]> {
+    return loadVectors(this.db, scope, identity);
+  }
+
+  saveVectors(
+    scope: string,
+    identity: EmbeddingIdentity,
+    entries: Array<{ beliefId: string; vector: number[] }>,
+  ): void {
+    saveVectors(this.db, scope, identity, entries);
+  }
+
+  clearScopeVectors(scope: string): void {
+    clearScopeVectors(this.db, scope);
   }
 
   addReadRun(r: ReadRunRecord): void {

@@ -186,6 +186,8 @@ async function invokeLlmWithRetry(
         temperature: cfg.temperature,
         toolChoice: cfg.toolChoice,
         adapter: cfg.adapter,
+        // 交给网关做按会话的成本分解（见 llm-gateway.ts）。这是唯一知道 sessionId 的地方。
+        sessionId: cfg.sessionId,
         signal: signal || new AbortController().signal,
         onTextChunk: (text) => {
           if (tracker.firstTokenAt === null) tracker.firstTokenAt = Date.now();
@@ -380,7 +382,13 @@ export async function runStep(cfg: StepEngineConfig, state: StepState, stepGroup
   const iteration = state.iteration;
 
   injectPendingNudge(cfg, state);
-  emit({ type: 'iteration_start', iteration, timestamp: Date.now() });
+  emit({
+    type: 'iteration_start',
+    iteration,
+    // 预算是宿主解析出来的真实值；拿不到就不带这个字段（界面据此不显示上限）。
+    ...(cfg.maxIterations !== undefined ? { maxIterations: cfg.maxIterations } : {}),
+    timestamp: Date.now(),
+  });
   emit({ type: 'step_start', iteration, timestamp: Date.now() });
   const tracker: StepTracker = { startedAt: Date.now(), firstTokenAt: null, outputTokens: 0 };
 

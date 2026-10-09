@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Button, Modal, message } from 'antd';
+import { Button, message } from 'antd';
 import { Copy, FolderOpen, Wrench } from '@/components/common/icons';
 import InlineEmpty from '../common/InlineEmpty';
 import LoadingState from '../common/LoadingState';
+import ToolViewShell from '../tools/ToolViewShell';
 import { useT } from '../../i18n';
 
 interface SkillMeta {
@@ -13,21 +14,35 @@ interface SkillMeta {
   updatedAt: number;
 }
 
-/** Skills directory: real SKILL.md discovery + open the folder. */
-export default function SkillsDirectory({ open, onClose }: { open: boolean; onClose: () => void }) {
+/**
+ * 技能目录：真实 SKILL.md 发现 + 打开所在文件夹。
+ *
+ * 与通知 / 定时 / 插件一致，直接占满主界面（页面级外壳 ToolViewShell），
+ * 不再是 520px 的弹窗——窄容器里两列卡片会把描述挤成碎片。
+ */
+export default function SkillsDirectory({ onClose }: { onClose?: () => void }) {
   const t = useT();
   const [skills, setSkills] = useState<SkillMeta[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!open) return;
+    let alive = true;
     setLoading(true);
     window.electronAPI?.skills
       .list()
-      .then((r) => setSkills(r.ok && r.data ? r.data.skills : []))
-      .catch(() => setSkills([]))
-      .finally(() => setLoading(false));
-  }, [open]);
+      .then((r) => {
+        if (alive) setSkills(r.ok && r.data ? r.data.skills : []);
+      })
+      .catch(() => {
+        if (alive) setSkills([]);
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const openDirectory = async (): Promise<void> => {
     const result = await window.electronAPI?.shell.openSkillsDirectory();
@@ -39,30 +54,23 @@ export default function SkillsDirectory({ open, onClose }: { open: boolean; onCl
   };
 
   return (
-    <Modal
-      title={
-        <span className="flex items-center gap-2">
-          <Wrench size={16} className="text-primary" />
-          {t('skills.title')}
-        </span>
-      }
-      open={open}
-      onCancel={onClose}
-      footer={
-        <Button type="primary" icon={<FolderOpen />} onClick={openDirectory}>
+    <ToolViewShell
+      icon={<Wrench size={20} />}
+      title={t('skills.title')}
+      description={t('skills.hint')}
+      onClose={onClose}
+      actions={
+        <Button type="primary" size="small" icon={<FolderOpen />} onClick={openDirectory}>
           {t('skills.open')}
         </Button>
       }
-      width={520}
-      transitionName=""
-      maskTransitionName=""
     >
       {loading ? (
         <LoadingState compact />
       ) : skills.length === 0 ? (
         <InlineEmpty description={t('skills.empty')} compact />
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[360px] overflow-y-auto pr-1">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
           {skills.map((s) => (
             <div key={s.path} className="px-3.5 py-3 rounded-xl bg-[var(--color-bg-secondary)] flex flex-col gap-1">
               <div className="flex items-center gap-2 min-w-0">
@@ -93,7 +101,6 @@ export default function SkillsDirectory({ open, onClose }: { open: boolean; onCl
           ))}
         </div>
       )}
-      <div className="mt-3 text-xs text-[var(--color-text-muted)]">{t('skills.hint')}</div>
-    </Modal>
+    </ToolViewShell>
   );
 }

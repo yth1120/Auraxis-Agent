@@ -10,12 +10,35 @@ import type { ToolStreamEvent } from '../tool-defs';
 import type { EngineEvent } from '../agent-runtime/engine-events';
 
 /**
+ * `usage` 与 `usage_update` 是引擎的同一个事实（前者给统计、后者给界面），
+ * 映射到渲染层是同一件事 —— 抽出来，别让两份条件展开各占一半圈复杂度。
+ */
+function usageUpdate(
+  event: Extract<EngineEvent, { type: 'usage' | 'usage_update' }>,
+  requestId: string,
+): ToolStreamEvent {
+  return {
+    type: 'usage_update',
+    requestId,
+    inputTokens: event.inputTokens,
+    outputTokens: event.outputTokens,
+    ...(event.reasoningTokens !== undefined ? { reasoningTokens: event.reasoningTokens } : {}),
+    ...(event.cacheHitTokens !== undefined ? { cacheHitTokens: event.cacheHitTokens } : {}),
+    ...(event.cacheMissTokens !== undefined ? { cacheMissTokens: event.cacheMissTokens } : {}),
+  };
+}
+
+/**
  * Convert an engine event into the renderer chat-stream shape.
  * Returns null for engine-internal events (turn/step/request envelopes) that
  * the chat UI does not render yet — they remain available to the agent
  * pipeline and to future diagnostics.
  */
-export function toToolStreamEvent(event: EngineEvent, requestId: string): ToolStreamEvent | null {
+export function toToolStreamEvent(
+  event: EngineEvent,
+  requestId: string,
+  maxIterations?: number,
+): ToolStreamEvent | null {
   switch (event.type) {
     case 'text_chunk':
       return { type: 'text_chunk', requestId, text: event.text };
@@ -53,6 +76,10 @@ export function toToolStreamEvent(event: EngineEvent, requestId: string): ToolSt
         timestamp: Date.now(),
         stepGroupId: event.stepGroupId,
         input: event.input ?? {},
+        // 引擎已经算好的摘要事实（行数 / 字节数 / 退出码 / 命中数）。此前这里把它丢掉，
+        // 于是聊天区永远拿不到摘要，只能各自从入参重推一个更弱的版本 —— 见
+        // agent-runtime/agent-loop-utils.ts 的 buildToolSummary。
+        ...(event.summary ? { summary: event.summary } : {}),
       };
     case 'tool_error':
       return {
@@ -77,8 +104,13 @@ export function toToolStreamEvent(event: EngineEvent, requestId: string): ToolSt
         stepGroupId: event.stepGroupId,
       };
     case 'iteration_start':
-      // Chat surface shows a single "iteration" counter.
-      return { type: 'iteration', requestId, iteration: event.iteration, maxIterations: 25 };
+      // Chat surface shows a single "iteration" counter. 上限用调用方解析出的真实预算。
+      return {
+        type: 'iteration',
+        requestId,
+        iteration: event.iteration,
+        ...(maxIterations !== undefined ? { maxIterations } : {}),
+      };
     case 'context_compressed':
       return {
         type: 'context_compressed',
@@ -89,25 +121,8 @@ export function toToolStreamEvent(event: EngineEvent, requestId: string): ToolSt
         tokensSaved: event.tokensSaved,
       };
     case 'usage':
-      return {
-        type: 'usage_update',
-        requestId,
-        inputTokens: event.inputTokens,
-        outputTokens: event.outputTokens,
-        ...(event.reasoningTokens !== undefined ? { reasoningTokens: event.reasoningTokens } : {}),
-        ...(event.cacheHitTokens !== undefined ? { cacheHitTokens: event.cacheHitTokens } : {}),
-        ...(event.cacheMissTokens !== undefined ? { cacheMissTokens: event.cacheMissTokens } : {}),
-      };
     case 'usage_update':
-      return {
-        type: 'usage_update',
-        requestId,
-        inputTokens: event.inputTokens,
-        outputTokens: event.outputTokens,
-        ...(event.reasoningTokens !== undefined ? { reasoningTokens: event.reasoningTokens } : {}),
-        ...(event.cacheHitTokens !== undefined ? { cacheHitTokens: event.cacheHitTokens } : {}),
-        ...(event.cacheMissTokens !== undefined ? { cacheMissTokens: event.cacheMissTokens } : {}),
-      };
+      return usageUpdate(event, requestId);
     case 'plan_created':
     case 'plan_updated':
       return {

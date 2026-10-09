@@ -63,6 +63,13 @@ export interface StepEngineConfig {
   plan?: TaskPlan | null;
   /** Model used for LLM summaries during compaction. */
   compactModel?: string;
+  /**
+   * 本次运行的迭代预算（`AgentLoopConfig.maxIterations`，由宿主经
+   * `resolveIterationBudget()` 解析后传入）。只用于**如实报告**进度
+   * （`iteration_start` 事件带上它），不参与任何停止判定 —— 停止判定在 agent-loop-driver。
+   * 续写会批一个新窗口，那时这个值随之变化，因此是快照而不是 getter。
+   */
+  maxIterations?: number;
   /** Token threshold that triggers compaction. */
   compactTokenThreshold?: number;
   /** 压缩策略：'snip'（默认原子组截断）或 'step'（AGORA 步骤级压缩）。 */

@@ -73,7 +73,7 @@ export default function NotificationsPanel({ onClose }: { onClose?: () => void }
     return (
       <section>
         <div className="mb-1.5 px-1 text-2xs font-medium text-text-muted">{label}</div>
-        <ul className="m-0 p-0 list-none rounded-xl bg-[var(--color-bg-secondary)] border border-[var(--color-border-dim)] overflow-hidden divide-y divide-[var(--color-border-dim)]/60">
+        <ul className="m-0 p-0 list-none rounded-xl bg-[var(--color-bg-secondary)] overflow-hidden divide-y divide-[var(--color-border-dim)]/60">
           {list.map((n) => {
             const running =
               n.kind === 'cron' && (n.title.includes('执行中') || n.title.toLowerCase().includes('running'));
@@ -158,7 +158,6 @@ export default function NotificationsPanel({ onClose }: { onClose?: () => void }
             <Bell size={20} />
           </span>
           <span className="text-sm font-medium text-text-muted">{tPanel('notif.empty')}</span>
-          <span className="text-2xs text-text-faint leading-[1.5] max-w-[320px]">{tPanel('notif.desc')}</span>
         </div>
       ) : (
         <div className="flex flex-col gap-4">

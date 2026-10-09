@@ -76,7 +76,8 @@ installAgentRuntimePorts();
 const handler = (ch: string) => h.handlers.get(ch)! as any;
 
 function makeWin() {
-  return { isDestroyed: () => false, webContents: { send: vi.fn() } };
+  const send = vi.fn();
+  return { isDestroyed: () => false, webContents: { send }, send, isAlive: () => true };
 }
 
 async function* sse(...parts: string[]) {
@@ -307,7 +308,15 @@ describe('ai:sendQuery / abortQuery / abortTool / retryTool', () => {
     await handler('ai:sendQuery')({ sender: { send: vi.fn() } }, queryPayload());
     const req = vi.mocked(runQuery).mock.calls[0][0] as any;
     await expect(req.checkPermission('Bash', {}, 'c1')).resolves.toBe(true);
-    expect(requestPermission).toHaveBeenCalledWith('Bash', {}, h.win, 'c1', expect.objectContaining({ mode: 'ask' }));
+    // 权限弹窗改经 SchedulerNotifier 端口下发；端口需把消息真正转发到窗口。
+    const call = vi.mocked(requestPermission).mock.calls[0];
+    expect(call.slice(0, 2)).toEqual(['Bash', {}]);
+    expect(call[3]).toBe('c1');
+    expect(call[4]).toEqual(expect.objectContaining({ mode: 'ask' }));
+    const notifier = call[2] as { send: (c: string, p: unknown) => void; isAlive: () => boolean };
+    expect(notifier.isAlive()).toBe(true);
+    notifier.send('permission:request', { x: 1 });
+    expect(h.win.webContents.send).toHaveBeenCalledWith('permission:request', { x: 1 });
 
     vi.mocked(toToolStreamEvent).mockReturnValueOnce({ type: 'tool_start' } as any);
     const emit = vi.mocked(runQuery).mock.calls[0][1] as any;

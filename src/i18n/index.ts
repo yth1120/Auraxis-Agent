@@ -69,7 +69,8 @@ export function slashCommandDescKey(name: string): I18nKey {
   return SLASH_DESC_KEYS[name] ?? 'cmd.desc.help';
 }
 
-const KB_DESC_KEYS: Record<string, I18nKey> = {
+/** 导出供一致性用例使用：绑定说明 → 文案 key 的映射必须是**全集**（见 i18n.test.ts）。 */
+export const KB_DESC_KEYS: Record<string, I18nKey> = {
   打开命令面板: 'kb.openPalette',
   切换侧边栏: 'kb.toggleSidebar',
   切换右侧面板: 'kb.toggleRightPanel',
@@ -78,8 +79,15 @@ const KB_DESC_KEYS: Record<string, I18nKey> = {
   聚焦右侧面板: 'kb.focusRight',
   '右侧面板：执行详情': 'kb.rightPlan',
   '右侧面板：时间线': 'kb.rightTimeline',
-  '右侧面板：审查': 'kb.rightReview',
+  // 键必须与 `KEY_BINDINGS[].description` 逐字一致：这里是**唯一的**显示文案来源，
+  // 而 description 同时是 `useAppShortcuts.SHORTCUT_ACTIONS` 的派发键，因此漏映射
+  // 会让该行悄悄 fallback 成「打开命令面板」。这行曾写作 `'右侧面板：审查'`（陈旧），
+  // 而绑定早就是 `'右侧面板：变更'` → 长期显示错文案。
+  '右侧面板：变更': 'kb.rightChanges',
   '右侧面板：预览': 'kb.rightPreview',
+  '右侧面板：概览': 'kb.rightSummary',
+  '右侧面板：计划': 'kb.rightPlanTasks',
+  '右侧面板：文件': 'kb.rightFiles',
   打开集成终端: 'kb.openTerminal',
   清空对话: 'kb.clearChat',
   新建对话: 'kb.newChat',

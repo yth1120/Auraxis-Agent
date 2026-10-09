@@ -28,7 +28,7 @@ function statusIconClass(status: TaskStatus): string {
     case 'pending':
     case 'skipped':
     default:
-      return 'text-muted';
+      return 'text-text-muted';
   }
 }
 
@@ -37,13 +37,13 @@ function statusTitleClass(status: TaskStatus): string {
     case 'running':
       return 'font-semibold text-primary';
     case 'done':
-      return 'text-muted line-through';
+      return 'text-text-muted line-through';
     case 'error':
       return 'text-text-secondary';
     case 'pending':
-      return 'text-secondary';
+      return 'text-text-secondary';
     case 'skipped':
-      return 'text-muted';
+      return 'text-text-muted';
     default:
       return 'text-primary';
   }
@@ -72,8 +72,8 @@ export default function TaskChecklist({ tasks, activeTaskId, onSelect, onRedo }:
   return (
     <section className="px-4 py-3 mb-3 rounded-xl bg-[var(--color-bg-secondary)]" aria-label={tPanel('checklist.aria')}>
       <header className="flex items-center justify-between mb-2">
-        <span className="text-2xs font-semibold text-muted tracking-wide">{tPanel('checklist.title')}</span>
-        <span className="text-2xs tabular-nums text-muted">
+        <span className="text-2xs font-semibold text-text-muted tracking-wide">{tPanel('checklist.title')}</span>
+        <span className="text-2xs tabular-nums text-text-muted">
           {done}/{tasks.length}
         </span>
       </header>
@@ -98,7 +98,7 @@ export default function TaskChecklist({ tasks, activeTaskId, onSelect, onRedo }:
             <span className={clsx('text-sm leading-[18px] shrink-0', statusIconClass(t.status))}>{ICON[t.status]}</span>
             <span className="flex flex-col min-w-0">
               <span className={clsx('text-xs leading-[18px] break-words', statusTitleClass(t.status))}>{t.title}</span>
-              {t.detail && <span className="text-2xs text-muted">{t.detail}</span>}
+              {t.detail && <span className="text-2xs text-text-muted">{t.detail}</span>}
             </span>
             {onRedo && t.status !== 'done' && (
               <button

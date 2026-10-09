@@ -9,25 +9,21 @@ import { useChatStore } from '../../stores/useChatStore';
 import { useAppStore } from '../../stores/useAppStore';
 import { useAgentStore } from '../../stores/useAgentStore';
 import { useSettingsStore } from '../../stores/useSettingsStore';
-import { backfillComposer } from '../../utils/backfillComposer';
 import { collectQualityRuns, findLatestFailure, deriveNextSteps } from '../../utils/agentQuality';
-import TaskChecklist from './TaskChecklist';
 import ContextManifest from './ContextManifest';
 import ExecutingIndicator from '../common/ExecutingIndicator';
 import { useT, type I18nKey } from '../../i18n';
-import AgentTasksCard from './AgentTasksCard';
 import SnapshotCard from './SnapshotCard';
-import { collectFilePaths, collectContextGroups, collectDeliverables } from './WorkspaceInspectorData';
+import { collectFilePaths, collectContextGroups } from './WorkspaceInspectorData';
 import {
   AgentInspectorHeader,
-  AgentSummaryCard,
-  DeliverablesCard,
   NextStepsCard,
   QualityGateCard,
   RollbackCard,
   SystemMessagesList,
 } from './WorkspaceInspectorSections';
-import { AGENT_STATUS_META, basename, latestAgentTodos } from './WorkspaceInspectorUtils';
+import { AGENT_STATUS_META, latestAgentTodos } from './WorkspaceInspectorUtils';
+import { latestChatTodos } from '../../core/activity/todos';
 
 /** 仅 Code/Work 模式且已选中任务时返回该任务，否则 undefined（兼作类型收窄）。 */
 function pickCodeAgent<T>(isCode: boolean, agent: T | undefined): T | undefined {
@@ -40,11 +36,10 @@ function inspectorContentState<T>(
   tasks: unknown[],
   groups: Array<{ items: unknown[] }>,
   systemMessages: T[],
-  agentCount: number,
-): { sysMessages: T[]; hasContent: boolean; showAgentTasks: boolean } {
+): { sysMessages: T[]; hasContent: boolean } {
   const sysMessages: T[] = isCode ? [] : systemMessages;
   const hasContent = tasks.length > 0 || groups.some((g) => g.items.length > 0) || sysMessages.length > 0;
-  return { sysMessages, hasContent, showAgentTasks: isCode && agentCount > 0 };
+  return { sysMessages, hasContent };
 }
 
 /** Agent 状态徽章与文案（无选中任务时为 null）。 */
@@ -76,28 +71,18 @@ function isAgentSettled(agent: { status: string } | undefined): boolean {
   return agent.status === 'completed' || agent.status === 'error' || agent.status === 'stopped';
 }
 
-/** 无内容时的空态：有任务时只显示任务卡，否则显示空态说明 + 快照卡。 */
+/** 无内容时的空态：说明这段面板是干什么的 + 快照卡。 */
 function InspectorEmptyState({
-  showAgentTasks,
   sidebarMode,
   projectRoot,
   now,
   tPanel,
 }: {
-  showAgentTasks: boolean;
   sidebarMode: string;
   projectRoot: string | null | undefined;
   now: number;
   tPanel: ReturnType<typeof useT>;
 }) {
-  if (showAgentTasks) {
-    return (
-      <div className="h-full overflow-y-auto px-3 pb-6 pt-3">
-        <AgentTasksCard now={now} />
-        <SnapshotCard projectRoot={projectRoot ?? null} now={now} />
-      </div>
-    );
-  }
   const emptyText = sidebarMode === 'work' ? tPanel('inspector.emptyWork') : tPanel('inspector.emptyCode');
   return (
     <div className="h-full overflow-y-auto px-3 pb-6 pt-3">
@@ -123,7 +108,6 @@ export default function WorkspaceInspector() {
   const isCode = sidebarMode !== 'chat';
 
   // Foreground chat inspector data (chat mode).
-  const inspectorTasks = useInspectorStore((s) => s.tasks);
   const systemMessages = useInspectorStore((s) => s.systemMessages);
   const inspectorActiveTools = useInspectorStore((s) => s.activeToolCount);
   const messages = useChatStore((s) => s.messages);
@@ -131,12 +115,10 @@ export default function WorkspaceInspector() {
   // Selected-agent data (code mode).
   const currentAgentId = useAgentStore((s) => s.currentAgentId);
   const agent = useStoreWithEqualityFn(useAgentStore, (s) => s.agents.find((a) => a.id === currentAgentId), shallow);
-  const agents = useAgentStore((s) => s.agents);
 
   const codeAgent = pickCodeAgent(isCode, agent);
   const { statusMeta, statusLabel } = inspectorStatus(agent, tPanel);
 
-  const deliverables = useMemo(() => collectDeliverables(agent), [agent]);
 
   const { elapsed, totalTokens } = inspectorMetrics(agent, now);
 
@@ -269,32 +251,17 @@ export default function WorkspaceInspector() {
   // ── Named snapshots (project-scoped, chat + code modes) ──
   const projectRoot = useSettingsStore((s) => s.projectPath);
 
-  const [preview, setPreview] = useState<{ path: string; mime: string; base64: string } | null>(null);
-  const openPreview = useCallback(
-    async (filePath: string) => {
-      const api = window.electronAPI?.file;
-      const projectRoot = useSettingsStore.getState().projectPath;
-      if (!api?.readPreview) return;
-      try {
-        const r = await api.readPreview(filePath, projectRoot || undefined);
-        if (!r.ok || !r.data) {
-          if (r.error) message.error(r.error);
-          return;
-        }
-        setPreview(r.data);
-      } catch {
-        message.error(tPanel('preview.failed'));
-      }
-    },
-    [tPanel],
-  );
 
-  // Tasks: derive from the selected agent's todos in code mode, else the foreground chat.
+  // 任务清单两种模式都以**真实的 TodoWrite** 为源：Code 模式读 agent 轨迹，
+  // 对话模式读聊天消息里的工具调用。从前对话模式读的是一个从未被写入的状态，永远是空的。
   const tasks = useMemo(() => {
-    if (!isCode) return inspectorTasks;
-    const todos = latestAgentTodos(agent);
+    if (isCode) {
+      const todos = latestAgentTodos(agent);
+      return todos ? mapTodosToTasks(todos) : [];
+    }
+    const todos = latestChatTodos(messages as never);
     return todos ? mapTodosToTasks(todos) : [];
-  }, [isCode, agent, inspectorTasks]);
+  }, [isCode, agent, messages]);
 
   const nextSteps = useMemo(
     () =>
@@ -317,26 +284,11 @@ export default function WorkspaceInspector() {
   );
 
   // System prompts only apply to the foreground chat inspector.
-  const { sysMessages, hasContent, showAgentTasks } = inspectorContentState(
-    isCode,
-    tasks,
-    groups,
-    systemMessages,
-    agents.length,
-  );
-
-  const redoTask = (task: { title: string }) => {
-    if (!agent) return;
-    backfillComposer(
-      `请重做计划步骤「${task.title}」：\n请重新执行该步骤，完成后更新计划状态，并运行 ReviewArtifact 验证。`,
-      agent.id,
-    );
-  };
+  const { sysMessages, hasContent } = inspectorContentState(isCode, tasks, groups, systemMessages);
 
   if (!hasContent) {
     return (
       <InspectorEmptyState
-        showAgentTasks={showAgentTasks}
         sidebarMode={sidebarMode}
         projectRoot={projectRoot ?? undefined}
         now={now}
@@ -359,8 +311,6 @@ export default function WorkspaceInspector() {
         />
       )}
 
-      {codeAgent && agents.length > 1 && <AgentTasksCard now={now} />}
-
       {activeToolCount > 0 && (
         <div className="flex items-center gap-2 px-4 py-2 mb-3 rounded-lg text-xs text-primary bg-primary-soft">
           <ExecutingIndicator size={14} />
@@ -369,8 +319,6 @@ export default function WorkspaceInspector() {
           </span>
         </div>
       )}
-
-      {codeAgent && <AgentSummaryCard agent={codeAgent} />}
 
       {codeAgent && qualityRuns.length > 0 && (
         <QualityGateCard
@@ -384,15 +332,11 @@ export default function WorkspaceInspector() {
 
       {codeAgent && nextSteps.length > 0 && <NextStepsCard agent={codeAgent} steps={nextSteps} />}
 
-      <TaskChecklist tasks={tasks} onRedo={isCode && agent ? redoTask : undefined} />
-
       {tasks.length > 0 && groups.some((g) => g.items.length > 0) && (
         <div className="border-t border-[var(--color-border-dim)] my-3" />
       )}
 
       <ContextManifest groups={groups} fileTokens={fileTokens} maxFileTokens={maxFileTokens} />
-
-      {codeAgent && deliverables.length > 0 && <DeliverablesCard files={deliverables} onPreview={openPreview} />}
 
       {settled && <RollbackCard onRollback={rollbackAgent} />}
 
@@ -400,29 +344,6 @@ export default function WorkspaceInspector() {
 
       {sysMessages.length > 0 && <SystemMessagesList messages={sysMessages} />}
 
-      <Modal
-        open={!!preview}
-        onCancel={() => setPreview(null)}
-        footer={null}
-        width={720}
-        transitionName=""
-        maskTransitionName=""
-        title={preview ? basename(preview.path) : ''}
-      >
-        {preview?.mime.startsWith('image/') ? (
-          <img
-            src={`data:${preview.mime};base64,${preview.base64}`}
-            alt={basename(preview.path)}
-            className="block max-w-full max-h-[70vh] mx-auto"
-          />
-        ) : preview?.mime === 'application/pdf' ? (
-          <iframe
-            src={`data:application/pdf;base64,${preview.base64}`}
-            title={basename(preview.path)}
-            className="w-full h-[70vh] border-0"
-          />
-        ) : null}
-      </Modal>
     </div>
   );
 }

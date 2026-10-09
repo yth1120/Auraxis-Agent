@@ -1,21 +1,28 @@
-import { BrowserWindow } from 'electron';
 import type { AgentLoopResult, AgentStateSnapshot } from '../agent-runtime/agent-loop-types';
 // 子代理状态归 registry 所有；直接依赖它而不是穿透 handler 层，
 // 否则 scheduler → handler → agent-loop 会把编排层拉进循环依赖。
 import { getSubAgentStates } from './agent-subagent-registry';
 import { broadcast, notifyFrontend } from './agent-scheduler-support';
-import type { AgentConfig, AgentInstance, SchedulerAgentState, SchedulerQueueItem } from './agent-scheduler-types';
+import { schedulerHost } from './agent-scheduler-ports';
+import { projectAgentTrace } from '../agent-trace';
+import { approvalsFor } from './approval-ledger';
+import type {
+  AgentConfig,
+  AgentInstance,
+  SchedulerAgentState,
+  SchedulerNotifier,
+  SchedulerQueueItem,
+} from './agent-scheduler-types';
 export type {
   AgentConfig,
   AgentInstance,
   FrontendTaskPlan,
   SchedulerAgentState,
+  SchedulerNotifier,
   SchedulerQueueItem,
 } from './agent-scheduler-types';
-import { loadAgentSnapshots, removeAgentSnapshot } from '../agent-snapshot';
-import { ptyRegistry } from './pty-tool';
-import { removeFtsDoc } from '../fts';
-import { readSettings } from './settings-store';
+// 宿主能力（snapshot / PTY / FTS / settings）改经 agent-scheduler-ports 注入，
+// 核心不再直接 import 这些模块。
 import { persistAgentInstance, restoreAgentSnapshot } from './agent-scheduler-snapshot';
 import { runSchedulerAgent } from './agent-scheduler-runner';
 import {
@@ -58,6 +65,8 @@ let maxConcurrent = 3;
 
 class AgentScheduler {
   private terminalListeners = new Set<(inst: AgentInstance) => void>();
+  /** 已导出过轨迹的 Agent，保证 notifyTerminal 多次触发时只导出一次。 */
+  private exportedTraces = new Set<string>();
 
   /** Observe terminal states (completed / error / stopped) for durable results. */
   onAgentTerminal(cb: (inst: AgentInstance) => void): () => void {
@@ -66,6 +75,7 @@ class AgentScheduler {
   }
 
   private notifyTerminal(inst: AgentInstance): void {
+    this.exportTraceOnce(inst);
     for (const cb of this.terminalListeners) {
       try {
         cb(inst);
@@ -75,8 +85,40 @@ class AgentScheduler {
     }
   }
 
-  private getWindow(): BrowserWindow | null {
-    return BrowserWindow.getAllWindows()[0] || null;
+  /**
+   * 把终止的 Agent 轨迹投影后交给宿主导出（OTLP）。
+   * 投影是纯内存计算（实例已在手上，无需读盘），导出本身在宿主端口里已是
+   * "未配置 endpoint 就空操作、失败不影响运行"，因此这里只需保证每个 Agent 只导出一次。
+   */
+  private exportTraceOnce(inst: AgentInstance): void {
+    if (this.exportedTraces.has(inst.agentId)) return;
+    this.exportedTraces.add(inst.agentId);
+    try {
+      const run = projectAgentTrace(
+        {
+          id: inst.agentId,
+          name: inst.config.name,
+          status: inst.status,
+          startTime: inst.startTime,
+          endTime: inst.endTime,
+          error: inst.error,
+          goal: null,
+          log: inst.log,
+        },
+        // 审批来自权限通道（审批事件不在 Agent 日志里，见 contracts/agent-trace.ts 的
+        // TraceApproval 注释），因此由这里从台账注入投影。
+        { approvals: approvalsFor(inst.agentId) },
+      );
+      void schedulerHost()
+        .exportTrace(run)
+        .catch(() => {});
+    } catch {
+      /* 遥测不得影响调度器 */
+    }
+  }
+
+  private getNotifier(): SchedulerNotifier | null {
+    return schedulerHost().createNotifier();
   }
 
   /** Write a durable checkpoint for terminal / paused agents. */
@@ -97,18 +139,20 @@ class AgentScheduler {
 
   /** Reload durable checkpoints so task history and paused work survive restarts. */
   async restoreSnapshots(): Promise<void> {
-    const records = await loadAgentSnapshots();
+    const records = await schedulerHost().loadSnapshots();
     if (records.length === 0) return;
     let apiKey = process.env.DEEPSEEK_API_KEY || '';
     if (!apiKey) {
-      const settings = await readSettings().catch(() => null);
-      apiKey = (settings as { deepseekApiKey?: string } | null)?.deepseekApiKey || '';
+      const settings = await schedulerHost()
+        .readSettings()
+        .catch(() => null);
+      apiKey = settings?.deepseekApiKey || '';
     }
     for (const r of records) {
       if (instances.has(r.id)) continue;
-      const inst = restoreAgentSnapshot(r, apiKey, () => this.getWindow());
+      const inst = restoreAgentSnapshot(r, apiKey, () => this.getNotifier());
       instances.set(r.id, inst);
-      notifyFrontend(this.getWindow(), inst);
+      notifyFrontend(this.getNotifier(), inst);
     }
   }
 
@@ -140,16 +184,16 @@ class AgentScheduler {
     const agentId = instance.agentId;
 
     instances.set(agentId, instance);
-    const win = this.getWindow();
-    notifyFrontend(win, instance);
-    broadcast(win, agentId, { type: 'agent:queued', agentId, name: config.name, priority: instance.priority });
+    const notifier = this.getNotifier();
+    notifyFrontend(notifier, instance);
+    broadcast(notifier, agentId, { type: 'agent:queued', agentId, name: config.name, priority: instance.priority });
 
     const runningCount = countRunning(instances);
     if (runningCount < maxConcurrent) {
       this.dequeueAndStart(agentId);
     } else {
       enqueuePending(pendingQueue, config);
-      broadcast(win, agentId, { type: 'agent:waiting', position: pendingQueue.length });
+      broadcast(notifier, agentId, { type: 'agent:waiting', position: pendingQueue.length });
     }
 
     return agentId;
@@ -160,7 +204,7 @@ class AgentScheduler {
       agentId,
       instances,
       inboxes: agentInboxes,
-      getWindow: () => this.getWindow(),
+      getNotifier: () => this.getNotifier(),
       persistAgent: (inst) => this.persistAgent(inst),
       onComplete: (id, result) => this.onAgentComplete(id, result),
       onError: (id, err) => this.onAgentError(id, err),
@@ -173,8 +217,8 @@ class AgentScheduler {
     // Don't overwrite status if already stopped or paused by user
     if (inst.status === 'stopped' || inst.status === 'paused') return;
     const needsDeliveryGate = applyLoopResult(inst, result);
-    const win = this.getWindow();
-    announceAgentResult(win, agentId, inst, result, needsDeliveryGate);
+    const notifier = this.getNotifier();
+    announceAgentResult(notifier, agentId, inst, result, needsDeliveryGate);
     this.processQueue();
     this.pruneStale();
     this.persistAgent(inst);
@@ -188,9 +232,9 @@ class AgentScheduler {
     if (!inst || inst.status !== 'review') return false;
     inst.status = 'completed';
     inst.endTime = Date.now();
-    const win = this.getWindow();
-    notifyFrontend(win, inst);
-    broadcast(win, agentId, { type: 'delivery_approved', agentId });
+    const notifier = this.getNotifier();
+    notifyFrontend(notifier, inst);
+    broadcast(notifier, agentId, { type: 'delivery_approved', agentId });
     this.persistAgent(inst);
     this.notifyTerminal(inst);
     return true;
@@ -201,8 +245,8 @@ class AgentScheduler {
     if (!inst) return;
     if (inst.status === 'stopped' || inst.status === 'paused') return;
     applyAgentError(inst, err);
-    const win = this.getWindow();
-    announceAgentError(win, agentId, inst);
+    const notifier = this.getNotifier();
+    announceAgentError(notifier, agentId, inst);
     this.processQueue();
     this.pruneStale();
     this.persistAgent(inst);
@@ -237,13 +281,13 @@ class AgentScheduler {
   stopAgent(agentId: string): boolean {
     const inst = instances.get(agentId);
     if (!inst) return false;
-    const win = this.getWindow();
+    const notifier = this.getNotifier();
     if (inst.status === 'queued') {
       // Remove from pending
       removePending(pendingQueue, inst.config);
       inst.status = 'stopped';
       inst.endTime = Date.now();
-      notifyFrontend(win, inst);
+      notifyFrontend(notifier, inst);
       this.persistAgent(inst);
       this.notifyTerminal(inst);
       return true;
@@ -257,10 +301,10 @@ class AgentScheduler {
     // here so pauseAgent's Promise (and any pauseSettled-awaiting resume)
     // doesn't hang.
     releasePauseWaiter(inst);
-    notifyFrontend(win, inst);
+    notifyFrontend(notifier, inst);
     this.persistAgent(inst);
     this.notifyTerminal(inst);
-    ptyRegistry.clearOwner(agentId);
+    schedulerHost().clearPtyOwner(agentId);
     // Immediately start next queued agent
     this.processQueue();
     return true;
@@ -298,9 +342,9 @@ class AgentScheduler {
     // creates a fresh AbortController before re-entering dequeueAndStart.
     inst.abortController.abort();
 
-    const win = this.getWindow();
-    notifyFrontend(win, inst);
-    broadcast(win, agentId, { type: 'agent:paused', agentId });
+    const notifier = this.getNotifier();
+    notifyFrontend(notifier, inst);
+    broadcast(notifier, agentId, { type: 'agent:paused', agentId });
     this.processQueue();
     return settled.then(() => true);
   }
@@ -332,8 +376,8 @@ class AgentScheduler {
     // aborted state from pauseAgent.
     inst.abortController = new AbortController();
     inst.status = 'queued';
-    const win = this.getWindow();
-    notifyFrontend(win, inst);
+    const notifier = this.getNotifier();
+    notifyFrontend(notifier, inst);
     const runningCount = countRunning(instances);
     if (runningCount < maxConcurrent) {
       // dequeueAndStart reads inst.savedState and threads it to agentLoopRun
@@ -344,7 +388,7 @@ class AgentScheduler {
       // Re-add config to pendingQueue so processQueue finds it on next completion
       enqueuePending(pendingQueue, inst.config);
     }
-    broadcast(win, agentId, { type: 'agent:resumed', agentId });
+    broadcast(notifier, agentId, { type: 'agent:resumed', agentId });
     return true;
   }
 
@@ -422,8 +466,8 @@ class AgentScheduler {
     inst.endTime = undefined;
     inst.error = undefined;
 
-    const win = this.getWindow();
-    notifyFrontend(win, inst);
+    const notifier = this.getNotifier();
+    notifyFrontend(notifier, inst);
     const runningCount = countRunning(instances);
     if (runningCount < maxConcurrent) {
       // dequeueAndStart reads inst.savedState and threads it to agentLoopRun
@@ -431,7 +475,7 @@ class AgentScheduler {
       this.dequeueAndStart(agentId);
     } else {
       enqueuePending(pendingQueue, inst.config);
-      broadcast(win, agentId, { type: 'agent:waiting', position: pendingQueue.length });
+      broadcast(notifier, agentId, { type: 'agent:waiting', position: pendingQueue.length });
     }
     this.persistAgent(inst);
     return { ok: true };
@@ -442,7 +486,7 @@ class AgentScheduler {
     if (!inst) return false;
     inst.priority = priority;
     if (inst.config) inst.config.priority = priority;
-    notifyFrontend(this.getWindow(), inst);
+    notifyFrontend(this.getNotifier(), inst);
     return true;
   }
 
@@ -529,15 +573,19 @@ class AgentScheduler {
     // Release any pending pauseAgent awaiter — the instance is going away,
     // so even if the loop's .then fires later it will find nothing to capture.
     releasePauseWaiter(inst);
-    ptyRegistry.clearOwner(agentId);
+    schedulerHost().clearPtyOwner(agentId);
     import('./conflict-detector')
       .then(({ conflictDetector }) => {
         conflictDetector.releaseAllForAgent(agentId);
       })
       .catch(() => {});
     instances.delete(agentId);
-    void removeAgentSnapshot(agentId).catch(() => {});
-    void removeFtsDoc(agentId).catch(() => {});
+    void schedulerHost()
+      .removeSnapshot(agentId)
+      .catch(() => {});
+    void schedulerHost()
+      .removeSearchDoc(agentId)
+      .catch(() => {});
     this.processQueue();
     return true;
   }
@@ -559,7 +607,7 @@ class AgentScheduler {
    * agent leaked both memory and disk/worktrees).
    */
   pruneStale(olderThanMs = 3600_000, maxKeep = 50): number {
-    return pruneAgentInstances(instances, (id) => ptyRegistry.clearOwner(id), olderThanMs, maxKeep);
+    return pruneAgentInstances(instances, (id) => schedulerHost().clearPtyOwner(id), olderThanMs, maxKeep);
   }
 }
 

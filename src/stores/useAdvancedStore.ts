@@ -5,8 +5,6 @@ import type {
   PermissionRule,
   MCPServerConfig,
   MCPStatus,
-  AgentInfo,
-  AgentLogEntry,
 } from '../types/advanced';
 import type { PermissionBridgeStatus } from '../services/replBridge';
 
@@ -29,12 +27,6 @@ export interface AdvancedStore {
   setMcpServers: (servers: MCPServerConfig[]) => void;
   updateMcpStatus: (status: MCPStatus) => void;
 
-  // ─── Agents ───────────────────────
-  runningAgents: AgentInfo[];
-  addAgent: (agent: AgentInfo) => void;
-  updateAgent: (id: string, updates: Partial<AgentInfo>) => void;
-  removeAgent: (id: string) => void;
-  appendAgentLog: (id: string, entries: AgentLogEntry[]) => void;
 }
 
 export const useAdvancedStore = create<AdvancedStore>()(
@@ -98,38 +90,6 @@ export const useAdvancedStore = create<AdvancedStore>()(
           mcpStatuses: [...s.mcpStatuses.filter((st) => st.serverId !== status.serverId), status],
         })),
 
-      // ─── Agents ─────────────────
-      runningAgents: [],
-
-      addAgent: (agent) => set((s) => ({ runningAgents: [...s.runningAgents, agent] })),
-
-      updateAgent: (id, updates) =>
-        set((s) => ({
-          runningAgents: s.runningAgents.map((a) => (a.id === id ? { ...a, ...updates } : a)),
-        })),
-
-      removeAgent: (id) =>
-        set((s) => ({
-          runningAgents: s.runningAgents.filter((a) => a.id !== id),
-        })),
-
-      appendAgentLog: (id, entries) =>
-        set((s) => ({
-          runningAgents: s.runningAgents.map((a) => {
-            if (a.id !== id) return a;
-            const currentLog = a.log || [];
-            const merged = [...currentLog];
-            for (const entry of entries) {
-              const last = merged[merged.length - 1];
-              if (last && last.type === 'text' && entry.type === 'text') {
-                merged[merged.length - 1] = { ...last, text: (last.text || '') + (entry.text || '') };
-              } else {
-                merged.push({ ...entry });
-              }
-            }
-            return { ...a, log: merged.slice(-500) };
-          }),
-        })),
     }),
     {
       name: 'auraxis-advanced-storage',

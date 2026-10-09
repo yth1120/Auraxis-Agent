@@ -34,6 +34,32 @@ export async function runReadDocument(params: { file_path?: unknown }, ctx: Tool
   }
 }
 
+/**
+ * 把长文档切块入项目记忆（见 ipc/document-ingest.ts）。
+ *
+ * 路径门禁与 ReadDocument 完全一致：它确实要读文件，沙箱与敏感路径的判定不能因为
+ * 「写的是记忆不是文件」而跳过。
+ */
+export async function runIngestDocument(params: { file_path?: unknown }, ctx: ToolContext): Promise<ToolResult> {
+  const filePath = typeof params?.file_path === 'string' && params.file_path.trim() ? params.file_path.trim() : '';
+  if (!filePath) return { output: null, error: 'file_path 不能为空' };
+  let resolved: string;
+  try {
+    resolved = resolveToolPath(filePath, ctx.projectRoot, ctx.sandboxMode, workspaceRootsOf(ctx));
+  } catch (e: unknown) {
+    return { output: null, error: errorText(e) };
+  }
+  if (isSensitiveToolPath(resolved)) {
+    return { output: null, error: `禁止模型读取敏感文件: ${resolved}` };
+  }
+  try {
+    const { ingestDocument } = await import('../document-ingest');
+    return { output: await ingestDocument({ filePath: resolved, scope: ctx.projectRoot }) };
+  } catch (e: unknown) {
+    return { output: null, error: `文档入库失败：${errorText(e)}` };
+  }
+}
+
 export async function runWriteDocument(
   params: { file_path?: unknown; spec?: unknown },
   ctx: ToolContext,

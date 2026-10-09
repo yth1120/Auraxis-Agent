@@ -35,6 +35,18 @@ function asNumber(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 }
 
+/**
+ * OpenAI 兼容 finish_reason → 循环内部语义（tool_calls → tool_use 等）。
+ * 两家适配器共用：内置 SSE 累加器与 AI SDK 影子适配器都必须给出同一个值。
+ */
+export function mapOpenAiFinishReason(reason: unknown): string | null {
+  if (typeof reason !== 'string' || !reason) return null;
+  if (reason === 'tool_calls') return 'tool_use';
+  if (reason === 'stop') return 'end_turn';
+  if (reason === 'length') return 'max_tokens';
+  return reason;
+}
+
 /** 工具参数是流式拼接的 JSON 字符串；解析失败时保留原文供排查。 */
 function parseToolArguments(raw: string): Record<string, unknown> {
   try {
@@ -47,8 +59,11 @@ function parseToolArguments(raw: string): Record<string, unknown> {
 /**
  * 收尾：提取工具调用、判定 <FINAL_ANSWER> 并把它从正文与时间线里剥掉。
  * 标记即使出现在非终止轮次也要清理，否则会污染下一轮历史。
+ *
+ * 导出给 AI SDK 影子适配器复用（`llm-adapter-ai-sdk.ts`），保证两条实现路径的
+ * 收尾语义完全一致。
  */
-function finalizeStream(
+export function finalizeStream(
   contentTimeline: AssistantMessage['contentTimeline'],
   toolCalls: ToolCall[],
   rawText: string,
@@ -214,11 +229,8 @@ export class OpenAiStreamAccumulator {
   }
 
   private captureStopReason(reason: unknown): void {
-    if (typeof reason !== 'string' || !reason) return;
-    if (reason === 'tool_calls') this.completionStopReason = 'tool_use';
-    else if (reason === 'stop') this.completionStopReason = 'end_turn';
-    else if (reason === 'length') this.completionStopReason = 'max_tokens';
-    else this.completionStopReason = reason;
+    const mapped = mapOpenAiFinishReason(reason);
+    if (mapped) this.completionStopReason = mapped;
   }
 }
 

@@ -1,0 +1,60 @@
+# Python SDK 发布：把 python/auraxis_sdk 构建为 sdist + wheel 并上传到 PyPI。
+#
+# 与 build.yml 的 Electron 产物发布相互独立：打 v* 标签时两者都会触发，因此本工作流
+# 会先校验 pyproject 的版本与 package.json 一致，避免两处版本漂移。
+#
+# 未配置 PYPI_API_TOKEN 时**只构建不发布**并给出告警——与 build.yml 里签名/公证
+# secrets 缺失时自动跳过的处理一致，fork 与 PR 上运行不会失败。
+name: Publish Python SDK
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.10'
+
+      # 版本以主项目为基准：Python 3.10 没有 tomllib，沿用与 check-doc-stats 相同的
+      # 文本匹配口径，不引入额外解析依赖。
+      - name: 校验版本与主项目一致
+        run: |
+          APP=$(node -p "require('./package.json').version")
+          PY=$(grep -m1 '^version = ' python/auraxis_sdk/pyproject.toml | sed 's/.*"\(.*\)".*/\1/')
+          echo "app=$APP python=$PY"
+          if [ "$APP" != "$PY" ]; then
+            echo "::error::python/auraxis_sdk/pyproject.toml 版本 $PY 与主项目 $APP 不一致"
+            exit 1
+          fi
+
+      - name: 构建 sdist 与 wheel
+        run: |
+          python -m pip install --disable-pip-version-check build twine
+          python -m build python/auraxis_sdk --outdir dist
+          python -m twine check dist/*
+
+      - name: 发布到 PyPI
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          if [ -z "$TWINE_PASSWORD" ]; then
+            echo "::warning::PYPI_API_TOKEN 未配置，跳过发布（仅保留构建产物）"
+            exit 0
+          fi
+          python -m twine upload --skip-existing dist/*
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: auraxis-sdk-python
+          path: dist/*
+          if-no-files-found: error

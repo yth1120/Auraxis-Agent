@@ -1,5 +1,4 @@
 /** agent-scheduler-runner.ts — start/run one scheduler agent instance. */
-import type { BrowserWindow } from 'electron';
 import { agentLoopRun } from '../agent-runtime/agent-loop';
 import {
   buildAgentLoopOptions,
@@ -9,20 +8,20 @@ import {
   selectAgentTools,
 } from './agent-scheduler-runtime';
 import { broadcast, notifyFrontend } from './agent-scheduler-support';
-import type { AgentInstance } from './agent-scheduler-types';
+import type { AgentInstance, SchedulerNotifier } from './agent-scheduler-types';
 
 export interface SchedulerRunArgs {
   agentId: string;
   instances: Map<string, AgentInstance>;
   inboxes: Map<string, string[]>;
-  getWindow: () => BrowserWindow | null;
+  getNotifier: () => SchedulerNotifier | null;
   persistAgent: (inst: AgentInstance) => void;
   onComplete: (agentId: string, result: Awaited<ReturnType<typeof agentLoopRun>>) => void;
   onError: (agentId: string, err: unknown) => void;
 }
 
 export function runSchedulerAgent(args: SchedulerRunArgs): void {
-  const { agentId, instances, inboxes, getWindow, persistAgent, onComplete, onError } = args;
+  const { agentId, instances, inboxes, getNotifier, persistAgent, onComplete, onError } = args;
   const inst = instances.get(agentId);
   if (!inst) return;
 
@@ -32,17 +31,17 @@ export function runSchedulerAgent(args: SchedulerRunArgs): void {
   if (!isResume) inst.startTime = Date.now();
   prepareAgentPrompt(inst);
 
-  const win = getWindow();
-  notifyFrontend(win, inst);
+  const notifier = getNotifier();
+  notifyFrontend(notifier, inst);
   if (inst.pendingInstruction) {
     const followUp = inst.pendingInstruction;
     inst.pendingInstruction = undefined;
-    broadcast(win, agentId, { type: 'user_message', text: followUp, timestamp: Date.now() });
+    broadcast(notifier, agentId, { type: 'user_message', text: followUp, timestamp: Date.now() });
     inst.logBuffer.push({ type: 'user_message', text: followUp, ts: Date.now() });
   }
 
   const tools = selectAgentTools(inst);
-  inst.observer = createAgentObserver(instances, agentId, win);
+  inst.observer = createAgentObserver(instances, agentId, notifier);
 
   void (async () => {
     const runtime = await resolveAgentRunContext(inst);
@@ -51,7 +50,7 @@ export function runSchedulerAgent(args: SchedulerRunArgs): void {
     await agentLoopRun(
       buildAgentLoopOptions({
         inst,
-        win,
+        notifier,
         tools,
         checkPermission,
         runtime,
